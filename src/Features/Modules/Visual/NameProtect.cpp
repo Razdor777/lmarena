@@ -123,6 +123,23 @@ void NameProtect::onPacketInEvent(PacketInEvent& event) {
     if (!mReplaceChatName.mValue) return;
     if (event.mPacket->getId() != PacketID::Text) return;
 
+    auto packet = event.getPacket<TextPacket>();
+    if (!packet) return;
+
+    // Only modify actual chat / whisper / announcement / raw messages — avoid system/popup packets
+    switch (packet->mType) {
+        case TextPacketType::Raw:
+        case TextPacketType::Chat:
+        case TextPacketType::Whisper:
+        case TextPacketType::Announcement:
+        case TextPacketType::TextObjectWhisper:
+        case TextPacketType::TextObject:
+        case TextPacketType::TextObjectAnnouncement:
+            break;
+        default:
+            return; // don't touch system / popup / tip packets
+    }
+
     if (mOldLocalName.empty()) {
         auto player = ClientInstance::get()->getLocalPlayer();
         if (player) {
@@ -137,22 +154,21 @@ void NameProtect::onPacketInEvent(PacketInEvent& event) {
     }
     if (mOldLocalName.empty()) return;
 
-    auto packet = event.getPacket<TextPacket>();
-    if (!packet) return;
     std::string styledNick = buildStyledNick();
+    if (styledNick.empty() || styledNick == mOldLocalName) return;
 
     // Replace real name with styled nick across all relevant packet fields
-    if (packet->mMessage.find(mOldLocalName) != std::string::npos) {
+    if (!packet->mMessage.empty() && packet->mMessage.find(mOldLocalName) != std::string::npos) {
         packet->mMessage = replaceAll(packet->mMessage, mOldLocalName, styledNick);
     }
-    if (packet->mAuthor.find(mOldLocalName) != std::string::npos) {
+    if (!packet->mAuthor.empty() && packet->mAuthor.find(mOldLocalName) != std::string::npos) {
         packet->mAuthor = replaceAll(packet->mAuthor, mOldLocalName, styledNick);
     }
-    if (packet->mFilteredMessage.find(mOldLocalName) != std::string::npos) {
+    if (!packet->mFilteredMessage.empty() && packet->mFilteredMessage.find(mOldLocalName) != std::string::npos) {
         packet->mFilteredMessage = replaceAll(packet->mFilteredMessage, mOldLocalName, styledNick);
     }
     for (auto& param : packet->mParams) {
-        if (param.find(mOldLocalName) != std::string::npos) {
+        if (!param.empty() && param.find(mOldLocalName) != std::string::npos) {
             param = replaceAll(param, mOldLocalName, styledNick);
         }
     }

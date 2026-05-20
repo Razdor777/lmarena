@@ -33,9 +33,12 @@ void ClickGui::onWindowResizeEvent(WindowResizeEvent& event)
     mModernGui.onWindowResizeEvent(event);
 }
 
-void ClickGui::onMouseEvent(MouseEvent& event)
-{
-    if(mEnabled) event.mCancelled=true;
+void ClickGui::onMouseEvent(MouseEvent& event) {
+    if (mEnabled) {
+        if (event.mActionButtonId != 4) {  // 4 = wheel in MouseHook, don't cancel wheel
+            event.mCancelled = true;
+        }
+    }
 }
 
 void ClickGui::onKeyEvent(KeyEvent& event)

@@ -1,9 +1,5 @@
 #pragma once
 #include <Features/Modules/Module.hpp>
-//
-// Created by alteik on 12/10/2024.
-// Extended with Flarial-style Nick features (color codes, bold, obfuscated)
-//
 
 class NameProtect : public ModuleBase<NameProtect> {
 public:
@@ -45,14 +41,11 @@ public:
     std::string mOldNameTag = "";
     std::string mLastStyledNick = "";
 
-    // Get the §-prefixed color code for the selected color
     std::string getColorCode() const;
-    // Build the full styled nick with color + formatting codes
     std::string buildStyledNick() const;
 
     void onEnable() override;
     void onDisable() override;
     void onBaseTickEvent(class BaseTickEvent& event);
-    void onPacketOutEvent(class PacketOutEvent& event);
     void onPacketInEvent(class PacketInEvent& event);
 };

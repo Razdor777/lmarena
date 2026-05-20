@@ -52,13 +52,17 @@ void MouseHook::onMouse(void* _this, char actionButtonId, int buttonData, short 
             break;
         case 4:
             {
-                int scrollDelta = buttonData;
-                if (scrollDelta < 0 || scrollDelta == 136 || scrollDelta == 0x88 || (scrollDelta >> 16) < 0) {
-                    io.AddMouseWheelEvent(0, -1.0f); // Scroll down
-                    io.MouseWheel = -1.0f;
-                } else if (scrollDelta > 0 || (scrollDelta >> 16) > 0) {
-                    io.AddMouseWheelEvent(0, 1.0f);  // Scroll up
-                    io.MouseWheel = 1.0f;
+                // buttonData is signed char: positive = scroll up, negative = scroll down
+                int scrollDelta = static_cast<signed char>(buttonData);
+                float wheelDelta = 0.0f;
+                if (scrollDelta < 0) {
+                    wheelDelta = -1.0f;
+                } else if (scrollDelta > 0) {
+                    wheelDelta = 1.0f;
+                }
+                if (wheelDelta != 0.0f) {
+                    io.AddMouseWheelEvent(0, wheelDelta);
+                    io.MouseWheel = wheelDelta;
                 }
             }
             break;
