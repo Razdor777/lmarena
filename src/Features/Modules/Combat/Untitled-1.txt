@@ -1,0 +1,107 @@
+void ModernGui::renderSettings(Module* mod, ImVec4 modRect, ImVec4 catRect, float& moduleY,
+    float animation, float inScale, float deltaTime, bool isEnabled, bool isExtended,
+    bool isLastModule, int catIdx, std::string& tooltip, bool isPressingShift, float midclickRounding)
+{
+    const float settingH = 22.f;
+    const float settingGap = 3.f;
+    auto drawList = ImGui::GetBackgroundDrawList();
+
+    int visibleCount = 0;
+    for (const auto& setting : mod->mSettings) {
+        if (setting->mIsVisible()) visibleCount++;
+    }
+    if (visibleCount == 0) return;
+
+    // Считаем общую высоту всех видимых настроек
+    float totalSettingsH = visibleCount * (settingH + settingGap) * mod->cAnim;
+    float startY = modRect.w;
+    float endY = startY + totalSettingsH;
+
+    if (totalSettingsH > 0.5f) {
+        float radius = 0.f;
+        if (isLastModule) radius = 10.f * inScale;
+
+        ImVec4 panelRect(modRect.x, startY, modRect.z, endY);
+        panelRect.x = std::floor(panelRect.x);
+        panelRect.y = std::floor(panelRect.y);
+        panelRect.z = std::floor(panelRect.z);
+        panelRect.w = std::floor(panelRect.w);
+
+        if (panelRect.w > catRect.y + 1.f) {
+            ImRenderUtils::fillRectangle(panelRect, gSettingBg, animation * mod->cAnim, radius,
+                drawList, isLastModule ? ImDrawFlags_RoundCornersBottom : 0);
+
+            ImColor accent = getAccentColor(catIdx * 50.f, animation * mod->cAnim * 0.25f);
+            drawList->AddRectFilled(
+                ImVec2(panelRect.x + 8.f, panelRect.y),
+                ImVec2(panelRect.z - 8.f, panelRect.y + 1.f),
+                accent);
+        }
+    }
+
+    // Рисуем каждую настройку по порядку
+    int sIndex = 0;
+    float currentY = modRect.w; // начинаем сразу под модулем
+
+    for (const auto& setting : mod->mSettings) {
+        if (!setting->mIsVisible()) {
+            setting->sliderEase = 0;
+            setting->enumSlide = 0;
+            continue;
+        }
+
+        float itemH = (settingH + settingGap) * mod->cAnim;
+        float localY = currentY;
+
+        ImVec4 rect = ImVec4(modRect.x, localY, modRect.z, localY + settingH * mod->cAnim);
+        rect.x = std::floor(rect.x);
+        rect.y = std::floor(rect.y);
+        rect.z = std::floor(rect.z);
+        rect.w = std::floor(rect.w);
+
+        // Пропускаем если выше области заголовка категории
+        if (rect.w <= catRect.y + 0.5f) {
+            currentY += itemH;
+            moduleY += itemH;
+            sIndex++;
+            continue;
+        }
+
+        bool hovered = ImRenderUtils::isMouseOver(rect) && isEnabled && isExtended && !displayColorPicker;
+        float targetHover = hovered ? 1.f : 0.f;
+        setting->hoverAnim = MathUtils::lerp(setting->hoverAnim, targetHover, deltaTime * 20.f);
+        if (std::abs(setting->hoverAnim - targetHover) < 0.001f) setting->hoverAnim = targetHover;
+
+        if (setting->hoverAnim > 0.001f) {
+            ImColor hoverCol = ImColor(255, 255, 255, (int)(8 * setting->hoverAnim * animation * mod->cAnim));
+            drawList->AddRectFilled(
+                ImVec2(rect.x + 2.f, rect.y), ImVec2(rect.z - 2.f, rect.w),
+                hoverCol, 4.f);
+        }
+
+        switch (setting->mType) {
+        case SettingType::Bool:
+            renderBoolSetting(reinterpret_cast<BoolSetting*>(setting), rect, animation, deltaTime,
+                isEnabled, isExtended, mod->cAnim, tooltip);
+            break;
+        case SettingType::Number:
+            renderNumberSetting(reinterpret_cast<NumberSetting*>(setting), rect, animation, deltaTime,
+                isEnabled, isExtended, mod->cAnim, tooltip, midclickRounding, isPressingShift);
+            break;
+        case SettingType::Enum:
+            renderEnumSetting(reinterpret_cast<EnumSetting*>(setting), rect, animation, deltaTime,
+                isEnabled, isExtended, mod->cAnim, tooltip,
+                isLastModule && sIndex == visibleCount - 1,
+                moduleY, modRect, inScale, catIdx, ImRenderUtils::getScreenSize(), catRect);
+            break;
+        case SettingType::Color:
+            renderColorSetting(reinterpret_cast<ColorSetting*>(setting), rect, animation, deltaTime,
+                isEnabled, isExtended, mod->cAnim, tooltip);
+            break;
+        }
+
+        currentY += itemH;
+        moduleY += itemH;
+        sIndex++;
+    }
+}

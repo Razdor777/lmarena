@@ -1,0 +1,832 @@
+// ============================================
+// STRUCTURE BLOCK STRINGS
+// ============================================
+// xStructureOffset     = 0x145F167A8
+// zStructureOffset     = 0x145F167D8
+// yStructureOffset     = 0x145F167F0
+// yStructureSize       = 0x145F16808
+// xStructureSize       = 0x145F16818
+// dataField            = 0x145F16828
+// zStructureSize       = 0x145F16838
+// includePlayers       = 0x145F16848
+// ignoreEntities       = 0x145F16858
+// lastTouchedPlayerId  = 0x145F16868
+// removeBlocks         = 0x145F16880
+// animationTicks       = 0x145F16890
+// showBoundingBox      = 0x145F168A0
+// IncludeEntities      = 0x145F168B0
+// IncludeBlocks        = 0x145F168D8
+// AnimationSeconds     = 0x145F168F8
+// AnimationTicks       = 0x145F16928
+// BlocksPlaced         = 0x145F16C18
+
+// ============================================
+// SCRIPT API EVENT STRINGS
+// ============================================
+// entityLoad           = 0x145E26E90
+// leverAction          = 0x145E26E80
+// entitySpawn          = 0x145E26EA0
+// projectileHitEntity  = 0x145E26ED8
+// projectileHitBlock   = 0x145E26EF0
+// effectAdd            = 0x145E26F20
+// entityHealthChanged  = 0x145E26F30
+// entityDie            = 0x145E26F48
+// entityHitEntity      = 0x145E26F58
+// entityHitBlock       = 0x145E26F68
+
+// ============================================
+// STRUCTURE BLOCK FUNCTIONS
+// ============================================
+// StructureBlock_SaveLoad1  = 0x143CAB950
+// StructureBlock_SaveLoad2  = 0x143CAC060
+// StructureBlock_Settings1  = 0x143CA8AB0
+// StructureBlock_Settings2  = 0x143CA9040
+// StructureBlock_Helper     = 0x14400CA00
+
+// ============================================
+// COMPONENT FUNCTIONS
+// ============================================
+// getComponent_ScriptAPI    = 0x142A7ADE0
+// getComponents_ScriptAPI   = 0x142A91E90
+// События игры - очень полезно для будущих модулей!
+// "entityLoad" - 0x145E26E90
+// "entitySpawn" - 0x145E26EA0  
+// "leverAction" - 0x145E26E80
+// "projectileHitEntity" - 0x145E26ED8
+// "projectileHitBlock" - 0x145E26EF0
+// "effectAdd" - 0x145E26F20
+// "entityHealthChanged" - 0x145E26F30
+// "entityDie" - 0x145E26F48
+// "entityHitEntity" - 0x145E26F58
+// "entityHitBlock" - 0x145E26F68
+// Полезные строки и офсеты для будущего:
+
+// Enchantments
+// "enchants" - 0x145F152A0
+
+// Lore  
+// "lore" - 0x145F15294
+
+// Block positions
+// "blockX" - 0x145F163A8
+// "blockY" - 0x145F163B8  
+// "blockZ" - 0x145F163B0
+
+// Entity
+// "entityId" - 0x145F163C0
+
+// Kill conditions (для лут таблиц)
+// "killed_by_player" - 0x145F15320
+// "killed_by_entity" - 0x145F15358
+// "match_tool" - 0x145F15410
+
+aQueryMaxDurabi - "query.max_durability" - 0x145ECBBA8
+aMaxDurability - "max_durability" - 0x145EF2F20
+aClassDurabilit - "class DurabilityItemComponent" - 0x145EEB5B0
+aMinecraftDurab - "minecraft:durability" - 0x145EFF370
+
+// ===========================================
+// DURABILITY / DAMAGE
+// ===========================================
+// "max_durability" - 0x145EF2F20
+// "max_damage" - 0x145EF2F30
+// "damage_chance" - 0x145EF2F40
+// "minecraft:durability" - 0x145EFF370
+// "query.max_durability" - 0x145ECBBA8
+// "class DurabilityItemComponent" - 0x145EEB5B0
+// "durability" - 0x145F15420
+// "durability_threshold" - 0x145F65800
+// ItemStackBase::mAuxValue offset 0x20
+// Item::mMaxDamage offset 0x268
+
+// ===========================================
+// СОБЫТИЯ ИГРЫ (для будущих модулей)
+// ===========================================
+// "entityLoad" - 0x145E26E90
+// "entitySpawn" - 0x145E26EA0  
+// "entityDie" - 0x145E26F48
+// "entityHealthChanged" - 0x145E26F30
+// "entityHitEntity" - 0x145E26F58
+// "entityHitBlock" - 0x145E26F68
+// "projectileHitEntity" - 0x145E26ED8
+// "projectileHitBlock" - 0x145E26EF0
+// "explosion" - 0x145E26E...
+// "effectAdd" - 0x145E26F20
+// "leverAction" - 0x145E26E80
+
+// ===========================================
+// ITEM EVENTS
+// ===========================================
+// "itemCompleteCharge" - 0x145E25D28 / 0x145E25ED0
+// "itemStartCharge" - 0x145E25D48 / 0x145E25EE8
+// "itemStopCharge" - 0x145E25D68 / 0x145E25EF8
+// "itemReleaseCharge" - 0x145E25D88 / 0x145E25F08
+// "beforeItemUse" - 0x145E25F20
+// "beforeItemUseOn" - 0x145E25DF8 / 0x145E25F50
+// "itemUseOn" - 0x145F60220
+
+// ===========================================
+// ITEM COMPONENTS
+// ===========================================
+// "minecraft:durability_sensor" - 0x145EFF370...
+
+// ===========================================
+// ITEM ЗВУКИ
+// ===========================================
+// "item.trident.riptide" - 0x145F60ED8...
+// "item.trident.throw" - 0x145F60F60
+// "item.trident.thunder" - 0x145F60F78
+// "item.trident.hit" - 0x145F60FF8
+// "item.shield.block" - 0x145F61438
+// "item.spyglass.use" - 0x145F61A08
+// "item.fizz" - 0x145F5F930
+// "item.thrown" - 0x145F60530
+
+// ===========================================
+// ENCHANTMENTS & LORE
+// ===========================================
+// "enchants" - 0x145F152A0
+// "lore" - 0x145F15294
+
+// ===========================================
+// BLOCK POSITIONS
+// ===========================================
+// "blockX" - 0x145F163A8
+// "blockY" - 0x145F163B8  
+// "blockZ" - 0x145F163B0
+// "entityId" - 0x145F163C0
+
+
+Query Handler Type Args Case
+query.is_invisible 0x145B75230 bool 0 6
+query.is_in_love 0x145B75290 bool 0 7
+query.is_saddled 0x145B74F90 bool 0 8
+query.is_powered 0x145B75050 bool 0 9
+query.is_ignited 0x145B752C0 bool 0 10
+query.is_baby 0x145B74C30 bool 0 11
+query.is_critical 0x145B749C0 bool 0 13
+query.is_silent 0x145B75A10 bool 0 17
+query.is_wall_climbing 0x145B757D0 bool 0 18
+query.can_climb 0x145B74B40 bool 0 19
+query.can_swim 0x145B74AE0 bool 0 20
+query.can_fly 0x145B74B10 bool 0 21
+query.can_walk 0x145B74AB0 bool 0 22
+query.is_resting 0x145B74FF0 bool 0 23
+query.is_sitting 0x145B759E0 bool 0 24
+query.is_angry 0x145B74C60 bool 0 25
+query.is_interested 0x145B75260 bool 0 26
+query.is_charged 0x145B74A50 bool 0 27
+query.is_tamed 0x145B75830 bool 0 28
+query.is_orphaned 0x145B75080 bool 0 29
+query.is_leashed 0x145B75140 bool 0 30
+query.is_sheared 0x145B74F00 bool 0 31
+query.is_gliding 0x145B75410 bool 0 32
+query.is_elder 0x145B748D0 bool 0 33
+query.is_moving 0x145B750E0 bool 0 34
+query.is_breathing 0x145B74C00 bool 0 35
+query.is_chested 0x145B749F0 bool 0 36
+query.is_stackable 0x145B758F0 bool 0 37
+query.show_bottom 0x145B74E40 bool 0 38
+query.is_standing 0x145B75890 bool 0 39
+query.is_shaking 0x145B74F30 bool 0 40
+query.is_idling 0x145B752F0 bool 0 41
+query.is_casting 0x145B74A80 bool 0 42
+query.is_charging 0x145B74A20 bool 0 43
+query.can_power_jump 0x145B74B70 bool 0 45
+query.can_dash 0x145B75500 bool 0 46
+query.is_lingering 0x145B75110 bool 0 47
+query.has_collision 0x145B753E0 bool 0 48
+query.has_gravity 0x145B753B0 bool 0 49
+query.is_fire_immune 0x145B74840 bool 0 50
+query.is_dancing 0x145B74960 bool 0 51
+query.is_enchanted 0x145B74870 bool 0 52
+query.is_transforming 0x145B75200 bool 0 55
+query.can_damage_nearby_mobs 0x145B74990 bool 0 56
+query.is_swimming 0x145B75860 bool 0 57
+query.is_bribed 0x145B74BD0 bool 0 58
+query.is_pregnant 0x145B751D0 bool 0 59
+query.is_laying_egg 0x145B75170 bool 0 60
+query.is_eating 0x145B74900 bool 0 63
+query.is_laying_down 0x145B751A0 bool 0 64
+query.is_sneezing 0x145B75950 bool 0 65
+query.is_rolling 0x145B74FC0 bool 0 67
+query.is_scared 0x145B74F60 bool 0 68
+query.blocking 0x145B74BA0 bool 0 72
+query.is_sleeping 0x145B759B0 bool 0 76
+query.is_illager_captain 0x145B75320 bool 0 82
+query.is_stunned 0x145B74ED0 bool 0 83
+query.is_roaring 0x145B74EA0 bool 0 84
+query.is_delayed_attacking 0x145B74930 bool 0 85
+query.is_avoiding_mobs 0x145B75380 bool 0 86
+query.is_avoiding_block 0x145B75350 bool 0 87
+query.facing_target_to_range_attack 0x145B74E70 bool 0 88
+query.is_paperdoll 0x145B757A0 bool 0 90
+query.is_stalking 0x145B758C0 bool 0 91
+query.is_emoting 0x145B748A0 bool 0 92
+query.is_celebrating 0x145B75770 bool 0 93
+query.is_admiring 0x145B75740 bool 0 94
+query.is_celebrating_special 0x145B75710 bool 0 95
+query.out_of_control 0x145B756E0 bool 0 96
+query.is_ram_attacking 0x145B75680 bool 0 97
+query.is_playing_dead 0x145B756B0 bool 0 98
+query.is_croaking 0x145B75650 bool 0 101
+query.is_eating_mob 0x145B75620 bool 0 102
+query.is_jump_goal_jumping 0x145B755F0 bool 0 103
+query.is_emerging 0x145B755C0 bool 0 104
+query.is_sniffing 0x145B75590 bool 0 105
+query.is_digging 0x145B75560 bool 0 106
+query.is_sonic_boom 0x145B75530 bool 0 107
+query.has_dash_cooldown 0x145B754D0 bool 0 108
+query.is_searching 0x145B73320 bool 0 113
+query.is_crawling 0x145B732F0 bool 0 114
+query.is_scenting (DEPRECATED) 0x145B754A0 bool 0 115
+query.timer_flag_1 0x145B75470 bool 0 115
+query.is_rising (DEPRECATED) 0x145B75440 bool 0 116
+query.timer_flag_2 0x145B733B0 bool 0 116
+query.is_feeling_happy (DEPRECATED) 0x145B73380 bool 0 117
+query.timer_flag_3 0x145B73350 bool 0 117
+
+Queries после switch (default case)
+
+Query Handler Type Args
+query.item_in_use_duration 0x145B732C0 float 0
+query.item_remaining_use_duration 0x143034E30 / 0x143034E50 float 0
+query.item_max_use_duration 0x145B73230 float 0
+query.is_cooldown_type 0x145B73200 bool 1-2
+query.cooldown_time 0x145B731D0 float 1-2
+query.cooldown_time_remaining 0x145B731A0 float 0-2
+query.texture_frame_index 0x145B73170 float 0
+query.is_grazing 0x145B73140 bool 0
+query.any_animation_finished 0x145B73110 bool 0
+query.all_animations_finished 0x145B730E0 bool 0
+query.state_time 0x145B730B0 float 0
+query.anim_time 0x145B73080 float 0
+query.frame_alpha 0x145B73050 float 0
+query.model_scale 0x145B73020 float 0
+query.delta_time 0x145B72FF0 float 0
+query.key_frame_lerp_time 0x145B72FC0 float 0
+query.life_time 0x145B72F90 float 0
+query.is_attached 0x145B72F60 bool 0
+query.is_attached_to_entity 0x145B72F30 bool 0
+query.actor_count 0x145B72F00 float 0
+query.distance_from_camera 0x145B72ED0 float 0
+query.camera_rotation 0x145B72EA0 float 1
+query.rotation_to_camera 0x145B72E70 float 1
+query.effect_emitter_count 0x145B72E40 float 0
+query.effect_particle_count 0x145B72E10 float 0
+query.total_emitter_count 0x145B72DE0 float 0
+query.total_particle_count 0x145B739B0 float 0
+query.lod_index 0x145B73980 float 0+
+query.camera_distance_range_lerp 0x145B73950 float 2
+query.is_on_screen 0x145B73920 bool 0
+query.last_frame_time 0x145B738F0 float 0-1
+query.maximum_frame_time 0x145B738C0 float 0-1
+query.minimum_frame_time 0x145B73890 float 0-1
+query.average_frame_time 0x145B73860 float 0-1
+query.health 0x145B73830 float 0
+query.max_health 0x145B73800 float 0
+query.log 0x145B737D0 float 1
+query.debug_output 0x145B737A0 float 1
+query.get_name 0x145B73770 string 0-1
+query.is_name_any 0x145B73740 bool 1+
+query.get_equipped_item_name 0x145B73710 string 0-2
+query.is_item_name_any 0x145B736E0 bool 2+
+query.equipped_item_any_tag 0x145B736B0 bool 0-1
+query.equipped_item_all_tags 0x145B73680 bool 0-1
+query.item_is_charged 0x145B73650 bool 0-1
+query.is_item_equipped 0x145B73620 bool 0-1
+query.has_block_property 0x1430351F0 bool 1
+query.has_block_state 0x143035210 bool 1
+query.block_property 0x143035230 bool 1
+query.block_state 0x143035250 bool 1
+query.owner_identifier 0x145B73530 string 0
+query.is_owner_identifier_any 0x145B73500 bool 1+
+query.get_actor_info_id 0x145B734D0 float 1
+query.get_locator_offset 0x145B734A0 float 0+
+query.get_default_bone_pivot 0x145B73470 float 0+
+query.get_root_locator_offset 0x145B73440 float 2
+query.any_tag 0x145B73410 float 0+
+query.all_tags 0x145B733E0 float 0+
+query.relative_block_has_any_tag 0x145B73FB0 bool 1+
+query.relative_block_has_all_tags 0x145B73F80 bool 1+
+query.block_neighbor_has_any_tag 0x145B73F50 bool 1+
+query.block_neighbor_has_all_tags 0x145B73F20 bool 1+
+query.block_has_any_tag 0x145B73EF0 bool 4+
+query.block_has_all_tags 0x145B73EC0 bool 4+
+query.count 0x145B73E90 float 0+
+query.has_player_rider 0x145B73E60 bool 0
+query.combine_entities 0x145B73E30 array(48) 0+
+query.approx_eq 0x145B73E00 bool 2+
+query.day 0x145B73DD0 float 0
+query.time_of_day 0x145B73DA0 float 0
+query.moon_phase 0x145B73D70 float 0
+query.moon_brightness 0x145B73D40 float 0
+query.bone_orientation_matrix 0x145B73D10 matrix 1-2
+query.bone_orientation_trs 0x145B73CE0 matrix 1-2
+query.bone_aabb 0x145B73CB0 matrix 1
+query.bone_origin 0x145B73C80 matrix 1
+query.bone_rotation 0x145B73C50 matrix 1
+query.scoreboard 0x145B73C20 float 1
+query.cardinal_block_face_placed_on 0x145B73BF0 float 0
+query.block_face 0x145B73BC0 float 0
+query.cardinal_player_facing 0x145B73B90 float 0
+query.cardinal_facing 0x145B73B60 float 0
+query.cardinal_facing_2d 0x145B73B30 float 0
+query.max_durability 0x145B73B00 float 0
+query.remaining_durability 0x145B73AD0 float 0
+query.has_property 0x145B73AA0 float 1
+query.property 0x145B73A70 float 1
+query.item_slot_to_bone_name 0x145B73A40 string 1
+query.equipped_item_is_attachable 0x145B73A10 12 1
+query.shield_blocking_bob 0x145B739E0 float 0
+query.get_animation_frame 0x145B74210 float 0
+query.any 0x145B741E0 float 3+
+query.all 0x145B741B0 float 3+
+query.in_range 0x145B74180 float 3
+query.is_spectator 0x145B74150 bool 0
+query.had_component_group 0x145B74120 bool 1
+query.has_head_gear 0x145B740F0 bool 0
+query.client_memory_tier 0x145B740C0 float 0
+query.server_memory_tier 0x145B74090 float 0
+query.client_max_render_distance 0x145B74060 float 0
+
+Ключевые вспомогательные функции
+
+Адрес Функция
+0x142FF37B0 RegisterMolangQuery
+0x144C4CCE0 CreateQueryContext
+0x140101F50 InitString
+0x1400F3AA0 FreeString
+0x1401021A0 InitStringWithLength
+0x144BC1940 FormatString
+0x1453C9C00 FreeMemory
+0x143034D30 - 0x143035250 Block state query handlers
+
+Return Type Flags
+
+C++
+enum MolangReturnType { FLOAT = 0x1, STRING = 0x2, BOOL = 0x20000, STRUCT = 0x4000, MATRIX = 0x40000, ARRAY = 0x30 // 48 };
+
+Molang Query Handlers
+
+C++
+// Query Name -> Handler Address -> Return Type struct MolangQuery { const char* name; void* handler; int returnType; // 1=float, 0x20000=bool, 0x4000=struct int minArgs; int maxArgs; };
+
+Query Handler Type Args
+query.ground_speed 0x145B76060 float 0
+query.vertical_speed 0x145B76030 float 0
+query.is_on_ground 0x145B76000 bool 0
+query.is_in_lava 0x145B75FD0 bool 0
+query.is_in_water 0x145B75FA0 bool 0
+query.is_in_water_or_rain 0x145B75F70 bool 0
+query.is_in_contact_with_water 0x145B75F40 bool 0
+query.is_levitating 0x145B75F10 bool 0
+query.is_jumping 0x145B75EE0 bool 0
+query.is_first_person 0x145B75EB0 bool 0
+query.is_alive 0x145B75E80 bool 0
+query.target_x_rotation 0x145B75E50 float 0
+query.dash_cooldown_progress 0x145B75E20 float 0
+query.target_y_rotation 0x145B75DF0 float 0
+query.body_y_rotation 0x145B75DC0 float 0
+query.body_x_rotation 0x145B75D90 float 0
+query.modified_distance_moved 0x145B75D60 float 0
+query.modified_move_speed 0x145B75D30 float 0
+query.walk_distance 0x145B75D00 float 0
+query.spellcolor 0x145B75CD0 struct 0
+query.sit_amount 0x145B75CA0 float 0
+query.lie_amount 0x145B75C70 float 0
+query.unhappy_counter 0x145B75C40 float 0
+query.sneeze_counter 0x145B75C10 float 0
+query.roll_counter 0x145B75BE0 float 0
+query.standing_scale 0x145B75BB0 float 0
+query.swell_amount 0x145B75B80 float 0
+query.head_x_rotation 0x145B75B50 float 1
+query.head_y_rotation 0x145B75B20 float 1
+query.rider_body_x_rotation 0x145B75AF0 float 1
+query.rider_body_y_rotation 0x145B76690 float 1
+query.rider_head_x_rotation 0x145B76660 float 1
+query.rider_head_y_rotation 0x145B76630 float 1-2
+query.ride_body_x_rotation 0x145B76600 float 0
+query.ride_body_y_rotation 0x145B765D0 float 0
+query.ride_head_x_rotation 0x145B765A0 float 0
+query.ride_head_y_rotation 0x145B76570 float 0-1
+query.is_shield_powered 0x145B76540 bool 0
+query.invulnerable_ticks 0x145B76510 float 0
+query.overlay_alpha 0x145B764E0 float 0
+query.current_squish_value 0x145B764B0 float 0
+query.previous_squish_value 0x145B76480 float 0
+query.wing_flap_position 0x145B76450 float 0
+query.wing_flap_speed 0x145B76420 float 0
+query.death_ticks 0x145B763F0 float 0
+query.has_owner 0x145B763C0 bool 0
+query.has_target 0x145B76390 bool 0
+query.has_rider 0x145B76360 bool 0
+query.time_stamp 0x145B76330 float 0
+query.variant 0x145B76300 float 0
+query.mark_variant 0x145B762D0 float 0
+query.skin_id 0x145B762A0 float 0
+query.yaw_speed 0x145B76270 float 0
+
+
+
+
+
+
+?? COMBAT МОДУЛИ
+Из entityHitEntity (0x145E26F58)
+Модуль	Описание
+ComboCounter	Счётчик последовательных ударов
+HitLog	Лог всех ударов с уроном в чат/на экран
+DamageNumbers	Числа урона над головой как в RPG
+CriticalIndicator	Индикатор критического удара
+ReachDisplay	Показывает дистанцию твоих ударов
+HitDirection	Стрелка откуда тебя бьют
+AttackCooldown	Визуал кулдауна атаки
+TradingHits	Статистика кто кого больше бьёт в драке
+Из entityDie (0x145E26F48)
+Модуль	Описание
+KillCounter	Счётчик убийств за сессию
+KillEffects	Молнии/парти??лы при убийстве
+KillStreak	Показ серии убийств (Double Kill, Triple Kill)
+AutoGG	Автоматически пишет "gg" после убийства
+KillSound	Кастомный звук при убийстве
+DeathRecap	Показывает кто тебя убил и чем
+KillFeed	Лента убийств на экране
+BountyTracker	Отслеживание кто сколько убил
+Из projectileHitEntity (0x145E26ED8)
+Модуль	Описание
+BowHitMarker	Маркер попадания стрелой
+ProjectileTracer	Линия полёта снаряда
+ArrowCounter	Сколько стрел попало/промазало
+SnipeAlert	Алерт когда в тебя летит стрела
+TridentTracker	Отслеживание трезубцев
+ProjectilePrediction	Предсказание куда прилетит
+Из projectileHitBlock (0x145E26EF0)
+Модуль	Описание
+ArrowRecovery	Показывает где застряли твои стрелы
+ImpactMarker	Маркеры попадания в блоки
+MissCounter	Счётчик промахов
+?? HEALTH & STATUS МОДУЛИ
+Из entityHealthChanged (0x145E26F30)
+Модуль	Описание
+HealthAlert	Алерт когда HP низкий
+DamageLog	Лог получаемого урона
+RegenIndicator	Показывает скорость регенерации
+HealthHistory	График HP за последние секунды
+TeamHealthBars	Полоски HP тиммейтов
+TargetHealthPredict	Предсказание когда цель умрёт
+HealingTracker	Сколько HP восстановил
+Из query.health / query.max_health (0x145B73830 / 0x145B73800)
+Модуль	Описание
+HealthDisplay	Цифровой показ HP
+HealthPercentage	HP в процентах
+HealthBar	Кастомная полоска HP
+LowHealthVignette	Красная рамка при низком HP
+HealthSound	Звук сердцебиения при низком HP
+Из effectAdd (0x145E26F20)
+Модуль	Описание
+EffectHUD	Список активных эффектов
+EffectTimer	Таймеры эффектов
+PotionAlert	Алерт когда получил эффект
+NegativeEffectWarning	Предупреждение о плохих эффектах
+EffectHistory	История полученных эффектов
+InvisibilityDetector	Детект невидимых игроков
+StrengthIndicator	Показ когда враг под силой
+?? MOVEMENT МОДУЛИ
+Из query.ground_speed (0x145B76060)
+Модуль	Описание
+Speedometer	Спидометр скорости
+SpeedGraph	График скорости
+SpeedAlert	Алерт при определённой скорости
+AverageSpeed	Средняя скорость за время
+TopSpeed	Рекорд максимальной скорости
+Из query.vertical_speed (0x145B76030)
+Модуль	Описание
+FallSpeed	Скорость падения
+JumpHeight	Высота прыжка
+VerticalVelocity	Вертикальная скорость
+FallDamagePredict	Предсказание урона от падения
+Из query.is_on_ground (0x145B76000)
+Модуль	Описание
+GroundIndicator	Индикатор на земле/в воздухе
+AirTime	Время в воздухе
+JumpCounter	Счётчик прыжков
+CoyoteTime	Показ "койот тайма" для прыжков
+Из query.is_jumping (0x145B75EE0)
+Модуль	Описание
+JumpIndicator	Визуал прыжка
+BunnyHopHelper	Помощник для банихопа
+JumpTiming	Тайминг прыжков
+Из query.is_swimming (0x145B75860)
+Модуль	Описание
+SwimIndicator	Индикатор плавания
+SwimSpeed	Скорость плавания
+UnderwaterTimer	Таймер под водой
+Из query.is_in_water / is_in_lava (0x145B75FA0 / 0x145B75FD0)
+Модуль	Описание
+LiquidWarning	Предупреждение о жидкости
+LavaAlert	Алерт при входе в лаву
+WaterBreathTimer	Таймер дыхания под водой
+?? ITEM МОДУЛИ
+Из itemStartCharge / itemReleaseCharge (0x145E25D48 / 0x145E25D88)
+Модуль	Описание
+BowTimer	Таймер зарядки лука
+CrossbowTimer	Таймер арбалета
+TridentTimer	Таймер трезубца
+ChargeIndicator	Универсальный индикатор зарядки
+PerfectRelease	Подсказка идеального момента
+AutoRelease	Автоматический выстрел
+Из beforeItemUse (0x145E25F20)
+Модуль	Описание
+ItemUseLog	Лог использования предметов
+PotionTracker	Трекер выпитых зелий
+FoodTracker	Трекер съеденной еды
+EnderPearlTracker	Трекер эндер перлов
+ItemCooldownDisplay	Кулдауны предметов
+Из itemUseOn (0x145F60220)
+Модуль	Описание
+BlockPlaceLog	Лог поставленных блоков
+BuildHelper	Помощник строительства
+PlaceCounter	Счётчик поставленных блоков
+LastPlacedBlock	Показ последнего блока
+Из query.max_durability / remaining_durability (0x145B73B00 / 0x145B73AD0)
+Модуль	Описание
+ArmorHUD	Показ прочности брони
+ToolDurability	Прочность инструментов
+DurabilityWarning	Алерт низкой прочности
+RepairReminder	Напоминание починить
+DurabilityPercentage	Прочность в процентах
+?? WORLD EVENTS МОДУЛИ
+Из explosion
+Модуль	Описание
+ExplosionESP	Подсветка мест взрывов
+TNTTimer	Таймер до взрыва TNT
+CreeperWarning	Алерт крипера
+BlastRadius	Показ радиуса взрыва
+ExplosionLog	Лог всех взрывов
+BedWarning	Предупреждение о кровати в незере
+Из playerBreakBlock
+Модуль	Описание
+BlockCounter	Счётчик сломанных блоков
+MiningStats	Статистика добычи
+OreCounter	Счётчик добытых руд
+MiningSpeed	Скорость добычи блоков/мин
+BlockBreakLog	Лог сломанных блоков
+XrayAlert	Алерт при нахождении руды
+Из leverAction (0x145E26E80)
+Модуль	Описание
+RedstoneLog	Лог активации редстоуна
+TrapDetector	Детект ловушек
+LeverTracker	Трекер рычагов
+?? ЗВУКОВЫЕ МОДУЛИ
+Из item.trident.* (0x145F60ED8 - 0x145F60FF8)
+Модуль	Описание
+TridentSounds	Кастомные звуки трезубца
+TridentWarning	Алерт когда кто-то кидает
+RiptideSound	Звук рывка
+Из item.shield.block (0x145F61438)
+Модуль	Описание
+ShieldSound	Кастомный звук блока
+BlockFeedback	Визуал + звук блока
+ShieldBreakAlert	Алерт сломанного щита
+Из item.thrown (0x145F60530)
+Модуль	Описание
+ThrowSound	Звуки бросков
+PotionThrowAlert	Алерт брошенного зелья
+EggSnowballSound	Звуки яиц/снежков
+??? ENTITY STATE МОДУЛИ
+Query флаги состояния
+Query	Модуль
+query.is_sleeping (0x145B759B0)	SleepDetector - кто спит
+query.is_sneaking (0x145B74BA0)	SneakIndicator - кто крадётся
+query.is_invisible (0x145B75230)	InvisDetector - невидимки
+query.is_baby (0x145B74C30)	BabyHighlight - подсветка детёнышей
+query.is_tamed (0x145B75830)	TamedIndicator - чьи питомцы
+query.is_angry (0x145B74C60)	AngryMobAlert - злые мобы
+query.is_charged (0x145B74A50)	ChargedCreeperESP - заряженные криперы
+query.has_target (0x145B76390)	AggroIndicator - кто на кого агрится
+query.is_gliding (0x145B75410)	ElytraDetector - кто летит
+query.is_sitting (0x145B759E0)	SitIndicator - сидящие мобы
+query.is_eating (0x145B74900)	EatingIndicator - кто ест
+query.is_blocking (0x145B74BA0)	ShieldIndicator - кто блокирует
+query.is_dancing (0x145B74960)	DanceDetector - танцующие мобы
+?? СТАТИСТИКА МОДУЛИ
+Комбинации событий
+Модуль	Использует	Описание
+SessionStats	Все события	Полная статистика сессии
+CombatStats	entityHit + entityDie	K/D, урон, комбо
+MiningSession	playerBreakBlock	Статистика добычи
+MovementStats	speed queries	Пройденная дистанция
+ItemUsageStats	item events	Использование предметов
+DamageStats	healthChanged + hit	Нанесённый/полученный урон
+?? ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
+Комбинации для визуала
+Модуль	Использует	Описание
+HitParticles	entityHitEntity	Партиклы при ударе
+DeathParticles	entityDie	Партиклы при смерти
+JumpCircles	is_on_ground change	Круги при приземлении
+SpeedLines	ground_speed	Линии скорости
+DamageVignette	healthChanged	Красная рамка при уроне
+HealingGlow	healthChanged (+)	Свечение при лечении
+ChargeGlow	itemCharge	Свечение при зарядке
+CriticalStar	entityHit + crit	Звезда при крите
+?? UTILITY МОДУЛИ
+Из enchants (0x145F152A0) и lore (0x145F15294)
+Модуль	Описание
+EnchantDisplay	Показ зачарований на HUD
+BetterTooltips	Улучшенные подсказки
+EnchantSearch	Поиск предметов по зачару
+LoreReader	Чтение лора предметов
+EnchantValue	Оценка стоимости зачаров
+Из blockX/Y/Z (0x145F163A8 - 0x145F163B8)
+Модуль	Описание
+CoordinateHUD	Показ координат
+WaypointSystem	Система точек
+DistanceCalculator	Расчёт расстояний
+ChunkDisplay	Показ чанка
+BiomeDisplay	Показ биома
+?? ИГРОВЫЕ РЕЖИМЫ
+Для BedWars/SkyWars
+Модуль	События	Описание
+BedDefenseAlert	playerBreakBlock	Алерт ломания кровати
+ResourceCounter	playerBreakBlock	Счётчик ресурсов
+KillsToWin	entityDie	Сколько осталось убить
+TeamTracker	entityDie	Трекер команд
+GeneratorTimer	-	Таймер генераторов
+Для PvP
+Модуль	События	Описание
+PotionCount	itemUse	Счётчик оставшихся зелий
+GappleTimer	itemUse	Кулдаун гапла
+PearlCooldown	itemUse	Кулдаун перла
+TotemPop	healthChanged	Счётчик тотемов
+ArmorBreak	durability	Алерт сломанной брони
+?? ПОЛНАЯ СВОДКА
+По категориям модулей:
+Категория	Количество возможных модулей
+Combat	~25 модулей
+Visual/HUD	~30 модулей
+Movement	~15 модулей
+Items	~20 модулей
+World Events	~15 модулей
+Sounds	~10 модулей
+Entity States	~15 модулей
+Statistics	~10 модулей
+Utility	~15 модулей
+ИТОГО	~155+ модулей
+?? КОМБО СИСТЕМЫ
+Объединяя несколько событий можно создать:
+
+Система	События	Описание
+Combat Analysis	hit + die + health	Полный анализ боя
+Movement Tracker	speed + ground + jump	Анализ движения
+Item Manager	itemUse + durability + charge	Управление предметами
+World Scanner	break + explosion + lever	Мониторинг мира
+Entity Radar	все query состояния	Радар сущностей
+Session Recorder	все события	Запись сессии
+Combat Replay	hit + die + position	Реплей боёв
+Achievement Tracker	различные события	Трекер достижений
+
+// PLAYER EVENTS
+// playerEmote              = 0x1423A3700
+// playerInteractWithBlock  = 0x1423A2C20
+// playerInteractWithEntity = 0x1423A2A50
+// playerInputPermChange    = 0x1423A2880
+// playerDimensionChange    = 0x1423A26B0
+// playerGameModeChange     = 0x1423A24E0
+// playerLeave              = 0x1423A2310
+// playerSpawn              = 0x1423A2140
+// playerJoin               = 0x1423A1F70
+// playerBreakBlock         = 0x14239F960
+// playerPlaceBlock         = 0x14239F3F0
+
+// ITEM EVENTS
+// itemStopUse              = 0x1423A1DA0
+// itemReleaseUse           = 0x1423A1BD0
+// itemCompleteUse          = 0x1423A1A00
+// itemStartUse             = 0x1423A1830
+// itemStopUseOn            = 0x1423A1660
+// itemUse                  = 0x1423A1490
+// itemUseOn                = 0x1423A12C0
+// itemStartUseOn           = 0x1423A10F0
+
+// ENTITY EVENTS
+// entityRemove             = 0x1423A0F20
+// entityDie                = 0x1423A0D50
+// entityHealthChanged      = 0x1423A0B80
+// entityHurt               = 0x1423A09B0
+// entityHitBlock           = 0x1423A07E0
+// entityHitEntity          = 0x1423A0610
+// entitySpawn              = 0x14239FD00
+// entityLoad               = 0x14239FB30
+
+// PROJECTILE EVENTS
+// projectileHitBlock       = 0x1423A0440
+// projectileHitEntity      = 0x1423A0270
+
+// WORLD EVENTS
+// tripWireTrip             = 0x1423A3530
+// targetBlockHit           = 0x1423A3360
+// pressurePlatePop         = 0x1423A3190
+// pressurePlatePush        = 0x1423A2FC0
+// pistonActivate           = 0x1423A2DF0
+// leverAction              = 0x14239F220
+// buttonPush               = 0x14239F050
+// explosion                = 0x14239F790
+// blockExplode             = 0x14239F5C0
+// weatherChange            = 0x14239ECB0
+// worldInitialize          = 0x14239E740
+// gameRuleChange           = 0x14239E910
+
+// MISC EVENTS
+// effectAdd                = 0x1423A00A0
+// chatSend                 = 0x14239EE80
+// messageReceive           = 0x14239EAE0
+
+inGround оффсет: 0x410
+
+// ============================================
+// ENTITY EVENTS
+// ============================================
+// entityDie                = 0x1423A0D50
+// entityHurt               = 0x1423A09B0
+// entityHitEntity          = 0x1423A0610
+// entityHitBlock           = 0x1423A07E0
+// entityHealthChanged      = 0x1423A0B80
+// entitySpawn              = 0x14239FD00
+// entityLoad               = 0x14239FB30
+// entityRemove             = 0x1423A0F20
+// dataDrivenEntityTrigger  = 0x14239FED0
+
+// ============================================
+// PROJECTILE EVENTS
+// ============================================
+// projectileHitEntity      = 0x1423A0270
+// projectileHitBlock       = 0x1423A0440
+
+// ============================================
+// PLAYER EVENTS
+// ============================================
+// playerJoin               = 0x1423A1F70
+// playerLeave              = 0x1423A2310
+// playerSpawn              = 0x1423A2140
+// playerBreakBlock         = 0x14239F960
+// playerPlaceBlock         = 0x14239F3F0
+// playerEmote              = 0x1423A3700
+// playerDimensionChange    = 0x1423A26B0
+// playerGameModeChange     = 0x1423A24E0
+// playerInteractWithBlock  = 0x1423A2C20
+// playerInteractWithEntity = 0x1423A2A50
+// playerInputPermChange    = 0x1423A2880
+
+// ============================================
+// ITEM EVENTS
+// ============================================
+// itemUse                  = 0x1423A1490
+// itemUseOn                = 0x1423A12C0
+// itemStartUse             = 0x1423A1830
+// itemStopUse              = 0x1423A1DA0
+// itemStartUseOn           = 0x1423A10F0
+// itemStopUseOn            = 0x1423A1660
+// itemReleaseUse           = 0x1423A1BD0
+// itemCompleteUse          = 0x1423A1A00
+
+// ============================================
+// WORLD EVENTS
+// ============================================
+// worldInitialize          = 0x14239E740
+// weatherChange            = 0x14239ECB0
+// explosion                = 0x14239F790
+// blockExplode             = 0x14239F5C0
+// leverAction              = 0x14239F220
+// buttonPush               = 0x14239F050
+// pressurePlatePush        = 0x1423A2FC0
+// pressurePlatePop         = 0x1423A3190
+// pistonActivate           = 0x1423A2DF0
+// tripWireTrip             = 0x1423A3530
+// targetBlockHit           = 0x1423A3360
+
+// ============================================
+// CHAT/MISC EVENTS
+// ============================================
+// chatSend                 = 0x14239EE80
+// messageReceive           = 0x14239EAE0
+// effectAdd                = 0x1423A00A0
+// gameRuleChange           = 0x14239E910
+
+// ============================================
+// SYSTEM FUNCTIONS
+// ============================================
+// RegisterAllQueries       = 0x142FF4530
+// RegisterSingleQuery      = 0x142FF37B0
+// CreateDefaultContext     = 0x144C4CCE0
+// StringInit               = 0x140101F50
+// StringFree               = 0x1400F3AA0
+// StringConcat             = 0x14012A710
+// FormatString             = 0x144BC1940
+// getComponent_ScriptAPI   = 0x142A7ADE0
+// DurabilityParser         = 0x1435B02A0
+
+// ============================================
+// FOUND OFFSETS
+// ============================================
+// Arrow::mInGround         = +0x410

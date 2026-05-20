@@ -1,0 +1,582 @@
+[
+    {
+        "ComponentName": "ActorIsKnockedBackOnDeathFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "ABF033F"
+    },
+    {
+        "ComponentName": "AgentFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "B13B8796"
+    },
+    {
+        "ComponentName": "WaterTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "F8AF088"
+    },
+    {
+        "ComponentName": "HitboxComponent",
+        "SizeFunc": "Minecraft.Windows.exe+1DFD180",
+        "TypeHash": "F132B47A"
+    },
+    {
+        "ComponentName": "IsDeadFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "56837BC7"
+    },
+    {
+        "ComponentName": "WasOnGroundFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "7D77BCA8"
+    },
+    {
+        "ComponentName": "PlayerIsSleepingFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "31AAA2B1"
+    },
+    {
+        "ComponentName": "GroundTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "128632C"
+    },
+    {
+        "ComponentName": "MobIsJumpingFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "6F3098E7"
+    },
+    {
+        "ComponentName": "ActorIsImmobileFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "D2359BD6"
+    },
+    {
+        "ComponentName": "PaintingFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "81C34C5"
+    },
+    {
+        "ComponentName": "FreezeImmuneFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "A62EBAE7"
+    },
+    {
+        "ComponentName": "ActorIsFirstTickFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "EDA8DD9D"
+    },
+    {
+        "ComponentName": "MobIsImmobileFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "817DB47F"
+    },
+    {
+        "ComponentName": "ActorAddedFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "74F0322E"
+    },
+    {
+        "ComponentName": "ClientParticleTrackingComponent",
+        "SizeFunc": "Minecraft.Windows.exe+2650C0",
+        "TypeHash": "FEA210C4"
+    },
+    {
+        "ComponentName": "ChickenFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "F50CB5D4"
+    },
+    {
+        "ComponentName": "DolphinFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "68ED786D"
+    },
+    {
+        "ComponentName": "SimulatedPlayerFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "CE1A0C18"
+    },
+    {
+        "ComponentName": "SkipPlayerTickSystemFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "922C7153"
+    },
+    {
+        "ComponentName": "EnderDragonFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2FB53E5E"
+    },
+    {
+        "ComponentName": "ShulkerBulletFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "21072B61"
+    },
+    {
+        "ComponentName": "DashJumpFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "E9095559"
+    },
+    {
+        "ComponentName": "CamelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "983E8177"
+    },
+    {
+        "ComponentName": "LiquidTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "16C2450D"
+    },
+    {
+        "ComponentName": "StandOnHoneyOrSlimeBlockFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "8C334D"
+    },
+    {
+        "ComponentName": "LavaTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "33BBF7EB"
+    },
+    {
+        "ComponentName": "IllagerBeastFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "D60C4224"
+    },
+    {
+        "ComponentName": "GlidingTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "C3ED098F"
+    },
+    {
+        "ComponentName": "TropicalFishFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "EDDC40EB"
+    },
+    {
+        "ComponentName": "ArmorFlyEnabledFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "272CBA4A"
+    },
+    {
+        "ComponentName": "AutoClimbTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2334659D"
+    },
+    {
+        "ComponentName": "LevitateTravelFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "F03388E3"
+    },
+    {
+        "ComponentName": "PrimedTntFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "FD165142"
+    },
+    {
+        "ComponentName": "WolfFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "7C0C0F31"
+    },
+    {
+        "ComponentName": "EyeOfEnderFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "69274D2F"
+    },
+    {
+        "ComponentName": "VerticalCollisionFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "990A4EC3"
+    },
+    {
+        "ComponentName": "CollisionFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "CDF8D319"
+    },
+    {
+        "ComponentName": "BlazeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "6E729961"
+    },
+    {
+        "ComponentName": "AutoStepRequestFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "5B79FF3B"
+    },
+    {
+        "ComponentName": "DiscardFrictionFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "9B6B7279"
+    },
+    {
+        "ComponentName": "WasInLavaFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "911430C1"
+    },
+    {
+        "ComponentName": "WasInWaterFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "4086B5E6"
+    },
+    {
+        "ComponentName": "StandOnOtherBlockFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "BAFDC63F"
+    },
+    {
+        "ComponentName": "IsNearDolphinsFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "C25D0B10"
+    },
+    {
+        "ComponentName": "ScanForDolphinFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "B0DE879"
+    },
+    {
+        "ComponentName": "BoatFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "DFAF0D9F"
+    },
+    {
+        "ComponentName": "SoulSpeedEnchantFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "255C5FB4"
+    },
+    {
+        "ComponentName": "ThrownTridentFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "320E6E5B"
+    },
+    {
+        "ComponentName": "ProjectileFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "CAB14014"
+    },
+    {
+        "ComponentName": "FireworksRocketFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "70FF1FFF"
+    },
+    {
+        "ComponentName": "WasHandledBySculkCatalystFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "B76C930C"
+    },
+    {
+        "ComponentName": "WitherSkullFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "B0313451"
+    },
+    {
+        "ComponentName": "LavaSlimeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "5F10CF3F"
+    },
+    {
+        "ComponentName": "SquidFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "881BF973"
+    },
+    {
+        "ComponentName": "FishingHookFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "6B8A1F6"
+    },
+    {
+        "ComponentName": "SkeletonFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "C215AC04"
+    },
+    {
+        "ComponentName": "MinecartFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "C140391A"
+    },
+    {
+        "ComponentName": "HangingActorFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "7C5099F6"
+    },
+    {
+        "ComponentName": "HorseFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2672B1B2"
+    },
+    {
+        "ComponentName": "ParrotFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "8A8F6721"
+    },
+    {
+        "ComponentName": "IsPanickingFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "6114D991"
+    },
+    {
+        "ComponentName": "SlimeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "821654A9"
+    },
+    {
+        "ComponentName": "SheepFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "C6CD57EC"
+    },
+    {
+        "ComponentName": "ShulkerFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "6A329671"
+    },
+    {
+        "ComponentName": "ExperienceOrbFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "88610AFE"
+    },
+    {
+        "ComponentName": "WitherBossFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "81E8CFE7"
+    },
+    {
+        "ComponentName": "PandaFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "DFC4CBF9"
+    },
+    {
+        "ComponentName": "WitchFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "3B3E55A8"
+    },
+    {
+        "ComponentName": "BatFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "FE597BC8"
+    },
+    {
+        "ComponentName": "GuardianFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "1D065388"
+    },
+    {
+        "ComponentName": "RemoveInPeacefulFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "5A5BBB6B"
+    },
+    {
+        "ComponentName": "EnderManFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "ACC666F3"
+    },
+    {
+        "ComponentName": "MonsterFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "5A800AC7"
+    },
+    {
+        "ComponentName": "SpiderFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "94411F96"
+    },
+    {
+        "ComponentName": "HitResultComponent",
+        "SizeFunc": "Minecraft.Windows.exe+C8BC10",
+        "TypeHash": "21197BD6"
+    },
+    {
+        "ComponentName": "BeeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "B610027D"
+    },
+    {
+        "ComponentName": "FishFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "3B5A8443"
+    },
+    {
+        "ComponentName": "VillagerV2FlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2D557D97"
+    },
+    {
+        "ComponentName": "VexFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2BE52F4"
+    },
+    {
+        "ComponentName": "WaterAnimalFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "9C24650"
+    },
+    {
+        "ComponentName": "ItemActorFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "3E419A55"
+    },
+    {
+        "ComponentName": "FallingBlockFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "D7053969"
+    },
+    {
+        "ComponentName": "PassengersChangedFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "75CFBD9C"
+    },
+    {
+        "ComponentName": "NeverChangesSizeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "E59345CF"
+    },
+    {
+        "ComponentName": "PredictedMovementComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "72A9099"
+    },
+    {
+        "ComponentName": "SwitchingVehiclesFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "E2186212"
+    },
+    {
+        "ComponentName": "NeedSetPreviousPositionFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "131345D7"
+    },
+    {
+        "ComponentName": "MobAllowStandSlidingFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "AC8C198E"
+    },
+    {
+        "ComponentName": "ShouldAwardWhoNeedsRocketsAchievementFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "8BD40506"
+    },
+    {
+        "ComponentName": "ActorChunkMoveFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "6FE00E98"
+    },
+    {
+        "ComponentName": "HorseLandedOnGroundFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "322D9858"
+    },
+    {
+        "ComponentName": "CollidableMobNearFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "43027696"
+    },
+    {
+        "ComponentName": "IgnoresEntityInsideFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2EE35719"
+    },
+    {
+        "ComponentName": "EjectedByActivatorRailFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "4CF75515"
+    },
+    {
+        "ComponentName": "SkipBodySlotUpgradeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "2D1D239E"
+    },
+    {
+        "ComponentName": "IsFishableFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "8DBB8107"
+    },
+    {
+        "ComponentName": "JoinRaidQueuedFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "457F71A6"
+    },
+    {
+        "ComponentName": "IsChasingDuringPlayFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "D5D5222F"
+    },
+    {
+        "ComponentName": "EntityNeedsInitializeFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "8408A0F3"
+    },
+    {
+        "ComponentName": "NeedsUpgradeToBodySlotFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "D9531EEB"
+    },
+    {
+        "ComponentName": "CanSeeInvisibleFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "1205CD61"
+    },
+    {
+        "ComponentName": "ActorDataHorseFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "FABAF013"
+    },
+    {
+        "ComponentName": "MoveTowardsClosestSpaceFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "EEDF4455"
+    },
+    {
+        "ComponentName": "ActorLocalPlayerEntityMovedFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "D917150A"
+    },
+    {
+        "ComponentName": "BreaksFallingBlocksFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "B62B25D2"
+    },
+    {
+        "ComponentName": "CollidableMobFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "F431D01C"
+    },
+    {
+        "ComponentName": "KeepRidingEvenIfTooLargeForVehicleFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "61323D40"
+    },
+    {
+        "ComponentName": "ReplayStateLenderFlagComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "8C3666FB"
+    },
+    {
+        "ComponentName": "MinecraftGameShimComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "BBA6873A"
+    },
+    {
+        "ComponentName": "UserEntityIdentifierComponent",
+        "SizeFunc": "Minecraft.Windows.exe+1CC7AA0",
+        "TypeHash": "7CF39851"
+    },
+    {
+        "ComponentName": "ClientParticleInitializationComponent",
+        "SizeFunc": "Minecraft.Windows.exe+264070",
+        "TypeHash": "FA3B7B53"
+    },
+    {
+        "ComponentName": "ClientParticleTerminationComponent",
+        "SizeFunc": "Minecraft.Windows.exe+264880",
+        "TypeHash": "12C0B3CD"
+    },
+    {
+        "ComponentName": "LodestoneCompassComponent",
+        "SizeFunc": "Minecraft.Windows.exe+265760",
+        "TypeHash": "AECBD9B"
+    },
+    {
+        "ComponentName": "AudioEmitterComponent",
+        "SizeFunc": "Minecraft.Windows.exe+265B90",
+        "TypeHash": "B628F844"
+    },
+    {
+        "ComponentName": "GlobalTextureGroupStateComponent",
+        "SizeFunc": "Minecraft.Windows.exe+E5DD0",
+        "TypeHash": "830F1310"
+    }
+]
