@@ -1,24 +1,27 @@
 #pragma once
-// HitColor - Custom hurt color via real game hook
-// Применяется ТОЛЬКО когда игрок получает урон
-
 #include <Features/Modules/Module.hpp>
 #include <Features/Events/HurtColorEvent.hpp>
 
-class HitColor : public ModuleBase<HitColor>
-{
+class HitColor : public ModuleBase<HitColor> {
 public:
-    // === HURT COLOR ===
-    ColorSetting mHurtColorValue = ColorSetting("Color", "Цвет оверлея при получении урона", 1.0f, 0.0f, 0.0f, 0.6f);
-    BoolSetting  mRainbowHurt   = BoolSetting("Rainbow", "Радужный цвет при получении урона", false);
+    BoolSetting  mAlwaysEnabled  = BoolSetting("AlwaysEnabled", "Включить постоянный цвет", true);
+    ColorSetting mAlwaysColor    = ColorSetting("AlwaysColor", "Цвет в обычном состоянии", 0.0f, 1.0f, 0.0f, 0.35f);
+    NumberSetting mAlwaysAlpha   = NumberSetting("AlwaysAlpha", "Прозрачность постоянного цвета", 0.35f, 0.05f, 1.0f, 0.05f);
+    BoolSetting  mRainbowAlways  = BoolSetting("RainbowAlways", "Радужный цвет в обычном состоянии", false);
 
-    HitColor() : ModuleBase("HitColor", "Custom hurt flash color (only triggers on damage)", ModuleCategory::Visual, 0, false) {
+    BoolSetting  mHurtEnabled    = BoolSetting("HurtEnabled", "Включить цвет при уроне", true);
+    ColorSetting mHurtColor      = ColorSetting("HurtColor", "Цвет при получении урона", 0.0f, 0.3f, 1.0f, 0.7f);
+    BoolSetting  mRainbowHurt    = BoolSetting("RainbowHurt", "Радужный цвет при уроне", false);
+
+    HitColor() : ModuleBase("HitColor", "Custom color: always + on hurt", ModuleCategory::Visual, 0, false) {
         addSettings(
-            &mHurtColorValue,
-            &mRainbowHurt
+            &mAlwaysEnabled, &mAlwaysColor, &mAlwaysAlpha, &mRainbowAlways,
+            &mHurtEnabled, &mHurtColor, &mRainbowHurt
         );
 
-        VISIBILITY_CONDITION(mHurtColorValue, !mRainbowHurt.mValue);
+        VISIBILITY_CONDITION(mAlwaysColor, !mRainbowAlways.mValue && mAlwaysEnabled.mValue);
+        VISIBILITY_CONDITION(mAlwaysAlpha, !mRainbowAlways.mValue && mAlwaysEnabled.mValue);
+        VISIBILITY_CONDITION(mHurtColor, !mRainbowHurt.mValue && mHurtEnabled.mValue);
 
         mNames = {
             {Lowercase,       "hitcolor"},

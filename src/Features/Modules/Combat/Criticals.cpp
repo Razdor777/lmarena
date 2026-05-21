@@ -1,152 +1,114 @@
 //
-// Criticals.cpp — Forces every melee hit to deal critical damage.
+// Criticals.cpp
 //
-// HOW IT WORKS (Minecraft Bedrock):
-// A hit is critical when the attacker is FALLING (negative Y velocity,
-// not on ground). We exploit this with TWO complementary methods:
+// Три метода в порядке надёжности:
 //
-//   1) PlayerAuthInputPacket spoofing:
-//      Every tick we alternate the Y position in the outgoing AuthInput
-//      packet (+offset on even ticks, normal on odd ticks). This makes
-//      the server think we're constantly micro-jumping. On "odd" ticks
-//      the server sees us falling from the previous raised position.
-//      We also clear the VERTICAL_COLLISION flag so the server doesn't
-//      think we're on the ground.
+// 1. ActorFlags::Critical (0xD) — прямой флаг крита в ECS.
+//    Ставим его каждый тик. Клиент сам включает его в пакеты.
+//    Самый чистый способ — движок сам обрабатывает.
 //
-//   2) MovePlayerPacket injection (on attack):
-//      When we detect an outgoing attack (InventoryTransactionPacket),
-//      we inject two MovePlayerPacket spoofs BEFORE the attack packet:
-//        - pos+offset (onGround=false, PositionMode::Teleport)
-//        - pos        (onGround=false, PositionMode::Teleport)
-//      This is the exact same pattern used by InfiniteAura and GhostMode.
-//      PositionMode::Teleport is KEY — Normal mode gets ignored by server.
+// 2. FallDistance + velocity.y + OnGround — компонентный метод.
+//    Меняем клиентские компоненты ДО того как движок собирает
+//    PlayerAuthInputPacket. Сервер получает легитимный пакет.
+//
+// 3. PlayerAuthInputPacket патч — дополнительный фикс полей пакета
+//    на случай если движок не подхватил изменения компонентов.
 //
 
 #include "Criticals.hpp"
 
 #include <Features/FeatureManager.hpp>
+#include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/Components/StateVectorComponent.hpp>
+#include <SDK/Minecraft/Actor/Components/FallDistanceComponent.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
-#include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
-#include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
-
-// ==================== LIFECYCLE ====================
+#include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 
 void Criticals::onEnable() {
-    gFeatureManager->mDispatcher->listen<PacketOutEvent, &Criticals::onPacketOutEvent>(this);
-    mTickCounter = 0;
+    gFeatureManager->mDispatcher->listen<BaseTickEvent,  &Criticals::onBaseTickEvent>(this);
+    gFeatureManager->mDispatcher->listen<PacketOutEvent, &Criticals::onPacketOutEvent,
+        nes::event_priority::ABSOLUTE_LAST>(this);
+    mTickCounter    = 0;
+    mSavedVelocityY = 0.f;
+    mWasOnGround    = true;
 }
 
 void Criticals::onDisable() {
+    gFeatureManager->mDispatcher->deafen<BaseTickEvent,  &Criticals::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Criticals::onPacketOutEvent>(this);
-    mTickCounter = 0;
-}
-
-// ==================== PACKET HANDLER ====================
-
-void Criticals::onPacketOutEvent(PacketOutEvent& event) {
-    if (!event.mPacket) return;
 
     auto* player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
 
-    PacketID id = event.mPacket->getId();
+    // Восстанавливаем всё
+    auto* sv = player->getStateVectorComponent();
+    if (sv) sv->mVelocity.y = mSavedVelocityY;
+    player->setFallDistance(0.f);
+    if (mWasOnGround) player->setOnGround(true);
 
-    // ─────────────────────────────────────────────────────
-    // METHOD 1: Modify PlayerAuthInputPacket every tick
-    // Alternate Y position so server always sees us "falling"
-    // ─────────────────────────────────────────────────────
-    if (id == PacketID::PlayerAuthInput) {
-        auto* pkt = event.getPacket<PlayerAuthInputPacket>();
-        if (!pkt) return;
+    // Снимаем флаг Critical
+    player->setStatusFlag(ActorFlags::Critical, false);
+}
 
-        float offset = mYOffset.mValue;
-        mTickCounter++;
+void Criticals::onBaseTickEvent(BaseTickEvent& event) {
+    auto* player = event.mActor;
+    if (!player) return;
 
-        if (mTickCounter % 2 == 0) {
-            // Even tick: bump position UP
-            pkt->mPos.y += offset;
-            pkt->mPosDelta.y = offset;
-        } else {
-            // Odd tick: normal position (server sees FALLING from previous tick = crit!)
-            pkt->mPosDelta.y = -offset;
-        }
-
-        // Remove vertical collision flag — we're "airborne"
-        pkt->mInputData &= ~AuthInputAction::VERTICAL_COLLISION;
-        return;
-    }
-
-    // ─────────────────────────────────────────────────────
-    // METHOD 2: Inject MovePlayerPacket spoofs before attacks
-    // Uses PositionMode::Teleport (same as InfiniteAura/GhostMode)
-    // ─────────────────────────────────────────────────────
-    if (id != PacketID::InventoryTransaction) return;
-
-    auto* pkt = event.getPacket<InventoryTransactionPacket>();
-    if (!pkt || !pkt->mTransaction) return;
-
-    // Only process attack transactions
-    if (pkt->mTransaction->getTransacType() != ComplexInventoryTransaction::Type::ItemUseOnEntityTransaction)
-        return;
-
-    auto* attackTx = reinterpret_cast<ItemUseOnActorInventoryTransaction*>(pkt->mTransaction.get());
-    if (!attackTx) return;
-
-    if (attackTx->mActionType != ItemUseOnActorInventoryTransaction::ActionType::Attack)
-        return;
-
-    auto* sender = ClientInstance::get()->getPacketSender();
-    if (!sender) return;
+    // Не трогаем в воде / плавании / элитры
+    if (player->getStatusFlag(ActorFlags::Swimming)) return;
+    if (player->getStatusFlag(ActorFlags::Gliding))  return;
+    if (player->getStatusFlag(ActorFlags::Riding))   return;
 
     auto* sv = player->getStateVectorComponent();
     if (!sv) return;
 
-    glm::vec3 playerPos = sv->mPos;
-    int64_t   rid       = player->getRuntimeID();
-    float     offset    = mYOffset.mValue;
+    mSavedVelocityY = sv->mVelocity.y;
+    mWasOnGround    = player->isOnGround();
+    mTickCounter++;
 
-    // Read current rotation
-    float yaw = 0.f, pitch = 0.f;
-    if (auto* rot = player->getActorRotationComponent()) {
-        pitch = rot->mPitch;
-        yaw   = rot->mYaw;
+    // ── Метод 1: Прямой флаг Critical ─────────────────────────────────────
+    // ActorFlags::Critical = 0xD — движок сам читает этот флаг при атаке
+    player->setStatusFlag(ActorFlags::Critical, true);
+
+    // ── Метод 2: Компонентный — FallDistance + velocity + OnGround ─────────
+    // Чередуем тики: вверх → вниз → вверх → вниз
+    // Сервер получает через PlayerAuthInput: posDelta.y меняет знак каждый тик
+    if (mTickCounter % 2 == 0) {
+        // "Вверх" тик
+        sv->mVelocity.y = mYOffset.mValue;
+        player->setFallDistance(0.f);
+        player->setOnGround(false);
+    } else {
+        // "Вниз" тик — крит условие
+        sv->mVelocity.y = -mYOffset.mValue;
+        player->setFallDistance(0.11f); // > 0 → сервер видит падение
+        player->setOnGround(false);
     }
+}
 
-    // Spoof packet 1: slightly above current position, NOT on ground
-    // PositionMode::Teleport forces the server to accept this position!
-    auto upPkt = MinecraftPackets::createPacket<MovePlayerPacket>();
-    upPkt->mPos              = playerPos + glm::vec3(0.f, offset, 0.f);
-    upPkt->mPlayerID         = rid;
-    upPkt->mRot              = { pitch, yaw };
-    upPkt->mYHeadRot         = yaw;
-    upPkt->mResetPosition    = PositionMode::Teleport;
-    upPkt->mOnGround         = false;
-    upPkt->mRidingID         = -1;
-    upPkt->mCause            = TeleportationCause::Unknown;
-    upPkt->mSourceEntityType = ActorType::Player;
-    upPkt->mTick             = 0;
-    sender->sendToServer(upPkt.get());
+void Criticals::onPacketOutEvent(PacketOutEvent& event) {
+    if (!event.mPacket) return;
+    auto* player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
 
-    // Spoof packet 2: back to original position, still NOT on ground
-    // Server sees us FALLING from pos+offset to pos → critical hit!
-    auto downPkt = MinecraftPackets::createPacket<MovePlayerPacket>();
-    downPkt->mPos              = playerPos;
-    downPkt->mPlayerID         = rid;
-    downPkt->mRot              = { pitch, yaw };
-    downPkt->mYHeadRot         = yaw;
-    downPkt->mResetPosition    = PositionMode::Teleport;
-    downPkt->mOnGround         = false;
-    downPkt->mRidingID         = -1;
-    downPkt->mCause            = TeleportationCause::Unknown;
-    downPkt->mSourceEntityType = ActorType::Player;
-    downPkt->mTick             = 0;
-    sender->sendToServer(downPkt.get());
+    // ── Метод 3: Патчим PlayerAuthInputPacket ─────────────────────────────
+    if (event.mPacket->getId() == PacketID::PlayerAuthInput) {
+        auto* pkt = event.getPacket<PlayerAuthInputPacket>();
+        if (!pkt) return;
 
-    // The original attack packet goes through right after these two spoofs
+        // Убираем vertical collision — иначе сервер думает что мы на земле
+        pkt->mInputData &= ~AuthInputAction::VERTICAL_COLLISION;
+
+        if (mTickCounter % 2 == 0) {
+            pkt->mPos.y      += mYOffset.mValue;
+            pkt->mPosDelta.y  = mYOffset.mValue;
+        } else {
+            pkt->mPosDelta.y  = -mYOffset.mValue;
+        }
+    }
 }

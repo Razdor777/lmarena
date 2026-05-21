@@ -1,114 +1,80 @@
 #pragma once
-//
-// HitParticles — Particle effects on hit
-// Preset-based: no 50 sliders, just pick a style
-//
-
-#include <Features/FeatureManager.hpp>
+#include <Features/Modules/Module.hpp>
+#include <Features/Events/EntityHurtEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
-#include <Features/Events/PacketOutEvent.hpp>
-#include <SDK/Minecraft/ClientInstance.hpp>
-#include <glm/glm.hpp>
-#include <vector>
 #include <random>
-#include <mutex>
-
-struct HitParticle {
-    glm::vec3 position;
-    glm::vec3 velocity;
-    float lifetime;
-    float maxLifetime;
-    float size;
-    float rotation;
-    float rotationSpeed;
-    ImColor color;
-    float gravity;
-    
-    float getProgress() const { return lifetime / maxLifetime; }
-    bool isDead() const { return lifetime >= maxLifetime; }
-};
 
 class HitParticles : public ModuleBase<HitParticles> {
 public:
-    enum class Preset {
-        Sparks,      // Orange/yellow directional sparks
-        Blood,       // Red droplets with gravity
-        Stars,       // Rainbow star particles
-        Hearts,      // Pink/red heart particles
-        Snow,        // White crystal particles
-        Fire,        // Fire-colored rising particles
-        Shatter,     // Glass shard fragments
-        Custom       // Manual settings
-    };
-    
-    EnumSettingT<Preset> mPreset = EnumSettingT<Preset>("Preset", "Particle style",
-        Preset::Sparks, "Sparks", "Blood", "Stars", "Hearts", "Snow", "Fire", "Shatter", "Custom");
-    
-    // Custom-only settings
-    NumberSetting mCount = NumberSetting("Count", "Particles per hit", 12, 3, 40, 1);
-    NumberSetting mSize = NumberSetting("Size", "Particle size", 3.0f, 1.0f, 10.0f, 0.5f);
-    NumberSetting mSpeed = NumberSetting("Speed", "Initial speed", 4.0f, 1.0f, 15.0f, 0.5f);
-    NumberSetting mLifetime = NumberSetting("Lifetime", "Particle lifetime", 0.8f, 0.2f, 3.0f, 0.1f);
-    NumberSetting mGravity = NumberSetting("Gravity", "Gravity strength", 5.0f, 0.0f, 20.0f, 0.5f);
-    BoolSetting mRainbow = BoolSetting("Rainbow", "Rainbow colors", false);
-    NumberSetting mColorR = NumberSetting("Red", "Red", 1.0f, 0.0f, 1.0f, 0.01f);
-    NumberSetting mColorG = NumberSetting("Green", "Green", 0.5f, 0.0f, 1.0f, 0.01f);
-    NumberSetting mColorB = NumberSetting("Blue", "Blue", 0.1f, 0.0f, 1.0f, 0.01f);
-    BoolSetting mGlow = BoolSetting("Glow", "Add glow to particles", true);
-    
-    HitParticles() : ModuleBase("HitParticles", "Spawn particles when hitting entities", ModuleCategory::Visual, 0, false) {
-        addSettings(
-            &mPreset,
-            &mCount, &mSize, &mSpeed, &mLifetime, &mGravity,
-            &mRainbow, &mColorR, &mColorG, &mColorB, &mGlow
-        );
-        
-        // Hide custom settings when using presets
-        auto isCustom = [this]() { return mPreset.mValue == Preset::Custom; };
-        VISIBILITY_CONDITION(mCount, isCustom());
-        VISIBILITY_CONDITION(mSize, isCustom());
-        VISIBILITY_CONDITION(mSpeed, isCustom());
-        VISIBILITY_CONDITION(mLifetime, isCustom());
-        VISIBILITY_CONDITION(mGravity, isCustom());
-        VISIBILITY_CONDITION(mRainbow, isCustom());
-        VISIBILITY_CONDITION(mColorR, isCustom() && !mRainbow.mValue);
-        VISIBILITY_CONDITION(mColorG, isCustom() && !mRainbow.mValue);
-        VISIBILITY_CONDITION(mColorB, isCustom() && !mRainbow.mValue);
-        VISIBILITY_CONDITION(mGlow, isCustom());
-        
-        mNames = {
-            {Lowercase, "hitparticles"},
-            {LowercaseSpaced, "hit particles"},
-            {Normal, "HitParticles"},
-            {NormalSpaced, "Hit Particles"}
-        };
-    }
-    
-    std::vector<HitParticle> mParticles;
-    std::mutex mParticleMutex;
-    std::mt19937 mRng{std::random_device{}()};
-    
+    HitParticles();
+
     void onEnable() override;
     void onDisable() override;
+    void onTick() override;
+
+    void onEntityHurt(EntityHurtEvent& event);
     void onRenderEvent(RenderEvent& event);
-    void onPacketOutEvent(PacketOutEvent& event);
-    
+
 private:
-    void spawnParticles(const glm::vec3& position);
-    void spawnPresetParticles(const glm::vec3& pos, Preset preset);
-    
-    // Helpers
-    float randFloat(float min, float max);
-    glm::vec3 randDir();
-    ImColor randPresetColor(Preset preset, float variation = 0.0f);
-    
-    // Shape renderers
-    void renderDiamond(ImDrawList* dl, ImVec2 center, float size, float rotation, ImColor color, float alpha);
-    void renderStar(ImDrawList* dl, ImVec2 center, float size, float rotation, ImColor color, float alpha);
-    void renderHeart(ImDrawList* dl, ImVec2 center, float size, float rotation, ImColor color, float alpha);
-    void renderDot(ImDrawList* dl, ImVec2 center, float size, ImColor color, float alpha, bool glow);
-    
-    std::string getSettingDisplay() override {
-        return mPreset.mValues[mPreset.as<int>()];
-    }
+    struct DamageNumber {
+        glm::vec3 mPos;
+        float mDamage;
+        float mAge = 0.f;
+        bool mIsCrit = false;
+        float mOffsetX = 0.f;
+    };
+
+    struct TrailPoint {
+        glm::vec3 mPos;
+        float mAge = 0.f;
+    };
+
+    struct HitParticle {
+        glm::vec3 mPos;
+        glm::vec3 mVel;
+        float mAge = 0.f;
+        float mSize;
+        ImColor mColor;
+    };
+
+    std::vector<DamageNumber> mNumbers;
+    std::vector<TrailPoint> mTrailPoints;
+    std::vector<HitParticle> mParticles;
+    std::mt19937 mRNG{std::random_device{}()};
+    int mTrailTickCounter = 0;
+
+    BoolSetting mDamageNumbers{"DamageNumbers", "Show floating damage", true};
+    NumberSetting mRiseSpeed{"RiseSpeed", "How fast numbers float up", 0.4f, 0.1f, 2.0f, 0.05f};
+    NumberSetting mDmgLifetime{"DmgLifetime", "Number lifetime (sec)", 1.5f, 0.3f, 5.0f, 0.1f};
+    NumberSetting mScale{"Scale", "Text size multiplier", 1.0f, 0.3f, 3.0f, 0.1f};
+    BoolSetting mShadow{"Shadow", "Draw text shadow", true};
+    BoolSetting mColorCrits{"ColorCrits", "Color crits differently", true};
+    ColorSetting mNormalColor{"NormalColor", "Normal hit color", 1.0f, 1.0f, 1.0f, 1.0f};
+    ColorSetting mCritColor{"CritColor", "Critical hit color", 1.0f, 0.55f, 0.0f, 1.0f};
+
+    BoolSetting mGhostTrail{"GhostTrail", "Ghostly trail behind actors", true};
+    NumberSetting mTrailInterval{"TrailInterval", "Ticks between saves", 3.0f, 1.0f, 20.0f, 1.0f};
+    NumberSetting mTrailLifetime{"TrailLifetime", "Trail duration (sec)", 3.0f, 0.5f, 10.0f, 0.5f};
+    NumberSetting mTrailRadius{"TrailRadius", "Point radius", 3.0f, 1.0f, 8.0f, 0.5f};
+    NumberSetting mTrailRange{"TrailRange", "Actor detection range", 15.0f, 5.0f, 50.0f, 1.0f};
+    ColorSetting mTrailColor{"TrailColor", "Trail color", 0.4f, 0.75f, 1.0f, 0.7f};
+    BoolSetting mOnlyPlayers{"OnlyPlayers", "Only trail players", true};
+    NumberSetting mMaxTrailPoints{"MaxTrailPoints", "Max trail points", 500.0f, 100.0f, 2000.0f, 50.0f};
+
+    BoolSetting mHitBurst{"HitBurst", "Particle burst on hit", true};
+    NumberSetting mParticleCount{"ParticleCount", "Particles per hit", 8.0f, 1.0f, 30.0f, 1.0f};
+    NumberSetting mParticleSpeed{"ParticleSpeed", "Particle speed", 0.3f, 0.05f, 1.0f, 0.05f};
+    NumberSetting mParticleLifetime{"ParticleLifetime", "Particle lifetime (sec)", 0.8f, 0.2f, 3.0f, 0.1f};
+    NumberSetting mParticleSize{"ParticleSize", "Particle size", 3.0f, 1.0f, 8.0f, 0.5f};
+    ColorSetting mParticleColor{"ParticleColor", "Particle color", 1.0f, 0.3f, 0.3f, 0.9f};
+    ColorSetting mParticleCritColor{"ParticleCritColor", "Crit particle color", 1.0f, 0.85f, 0.0f, 1.0f};
+
+    NumberSetting mMaxDist{"MaxDist", "Max render distance", 20.0f, 5.0f, 50.0f, 1.0f};
+
+    void spawnDamageNumber(Actor* entity, float damage, bool isCrit);
+    void spawnHitBurst(const glm::vec3& pos, bool isCrit);
+    void updateTrail();
+    void renderNumbers(const glmatrixf& mat, const glm::vec2& fov, const glm::vec2& screenSize, const glm::vec3& origin);
+    void renderTrail(const glmatrixf& mat, const glm::vec2& fov, const glm::vec2& screenSize, const glm::vec3& origin);
+    void renderParticles(const glmatrixf& mat, const glm::vec2& fov, const glm::vec2& screenSize, const glm::vec3& origin);
 };

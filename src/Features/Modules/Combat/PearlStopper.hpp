@@ -79,8 +79,10 @@ public:
     bool      mSavedGravity     = true;
     bool      mSavedPush        = true;
 
-    std::unordered_map<int64_t, glm::vec3>  mPearlPrevPos;
-    std::unordered_map<int64_t, uint64_t>   mPearlPrevTime;
+    std::unordered_map<int64_t, glm::vec3>   mPearlPrevPos;
+    std::unordered_map<int64_t, uint64_t>    mPearlPrevTime;
+    // Кеш перл по runtimeId — не теряем перлы между тиками при лагах
+    std::unordered_map<int64_t, PearlData>   mKnownPearls;
 
     std::vector<glm::vec3> mPredictedPath;
     std::vector<glm::vec3> mPacketPositions;

@@ -32,6 +32,7 @@ void PearlStopper::onEnable() {
 
     mPearlPrevPos.clear();
     mPearlPrevTime.clear();
+    mKnownPearls.clear();
     mTotalStops = 0;
 
     if (player) {
@@ -117,10 +118,24 @@ std::vector<PearlStopper::PearlData> PearlStopper::findEnemyPearls(Actor* local)
     std::vector<PearlData> result;
     if (!local) return result;
 
+    // Собираем текущие живые перлы
+    std::unordered_map<int64_t, Actor*> currentAlive;
     for (Actor* a : ActorUtils::getActorList(false, false)) {
         if (!a || !isEnderPearl(a)) continue;
         if (isOwnPearl(a, local)) continue;
+        currentAlive[a->getRuntimeID()] = a;
+    }
 
+    // Удаляем из кеша перлы которых уже нет
+    for (auto it = mKnownPearls.begin(); it != mKnownPearls.end(); ) {
+        if (currentAlive.find(it->first) == currentAlive.end())
+            it = mKnownPearls.erase(it);
+        else
+            ++it;
+    }
+
+    // Добавляем новые / обновляем существующие
+    for (auto& [id, a] : currentAlive) {
         auto* sv = a->getStateVectorComponent();
         if (!sv) continue;
 
@@ -130,13 +145,31 @@ std::vector<PearlStopper::PearlData> PearlStopper::findEnemyPearls(Actor* local)
         if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z)) continue;
         if (!std::isfinite(vel.x) || !std::isfinite(vel.y) || !std::isfinite(vel.z)) continue;
 
+        // Если перла уже была в кеше — берём velocity из кеша если текущий нулевой
+        // (сервер иногда присылает vel=0 в первый тик из-за лага)
+        auto it = mKnownPearls.find(id);
+        if (it != mKnownPearls.end()) {
+            float curLen   = glm::length(vel);
+            float cacheLen = glm::length(it->second.velocity);
+            // Если текущий velocity подозрительно мал а кешированный нормальный — используем кеш
+            if (curLen < 0.02f && cacheLen > 0.05f) {
+                // Симулируем следующий тик из кеша
+                glm::vec3 predicted = it->second.velocity * PEARL_DRAG;
+                predicted.y -= PEARL_GRAVITY;
+                vel = predicted;
+            }
+        }
+
         PearlData d;
         d.actor     = a;
-        d.runtimeId = a->getRuntimeID();
+        d.runtimeId = id;
         d.position  = pos;
         d.velocity  = vel;
+
+        mKnownPearls[id] = d;
         result.push_back(d);
     }
+
     return result;
 }
 
@@ -422,14 +455,21 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
 
     for (auto& pearl : pearls) {
         float dist = glm::distance(pearl.position, myFeet);
-        if (dist > 90.f) continue;
+        if (dist > 120.f) continue; // увеличили радиус — ловим дальние броски
 
         float speedLen = glm::length(pearl.velocity);
-        if (speedLen < 0.05f) continue;
+        // Снижен порог: даже если velocity почти 0 в первый тик — всё равно рассматриваем
+        // При лаге сервер может прислать vel=0 в первый пакет
+        if (speedLen < 0.005f) continue;
 
-        glm::vec3 toUs    = glm::normalize(myFeet - pearl.position);
-        float     approach = glm::dot(glm::normalize(pearl.velocity), toUs);
-        float     score    = dist * (1.6f - approach * 1.4f);
+        float score = dist; // базово — ближайшая
+
+        // Если velocity известен — учитываем направление к нам
+        if (speedLen > 0.02f) {
+            glm::vec3 toUs    = glm::normalize(myFeet - pearl.position);
+            float     approach = glm::dot(glm::normalize(pearl.velocity), toUs);
+            score = dist * (1.6f - approach * 1.4f);
+        }
 
         if (score < bestScore) { bestScore = score; best = &pearl; }
     }
@@ -438,7 +478,30 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
 
     // Продвигаем velocity на один шаг — StateVector уже применил текущий тик,
     // симуляция должна начинаться со следующего
-    glm::vec3 simVel  = best->velocity;
+    glm::vec3 simVel = best->velocity;
+
+    // Если velocity почти нулевой (лаг/первый тик) — пробуем восстановить из истории позиций
+    if (glm::length(simVel) < 0.02f) {
+        auto itPos  = mPearlPrevPos.find(best->runtimeId);
+        auto itTime = mPearlPrevTime.find(best->runtimeId);
+        if (itPos != mPearlPrevPos.end() && itTime != mPearlPrevTime.end()) {
+            float dtSec = static_cast<float>(nowMs - itTime->second) / 1000.0f;
+            if (dtSec > 0.01f && dtSec < 0.5f) {
+                glm::vec3 empirical = (best->position - itPos->second) / dtSec * 0.05f;
+                if (glm::length(empirical) > 0.02f)
+                    simVel = empirical;
+            }
+        }
+        // Если всё ещё нулевой — пропускаем эту перлу в этом тике
+        // но НЕ удаляем из кеша — поймаем в следующем тике
+        if (glm::length(simVel) < 0.005f) {
+            // Сохраняем позицию для следующего тика
+            mPearlPrevPos[best->runtimeId]  = best->position;
+            mPearlPrevTime[best->runtimeId] = nowMs;
+            return;
+        }
+    }
+
     simVel   *= PEARL_DRAG;
     simVel.y -= PEARL_GRAVITY;
 
