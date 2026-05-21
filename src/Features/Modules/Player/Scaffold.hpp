@@ -62,7 +62,6 @@ public:
     BoolSetting mFallDistanceCheck = BoolSetting("Fall Distance Check", "Whether or not to check fall distance before towering", false);
     BoolSetting mAllowMovement = BoolSetting("Allow Movement", "Whether or not to allow movement while towering", false);
     EnumSettingT<BlockHUDStyle> mBlockHUDStyle = EnumSettingT<BlockHUDStyle>("HUD Style", "The style for the block HUD", BlockHUDStyle::Solstice, "None", "Solstice");
-    //BoolSetting mFlareonV2Placement = BoolSetting("Flareon V2", "Whether or not to use Flareon V2 placement", false);
     BoolSetting mAvoidUnderplace = BoolSetting("Avoid Underplace", "Whether or not to avoid underplacing", false);
     BoolSetting mFastClutch = BoolSetting("Fast Clutch", "Whether or not to use fast clutch", false);
     NumberSetting mClutchFallDistance = NumberSetting("Clutch Fall Dist", "The fall distance to clutch at", 3, 0, 20, 0.01);
@@ -87,7 +86,6 @@ public:
             &mFallDistanceCheck,
             &mAllowMovement,
             &mBlockHUDStyle,
-            //&mFlareonV2Placement,
             &mAvoidUnderplace,
             &mFastClutch,
             &mClutchFallDistance,
@@ -97,11 +95,9 @@ public:
             &mTest);
 
         VISIBILITY_CONDITION(mFlickMode, mRotateMode.mValue != RotateMode::None);
-
         VISIBILITY_CONDITION(mSwitchPriority, mSwitchMode.mValue != SwitchMode::None);
         VISIBILITY_CONDITION(mHotbarOnly, mSwitchMode.mValue != SwitchMode::None);
         VISIBILITY_CONDITION(mTowerSpeed, mTowerMode.mValue != TowerMode::Vanilla);
-
         VISIBILITY_CONDITION(mClutchFallDistance, mFastClutch.mValue);
         VISIBILITY_CONDITION(mCluchPlaces, mFastClutch.mValue);
 
@@ -122,9 +118,6 @@ public:
     uint64_t mLastSwitchTime = 0;
     int mLastSlot = -1;
     bool mShouldClip = false;
-
-
-    // Tower stuff
     bool mIsTowering = false;
 
     void onEnable() override;
@@ -133,12 +126,11 @@ public:
     bool tickPlace(class BaseTickEvent& event);
     void onRenderEvent(class RenderEvent& event);
     void onPacketOutEvent(class PacketOutEvent& event);
+    void onLookInputEvent(class LookInputEvent& event);
     glm::vec3 getRotBasedPos(float extend, float yPos);
     glm::vec3 getPlacePos(float extend);
 
     std::string getSettingDisplay() override {
         return mRotateMode.mValues[mRotateMode.as<int>()];
     }
-
-
 };

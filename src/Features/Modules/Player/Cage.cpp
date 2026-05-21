@@ -3,6 +3,7 @@
 #include <Features/FeatureManager.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
+#include <Features/Modules/Misc/Friends.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/GameMode.hpp>
@@ -12,6 +13,7 @@
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
 #include <SDK/Minecraft/Inventory/Item.hpp>
 #include <SDK/Minecraft/Inventory/ItemStack.hpp>
+#include <SDK/Minecraft/Inventory/SimpleContainer.hpp>
 #include <SDK/Minecraft/Inventory/NetworkItemStackDescriptor.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
@@ -27,10 +29,15 @@
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <glm/glm.hpp>
 #include <algorithm>
+#include <set>
 
-// ═══════════════════════════════════════════════════════════════════════════
+#ifndef PI
+#define PI 3.14159265358979323846f
+#endif
+
+// ═══════════════════════════════════════════════════════════════
 // Enable / Disable
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 
 void Cage::onEnable()
 {
@@ -60,9 +67,9 @@ void Cage::onDisable()
     mCagePositions.clear();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // Helpers
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 
 bool Cage::isAirAt(glm::ivec3 pos)
 {
@@ -85,10 +92,41 @@ int Cage::findBlockSlot()
         if (!stack || !stack->mItem || stack->mCount <= 0) continue;
         if (stack->mBlock) {
             auto* bl = stack->mBlock->toLegacy();
-            if (bl && !bl->isAir()) return i;
+            if (bl && !bl->isAir() && bl->getBlockId() != 30) return i;
         }
     }
     return -1;
+}
+
+int Cage::findWebSlot()
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return -1;
+    auto supplies  = player->getSupplies();
+    auto container = supplies ? supplies->getContainer() : nullptr;
+    if (!container) return -1;
+
+    for (int i = 0; i < 9; i++) {
+        auto* stack = container->getItem(i);
+        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
+        if (stack->mBlock) {
+            auto* bl = stack->mBlock->toLegacy();
+            if (bl && bl->getBlockId() == 30) return i;
+        }
+    }
+    return -1;
+}
+
+static int getArmorCount(Actor* a)
+{
+    auto* armor = a->getArmorContainer();
+    if (!armor) return 0;
+    int count = 0;
+    for (int s = 0; s < 4; s++) {
+        auto* item = armor->getItem(s);
+        if (item && item->mItem) count++;
+    }
+    return count;
 }
 
 Actor* Cage::findTarget()
@@ -97,19 +135,36 @@ Actor* Cage::findTarget()
     if (!player) return nullptr;
 
     glm::vec3 myPos = *player->getPos();
-    float maxRange  = mRange.mValue;
-    Actor* best     = nullptr;
-    float  bestDist = maxRange + 1.f;
+    Actor* best  = nullptr;
+    float  bestVal = FLT_MAX;
 
     for (auto* a : ActorUtils::getActorList(true, true)) {
         if (a == player) continue;
-        float d = glm::distance(myPos, *a->getPos());
-        if (d < bestDist) { bestDist = d; best = a; }
+        if (a->isDead()) continue;
+        if (a->getHealth() <= 0.f) continue;
+
+        bool isPlayer = a->isPlayer();
+        bool isMob    = !isPlayer;
+        if (mTargetMode.mValue == TargetMode::Players && !isPlayer) continue;
+        if (mTargetMode.mValue == TargetMode::Mobs    && !isMob)    continue;
+
+        if (mIgnoreFriends.mValue && gFriendManager && gFriendManager->isFriend(a)) continue;
+
+        float val = 0.f;
+        if (mPriority.mValue == Priority::Closest) {
+            val = glm::distance(myPos, *a->getPos());
+        } else {
+            val = (float)(4 - getArmorCount(a));
+        }
+
+        if (val < bestVal) { bestVal = val; best = a; }
     }
     return best;
 }
 
-// ── TP Packets (identical to RegionFill pattern) ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// TP
+// ═══════════════════════════════════════════════════════════════
 
 std::shared_ptr<MovePlayerPacket> Cage::makeTPPacket(glm::vec3 pos)
 {
@@ -139,13 +194,14 @@ void Cage::tpBetween(glm::vec3 from, glm::vec3 to)
 
     for (float d = 0.f; d < dist; d += step)
         sender->sendToServer(makeTPPacket(from + dir * d).get());
-
     sender->sendToServer(makeTPPacket(to).get());
 }
 
-// ── Place one block (RegionFill approach: TP over block + txn) ────────────
+// ═══════════════════════════════════════════════════════════════
+// Place block
+// ═══════════════════════════════════════════════════════════════
 
-void Cage::placeBlock(glm::ivec3 blockPos, Actor* player)
+void Cage::placeBlockAt(glm::ivec3 blockPos, Actor* player)
 {
     auto sender = ClientInstance::get()->getPacketSender();
     if (!sender) return;
@@ -154,11 +210,7 @@ void Cage::placeBlock(glm::ivec3 blockPos, Actor* player)
     if (side == -1) return;
 
     int slot = findBlockSlot();
-    if (slot == -1) {
-        ChatUtils::displayClientMessage("§c[Cage] No blocks in hotbar!");
-        setEnabled(false);
-        return;
-    }
+    if (slot == -1) return;
 
     auto supplies  = player->getSupplies();
     auto container = supplies ? supplies->getContainer() : nullptr;
@@ -168,16 +220,13 @@ void Cage::placeBlock(glm::ivec3 blockPos, Actor* player)
     glm::vec3 myPos    = *player->getPos();
     glm::vec3 standPos = glm::vec3(blockPos.x + 0.5f, blockPos.y + 2.62f, blockPos.z + 0.5f);
 
-    // TP to position above block
     tpBetween(myPos, standPos);
 
-    // Switch slot if needed
     if (slot != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(slot).get());
 
     if (mSwing.mValue) player->swing();
 
-    // Send place transaction
     {
         auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
         auto cit = std::make_unique<ItemUseInventoryTransaction>();
@@ -190,7 +239,6 @@ void Cage::placeBlock(glm::ivec3 blockPos, Actor* player)
         cit->mPlayerPos            = standPos;
         cit->mClickPos             = BlockUtils::clickPosOffsets[side];
 
-        // Randomize click pos (anti-cheat)
         for (int i = 0; i < 3; i++)
             if (cit->mClickPos[i] == 0.5f)
                 cit->mClickPos[i] = MathUtils::randomFloat(-0.49f, 0.49f);
@@ -199,17 +247,97 @@ void Cage::placeBlock(glm::ivec3 blockPos, Actor* player)
         sender->sendToServer(txn.get());
     }
 
-    // Restore slot
     if (slot != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
 
-    // TP back
     tpBetween(standPos, myPos);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Build cage queue with smart prediction
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// Place web
+// ═══════════════════════════════════════════════════════════════
+
+void Cage::placeWebAt(glm::ivec3 blockPos, Actor* player)
+{
+    auto sender = ClientInstance::get()->getPacketSender();
+    if (!sender) return;
+
+    int slot = findWebSlot();
+    if (slot == -1) return;
+
+    int side = BlockUtils::getBlockPlaceFace(blockPos);
+    if (side == -1) {
+        glm::ivec3 below = blockPos - glm::ivec3(0, 1, 0);
+        side = BlockUtils::getBlockPlaceFace(below);
+        if (side != -1) blockPos = below;
+        else return;
+    }
+
+    auto supplies  = player->getSupplies();
+    auto container = supplies ? supplies->getContainer() : nullptr;
+    if (!supplies || !container) return;
+
+    int       oldSlot  = supplies->mSelectedSlot;
+    glm::vec3 myPos    = *player->getPos();
+    glm::vec3 standPos = glm::vec3(blockPos.x + 0.5f, blockPos.y + 2.62f, blockPos.z + 0.5f);
+
+    tpBetween(myPos, standPos);
+
+    if (slot != oldSlot)
+        sender->sendToServer(PacketUtils::createMobEquipmentPacket(slot).get());
+
+    if (mSwing.mValue) player->swing();
+
+    {
+        auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
+        auto cit = std::make_unique<ItemUseInventoryTransaction>();
+        cit->mActionType           = ItemUseInventoryTransaction::ActionType::Place;
+        cit->mSlot                 = slot;
+        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(slot));
+        cit->mBlockPos             = blockPos + glm::ivec3(BlockUtils::blockFaceOffsets[side]);
+        cit->mFace                 = side;
+        cit->mTargetBlockRuntimeId = 0;
+        cit->mPlayerPos            = standPos;
+        cit->mClickPos             = BlockUtils::clickPosOffsets[side];
+
+        for (int i = 0; i < 3; i++)
+            if (cit->mClickPos[i] == 0.5f)
+                cit->mClickPos[i] = MathUtils::randomFloat(-0.49f, 0.49f);
+
+        txn->mTransaction = std::move(cit);
+        sender->sendToServer(txn.get());
+    }
+
+    if (slot != oldSlot)
+        sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
+
+    tpBetween(standPos, myPos);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Ivec3 comparator for std::set
+// ═══════════════════════════════════════════════════════════════
+
+struct Ivec3Cmp {
+    bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
+        if (a.x != b.x) return a.x < b.x;
+        if (a.y != b.y) return a.y < b.y;
+        return a.z < b.z;
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Build cage queue
+//
+// Логика:
+// 1. Вычисляем "занятые" блоки — где хитбокс цели пересекается
+//    (using 0.3 hitbox margin → up to 4 blocks at feet level)
+// 2. Для блоков: стены = соседние блокы НЕ из занятого множества
+//    (outer ring — даже если цель между 4 блоками, ставим вокруг них)
+// 3. Для паутины: ставим прямо в занятые позиции (web проходит сквозь игрока)
+// 4. Сортировка: сначала блокируем путь отхода (velocity > look dir),
+//    затем стороны, затем спина. Нижние Y первыми (опора для верхних).
+// ═══════════════════════════════════════════════════════════════
 
 void Cage::rebuildQueue()
 {
@@ -217,141 +345,161 @@ void Cage::rebuildQueue()
 
     glm::vec3 tPos = *mTarget->getPos();
 
-    // ── Predict where the target will be ──────────────────────────────────
-    glm::vec3 predictedPos = tPos;
-    if (mPredictMotion.mValue) {
-        float ticks = mPredictTicks.mValue;
-        // mTargetVel is updated each tick
-        predictedPos = tPos + mTargetVel * ticks;
-    }
+    // === Occupied footprint (player hitbox 0.6 wide → 0.3 margin) ===
+    int feetY = (int)std::floor(tPos.y - 1.62f);
 
-    int R = (int)mCageRadius.mValue;
-    int H = (int)mCageHeight.mValue;
+    int minBX = (int)std::floor(tPos.x - 0.3f);
+    int maxBX = (int)std::floor(tPos.x + 0.3f);
+    int minBZ = (int)std::floor(tPos.z - 0.3f);
+    int maxBZ = (int)std::floor(tPos.z + 0.3f);
 
-    // ── Generate ALL cage block positions around predicted location ────────
-    // Use round() for X/Z so cage wraps around the target properly
-    // even when standing on block edges (between 2-4 blocks)
-    // Y uses feet level (pos.y is eye height, subtract 1.62 for feet)
-    glm::ivec3 center = glm::ivec3(
-        (int)std::round(predictedPos.x - 0.5f),
-        (int)std::floor(predictedPos.y - 1.62f),
-        (int)std::round(predictedPos.z - 0.5f));
+    // Occupied blocks at feet AND body level (feetY and feetY+1)
+    std::set<glm::ivec3, Ivec3Cmp> occupied;
+    for (int bx = minBX; bx <= maxBX; bx++)
+        for (int bz = minBZ; bz <= maxBZ; bz++) {
+            occupied.insert({bx, feetY,     bz});
+            occupied.insert({bx, feetY + 1, bz});
+        }
 
-    std::vector<glm::ivec3> walls, ceiling, floor;
+    bool hasWeb    = (findWebSlot()   != -1);
+    bool hasBlocks = (findBlockSlot() != -1);
 
-    // Walls: perimeter of XZ ring at each Y level
-    for (int y = 0; y < H; y++) {
-        for (int x = -R; x <= R; x++) {
-            for (int z = -R; z <= R; z++) {
-                if (!mHollowWalls.mValue) {
-                    // Solid — all blocks inside ring
-                    if (x == -R || x == R || z == -R || z == R) {
-                        walls.push_back({center.x + x, center.y + y, center.z + z});
-                    }
-                } else {
-                    // Perimeter only
-                    if (std::abs(x) == R || std::abs(z) == R) {
-                        walls.push_back({center.x + x, center.y + y, center.z + z});
+    std::vector<glm::ivec3> positions;
+    std::set<glm::ivec3, Ivec3Cmp> seen;
+
+    if (hasWeb) {
+        // ═══ Web: place directly at occupied positions ═══
+        // Web can be placed even if player stands there
+        for (int bx = minBX; bx <= maxBX; bx++)
+            for (int bz = minBZ; bz <= maxBZ; bz++) {
+                glm::ivec3 p1 = {bx, feetY,     bz};
+                glm::ivec3 p2 = {bx, feetY + 1, bz};
+                if (seen.insert(p1).second) positions.push_back(p1);
+                if (seen.insert(p2).second) positions.push_back(p2);
+            }
+    } else if (hasBlocks) {
+        // ═══ Blocks: outer ring (adjacent to occupied, NOT occupied) ═══
+
+        // Scan expanded area (1 block larger in each XZ direction)
+        for (int bx = minBX - 1; bx <= maxBX + 1; bx++)
+            for (int bz = minBZ - 1; bz <= maxBZ + 1; bz++) {
+                // Skip if this XZ column is occupied at any wall Y level
+                bool isOccXZ = false;
+                for (int y = 0; y < 2; y++) {
+                    if (occupied.count({bx, feetY + y, bz})) {
+                        isOccXZ = true;
+                        break;
                     }
                 }
+                if (isOccXZ) continue;
+
+                // Wall blocks at feet + head level
+                for (int y = 0; y < 2; y++) {
+                    glm::ivec3 bp = {bx, feetY + y, bz};
+                    if (seen.insert(bp).second)
+                        positions.push_back(bp);
+                }
             }
+
+        // Ceiling (above occupied area — at feetY + 2)
+        if (mPlaceCeiling.mValue) {
+            for (int bx = minBX; bx <= maxBX; bx++)
+                for (int bz = minBZ; bz <= maxBZ; bz++) {
+                    glm::ivec3 ceil = {bx, feetY + 2, bz};
+                    if (seen.insert(ceil).second)
+                        positions.push_back(ceil);
+                }
+        }
+
+        // Floor (below occupied area — at feetY - 1)
+        if (mPlaceFloor.mValue) {
+            for (int bx = minBX; bx <= maxBX; bx++)
+                for (int bz = minBZ; bz <= maxBZ; bz++) {
+                    glm::ivec3 floor = {bx, feetY - 1, bz};
+                    if (seen.insert(floor).second)
+                        positions.push_back(floor);
+                }
         }
     }
 
-    // Ceiling: solid cap above
-    if (mPlaceCeiling.mValue) {
-        for (int x = -R; x <= R; x++)
-            for (int z = -R; z <= R; z++)
-                ceiling.push_back({center.x + x, center.y + H, center.z + z});
-    }
+    mCagePositions = positions;
 
-    // Floor: one below feet
-    if (mPlaceFloor.mValue) {
-        for (int x = -R; x <= R; x++)
-            for (int z = -R; z <= R; z++)
-                floor.push_back({center.x + x, center.y - 1, center.z + z});
-    }
+    // === Sort: escape path first, lower Y first for support ===
 
-    // ── Sort by priority: cut-off mode puts predicted-path blocks first ───
-    auto toCurrent = *mTarget->getPos();
-    auto velocity  = mTargetVel;
+    glm::vec3 vel = mTargetVel;
+    bool isMoving = glm::length(glm::vec3(vel.x, 0, vel.z)) > 0.01f;
+    glm::vec3 priorityDir(0);
 
-    // Priority function: blocks in front of the target's motion get placed first
-    auto priority = [&](const glm::ivec3& bp) -> float {
-        glm::vec3 bpf(bp.x + 0.5f, bp.y, bp.z + 0.5f);
-        if (mCutoffMode.mValue && glm::length(velocity) > 0.01f) {
-            // Dot product: how much is this block "ahead" of target's movement?
-            glm::vec3 dir = glm::normalize(velocity);
-            glm::vec3 toBlock = bpf - toCurrent;
-            float dot = glm::dot(dir, glm::vec3(toBlock.x, 0.f, toBlock.z));
-            // Negate: higher dot = in front = higher priority
-            return -dot;
+    if (isMoving) {
+        priorityDir = glm::normalize(glm::vec3(vel.x, 0, vel.z));
+    } else {
+        auto rot = mTarget->getActorRotationComponent();
+        if (rot) {
+            float yaw = rot->mYaw * (PI / 180.f);
+            priorityDir = glm::vec3(-sinf(yaw), 0, cosf(yaw));
         }
-        // Default: distance to target (closest first)
-        return glm::distance(bpf, toCurrent);
-    };
+    }
 
-    // Merge: walls first, then ceiling, then floor
-    std::vector<glm::ivec3> all;
-    all.insert(all.end(), walls.begin(),   walls.end());
-    all.insert(all.end(), ceiling.begin(), ceiling.end());
-    all.insert(all.end(), floor.begin(),   floor.end());
+    bool hasPriority = glm::length(priorityDir) > 0.01f;
+    glm::vec3 center(tPos.x, 0, tPos.z);
 
-    // Filter: only air positions
+    std::sort(positions.begin(), positions.end(), [&](const glm::ivec3& a, const glm::ivec3& b) {
+        // Lower Y first — lower blocks support upper ones
+        if (a.y != b.y) return a.y < b.y;
+
+        if (hasPriority) {
+            glm::vec3 ac(a.x + 0.5f, 0, a.z + 0.5f);
+            glm::vec3 bc(b.x + 0.5f, 0, b.z + 0.5f);
+            float da = glm::dot(ac - center, priorityDir);
+            float db = glm::dot(bc - center, priorityDir);
+            if (std::abs(da - db) > 0.1f) return da > db; // ahead first
+        }
+
+        return glm::distance(glm::vec3(a), tPos) < glm::distance(glm::vec3(b), tPos);
+    });
+
+    // Filter: only air blocks
     std::vector<glm::ivec3> needed;
-    for (auto& p : all) {
+    for (auto& p : positions) {
         if (isAirAt(p)) needed.push_back(p);
     }
 
-    // Sort by priority
-    std::sort(needed.begin(), needed.end(), [&](const glm::ivec3& a, const glm::ivec3& b){
-        return priority(a) < priority(b);
-    });
-
-    mPlaceQueue    = std::move(needed);
-    mCagePositions = all; // for ESP (all, not just air)
+    mPlaceQueue = std::move(needed);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // Tick
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 
 void Cage::onBaseTickEvent(BaseTickEvent& event)
 {
     auto player = event.mActor;
     if (!player) return;
 
-    // ── Select target ─────────────────────────────────────────────────────
-    if (mAutoTarget.mValue) {
-        mTarget = findTarget();
-    }
+    mTarget = findTarget();
     if (!mTarget || mTarget->isDead()) {
         mTarget = nullptr;
         mPlaceQueue.clear();
         return;
     }
 
-    // ── Track velocity ────────────────────────────────────────────────────
     glm::vec3 curPos = *mTarget->getPos();
     mTargetVel  = curPos - mTargetPrev;
     mTargetPrev = curPos;
 
-    // ── Check distance ────────────────────────────────────────────────────
-    float dist = glm::distance(*player->getPos(), curPos);
-    if (dist > mRange.mValue) {
-        mPlaceQueue.clear();
-        return;
-    }
+    auto rot = player->getActorRotationComponent();
+    if (rot) mRots = {rot->mPitch, rot->mYaw, rot->mYaw};
 
-    // ── Rebuild queue every tick (target moves) ───────────────────────────
     rebuildQueue();
 
     if (mPlaceQueue.empty()) return;
-
-    // ── Delay ─────────────────────────────────────────────────────────────
     if (NOW - mLastPlace < static_cast<uint64_t>(mDelay.mValue)) return;
 
-    // ── Place N blocks per tick ───────────────────────────────────────────
+    bool hasWeb    = (findWebSlot()   != -1);
+    bool hasBlocks = (findBlockSlot() != -1);
+
+    if (!hasWeb && !hasBlocks) return;
+
     int maxPlace = (int)mBlocksPerTick.mValue;
     int placed   = 0;
 
@@ -359,19 +507,20 @@ void Cage::onBaseTickEvent(BaseTickEvent& event)
         glm::ivec3 pos = mPlaceQueue.front();
         mPlaceQueue.erase(mPlaceQueue.begin());
 
-        // Skip if already filled (another player placed / block update)
         if (!isAirAt(pos)) continue;
 
-        placeBlock(pos, player);
+        if (hasWeb) placeWebAt(pos, player);
+        else        placeBlockAt(pos, player);
+
         placed++;
     }
 
     if (placed > 0) mLastPlace = NOW;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Render — ESP highlight for cage positions
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════════════════════════
 
 void Cage::onRenderEvent(RenderEvent& event)
 {
@@ -379,25 +528,22 @@ void Cage::onRenderEvent(RenderEvent& event)
 
     float now = (float)ImGui::GetTime();
 
-
     for (auto& pos : mCagePositions) {
         if (!isAirAt(pos)) continue;
         AABB box(
             glm::vec3(pos.x,     pos.y,     pos.z),
             glm::vec3(pos.x + 1, pos.y + 1, pos.z + 1)
         );
-        // filled tint
-        ImColor fill = ColorUtils::getThemedColor(now * 50.f);
-        fill.Value.w  = 0.10f + 0.05f * sinf(now * 4.f);
+        ImColor fill    = ColorUtils::getThemedColor(now * 50.f);
+        fill.Value.w    = 0.10f + 0.05f * sinf(now * 4.f);
         ImColor outline = ColorUtils::getThemedColor(now * 50.f + 45.f);
         outline.Value.w = 0.75f;
-        RenderUtils::drawOutlinedAABB(box, true, fill);
+        RenderUtils::drawOutlinedAABB(box, true,  fill);
         RenderUtils::drawOutlinedAABB(box, false, outline);
     }
 
-    // Highlight target
     if (mTarget) {
-        AABB tbox = mTarget->getAABB();
+        AABB tbox  = mTarget->getAABB();
         float pulse = 0.5f + 0.25f * sinf(now * 6.f);
         ImColor fill = ImColor(1.f, 0.3f, 0.3f, pulse * 0.5f);
         ImColor out  = ImColor(1.f, 0.2f, 0.2f, 0.9f);

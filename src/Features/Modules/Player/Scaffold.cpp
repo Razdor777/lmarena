@@ -7,6 +7,7 @@
 #include <Features/FeatureManager.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
+#include <Features/Events/LookInputEvent.hpp>
 #include <Features/Modules/Combat/Aura.hpp>
 #include <Features/Modules/Misc/TestModule.hpp>
 #include <Features/Modules/Visual/Interface.hpp>
@@ -15,15 +16,13 @@
 #include <SDK/Minecraft/Network/PacketID.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
-#include <Features/Modules/Visual/Interface.hpp>
-#include <Features/FeatureManager.hpp>
 #include <SDK/Minecraft/KeyboardMouseSettings.hpp>
 
 void Scaffold::onEnable()
 {
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &Scaffold::onBaseTickEvent, nes::event_priority::LAST>(this);
     gFeatureManager->mDispatcher->listen<PacketOutEvent, &Scaffold::onPacketOutEvent, nes::event_priority::VERY_LAST>(this);
-
+    gFeatureManager->mDispatcher->listen<LookInputEvent, &Scaffold::onLookInputEvent>(this);
 
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
@@ -36,8 +35,8 @@ void Scaffold::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &Scaffold::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Scaffold::onPacketOutEvent>(this);
+    gFeatureManager->mDispatcher->deafen<LookInputEvent, &Scaffold::onLookInputEvent>(this);
 
-    // Reset fields
     mStartY = 0.f;
     mLastBlock = {0, 0, 0};
     mLastFace = 0;
@@ -59,8 +58,6 @@ void Scaffold::onDisable()
         }
     }
 }
-
-
 
 void Scaffold::onBaseTickEvent(BaseTickEvent& event)
 {
@@ -85,20 +82,17 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
 {
     auto player = event.mActor;
 
-    // components
     auto moveInput = player->getMoveInputComponent();
     auto actorRot = player->getActorRotationComponent();
     auto stateVec = player->getStateVectorComponent();
 
-
     auto currentY = player->getPos()->y - 2.62f;
     if (!mLockY.mValue) mStartY = currentY;
     if (player->getPos()->y - 2.62f < mStartY) mStartY = player->getPos()->y - 2.62f;
-    // If space is held unlock Y
     if (moveInput->mIsJumping && !Keyboard::isUsingMoveKeys()) mStartY = currentY;
-    float yaw = actorRot ->mYaw + MathUtils::getRotationKeyOffset() + 90;
+    float yaw = actorRot->mYaw + MathUtils::getRotationKeyOffset() + 90;
 
-    glm::vec3 velocity = stateVec ->mVelocity;
+    glm::vec3 velocity = stateVec->mVelocity;
 
     bool isMoving = Keyboard::isUsingMoveKeys();
 
@@ -109,12 +103,12 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
         if (mIsTowering)
         {
             mIsTowering = false;
-            stateVec ->mVelocity.y = -5.0f;
+            stateVec->mVelocity.y = -5.0f;
         }
         return false;
     }
 
-    if (mSwitchMode.mValue == SwitchMode::Fake && mLastSlot != -1) player->getSupplies()->mInHandSlot = mLastSlot; // Change the
+    if (mSwitchMode.mValue == SwitchMode::Fake && mLastSlot != -1) player->getSupplies()->mInHandSlot = mLastSlot;
 
     if (mPlacementMode.mValue == PlacementMode::Flareon)
     {
@@ -128,11 +122,9 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
         maxExtend = 0.f;
     }
 
-    //bool space = Keyboard::mPressedKeys[VK_SPACE];
     auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
     bool space = Keyboard::mPressedKeys[keyboard["key.jump"]];
     bool wasTowering = mIsTowering;
-
 
     float fallDistance = player->getFallDistance();
     if (!mFallDistanceCheck.mValue) fallDistance = 0.f;
@@ -147,53 +139,54 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
             {
                 if (!mAllowMovement.mValue)
                 {
-                    stateVec ->mVelocity.x = 0;
-                    stateVec ->mVelocity.z = 0;
+                    stateVec->mVelocity.x = 0;
+                    stateVec->mVelocity.z = 0;
                 } else if (!player->isOnGround())
                 {
-                    glm::vec2 currentMotion = {stateVec ->mVelocity.x, stateVec ->mVelocity.z};
+                    glm::vec2 currentMotion = {stateVec->mVelocity.x, stateVec->mVelocity.z};
                     float movementSpeed = sqrt(currentMotion.x * currentMotion.x + currentMotion.y * currentMotion.y);
                     float movementYaw = atan2(currentMotion.y, currentMotion.x);
                     float moveYawDeg = movementYaw * (180 / IM_PI) - 90.f;
-                    float playerYawDeg = actorRot ->mYaw + MathUtils::getRotationKeyOffset();
+                    float playerYawDeg = actorRot->mYaw + MathUtils::getRotationKeyOffset();
                     float yawDiff = playerYawDeg - moveYawDeg;
                     float yawDiffRad = yawDiff * (IM_PI / 180);
                     float newMoveYaw = movementYaw + yawDiffRad;
-                    stateVec ->mVelocity.x = cos(newMoveYaw) * movementSpeed;;
-                    stateVec ->mVelocity.z = sin(newMoveYaw) * movementSpeed;
+                    stateVec->mVelocity.x = cos(newMoveYaw) * movementSpeed;
+                    stateVec->mVelocity.z = sin(newMoveYaw) * movementSpeed;
                 }
                 mStartY = player->getPos()->y;
                 mIsTowering = true;
-                stateVec ->mVelocity.y = mTowerSpeed.mValue / 10;
+                stateVec->mVelocity.y = mTowerSpeed.mValue / 10;
                 maxExtend = 0.f;
             }
             else if (wasTowering)
             {
                 mIsTowering = false;
-                stateVec ->mVelocity.y = -5.0f;
+                stateVec->mVelocity.y = -5.0f;
             }
             break;
         }
-    case TowerMode::Clip: {
+    case TowerMode::Clip:
+        {
             if (ClientInstance::get()->getMouseGrabbed()) break;
             if ((space && mAllowMovement.mValue || space && !isMoving) && fallDistance < 3.f)
             {
                 if (!mAllowMovement.mValue)
                 {
-                    stateVec ->mVelocity.x = 0;
-                    stateVec ->mVelocity.z = 0;
+                    stateVec->mVelocity.x = 0;
+                    stateVec->mVelocity.z = 0;
                 } else if (!player->isOnGround())
                 {
-                    glm::vec2 currentMotion = {stateVec ->mVelocity.x, stateVec ->mVelocity.z};
+                    glm::vec2 currentMotion = {stateVec->mVelocity.x, stateVec->mVelocity.z};
                     float movementSpeed = sqrt(currentMotion.x * currentMotion.x + currentMotion.y * currentMotion.y);
                     float movementYaw = atan2(currentMotion.y, currentMotion.x);
                     float moveYawDeg = movementYaw * (180 / IM_PI) - 90.f;
-                    float playerYawDeg = actorRot ->mYaw + MathUtils::getRotationKeyOffset();
+                    float playerYawDeg = actorRot->mYaw + MathUtils::getRotationKeyOffset();
                     float yawDiff = playerYawDeg - moveYawDeg;
                     float yawDiffRad = yawDiff * (IM_PI / 180);
                     float newMoveYaw = movementYaw + yawDiffRad;
-                    stateVec ->mVelocity.x = cos(newMoveYaw) * movementSpeed;;
-                    stateVec ->mVelocity.z = sin(newMoveYaw) * movementSpeed;
+                    stateVec->mVelocity.x = cos(newMoveYaw) * movementSpeed;
+                    stateVec->mVelocity.z = sin(newMoveYaw) * movementSpeed;
                 }
                 mStartY = player->getPos()->y;
                 mIsTowering = true;
@@ -203,11 +196,10 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
             else if (wasTowering)
             {
                 mIsTowering = false;
-                stateVec ->mVelocity.y = -5.0f;
+                stateVec->mVelocity.y = -5.0f;
             }
+        }
     }
-    }
-
 
     if (!BlockUtils::isAirBlock(blockPos) && !mIsTowering)
     {
@@ -258,9 +250,44 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
     return true;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Visual rotation — поворот камеры клиента
+// ═══════════════════════════════════════════════════════════════
+
+void Scaffold::onLookInputEvent(LookInputEvent& event)
+{
+    if (!mShouldRotate || mRotateMode.mValue == RotateMode::None) return;
+    if (!event.mCameraDirectLookComponent) return;
+
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+
+    glm::vec3 side = BlockUtils::blockFaceOffsets[mLastFace] * 0.5f;
+    glm::vec3 target = mLastBlock + side;
+    glm::vec2 rotations = MathUtils::getRots(*player->getPos(), target);
+
+    if (mRotateMode.mValue == RotateMode::Normal)
+        rotations.x = fmax(rotations.x, 82.f);
+    if (mRotateMode.mValue == RotateMode::Down)
+        rotations.x = 89.9f;
+    if (mRotateMode.mValue == RotateMode::Backwards)
+    {
+        rotations.y += 180.f;
+        if (rotations.y > 180.f)  rotations.y -= 360.f;
+        if (rotations.y < -180.f) rotations.y += 360.f;
+    }
+
+    // mRotRads = {yaw, pitch} в радианах
+    event.mCameraDirectLookComponent->mRotRads.x = glm::radians(rotations.y);
+    event.mCameraDirectLookComponent->mRotRads.y = glm::radians(rotations.x);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════════════════════════
+
 void Scaffold::onRenderEvent(RenderEvent& event)
 {
-
     if (mBlockHUDStyle.mValue == BlockHUDStyle::None) return;
 
     auto player = ClientInstance::get()->getLocalPlayer();
@@ -298,15 +325,13 @@ void Scaffold::onRenderEvent(RenderEvent& event)
     auto fontSel = daInterface->mFont.as<Interface::FontType>();
     if (fontSel == Interface::FontType::ProductSans) {
         FontHelper::pushPrefFont(true, true);
-    }
-    else {
+    } else {
         FontHelper::pushPrefFont(true);
     }
 
     float fontSize = 25.f * anim;
 
     ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, text.c_str());
-    // Compensate for anim
     pos.x -= textSize.x / 2;
     pos.y -= textSize.y / 2;
 
@@ -317,14 +342,11 @@ void Scaffold::onRenderEvent(RenderEvent& event)
 
     ImColor color = ImColor(255, 255, 255, 255);
 
-    // Center the text on the bg
-
     for (int i = 0; i < displayText.size(); i++) {
         color = ColorUtils::getThemedColor(i * 100);
         color.Value.w = color.Value.w * anim;
         ImVec2 ptextSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, std::string(1, displayText[i]).c_str());
 
-        //Render::RenderText(std::string(1, display[i]), pos, fontSize, ImColor(color.Value.x, color.Value.y, color.Value.z, color.Value.w * inScale), true);
         ImVec2 shadowPos = ImVec2(pos.x + 2, pos.y + 2);
         drawList->AddText(ImGui::GetFont(), fontSize, shadowPos, ImColor(color.Value.x * 0.25f, color.Value.y * 0.25f, color.Value.z * 0.25f, 0.9f), std::string(1, displayText[i]).c_str());
         drawList->AddText(ImGui::GetFont(), fontSize, pos, color, std::string(1, displayText[i]).c_str());
@@ -333,15 +355,12 @@ void Scaffold::onRenderEvent(RenderEvent& event)
 
     int colorStartingIndex = displayText.size() * 100;
 
-    // render da number
-    // Smoothly animate the number
     static std::vector<std::string> numbers = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
     static std::string joinedNumbers = StringUtils::join(numbers, "\n");
 
     int num = totalBlocks;
     std::string numStr = std::to_string(num);
 
-    // Add a cliprect to the drawlist
     ImVec2 numTextSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, numStr.c_str());
 
     ImVec2 clipRectMin = ImVec2(pos.x, pos.y);
@@ -349,9 +368,7 @@ void Scaffold::onRenderEvent(RenderEvent& event)
 
     drawList->PushClipRect(clipRectMin, clipRectMax, true);
 
-    // Render the number
     for (int i = 0; i < numStr.size(); i++) {
-        // Calc text size
         std::string num = std::string(1, numStr[i]);
         int realNum = std::stoi(num);
         ImVec2 ptextSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, num.c_str());
@@ -363,31 +380,26 @@ void Scaffold::onRenderEvent(RenderEvent& event)
             indexOffsetMap[i] = offset;
         }
 
-        // Scroll the number smoothly to the offset
         ImVec2 daPos = ImVec2((float)i * (float)ptextSize.x + pos.x, (float)-indexOffsetMap[i] + pos.y);
 
         color = ColorUtils::getThemedColor(colorStartingIndex + i * 100);
         color.Value.w = color.Value.w * anim;
 
-        // Draw the number
-        //Render::RenderText(joinedNumbers, daPos, fontSize, ImColor(color.Value.x, color.Value.y, color.Value.z, color.Value.w * AnimationPerc), true);
         ImVec2 shadowPos = ImVec2(daPos.x + 2, daPos.y + 2);
         drawList->AddText(ImGui::GetFont(), fontSize, shadowPos, ImColor(color.Value.x * 0.25f, color.Value.y * 0.25f, color.Value.z * 0.25f, 0.9f * anim), joinedNumbers.c_str());
         drawList->AddText(ImGui::GetFont(), fontSize, daPos, color, joinedNumbers.c_str());
-        // we will cliprect this later
 
-        // lerp da offset
         indexOffsetMap[i] = MathUtils::lerp(indexOffsetMap[i], offset, ImGui::GetIO().DeltaTime * 10.f);
     }
 
     drawList->PopClipRect();
 
-
     ImGui::PopFont();
-
 }
 
-
+// ═══════════════════════════════════════════════════════════════
+// Packet Out — серверная ротация + clickPos фикс
+// ═══════════════════════════════════════════════════════════════
 
 void Scaffold::onPacketOutEvent(PacketOutEvent& event)
 {
@@ -427,19 +439,12 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
         {
             glm::vec3 side = BlockUtils::blockFaceOffsets[mLastFace] * 0.5f;
             glm::vec3 target = mLastBlock + side;
-
             auto pos = *player->getPos();
-
             glm::vec2 rotations = MathUtils::getRots(pos, target);
 
-
             if (mRotateMode.mValue == RotateMode::Normal) {
-                // Keep calculated yaw pointing toward the block face
-                // rotations already has correct yaw from getRots()
-                // Clamp pitch to always look downward (82+ degrees)
                 rotations.x = fmax(rotations.x, 82.f);
             }
-
             if (mRotateMode.mValue == RotateMode::Down) rotations.x = 89.9f;
             if (mRotateMode.mValue == RotateMode::Backwards)
             {
@@ -449,27 +454,22 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
             }
 
             bool flickRotate = false;
-
             auto auraMod = gFeatureManager->mModuleManager->getModule<Aura>();
 
-            if (auraMod->sHasTarget && mFlickMode.mValue == FlickMode::Combat || mFlickMode.mValue == FlickMode::Always) flickRotate = true;
+            if (auraMod->sHasTarget && mFlickMode.mValue == FlickMode::Combat || mFlickMode.mValue == FlickMode::Always)
+                flickRotate = true;
 
-            if (flickRotate) mShouldRotate = false;
-            else
+            // Aura + FlickMode::None → не трогаем PAIP, но визуальная ротация работает
+            bool skipPacket = (auraMod->sHasTarget && mFlickMode.mValue == FlickMode::None);
+
+            if (!skipPacket && !flickRotate)
             {
-                // If the last block placed was more than 500ms ago, then ShouldRotate = false
-                if (NOW - mLastSwitchTime > 500) mShouldRotate = false;
+                paip->mRot = rotations;
+                paip->mYHeadRot = rotations.y;
             }
 
-            if (auraMod->sHasTarget && mFlickMode.mValue == FlickMode::None)
-            {
+            if (flickRotate || NOW - mLastSwitchTime > 500)
                 mShouldRotate = false;
-                flickRotate = false;
-                return;
-            }
-
-            paip->mRot = rotations;
-            paip->mYHeadRot = rotations.y;
         }
     }
 }
@@ -492,7 +492,6 @@ glm::vec3 Scaffold::getRotBasedPos(float extend, float yPos)
     float placeY = yPos;
     float placeZ = player->getPos()->z + inFrontZ;
 
-    // Floor the values
     return {floor(placeX), floor(placeY), floor(placeZ)};
 }
 
@@ -515,7 +514,6 @@ glm::vec3 Scaffold::getPlacePos(float extend)
             blockSel.y = player->getPos()->y - 3.62f;
         }
 
-        // Find da block
         blockSel = BlockUtils::getClosestPlacePos(blockSel, mRange.as<float>());
         if (blockSel.x == INT_MAX) return {FLT_MAX, FLT_MAX, FLT_MAX};
         side = BlockUtils::getBlockPlaceFace(blockSel);

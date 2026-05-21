@@ -28,136 +28,93 @@
 #define PI 3.14159265358979323846f
 #endif
 
-// =========================================================
-// SAFE ACTOR CHECK — единственное место проверки валидности
-// Всё остальное использует только эту функцию
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+// SAFE ACTOR CHECK
+// ═══════════════════════════════════════════════════════════════
+
 bool InfiniteAura::isActorSafeToUse(Actor *actor) {
   if (!actor)
     return false;
 
-  // Проверяем через реестр — это единственный надёжный способ
   auto player = ClientInstance::get()->getLocalPlayer();
   if (!player)
     return false;
 
-  // Проверяем что EntityId валиден в реестре
   if (!player->mContext.mRegistry->valid(actor->mContext.mEntityId))
     return false;
 
-  // Теперь безопасно вызывать методы
   return true;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // KEY NAME
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 const char *InfiniteAura::getKeyName(int vk) {
   static char buf[32];
   switch (vk) {
-  case 0:
-    return "None";
-  case VK_LBUTTON:
-    return "LMB";
-  case VK_RBUTTON:
-    return "RMB";
-  case VK_MBUTTON:
-    return "MMB";
-  case VK_BACK:
-    return "Back";
-  case VK_TAB:
-    return "Tab";
-  case VK_RETURN:
-    return "Enter";
-  case VK_SHIFT:
-    return "Shift";
-  case VK_CONTROL:
-    return "Ctrl";
-  case VK_MENU:
-    return "Alt";
-  case VK_ESCAPE:
-    return "Esc";
-  case VK_SPACE:
-    return "Space";
-  case VK_DELETE:
-    return "Del";
-  case VK_INSERT:
-    return "Ins";
-  case VK_HOME:
-    return "Home";
-  case VK_END:
-    return "End";
-  case VK_CAPITAL:
-    return "CapsLock";
-  default:
-    break;
+  case 0: return "None";
+  case VK_LBUTTON: return "LMB";
+  case VK_RBUTTON: return "RMB";
+  case VK_MBUTTON: return "MMB";
+  case VK_BACK: return "Back";
+  case VK_TAB: return "Tab";
+  case VK_RETURN: return "Enter";
+  case VK_SHIFT: return "Shift";
+  case VK_CONTROL: return "Ctrl";
+  case VK_MENU: return "Alt";
+  case VK_ESCAPE: return "Esc";
+  case VK_SPACE: return "Space";
+  case VK_DELETE: return "Del";
+  case VK_INSERT: return "Ins";
+  case VK_HOME: return "Home";
+  case VK_END: return "End";
+  case VK_CAPITAL: return "CapsLock";
+  default: break;
   }
-  if (vk >= VK_F1 && vk <= VK_F12) {
-    snprintf(buf, 32, "F%d", vk - VK_F1 + 1);
-    return buf;
-  }
-  if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) {
-    snprintf(buf, 32, "Num%d", vk - VK_NUMPAD0);
-    return buf;
-  }
-  if ((vk >= '0' && vk <= '9') || (vk >= 'A' && vk <= 'Z')) {
-    snprintf(buf, 32, "%c", (char)vk);
-    return buf;
-  }
+  if (vk >= VK_F1 && vk <= VK_F12) { snprintf(buf, 32, "F%d", vk - VK_F1 + 1); return buf; }
+  if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) { snprintf(buf, 32, "Num%d", vk - VK_NUMPAD0); return buf; }
+  if ((vk >= '0' && vk <= '9') || (vk >= 'A' && vk <= 'Z')) { snprintf(buf, 32, "%c", (char)vk); return buf; }
   snprintf(buf, 32, "0x%02X", vk);
   return buf;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // KEY HELPERS
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 bool InfiniteAura::sIsAnyKeyHeld() {
   for (int vk = 8; vk <= 254; vk++) {
-    if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU)
-      continue;
-    if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-      continue;
-    if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-      continue;
-    if (vk == VK_LMENU || vk == VK_RMENU)
-      continue;
-    if (vk == VK_LWIN || vk == VK_RWIN)
-      continue;
-    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON)
-      continue;
-    if (vk == VK_ESCAPE)
-      continue;
-    if (GetAsyncKeyState(vk) & 0x8000)
-      return true;
+    if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU) continue;
+    if (vk == VK_LSHIFT || vk == VK_RSHIFT) continue;
+    if (vk == VK_LCONTROL || vk == VK_RCONTROL) continue;
+    if (vk == VK_LMENU || vk == VK_RMENU) continue;
+    if (vk == VK_LWIN || vk == VK_RWIN) continue;
+    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
+    if (vk == VK_ESCAPE) continue;
+    if (GetAsyncKeyState(vk) & 0x8000) return true;
   }
   return false;
 }
 
 int InfiniteAura::sFindHeldKey() {
   for (int vk = 8; vk <= 254; vk++) {
-    if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU)
-      continue;
-    if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-      continue;
-    if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-      continue;
-    if (vk == VK_LMENU || vk == VK_RMENU)
-      continue;
-    if (vk == VK_LWIN || vk == VK_RWIN)
-      continue;
-    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON)
-      continue;
-    if (vk == VK_ESCAPE)
-      continue;
-    if (GetAsyncKeyState(vk) & 0x8000)
-      return vk;
+    if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU) continue;
+    if (vk == VK_LSHIFT || vk == VK_RSHIFT) continue;
+    if (vk == VK_LCONTROL || vk == VK_RCONTROL) continue;
+    if (vk == VK_LMENU || vk == VK_RMENU) continue;
+    if (vk == VK_LWIN || vk == VK_RWIN) continue;
+    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
+    if (vk == VK_ESCAPE) continue;
+    if (GetAsyncKeyState(vk) & 0x8000) return vk;
   }
   return -1;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // ENABLE / DISABLE
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 void InfiniteAura::onEnable() {
   gFeatureManager->mDispatcher
       ->listen<BaseTickEvent, &InfiniteAura::onBaseTickEvent>(this);
@@ -212,9 +169,10 @@ void InfiniteAura::onDisable() {
   mLastPositions.clear();
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // SERIALIZATION
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 nlohmann::json InfiniteAura::serializeCustomData() {
   nlohmann::json j;
   j["lockTargetKey"] = mLockTargetKey;
@@ -222,64 +180,52 @@ nlohmann::json InfiniteAura::serializeCustomData() {
 }
 
 void InfiniteAura::deserializeCustomData(const nlohmann::json &j) {
-  // Если json пустой — НЕ сбрасываем, оставляем текущее значение
-  if (j.is_null() || j.empty())
-    return;
-
+  if (j.is_null() || j.empty()) return;
   if (j.contains("lockTargetKey") && j["lockTargetKey"].is_number())
     mLockTargetKey = j["lockTargetKey"].get<int>();
-  // Если ключа нет — тоже не сбрасываем
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // LOCK KEY
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 bool InfiniteAura::isLockKeyJustPressed(int vk) {
-  if (vk <= 0)
-    return false;
+  if (vk <= 0) return false;
   bool down = (GetAsyncKeyState(vk) & 0x8000) != 0;
   bool was = mLockKeyStates[vk];
   mLockKeyStates[vk] = down;
   return down && !was;
 }
 
-// =========================================================
-// GET LOCKED TARGET — безопасно
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+// GET LOCKED TARGET
+// ═══════════════════════════════════════════════════════════════
+
 Actor *InfiniteAura::getLockedTarget() {
-  if (mLockedTargetRuntimeID == -1)
-    return nullptr;
-
+  if (mLockedTargetRuntimeID == -1) return nullptr;
   Actor *actor = ActorUtils::getActorFromRuntimeID(mLockedTargetRuntimeID);
-  if (!actor)
-    return nullptr;
-
-  // Проверяем через реестр
-  if (!isActorSafeToUse(actor))
-    return nullptr;
-
+  if (!actor) return nullptr;
+  if (!isActorSafeToUse(actor)) return nullptr;
   return actor;
 }
 
 void InfiniteAura::clearLockedTarget() { mLockedTargetRuntimeID = -1; }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // RAYCAST TO ACTOR
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 Actor *InfiniteAura::raycastToActor(float maxAngle) {
   auto player = ClientInstance::get()->getLocalPlayer();
-  if (!player)
-    return nullptr;
+  if (!player) return nullptr;
 
   auto rot = player->getActorRotationComponent();
-  if (!rot)
-    return nullptr;
+  if (!rot) return nullptr;
 
   float yaw = rot->mYaw * (PI / 180.f);
   float pitch = rot->mPitch * (PI / 180.f);
 
-  glm::vec3 lookDir(-sinf(yaw) * cosf(pitch), -sinf(pitch),
-                    cosf(yaw) * cosf(pitch));
+  glm::vec3 lookDir(-sinf(yaw) * cosf(pitch), -sinf(pitch), cosf(yaw) * cosf(pitch));
   lookDir = glm::normalize(lookDir);
 
   glm::vec3 playerPos = *player->getPos();
@@ -290,13 +236,11 @@ Actor *InfiniteAura::raycastToActor(float maxAngle) {
   float bestDist = FLT_MAX;
 
   for (auto actor : actors) {
-    if (!isValidTarget(actor, player))
-      continue;
+    if (!isValidTarget(actor, player)) continue;
 
     glm::vec3 toActor = *actor->getPos() - playerPos;
     float dist = glm::length(toActor);
-    if (dist < 0.01f)
-      continue;
+    if (dist < 0.01f) continue;
 
     toActor = glm::normalize(toActor);
     float dot = std::clamp(glm::dot(lookDir, toActor), -1.f, 1.f);
@@ -315,81 +259,64 @@ Actor *InfiniteAura::raycastToActor(float maxAngle) {
   return bestActor;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // IS LOCKED TARGET VALID
-// ВАЖНО: никаких вызовов методов Actor без isActorSafeToUse!
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 bool InfiniteAura::isLockedTargetValid() {
-  if (mLockedTargetRuntimeID == -1)
-    return false;
+  if (mLockedTargetRuntimeID == -1) return false;
 
   auto player = ClientInstance::get()->getLocalPlayer();
-  if (!player)
-    return false;
+  if (!player) return false;
 
   Actor *locked = ActorUtils::getActorFromRuntimeID(mLockedTargetRuntimeID);
-  if (!locked)
-    return false;
+  if (!locked) return false;
 
-  // СНАЧАЛА проверяем реестр — только потом вызываем методы
-  if (!isActorSafeToUse(locked))
-    return false;
+  if (!isActorSafeToUse(locked)) return false;
 
-  // Теперь безопасно
-  if (locked->isDead())
-    return false;
-  if (locked->getHealth() <= 0.f)
-    return false;
+  if (locked->isDead()) return false;
+  if (locked->getHealth() <= 0.f) return false;
 
-  if (!isValidTarget(locked, player))
-    return false;
+  if (!isValidTarget(locked, player)) return false;
 
   if (mAutoUnlock.mValue && !mInfiniteRange.mValue) {
-    if (locked->distanceTo(player) > mMaxLockDistance.mValue)
-      return false;
+    if (locked->distanceTo(player) > mMaxLockDistance.mValue) return false;
   }
 
   return true;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // FIND ACTOR BY NAME
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 Actor *InfiniteAura::findActorByLockedName() {
-  if (mLockedTargetName.empty())
-    return nullptr;
+  if (mLockedTargetName.empty()) return nullptr;
 
   auto player = ClientInstance::get()->getLocalPlayer();
-  if (!player)
-    return nullptr;
+  if (!player) return nullptr;
 
   auto actors = ActorUtils::getActorList(true, true);
   for (auto actor : actors) {
-    if (!isActorSafeToUse(actor))
-      continue;
-    if (actor == player)
-      continue;
-    if (actor->isDead())
-      continue;
+    if (!isActorSafeToUse(actor)) continue;
+    if (actor == player) continue;
+    if (actor->isDead()) continue;
 
     try {
-      if (actor->getRawName() == mLockedTargetName)
-        return actor;
-    } catch (...) {
-    }
+      if (actor->getRawName() == mLockedTargetName) return actor;
+    } catch (...) {}
   }
   return nullptr;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // UPDATE LOCK TARGET
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 void InfiniteAura::updateLockTarget() {
-  if (mIsBindingLockKey)
-    return;
+  if (mIsBindingLockKey) return;
 
   if (mLockedTargetRuntimeID != -1 && !isLockedTargetValid()) {
-    // Пробуем найти по имени (возрождение меняет RuntimeID)
     Actor *newActor = findActorByLockedName();
     if (newActor && isActorSafeToUse(newActor)) {
       int64_t newID = newActor->getRuntimeID();
@@ -399,23 +326,14 @@ void InfiniteAura::updateLockTarget() {
       }
     }
 
-    // Определяем причину разлока БЕЗОПАСНО
     std::string reason = "lost";
 
     Actor *old = ActorUtils::getActorFromRuntimeID(mLockedTargetRuntimeID);
-    // Только если актор ещё валиден в реестре — проверяем детали
     if (old && isActorSafeToUse(old)) {
-      // Теперь безопасно вызывать методы
       bool dead = false;
       float hp = 1.f;
-      try {
-        dead = old->isDead();
-      } catch (...) {
-      }
-      try {
-        hp = old->getHealth();
-      } catch (...) {
-      }
+      try { dead = old->isDead(); } catch (...) {}
+      try { hp = old->getHealth(); } catch (...) {}
 
       if (dead || hp <= 0.f) {
         reason = "dead";
@@ -423,28 +341,21 @@ void InfiniteAura::updateLockTarget() {
         auto player = ClientInstance::get()->getLocalPlayer();
         if (player) {
           float dist = 0.f;
-          try {
-            dist = old->distanceTo(player);
-          } catch (...) {
-          }
-          if (dist > mMaxLockDistance.mValue)
-            reason = "too far";
+          try { dist = old->distanceTo(player); } catch (...) {}
+          if (dist > mMaxLockDistance.mValue) reason = "too far";
         }
       }
     }
 
-    NotifyUtils::notify("§cTarget unlocked: " + reason, 2.f,
-                        Notification::Type::Warning);
+    NotifyUtils::notify("§cTarget unlocked: " + reason, 2.f, Notification::Type::Warning);
     clearLockedTarget();
     mLockedTargetName.clear();
   }
 
-  // Нажатие клавиши лока
   if (isLockKeyJustPressed(mLockTargetKey)) {
     Actor *raycastTarget = raycastToActor(mLockFOV.mValue);
     int64_t raycastID = (raycastTarget && isActorSafeToUse(raycastTarget))
-                            ? raycastTarget->getRuntimeID()
-                            : -1;
+                            ? raycastTarget->getRuntimeID() : -1;
 
     if (raycastID != -1 && raycastID == mLockedTargetRuntimeID) {
       clearLockedTarget();
@@ -453,14 +364,8 @@ void InfiniteAura::updateLockTarget() {
       ClientInstance::get()->playUi("random.orb", 1.0f, 0.8f);
     } else if (raycastID != -1) {
       mLockedTargetRuntimeID = raycastID;
-      try {
-        mLockedTargetName = raycastTarget->getRawName();
-      } catch (...) {
-        mLockedTargetName.clear();
-      }
-
-      NotifyUtils::notify("§aLocked: §f" + mLockedTargetName, 2.5f,
-                          Notification::Type::Info);
+      try { mLockedTargetName = raycastTarget->getRawName(); } catch (...) { mLockedTargetName.clear(); }
+      NotifyUtils::notify("§aLocked: §f" + mLockedTargetName, 2.5f, Notification::Type::Info);
       ClientInstance::get()->playUi("random.orb", 1.0f, 1.2f);
     } else {
       if (mLockedTargetRuntimeID != -1) {
@@ -473,11 +378,11 @@ void InfiniteAura::updateLockTarget() {
   }
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // CREATE MOVE PACKET
-// =========================================================
-std::shared_ptr<MovePlayerPacket>
-InfiniteAura::createPacketForPos(glm::vec3 pos) {
+// ═══════════════════════════════════════════════════════════════
+
+std::shared_ptr<MovePlayerPacket> InfiniteAura::createPacketForPos(glm::vec3 pos) {
   auto player = ClientInstance::get()->getLocalPlayer();
   auto packet = MinecraftPackets::createPacket<MovePlayerPacket>();
   packet->mPos = pos;
@@ -493,14 +398,13 @@ InfiniteAura::createPacketForPos(glm::vec3 pos) {
   return packet;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // STRAIGHT LINE TP
-// =========================================================
-void InfiniteAura::straightLineTP(glm::vec3 from, glm::vec3 to,
-                                  bool saveForRender) {
+// ═══════════════════════════════════════════════════════════════
+
+void InfiniteAura::straightLineTP(glm::vec3 from, glm::vec3 to, bool saveForRender) {
   auto sender = ClientInstance::get()->getPacketSender();
-  if (!sender)
-    return;
+  if (!sender) return;
 
   float stepSize = mStepDistance.mValue;
   glm::vec3 diff = to - from;
@@ -531,16 +435,14 @@ void InfiniteAura::straightLineTP(glm::vec3 from, glm::vec3 to,
   }
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // KB DIRECTION + POSITION PREDICTION
-// Predicts where the target will be when the attack reaches server
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 glm::vec3 InfiniteAura::getAttackPosition(Actor *target, Actor *player) {
   glm::vec3 targetPos = *target->getPos();
   int64_t targetID = target->getRuntimeID();
 
-  // === POSITION PREDICTION ===
-  // Calculate target velocity from position history
   glm::vec3 velocity(0.f);
   auto now = NOW;
 
@@ -553,31 +455,23 @@ glm::vec3 InfiniteAura::getAttackPosition(Actor *target, Actor *player) {
     }
   }
 
-  // Save current position for next calculation
   mLastPositions[targetID] = {targetPos, (uint64_t)now};
 
-  // Predict position 2-4 ticks ahead (100-200ms) based on distance
-  // The farther the target, the more prediction is needed (more TP packets =
-  // more latency)
   float dist = glm::distance(*player->getPos(), targetPos);
-  float predictTicks = std::clamp(
-      dist / 50.f, 0.1f, 0.35f); // 2-7 tick prediction based on distance
+  float predictTicks = std::clamp(dist / 50.f, 0.1f, 0.35f);
   glm::vec3 predictedPos = targetPos + velocity * predictTicks;
 
-  // Clamp prediction to prevent crazy overshooting
-  float maxPredictDist = 3.f; // Max 3 blocks of prediction
+  float maxPredictDist = 3.f;
   if (glm::distance(predictedPos, targetPos) > maxPredictDist) {
     glm::vec3 predDir = glm::normalize(predictedPos - targetPos);
     predictedPos = targetPos + predDir * maxPredictDist;
   }
 
-  if (mKBDirection.mValue == KBDirection::Default)
-    return predictedPos;
+  if (mKBDirection.mValue == KBDirection::Default) return predictedPos;
 
   float targetYaw = 0.f;
   auto targetRot = target->getActorRotationComponent();
-  if (targetRot)
-    targetYaw = targetRot->mYaw;
+  if (targetRot) targetYaw = targetRot->mYaw;
 
   float yawRad = targetYaw * (PI / 180.0f);
   float offset = mKBOffset.mValue;
@@ -585,121 +479,108 @@ glm::vec3 InfiniteAura::getAttackPosition(Actor *target, Actor *player) {
   glm::vec3 right = {cosf(yawRad), 0.f, sinf(yawRad)};
 
   switch (mKBDirection.mValue) {
-  case KBDirection::PushBack:
-    return predictedPos + forward * offset;
-  case KBDirection::PushForward:
-    return predictedPos - forward * offset;
-  case KBDirection::PushLeft:
-    return predictedPos + right * offset;
-  case KBDirection::PushRight:
-    return predictedPos - right * offset;
+  case KBDirection::PushBack:   return predictedPos + forward * offset;
+  case KBDirection::PushForward: return predictedPos - forward * offset;
+  case KBDirection::PushLeft:   return predictedPos + right * offset;
+  case KBDirection::PushRight:  return predictedPos - right * offset;
   case KBDirection::Custom: {
     float rad = (targetYaw + mKBCustomAngle.mValue + 180.f) * (PI / 180.0f);
-    return predictedPos +
-           glm::vec3(-sinf(rad) * offset, 0.f, cosf(rad) * offset);
+    return predictedPos + glm::vec3(-sinf(rad) * offset, 0.f, cosf(rad) * offset);
   }
-  default:
-    return predictedPos;
+  default: return predictedPos;
   }
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // BEST WEAPON
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 int InfiniteAura::getBestWeapon() {
-  if (mSwapMode.mValue == SwapMode::None)
-    return -1;
+  if (mSwapMode.mValue == SwapMode::None) return -1;
   return ItemUtils::getBestItem(SItemType::Sword, mHotbarOnly.mValue);
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // ARMOR PIECES
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 int InfiniteAura::getArmorPieces(Actor *actor) {
-  if (!isActorSafeToUse(actor))
-    return 0;
+  if (!isActorSafeToUse(actor)) return 0;
   try {
     auto container = actor->getArmorContainer();
-    if (!container)
-      return 0;
+    if (!container) return 0;
     int count = 0;
     for (int i = 0; i < 4; i++) {
       auto item = container->getItem(i);
-      if (item && item->mItem)
-        count++;
+      if (item && item->mItem) count++;
     }
     return count;
-  } catch (...) {
-    return 0;
-  }
+  } catch (...) { return 0; }
 }
 
-// =========================================================
-// TARGET VALIDATION — всё через isActorSafeToUse
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+// SHIELD CHECK — по имени предмета (SItemType::Shield нет)
+// ═══════════════════════════════════════════════════════════════
+
+bool InfiniteAura::hasShieldInOffhand(Actor *target)
+{
+  if (!isActorSafeToUse(target)) return false;
+  try {
+    auto *offhand = target->getOffhandContainer();
+    if (!offhand) return false;
+    auto *stack = offhand->getItem(0);
+    if (!stack || !stack->mItem) return false;
+    auto *itemObj = stack->getItem();
+    if (!itemObj) return false;
+    std::string name = itemObj->mName;
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    return name.find("shield") != std::string::npos;
+  } catch (...) {}
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TARGET VALIDATION
+// ═══════════════════════════════════════════════════════════════
+
 bool InfiniteAura::isValidTarget(Actor *actor, Actor *player) {
-  if (!actor || !player)
-    return false;
-  if (actor == player)
-    return false;
-
-  // Единственная надёжная проверка — через реестр
-  if (!isActorSafeToUse(actor))
-    return false;
-
-  // Теперь безопасно вызывать методы
-  if (actor->isDead())
-    return false;
+  if (!actor || !player) return false;
+  if (actor == player) return false;
+  if (!isActorSafeToUse(actor)) return false;
+  if (actor->isDead()) return false;
 
   float hp = 0.f;
-  try {
-    hp = actor->getHealth();
-  } catch (...) {
-    return false;
-  }
-  if (hp <= 0.f)
-    return false;
+  try { hp = actor->getHealth(); } catch (...) { return false; }
+  if (hp <= 0.f) return false;
 
   if (!mInfiniteRange.mValue) {
-    try {
-      if (actor->distanceTo(player) > mRange.mValue)
-        return false;
-    } catch (...) {
-      return false;
-    }
+    try { if (actor->distanceTo(player) > mRange.mValue) return false; } catch (...) { return false; }
   }
 
-  if (mIgnoreFriends.mValue && gFriendManager &&
-      gFriendManager->isFriend(actor))
-    return false;
+  if (mIgnoreFriends.mValue && gFriendManager && gFriendManager->isFriend(actor)) return false;
 
   if (mOnlySameY.mValue) {
     try {
       float yDiff = std::fabs(actor->getPos()->y - player->getPos()->y);
-      if (yDiff > mYOffset.mValue)
-        return false;
-    } catch (...) {
-      return false;
-    }
+      if (yDiff > mYOffset.mValue) return false;
+    } catch (...) { return false; }
   }
 
   return true;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // MAIN TICK
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   auto player = event.mActor;
-  if (!player)
-    return;
+  if (!player) return;
 
   auto supplies = player->getSupplies();
-  if (!supplies)
-    return;
+  if (!supplies) return;
 
-  if (mOnlyOnGround.mValue && !player->isOnGround())
-    return;
+  if (mOnlyOnGround.mValue && !player->isOnGround()) return;
 
   // --------------------------------------------------
   // KEYBIND CAPTURE
@@ -711,8 +592,7 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
       return;
     }
     if (mBindWaitRelease) {
-      if (!sIsAnyKeyHeld())
-        mBindWaitRelease = false;
+      if (!sIsAnyKeyHeld()) mBindWaitRelease = false;
       return;
     }
     int pressed = sFindHeldKey();
@@ -721,9 +601,7 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
       mIsBindingLockKey = false;
       mBindWaitRelease = false;
       mLockKeyStates[pressed] = true;
-      NotifyUtils::notify(std::string("§aLock key set to: §f") +
-                              getKeyName(pressed),
-                          2.f, Notification::Type::Info);
+      NotifyUtils::notify(std::string("§aLock key set to: §f") + getKeyName(pressed), 2.f, Notification::Type::Info);
     }
     return;
   }
@@ -737,13 +615,8 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   if (currentHealth < mLastHealth) {
     auto nearby = ActorUtils::getActorList(true, true);
     for (auto a : nearby) {
-      if (!isActorSafeToUse(a) || a == player)
-        continue;
-      try {
-        if (a->distanceTo(player) < 8.f)
-          mRecentAttackers[a->getRuntimeID()] = NOW;
-      } catch (...) {
-      }
+      if (!isActorSafeToUse(a) || a == player) continue;
+      try { if (a->distanceTo(player) < 8.f) mRecentAttackers[a->getRuntimeID()] = NOW; } catch (...) {}
     }
   }
   mLastHealth = currentHealth;
@@ -754,7 +627,6 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   for (auto it = mLastAttacksByID.begin(); it != mLastAttacksByID.end();)
     it = (NOW - it->second > 30000) ? mLastAttacksByID.erase(it) : ++it;
 
-  // Cleanup stale position history (older than 5 seconds)
   for (auto it = mLastPositions.begin(); it != mLastPositions.end();)
     it = (NOW - it->second.timestamp > 5000) ? mLastPositions.erase(it) : ++it;
 
@@ -762,10 +634,8 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   // GET & FILTER TARGETS
   // --------------------------------------------------
   auto actors = ActorUtils::getActorList(true, true);
-  actors.erase(
-      std::remove_if(actors.begin(), actors.end(),
-                     [&](Actor *a) { return !isValidTarget(a, player); }),
-      actors.end());
+  actors.erase(std::remove_if(actors.begin(), actors.end(),
+      [&](Actor *a) { return !isValidTarget(a, player); }), actors.end());
 
   // --------------------------------------------------
   // LOCK OVERRIDE
@@ -781,12 +651,8 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
     // --------------------------------------------------
     if (mMode.mValue == Mode::Switch) {
       std::ranges::sort(actors, [&](Actor *a, Actor *b) {
-        uint64_t tA = mLastAttacksByID.count(a->getRuntimeID())
-                          ? mLastAttacksByID[a->getRuntimeID()]
-                          : 0;
-        uint64_t tB = mLastAttacksByID.count(b->getRuntimeID())
-                          ? mLastAttacksByID[b->getRuntimeID()]
-                          : 0;
+        uint64_t tA = mLastAttacksByID.count(a->getRuntimeID()) ? mLastAttacksByID[a->getRuntimeID()] : 0;
+        uint64_t tB = mLastAttacksByID.count(b->getRuntimeID()) ? mLastAttacksByID[b->getRuntimeID()] : 0;
         return tA < tB;
       });
     } else {
@@ -799,21 +665,15 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
       case Priority::Armor:
         std::ranges::sort(actors, [&](Actor *a, Actor *b) {
           int armorA = getArmorPieces(a), armorB = getArmorPieces(b);
-          if (armorA != armorB)
-            return armorA > armorB;
+          if (armorA != armorB) return armorA > armorB;
           return a->distanceTo(player) < b->distanceTo(player);
         });
         break;
       case Priority::HurtBy:
         std::ranges::sort(actors, [&](Actor *a, Actor *b) {
-          uint64_t tA = mRecentAttackers.count(a->getRuntimeID())
-                            ? mRecentAttackers[a->getRuntimeID()]
-                            : 0;
-          uint64_t tB = mRecentAttackers.count(b->getRuntimeID())
-                            ? mRecentAttackers[b->getRuntimeID()]
-                            : 0;
-          if (tA != tB)
-            return tA > tB;
+          uint64_t tA = mRecentAttackers.count(a->getRuntimeID()) ? mRecentAttackers[a->getRuntimeID()] : 0;
+          uint64_t tB = mRecentAttackers.count(b->getRuntimeID()) ? mRecentAttackers[b->getRuntimeID()] : 0;
+          if (tA != tB) return tA > tB;
           return a->distanceTo(player) < b->distanceTo(player);
         });
         break;
@@ -825,8 +685,7 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   // APS DELAY
   // --------------------------------------------------
   uint64_t delay = static_cast<uint64_t>(1000.f / mAPS.mValue);
-  if (NOW - mLastAttack < delay)
-    return;
+  if (NOW - mLastAttack < delay) return;
 
   if (actors.empty()) {
     mHasTarget = mGhostVisible = false;
@@ -834,41 +693,25 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   }
 
   auto sender = ClientInstance::get()->getPacketSender();
-  if (!sender)
-    return;
+  if (!sender) return;
 
   bool targetFound = false;
   glm::vec3 savedPlayerPos = *player->getPos();
 
   for (auto actor : actors) {
-    // Многоуровневая защита — всё через isActorSafeToUse
-    if (!isActorSafeToUse(actor))
-      continue;
-    if (actor->isDead())
-      continue;
+    if (!isActorSafeToUse(actor)) continue;
+    if (actor->isDead()) continue;
 
     float hp = 0.f;
-    try {
-      hp = actor->getHealth();
-    } catch (...) {
-      continue;
-    }
-    if (hp <= 0.f)
-      continue;
+    try { hp = actor->getHealth(); } catch (...) { continue; }
+    if (hp <= 0.f) continue;
 
     int64_t actorID = 0;
-    try {
-      actorID = actor->getRuntimeID();
-    } catch (...) {
-      continue;
-    }
-    if (actorID == 0)
-      continue;
+    try { actorID = actor->getRuntimeID(); } catch (...) { continue; }
+    if (actorID == 0) continue;
 
-    // Switch delay
     if (mMode.mValue == Mode::Switch && mSwitchDelay.mValue > 0) {
-      if (actorID != mLastTargetRuntimeID &&
-          NOW - mLastTargetSwitch < static_cast<uint64_t>(mSwitchDelay.mValue))
+      if (actorID != mLastTargetRuntimeID && NOW - mLastTargetSwitch < static_cast<uint64_t>(mSwitchDelay.mValue))
         continue;
     }
 
@@ -876,6 +719,28 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
     int oldSlot = supplies->mSelectedSlot;
 
     glm::vec3 attackPos = getAttackPosition(actor, player);
+
+    // ── AutoShield ──
+    if (mAutoShield.mValue) {
+      bool isSneaking = false;
+      try { isSneaking = actor->getStatusFlag(ActorFlags::Sneaking); } catch (...) {}
+
+      if (isSneaking && hasShieldInOffhand(actor)) {
+        // Priority 1: axe disables shield
+        int axeSlot = ItemUtils::getBestItem(SItemType::Axe, mHotbarOnly.mValue);
+        if (axeSlot != -1) {
+          bestWeapon = axeSlot;
+        } else {
+          // Priority 2: attack from behind
+          auto targetRot = actor->getActorRotationComponent();
+          if (targetRot) {
+            float yaw = targetRot->mYaw * (PI / 180.f);
+            glm::vec3 behindDir(sinf(yaw), 0, -cosf(yaw));
+            attackPos = *actor->getPos() + behindDir * 0.5f;
+          }
+        }
+      }
+    }
 
     // STEP 1: TP
     straightLineTP(savedPlayerPos, attackPos, true);
@@ -893,33 +758,25 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
 
     // STEP 3: Weapon
     if (bestWeapon != -1)
-      sender->sendToServer(
-          PacketUtils::createMobEquipmentPacket(bestWeapon).get());
+      sender->sendToServer(PacketUtils::createMobEquipmentPacket(bestWeapon).get());
 
-    // STEP 4: Финальная проверка перед атакой
+    // STEP 4: Final check + attack
     bool shouldAttack = false;
     if (isActorSafeToUse(actor)) {
-      try {
-        shouldAttack = !actor->isDead() && actor->getHealth() > 0.f;
-      } catch (...) {
-      }
+      try { shouldAttack = !actor->isDead() && actor->getHealth() > 0.f; } catch (...) {}
     }
 
     if (shouldAttack) {
       try {
         player->swing();
-        auto attackPkt = ActorUtils::createAttackTransaction(
-            actor, bestWeapon != -1 ? bestWeapon : supplies->mSelectedSlot);
-        if (attackPkt)
-          sender->sendToServer(attackPkt.get());
-      } catch (...) {
-      }
+        auto attackPkt = ActorUtils::createAttackTransaction(actor, bestWeapon != -1 ? bestWeapon : supplies->mSelectedSlot);
+        if (attackPkt) sender->sendToServer(attackPkt.get());
+      } catch (...) {}
     }
 
     // STEP 5: Restore weapon
     if (bestWeapon != -1)
-      sender->sendToServer(
-          PacketUtils::createMobEquipmentPacket(oldSlot).get());
+      sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
 
     // STEP 6: TP back
     if (mFollow.mValue)
@@ -935,18 +792,17 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
     mLastAttacksByID[actorID] = NOW;
     targetFound = true;
 
-    if (mMode.mValue == Mode::Single || mMode.mValue == Mode::Switch)
-      break;
+    if (mMode.mValue == Mode::Single || mMode.mValue == Mode::Switch) break;
   }
 
   mHasTarget = targetFound;
-  if (!targetFound)
-    mGhostVisible = false;
+  if (!targetFound) mGhostVisible = false;
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // PACKET OUT
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 void InfiniteAura::onPacketOutEvent(PacketOutEvent &event) {
   if (event.mPacket->getId() == PacketID::MovePlayer) {
     auto packet = event.getPacket<MovePlayerPacket>();
@@ -954,46 +810,39 @@ void InfiniteAura::onPacketOutEvent(PacketOutEvent &event) {
   }
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // PACKET IN
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 void InfiniteAura::onPacketInEvent(PacketInEvent &event) {
   auto player = ClientInstance::get()->getLocalPlayer();
-  if (!player)
-    return;
+  if (!player) return;
 
-  // --- Full Velocity: cancel all knockback ---
-  if (mFullVelocity.mValue &&
-      event.mPacket->getId() == PacketID::SetActorMotion) {
-    auto motionPkt =
-        std::reinterpret_pointer_cast<SetActorMotionPacket>(event.mPacket);
+  if (mFullVelocity.mValue && event.mPacket->getId() == PacketID::SetActorMotion) {
+    auto motionPkt = std::reinterpret_pointer_cast<SetActorMotionPacket>(event.mPacket);
     if (motionPkt && motionPkt->mRuntimeID == player->getRuntimeID()) {
       event.setCancelled(true);
       return;
     }
   }
 
-  // --- Silent Accept ---
-  if (!mSilentAccept.mValue)
-    return;
-  if (event.mPacket->getId() != PacketID::MovePlayer)
-    return;
+  if (!mSilentAccept.mValue) return;
+  if (event.mPacket->getId() != PacketID::MovePlayer) return;
 
   auto packet = event.getPacket<MovePlayerPacket>();
-  if (packet->mPlayerID != player->getRuntimeID())
-    return;
+  if (packet->mPlayerID != player->getRuntimeID()) return;
 
   event.cancel();
   ClientInstance::get()->getPacketSender()->sendToServer(packet.get());
 }
 
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
 // RENDER
-// =========================================================
+// ═══════════════════════════════════════════════════════════════
+
 void InfiniteAura::onRenderEvent(RenderEvent &event) {
   auto player = ClientInstance::get()->getLocalPlayer();
-  if (!player)
-    return;
+  if (!player) return;
 
   uint64_t currentTime = NOW;
   uint64_t fadeTime = 500;
@@ -1001,11 +850,9 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
 
   {
     std::lock_guard<std::mutex> guard(mMutex);
-    if (mLastPathTime + fadeTime < currentTime)
-      mPacketPositions.clear();
+    if (mLastPathTime + fadeTime < currentTime) mPacketPositions.clear();
     if (mLastPathTime + fadeTime > currentTime) {
-      alphaMultiplier = 1.0f - static_cast<float>(currentTime - mLastPathTime) /
-                                   static_cast<float>(fadeTime);
+      alphaMultiplier = 1.0f - static_cast<float>(currentTime - mLastPathTime) / static_cast<float>(fadeTime);
       alphaMultiplier = std::clamp(alphaMultiplier, 0.0f, 1.0f);
     }
   }
@@ -1020,8 +867,7 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
         std::vector<ImVec2> points;
         for (auto &pos : mPacketPositions) {
           ImVec2 pt;
-          if (RenderUtils::worldToScreen(pos, pt))
-            points.emplace_back(pt);
+          if (RenderUtils::worldToScreen(pos, pt)) points.emplace_back(pt);
         }
         for (size_t i = 0; i + 1 < points.size(); i++) {
           ImColor c = ColorUtils::getThemedColor(static_cast<float>(i) * 0.05f);
@@ -1032,12 +878,8 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
         for (auto &pos : mPacketPositions) {
           AABB aabb = AABB(pos, glm::vec3(0.2f));
           auto pts = MathUtils::getImBoxPoints(aabb);
-          drawList->AddConvexPolyFilled(
-              pts.data(), (int)pts.size(),
-              IM_COL32(255, 0, 0, (int)(100 * alphaMultiplier)));
-          drawList->AddPolyline(
-              pts.data(), (int)pts.size(),
-              IM_COL32(255, 0, 0, (int)(255 * alphaMultiplier)), true, 2.f);
+          drawList->AddConvexPolyFilled(pts.data(), (int)pts.size(), IM_COL32(255, 0, 0, (int)(100 * alphaMultiplier)));
+          drawList->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 0, 0, (int)(255 * alphaMultiplier)), true, 2.f);
         }
       }
     }
@@ -1068,8 +910,7 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
     }
 
     ImVec2 ps, gs;
-    if (RenderUtils::worldToScreen(*player->getPos(), ps) &&
-        RenderUtils::worldToScreen(mGhostPos, gs)) {
+    if (RenderUtils::worldToScreen(*player->getPos(), ps) && RenderUtils::worldToScreen(mGhostPos, gs)) {
       ImColor lc = ColorUtils::getThemedColor(0);
       lc.Value.w = 0.4f * alphaMultiplier;
       drawList->AddLine(ps, gs, lc, 1.5f);
@@ -1088,43 +929,32 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
     auto pts = MathUtils::getImBoxPoints(targetAABB);
 
     if (!pts.empty())
-      drawList->AddPolyline(pts.data(), (int)pts.size(),
-                            IM_COL32(255, 215, 0, 180), true, 3.f);
+      drawList->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 215, 0, 180), true, 3.f);
 
     ImVec2 screenPos;
-    if (RenderUtils::worldToScreen(targetPos + glm::vec3(0.f, 0.5f, 0.f),
-                                   screenPos)) {
+    if (RenderUtils::worldToScreen(targetPos + glm::vec3(0.f, 0.5f, 0.f), screenPos)) {
       std::string lockText;
-      try {
-        lockText = "Locked: " + locked->getRawName() + "  [" +
-                   getKeyName(mLockTargetKey) + "]";
-      } catch (...) {
-        lockText = "Locked  [" + std::string(getKeyName(mLockTargetKey)) + "]";
-      }
+      try { lockText = "Locked: " + locked->getRawName() + "  [" + getKeyName(mLockTargetKey) + "]"; }
+      catch (...) { lockText = "Locked  [" + std::string(getKeyName(mLockTargetKey)) + "]"; }
 
       ImVec2 textSize = ImGui::CalcTextSize(lockText.c_str());
       screenPos.x -= textSize.x * 0.5f;
       screenPos.y -= textSize.y + 5.f;
 
-      drawList->AddRectFilled(
-          {screenPos.x - 4, screenPos.y - 2},
-          {screenPos.x + textSize.x + 4, screenPos.y + textSize.y + 2},
-          IM_COL32(0, 0, 0, 140), 3.f);
-      drawList->AddText(screenPos, IM_COL32(255, 215, 0, 255),
-                        lockText.c_str());
+      drawList->AddRectFilled({screenPos.x - 4, screenPos.y - 2}, {screenPos.x + textSize.x + 4, screenPos.y + textSize.y + 2}, IM_COL32(0, 0, 0, 140), 3.f);
+      drawList->AddText(screenPos, IM_COL32(255, 215, 0, 255), lockText.c_str());
     }
   }
 
-  // BIND PANEL (СЛЕВА СНИЗУ) ← ИСПРАВЛЕНО
+  // BIND PANEL
   if (mShowBindPanel.mValue) {
     ImVec2 ss = ImGui::GetIO().DisplaySize;
-    float panX = 20.f;        // ← ЛЕВЫЙ КРАЙ
-    float panY = ss.y - 80.f; // ← СНИЗУ
+    float panX = 20.f;
+    float panY = ss.y - 80.f;
 
     std::string btnLabel;
     if (mIsBindingLockKey)
-      btnLabel =
-          mBindWaitRelease ? "Release keys..." : "Press key... (ESC = cancel)";
+      btnLabel = mBindWaitRelease ? "Release keys..." : "Press key... (ESC = cancel)";
     else
       btnLabel = std::string("Lock Key: [") + getKeyName(mLockTargetKey) + "]";
 
@@ -1136,22 +966,15 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
     ImVec2 btnMax{panX + btnW, panY + btnH};
 
     ImVec2 mouse = ImGui::GetIO().MousePos;
-    bool hovered = (mouse.x >= btnMin.x && mouse.x <= btnMax.x &&
-                    mouse.y >= btnMin.y && mouse.y <= btnMax.y);
+    bool hovered = (mouse.x >= btnMin.x && mouse.x <= btnMax.x && mouse.y >= btnMin.y && mouse.y <= btnMax.y);
     bool clicked = hovered && ImGui::GetIO().MouseClicked[0];
 
     ImU32 bgColor = mIsBindingLockKey ? IM_COL32(200, 100, 0, 220)
-                                      : (hovered ? IM_COL32(70, 70, 110, 220)
-                                                 : IM_COL32(30, 30, 50, 180));
+                                      : (hovered ? IM_COL32(70, 70, 110, 220) : IM_COL32(30, 30, 50, 180));
 
     drawList->AddRectFilled(btnMin, btnMax, bgColor, 6.f);
-    drawList->AddRect(btnMin, btnMax,
-                      mIsBindingLockKey ? IM_COL32(255, 150, 50, 255)
-                                        : IM_COL32(100, 100, 160, 200),
-                      6.f, 0, 1.5f);
-    drawList->AddText({panX + (btnW - labelSize.x) * 0.5f,
-                       panY + (btnH - labelSize.y) * 0.5f},
-                      IM_COL32(255, 255, 255, 255), btnLabel.c_str());
+    drawList->AddRect(btnMin, btnMax, mIsBindingLockKey ? IM_COL32(255, 150, 50, 255) : IM_COL32(100, 100, 160, 200), 6.f, 0, 1.5f);
+    drawList->AddText({panX + (btnW - labelSize.x) * 0.5f, panY + (btnH - labelSize.y) * 0.5f}, IM_COL32(255, 255, 255, 255), btnLabel.c_str());
 
     if (clicked && !mIsBindingLockKey) {
       mIsBindingLockKey = true;

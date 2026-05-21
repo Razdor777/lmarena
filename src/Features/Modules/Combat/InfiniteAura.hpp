@@ -57,6 +57,9 @@ public:
     EnumSettingT<SwapMode> mSwapMode   = EnumSettingT("Swap", "Weapon swap mode", SwapMode::None, "None", "Full", "Spoof");
     BoolSetting            mHotbarOnly = BoolSetting("Hotbar Only", "Only hotbar items", true);
 
+    // --- Auto Shield ---
+    BoolSetting mAutoShield = BoolSetting("Auto Shield", "Use axe or attack behind when target shields", false);
+
     // --- Visuals ---
     EnumSettingT<RenderMode> mRenderMode      = EnumSettingT("Render Mode", "Path render mode.", RenderMode::Lines, "Lines", "Boxes");
     BoolSetting              mDrawPath        = BoolSetting("Draw Path", "Draw movement path", true);
@@ -75,6 +78,7 @@ public:
             &mOnlySameY, &mYOffset, &mOnlyOnGround,
             &mFollow, &mSilentAccept, &mIgnoreFriends,
             &mSwapMode, &mHotbarOnly,
+            &mAutoShield,
             &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked
         );
 
@@ -110,7 +114,6 @@ public:
     std::unordered_map<int64_t, uint64_t> mLastAttacksByID;
     std::unordered_map<int64_t, uint64_t> mRecentAttackers;
 
-    // Position prediction — stores last known position + timestamp per entity
     struct PositionEntry {
         glm::vec3 position;
         uint64_t timestamp;
@@ -140,9 +143,9 @@ public:
     int       getBestWeapon();
     int       getArmorPieces(class Actor* actor);
 
-    // Главная функция валидации — все проверки через реестр
     bool      isActorSafeToUse(class Actor* actor);
     bool      isValidTarget(class Actor* actor, class Actor* player);
+    bool      hasShieldInOffhand(class Actor* target);
 
     bool         isLockKeyJustPressed(int vk);
     class Actor* raycastToActor(float maxAngle);
