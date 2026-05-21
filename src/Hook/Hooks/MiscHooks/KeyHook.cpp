@@ -145,63 +145,77 @@ void KeyHook::onKey(uint32_t key, bool isDown)
 
     gFeatureManager->mDispatcher->trigger<KeyEvent>(holder);
 
-    // Process module binds FIRST before any cancel/wantCapture checks
-    // so keybinds work even when ImGui wants keyboard (e.g. search box).
-    // We only skip binds for non-ClickGui modules when the ClickGui is open.
+    if (holder->mCancelled) return;
+
+    if (!ImGui::GetCurrentContext()) return;
+    ImGuiIO& io = ImGui::GetIO();
+
+    ImGuiKey imKey = ImGui_ImplWin32_VirtualKeyToImGuiKey(key);
+    io.AddKeyEvent(imKey, isDown);
+    if (isDown)
     {
-        const auto* clickGui = gFeatureManager->mModuleManager->getModule<ClickGui>();
-        bool clickGuiOpen = clickGui && clickGui->mEnabled;
+        HKL layout = GetKeyboardLayout(0);
+        int scanCode = MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
+        BYTE translation[2];
+        BYTE keyState[256] = { 0 };
+        GetKeyboardState(keyState);
+        int result = ToAscii(key, scanCode, keyState, (LPWORD)translation, 0);
 
-        for (auto& module : gFeatureManager->mModuleManager->getModules())
-        {
-            if (clickGuiOpen && module.get() != clickGui) continue;
-            if (ClientInstance::get()->getScreenName() == "chat_screen") continue;
-
-            if (module->mKey == key)
-            {
-                if (module->mEnableWhileHeld)
-                {
-                    module->mWantedState = isDown;
-                }
-                else if (isDown)
-                {
-                    module->toggle();
-                }
-            }
+        if (result == 1) {
+            // If a single character is returned, return it
+            char c = static_cast<char>(translation[0]);
+            io.AddInputCharacter(c);
+        }
+        else if (result == 2) {
+            // If a dead key or a special character is returned, return the second character in the buffer
+            char sc = static_cast<char>(translation[1]);
+            io.AddInputCharacter(sc);
         }
     }
 
-    if (ImGui::GetCurrentContext() != nullptr)
-    {
-        ImGuiIO& io = ImGui::GetIO();
-        ImGuiKey imKey = ImGui_ImplWin32_VirtualKeyToImGuiKey(key);
-        io.AddKeyEvent(imKey, isDown);
-        if (isDown)
-        {
-            int scanCode = MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
-            WCHAR translation[5];
-            BYTE keyState[256] = { 0 };
-            GetKeyboardState(keyState);
-            int result = ToUnicode(key, scanCode, keyState, translation, 5, 0);
-
-            if (result > 0) {
-                for (int i = 0; i < result; i++) {
-                    io.AddInputCharacter(translation[i]);
-                }
-            }
-        }
-
-        if (holder->mCancelled || io.WantCaptureKeyboard || io.WantTextInput)
-        {
-            return;
-        }
-    }
-    else if (holder->mCancelled)
+    // Return and don't call oFunc if ImGui wants to capture keyboard or text input
+    if (io.WantCaptureKeyboard || io.WantTextInput)
     {
         return;
     }
 
     oFunc(key, isDown);
+
+    // Look for modules
+    const auto* clickGui = gFeatureManager->mModuleManager->getModule<ClickGui>();
+
+    for (auto& module : gFeatureManager->mModuleManager->getModules())
+    {
+        if (ClientInstance::get()->getMouseGrabbed() && module.get() != clickGui) continue;
+        if (ClientInstance::get()->getScreenName() == "chat_screen") continue;
+
+        if (module->mKey == key)
+        {
+            if (module->mEnableWhileHeld)
+            {
+                module->mWantedState = isDown;
+            }
+            else if (isDown)
+            {
+                module->toggle();
+            }
+        }
+
+        /*if (isDown)
+        {
+            for (Setting* setting : module->mSettings)
+            {
+                if (auto boolSetting = dynamic_cast<BoolSetting*>(setting))
+                {
+                    if (boolSetting->mKey == key)
+                    {
+                        bool oldValue = static_cast<bool>(*boolSetting);
+                        boolSetting->setValue(!oldValue);
+                    }
+                }
+            }
+        }*/
+    }
 }
 
 void KeyHook::init()
