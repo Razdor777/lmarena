@@ -16,6 +16,35 @@ void HealthDisplay::onDisable() {
       this);
 }
 
+// TargetHUD-style health calculation
+static float calculateActorHealth(Actor* actor) {
+    if (!actor) return 0.f;
+    float health = actor->getHealth();
+    float maxHealth = actor->getMaxHealth();
+    
+    if (actor->isPlayer()) {
+        std::string targetName = actor->getNameTag();
+        size_t nl = targetName.find('\n');
+        if (nl != std::string::npos) targetName = targetName.substr(0, nl);
+        
+        float th = health, tmh = maxHealth;
+        bool tracked = false;
+        if (HealthTracker::getInstance().getHealth(targetName, th, tmh)) {
+            health = th;
+            maxHealth = tmh;
+            tracked = true;
+        } else {
+            std::string cleanName = actor->getRawName();
+            if (HealthTracker::getInstance().getHealth(cleanName, th, tmh)) {
+                health = th;
+                maxHealth = tmh;
+                tracked = true;
+            }
+        }
+    }
+    return health;
+}
+
 void HealthDisplay::onRender(RenderEvent &event) {
   auto player = ClientInstance::get()->getLocalPlayer();
   if (!player)
@@ -31,40 +60,33 @@ void HealthDisplay::onRender(RenderEvent &event) {
     if (isPlayer && !mShowPlayers.mValue)
       continue;
     if (!isPlayer && !mShowMobs.mValue && !mShowAnimals.mValue)
-      continue; // Simplify check
+      continue;
 
-    // Render
-    float health = actor->getHealth();
-    if (isPlayer) {
-      std::string targetName = actor->getNameTag();
-      size_t nl = targetName.find('\n');
-      if (nl != std::string::npos) targetName = targetName.substr(0, nl);
-      
-      float th = health, tmh = 20.f;
-      if (HealthTracker::getInstance().getHealth(targetName, th, tmh)) {
-        health = th;
-      } else {
-        std::string cleanName = actor->getRawName();
-        if (HealthTracker::getInstance().getHealth(cleanName, th, tmh)) {
-          health = th;
-        }
-      }
-    }
+    float health = calculateActorHealth(actor);
+    float maxHealth = actor->getMaxHealth();
+    
     std::string text = std::to_string((int)health) + " HP";
 
     glm::vec3 pos = *actor->getPos();
     auto AABB = actor->getAABBShapeComponent();
     if (AABB)
-      pos.y += AABB->mHeight + 0.8f; // Higher than TeamHealthBars
+      pos.y += AABB->mHeight + 0.8f;
     else
       pos.y += 2.3f;
 
     ImVec2 screenPos;
     if (RenderUtils::worldToScreen(pos, screenPos)) {
       ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+      ImColor col = mColor.getAsImColor();
+      // Color based on health percentage
+      float hpPerc = maxHealth > 0 ? health / maxHealth : 1.f;
+      if (hpPerc > 0.6f) col = ImColor(100, 255, 100, 255);
+      else if (hpPerc > 0.3f) col = ImColor(255, 255, 100, 255);
+      else col = ImColor(255, 80, 80, 255);
+      
       ImGui::GetBackgroundDrawList()->AddText(
           ImVec2(screenPos.x - textSize.x / 2, screenPos.y - textSize.y / 2),
-          mColor.getAsImColor(), text.c_str());
+          col, text.c_str());
     }
   }
 }

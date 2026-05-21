@@ -29,6 +29,9 @@ void HitColor::onHurtColorEvent(HurtColorEvent& event)
     if (!mHurtColor.mValue) return;
     if (!event.mColor) return;
 
+    // Only apply when actually hurt (alpha > 0 means hurt overlay is active)
+    if (event.mColor[3] <= 0.01f) return;
+
     if (mRainbowHurt.mValue) {
         // Rainbow: cycle through hue based on time
         float time = static_cast<float>(ImGui::GetTime());

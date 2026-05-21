@@ -38,6 +38,7 @@ LOAD_RESOURCE(fonts_Open_Sans_Bold_ttf);
 LOAD_RESOURCE(fonts_Open_Sans_ttf);
 LOAD_RESOURCE(fonts_Product_Sans_Bold_ttf);
 LOAD_RESOURCE(fonts_Product_Sans_ttf);
+LOAD_RESOURCE(fonts_Roboto_Regular_ttf);
 LOAD_RESOURCE(fonts_SF_Pro_Display_Bold_ttf);
 LOAD_RESOURCE(fonts_SF_Pro_Display_ttf);
 LOAD_RESOURCE(fonts_Sarabun_Light_ttf);

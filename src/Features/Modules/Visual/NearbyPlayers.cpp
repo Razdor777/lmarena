@@ -24,11 +24,53 @@ public:
 };
 static NearbyPlayersElement *gNearbyElem = nullptr;
 
-// Функция для парсинга цветов Minecraft (премиум-рендер текста)
-// Функция для парсинга цветов Minecraft (Идеальная работа с UTF-8 и кириллицей)
+// Проверяет содержит ли строка кириллические символы (U+0400–U+04FF)
+static bool hasCyrillic(const std::string &text) {
+  for (size_t i = 0; i < text.length();) {
+    unsigned char c = static_cast<unsigned char>(text[i]);
+    if (c < 0x80) { i++; continue; }
+
+    uint32_t cp = 0;
+    if (c >= 0xC0 && c < 0xE0 && i + 1 < text.length()) {
+      cp = ((uint32_t)(c & 0x1F) << 6) | (text[i + 1] & 0x3F);
+      i += 2;
+    } else if (c >= 0xE0 && c < 0xF0 && i + 2 < text.length()) {
+      cp = ((uint32_t)(c & 0x0F) << 12) |
+           ((uint32_t)(text[i + 1] & 0x3F) << 6) |
+           (text[i + 2] & 0x3F);
+      i += 3;
+    } else if (c >= 0xF0 && i + 3 < text.length()) {
+      cp = ((uint32_t)(c & 0x07) << 18) |
+           ((uint32_t)(text[i + 1] & 0x3F) << 12) |
+           ((uint32_t)(text[i + 2] & 0x3F) << 6) |
+           (text[i + 3] & 0x3F);
+      i += 4;
+    } else {
+      i++;
+      continue;
+    }
+    if (cp >= 0x0400 && cp <= 0x04FF) return true;
+  }
+  return false;
+}
+
+// Получить шрифт с поддержкой кириллицы
+static ImFont *getCyrillicFont() {
+  // Сначала пробуем текущий шрифт — если он поддерживает кириллицу, ок
+  // Но лучше сразу вернуть заведомо поддерживающий
+  auto it = FontHelper::Fonts.find("open_sans");
+  if (it != FontHelper::Fonts.end() && it->second) return it->second;
+  it = FontHelper::Fonts.find("product_sans");
+  if (it != FontHelper::Fonts.end() && it->second) return it->second;
+  it = FontHelper::Fonts.find("comfortaa");
+  if (it != FontHelper::Fonts.end() && it->second) return it->second;
+  return ImGui::GetFont(); // последний fallback
+}
+
+// Улучшенный рендер текста с поддержкой § цветов и UTF-8
 static void DrawMinecraftText(ImDrawList *dl, ImVec2 pos,
                               const std::string &text, float fontSize,
-                              float alpha) {
+                              float alpha, ImColor defaultColor = ImColor(255,255,255)) {
   static std::map<char, ImColor> mcColors = {
       {'0', ImColor(0, 0, 0)},      {'1', ImColor(0, 0, 170)},
       {'2', ImColor(0, 170, 0)},    {'3', ImColor(0, 170, 170)},
@@ -40,36 +82,35 @@ static void DrawMinecraftText(ImDrawList *dl, ImVec2 pos,
       {'e', ImColor(255, 255, 85)}, {'f', ImColor(255, 255, 255)},
       {'g', ImColor(221, 214, 5)},  {'r', ImColor(255, 255, 255)}};
 
-  ImColor currentColor = ImColor(255, 255, 255, (int)(255 * alpha));
+  ImFont* font = FontHelper::getFont(false, false, false);
+  if (!font) font = ImGui::GetFont();
+
+  ImColor currentColor = defaultColor;
+  currentColor.Value.w = alpha;
   float currentX = pos.x;
   std::string currentChunk = "";
 
-  // Вспомогательная лямбда для отрисовки куска текста
   auto drawChunk = [&]() {
     if (!currentChunk.empty()) {
-      dl->AddText(ImGui::GetFont(), fontSize, ImVec2(currentX, pos.y),
+      dl->AddText(font, fontSize, ImVec2(currentX, pos.y),
                   currentColor, currentChunk.c_str());
       currentX +=
-          ImGui::GetFont()
-              ->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, currentChunk.c_str())
-              .x;
+          font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, currentChunk.c_str()).x;
       currentChunk = "";
     }
   };
 
-  for (size_t i = 0; i < text.length(); ++i) {
-    // Проверка на параграф (в UTF-8 символ '§' - это два байта: 0xC2 0xA7)
+  for (size_t i = 0; i < text.length();) {
     if ((unsigned char)text[i] == 0xC2 && i + 2 < text.length() &&
         (unsigned char)text[i + 1] == 0xA7) {
-      drawChunk(); // Рисуем всё, что было до этого цвета
+      drawChunk();
       char colorCode = tolower(text[i + 2]);
       if (mcColors.find(colorCode) != mcColors.end()) {
         currentColor = mcColors[colorCode];
-        currentColor.Value.w = alpha; // сохраняем прозрачность
+        currentColor.Value.w = alpha;
       }
-      i += 2; // Пропускаем символ параграфа и сам код цвета
+      i += 3;
     }
-    // Резервная проверка (если параграф вдруг пришел одним байтом)
     else if ((unsigned char)text[i] == 0xA7 && i + 1 < text.length()) {
       drawChunk();
       char colorCode = tolower(text[i + 1]);
@@ -77,14 +118,52 @@ static void DrawMinecraftText(ImDrawList *dl, ImVec2 pos,
         currentColor = mcColors[colorCode];
         currentColor.Value.w = alpha;
       }
-      i += 1;
+      i += 2;
     } else {
-      currentChunk += text[i]; // Добавляем букву в кусок
+      size_t len = 1;
+      unsigned char uc = static_cast<unsigned char>(text[i]);
+      if (uc >= 0xC0 && uc < 0xE0) len = 2;
+      else if (uc >= 0xE0 && uc < 0xF0) len = 3;
+      else if (uc >= 0xF0 && uc < 0xF8) len = 4;
+      if (i + len > text.length()) len = text.length() - i;
+      currentChunk += text.substr(i, len);
+      i += len;
     }
   }
-  drawChunk(); // Дорисовываем остаток
+  drawChunk();
 }
 
+void NearbyPlayers::onEnable() {
+  mPlayers.clear();
+  mKnownNames.clear();
+  gFeatureManager->mDispatcher
+      ->listen<BaseTickEvent, &NearbyPlayers::onBaseTickEvent>(this);
+  gFeatureManager->mDispatcher
+      ->listen<RenderEvent, &NearbyPlayers::onRenderEvent>(this);
+
+  if (!gNearbyElem) {
+    gNearbyElem = new NearbyPlayersElement();
+    gNearbyElem->mSize = {200.f, 40.f};
+    if (HudEditor::gInstance)
+      HudEditor::gInstance->registerElement(gNearbyElem);
+  }
+  if (gNearbyElem)
+    gNearbyElem->mVisible = true;
+
+  mLastHealTime = NOW;
+  mHealths.clear();
+}
+
+void NearbyPlayers::onDisable() {
+  gFeatureManager->mDispatcher
+      ->deafen<BaseTickEvent, &NearbyPlayers::onBaseTickEvent>(this);
+  gFeatureManager->mDispatcher
+      ->deafen<RenderEvent, &NearbyPlayers::onRenderEvent>(this);
+  if (gNearbyElem)
+    gNearbyElem->mVisible = false;
+}
+
+// TargetHUD-style health calculation
 void NearbyPlayers::calculateHealths() {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
@@ -139,42 +218,12 @@ void NearbyPlayers::calculateHealths() {
     }
 }
 
-void NearbyPlayers::onEnable() {
-  mPlayers.clear();
-  mKnownNames.clear();
-  gFeatureManager->mDispatcher
-      ->listen<BaseTickEvent, &NearbyPlayers::onBaseTickEvent>(this);
-  gFeatureManager->mDispatcher
-      ->listen<RenderEvent, &NearbyPlayers::onRenderEvent>(this);
-
-  if (!gNearbyElem) {
-    gNearbyElem = new NearbyPlayersElement();
-    gNearbyElem->mSize = {200.f, 40.f};
-    if (HudEditor::gInstance)
-      HudEditor::gInstance->registerElement(gNearbyElem);
-  }
-  if (gNearbyElem)
-    gNearbyElem->mVisible = true;
-
-  mLastHealTime = NOW;
-  mHealths.clear();
-}
-
-void NearbyPlayers::onDisable() {
-  gFeatureManager->mDispatcher
-      ->deafen<BaseTickEvent, &NearbyPlayers::onBaseTickEvent>(this);
-  gFeatureManager->mDispatcher
-      ->deafen<RenderEvent, &NearbyPlayers::onRenderEvent>(this);
-  if (gNearbyElem)
-    gNearbyElem->mVisible = false;
-}
-
 void NearbyPlayers::onBaseTickEvent(BaseTickEvent &event) {
   auto localPlayer = event.mActor;
   if (!localPlayer)
     return;
 
-  calculateHealths(); // ← РАСЧЁТ HP
+  calculateHealths();
 
   glm::vec3 myPos = *localPlayer->getPos();
   float maxD = mMaxDist.mValue;
@@ -191,39 +240,46 @@ void NearbyPlayers::onBaseTickEvent(BaseTickEvent &event) {
     if (d > maxD)
       continue;
 
-    std::string rawName = actor->getRawName(); // БОЛЬШЕ НЕ УДАЛЯЕМ ЦВЕТА!
-    std::string cleanName =
-        ColorUtils::removeColorCodes(rawName); // Чистое имя для логики
+    std::string rawName = actor->getRawName();
+    std::string cleanName = ColorUtils::removeColorCodes(rawName);
     currentNames.insert(cleanName);
 
     PlayerEntry pe;
-    pe.name      = rawName;
-    pe.dist      = d;
+    pe.name = rawName;
+    pe.dist = d;
+
+    // HP calculation like TargetHUD
+    float health = actor->getHealth();
+    float maxHealth = actor->getMaxHealth();
+    
+    if (actor->isPlayer()) {
+        std::string targetName = actor->getNameTag();
+        size_t nl = targetName.find('\n');
+        if (nl != std::string::npos) targetName = targetName.substr(0, nl);
         
-    // ← ИСПОЛЬЗУЕМ РАССЧИТАННОЕ HP
-    float th = actor->getHealth();
-    float tmh = actor->getMaxHealth();
-    std::string targetName = actor->getNameTag();
-    size_t nl = targetName.find('\n');
-    if (nl != std::string::npos) targetName = targetName.substr(0, nl);
-
-    bool tracked = false;
-    if (HealthTracker::getInstance().getHealth(targetName, th, tmh)) {
-      tracked = true;
-    } else if (HealthTracker::getInstance().getHealth(cleanName, th, tmh)) {
-      tracked = true;
+        float th = health, tmh = maxHealth;
+        bool tracked = false;
+        if (HealthTracker::getInstance().getHealth(targetName, th, tmh)) {
+            health = th;
+            maxHealth = tmh;
+            tracked = true;
+        } else {
+            if (HealthTracker::getInstance().getHealth(cleanName, th, tmh)) {
+                health = th;
+                maxHealth = tmh;
+                tracked = true;
+            }
+        }
+        
+        if (!tracked && mHealths.count(cleanName)) {
+            health = mHealths[cleanName].health;
+        }
     }
-
-    if (tracked) {
-      pe.health = th;
-      pe.maxHealth = tmh;
-      mHealths[cleanName].health = th;
-    } else {
-      pe.health = mHealths.count(cleanName) ? mHealths[cleanName].health : actor->getHealth();
-      pe.maxHealth = actor->getMaxHealth();
-    }
+    
+    pe.health = health;
+    pe.maxHealth = maxHealth;
     pe.introAnim = 0.f;
-    pe.animHealth = pe.health; // Для плавной полоски
+    pe.animHealth = health;
     pe.isNew = (mKnownNames.find(cleanName) == mKnownNames.end());
     pe.newPulse = pe.isNew ? 0.f : 1.f;
 
@@ -266,82 +322,117 @@ void NearbyPlayers::onRenderEvent(RenderEvent &event) {
 
   float scale = mScale.mValue;
   float fs = mFontSize.mValue * scale;
-  float rowH = (fs + 14.f) * scale; // Сделали строки шире для полоски хп
-  float width = 220.f * scale;
-  float padL = 12.f * scale;
+  float rowH = (fs + 18.f) * scale;
+  float width = 240.f * scale;
+  float padL = 14.f * scale;
 
   int count = (int)mPlayers.size();
-  float totalH = (float)count * rowH + 10.f * scale;
+  float totalH = (float)count * rowH + 12.f * scale;
 
   ImVec2 base = gNearbyElem ? gNearbyElem->getPos() : ImVec2(10.f, 220.f);
   float x = base.x, y = base.y;
 
-  // ПРЕМИУМ ФОН: Темный полупрозрачный градиент + тонкая обводка
+  // Modern glassmorphism background with blur
+  if (mGlassStyle.mValue) {
+    ImRenderUtils::addBlur(ImVec4(x - 2, y - 2, x + width + 2, y + totalH + 2), 3 * scale, 8);
+  }
+  
+  // Background
   dl->AddRectFilled({x, y}, {x + width, y + totalH},
-                    ImColor(15, 15, 20, (int)(220 * mOpacity.mValue)),
+                    ImColor(12, 12, 16, (int)(230 * mOpacity.mValue)),
                     mRounding.mValue);
-  dl->AddRect({x, y}, {x + width, y + totalH}, ImColor(255, 255, 255, 30),
-              mRounding.mValue, 0, 1.5f);
+  
+  // Top accent line
+  ImColor accent = ColorUtils::getThemedColor(0);
+  accent.Value.w = 0.8f;
+  dl->AddRectFilled({x, y}, {x + width, y + 2.f * scale}, accent, mRounding.mValue, ImDrawFlags_RoundCornersTop);
+  
+  // Border
+  dl->AddRect({x, y}, {x + width, y + totalH}, ImColor(255, 255, 255, 25),
+              mRounding.mValue, 0, 1.f);
 
   FontHelper::pushPrefFont(false);
-  float ry = y + 5.f * scale;
+  float ry = y + 8.f * scale;
 
   for (int i = 0; i < count; i++) {
     auto &pe = mPlayers[i];
 
-    // Плавные анимации
-    pe.introAnim = MathUtils::animate(1.f, pe.introAnim, dt * 15.f);
-    pe.animHealth =
-        MathUtils::animate(pe.health, pe.animHealth, dt * 10.f); // Плавное ХП
+    pe.introAnim = MathUtils::animate(1.f, pe.introAnim, dt * 12.f);
+    pe.animHealth = MathUtils::animate(pe.health, pe.animHealth, dt * 8.f);
+    
+    if (mPulseNew.mValue && pe.isNew) {
+        pe.newPulse = MathUtils::animate(1.f, pe.newPulse, dt * 4.f);
+    }
+    
     float alpha = pe.introAnim;
+    float textY = ry + 5.f * scale;
 
-    float textY = ry + 4.f * scale;
+    // New player highlight
+    if (mPulseNew.mValue && !pe.isNew && pe.newPulse < 1.f) {
+        float pulseAlpha = (1.f - pe.newPulse) * 0.15f;
+        dl->AddRectFilled({x + 2, ry}, {x + width - 2, ry + rowH - 2}, 
+                          ImColor(255, 255, 255, (int)(255 * pulseAlpha)), 4.f);
+    }
 
-    // Рисуем имя с поддержкой § цветов
+    // Name with color support
     DrawMinecraftText(dl, {x + padL, textY}, pe.name, fs, alpha);
 
-    // Расстояние
+    // Distance
     if (mShowDist.mValue) {
       char distBuf[16];
       snprintf(distBuf, sizeof(distBuf), "%.1fm", pe.dist);
-      float distFs = fs * 0.85f;
+      float distFs = fs * 0.8f;
       float dw = ImGui::GetFont()->CalcTextSizeA(distFs, FLT_MAX, 0, distBuf).x;
 
-      ImColor dc = mColorDist.mValue
-                       ? ImColor(255 - (int)(pe.dist * 2.5f),
-                                 (int)(pe.dist * 2.5f), 50, (int)(255 * alpha))
-                       : ColorUtils::getThemedColor((float)i * 35.f);
+      ImColor dc;
+      if (mColorDist.mValue) {
+        float t = std::clamp(pe.dist / mMaxDist.mValue, 0.f, 1.f);
+        dc = ImColor((int)(255 * t), (int)(255 * (1.f - t)), 80, (int)(255 * alpha));
+      } else {
+        dc = ColorUtils::getThemedColor((float)i * 35.f);
+        dc.Value.w = alpha;
+      }
       dl->AddText(ImGui::GetFont(), distFs,
-                  {x + width - dw - padL, textY + (fs - distFs) / 2.f}, dc,
+                  {x + width - dw - padL, textY + (fs - distFs) * 0.3f}, dc,
                   distBuf);
     }
 
-    // ПРЕМИУМ ПОЛОСКА ЗДОРОВЬЯ
+    // Health bar
     if (mShowHealth.mValue) {
       float hpBarY = ry + fs + 8.f * scale;
       float hpBarW = width - padL * 2.f;
-      float hpBarH = 3.f * scale;
+      float hpBarH = 4.f * scale;
       float hpPercent = MathUtils::clamp(
           pe.animHealth / std::max(pe.maxHealth, 1.f), 0.f, 1.f);
 
-      // Фон полоски
+      // Background
       dl->AddRectFilled({x + padL, hpBarY},
                         {x + padL + hpBarW, hpBarY + hpBarH},
-                        ImColor(0, 0, 0, (int)(150 * alpha)), 2.f);
+                        ImColor(30, 30, 35, (int)(200 * alpha)), hpBarH);
 
-      // Заливка полоски (Градиент от красного к зеленому)
-      ImColor hpColor = ImColor((int)(255 * (1.f - hpPercent)),
-                                (int)(255 * hpPercent), 50, (int)(255 * alpha));
+      // Fill color based on health
+      ImColor hpColor;
+      if (hpPercent > 0.6f) hpColor = ImColor(80, 220, 120, (int)(255 * alpha));
+      else if (hpPercent > 0.3f) hpColor = ImColor(255, 200, 60, (int)(255 * alpha));
+      else hpColor = ImColor(255, 70, 70, (int)(255 * alpha));
+      
       dl->AddRectFilled({x + padL, hpBarY},
                         {x + padL + (hpBarW * hpPercent), hpBarY + hpBarH},
-                        hpColor, 2.f);
+                        hpColor, hpBarH);
+      
+      // HP text
+      char hpBuf[16];
+      snprintf(hpBuf, sizeof(hpBuf), "%.0f", pe.animHealth);
+      float hpTextW = ImGui::GetFont()->CalcTextSizeA(fs * 0.7f, FLT_MAX, 0, hpBuf).x;
+      dl->AddText(ImGui::GetFont(), fs * 0.7f, 
+                  {x + padL + hpBarW * hpPercent - hpTextW - 2.f, hpBarY - fs * 0.5f},
+                  ImColor(255, 255, 255, (int)(200 * alpha)), hpBuf);
+    }
 
-      // Глоу-эффект для ХП (Свечение)
-      hpColor.Value.w = alpha * 0.4f;
-      dl->AddRectFilled(
-          {x + padL, hpBarY - 1.f},
-          {x + padL + (hpBarW * hpPercent), hpBarY + hpBarH + 1.f}, hpColor,
-          3.f);
+    // Separator line
+    if (i < count - 1) {
+        dl->AddLine({x + padL, ry + rowH - 1}, {x + width - padL, ry + rowH - 1}, 
+                    ImColor(255, 255, 255, 15), 1.f);
     }
 
     ry += rowH;

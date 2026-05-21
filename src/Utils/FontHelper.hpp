@@ -3,7 +3,7 @@
 class FontHelper {
 public:
     static inline std::map<std::string, ImFont*> Fonts;
-    static inline std::string currentFontKey = "open_sans";
+    static inline std::string currentFontKey = "roboto";
     static inline float fontScale = 1.0f;
 
     static void load();
@@ -13,6 +13,5 @@ public:
     static void setCurrentFont(const std::string& fontKey);
     static void setFontScale(float scale);
 
-    // Получить масштабированный размер текста
     static float getScaledSize(float baseSize);
 };

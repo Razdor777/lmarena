@@ -157,19 +157,13 @@ void NameProtect::onPacketInEvent(PacketInEvent& event) {
     std::string styledNick = buildStyledNick();
     if (styledNick.empty() || styledNick == mOldLocalName) return;
 
-    // Replace real name with styled nick across all relevant packet fields
+    // Replace real name with styled nick in safe client-side fields only.
+    // mFilteredMessage and mParams are BDS/server-only fields — accessing them
+    // on the client causes a memory layout mismatch and instant crash.
     if (!packet->mMessage.empty() && packet->mMessage.find(mOldLocalName) != std::string::npos) {
         packet->mMessage = replaceAll(packet->mMessage, mOldLocalName, styledNick);
     }
     if (!packet->mAuthor.empty() && packet->mAuthor.find(mOldLocalName) != std::string::npos) {
         packet->mAuthor = replaceAll(packet->mAuthor, mOldLocalName, styledNick);
-    }
-    if (!packet->mFilteredMessage.empty() && packet->mFilteredMessage.find(mOldLocalName) != std::string::npos) {
-        packet->mFilteredMessage = replaceAll(packet->mFilteredMessage, mOldLocalName, styledNick);
-    }
-    for (auto& param : packet->mParams) {
-        if (!param.empty() && param.find(mOldLocalName) != std::string::npos) {
-            param = replaceAll(param, mOldLocalName, styledNick);
-        }
     }
 }

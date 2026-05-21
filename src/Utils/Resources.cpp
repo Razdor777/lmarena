@@ -91,6 +91,10 @@ void ResourceLoader::loadResources() {
     Resources.emplace("product_sans", fonts_Product_Sans_ttf);
     FontHelper::Fonts.emplace("product_sans", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(fonts_Product_Sans_ttf.data2(), fonts_Product_Sans_ttf.size(), 20, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));
     FontHelper::Fonts.emplace("product_sans_large", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(fonts_Product_Sans_ttf.data2(), fonts_Product_Sans_ttf.size(), 42, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));
+    auto fonts_Roboto_Regular_ttf = GET_RESOURCE(fonts_Roboto_Regular_ttf);
+    Resources.emplace("roboto_regular", fonts_Roboto_Regular_ttf);
+    FontHelper::Fonts.emplace("roboto_regular", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(fonts_Roboto_Regular_ttf.data2(), fonts_Roboto_Regular_ttf.size(), 20, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));
+    FontHelper::Fonts.emplace("roboto_regular_large", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(fonts_Roboto_Regular_ttf.data2(), fonts_Roboto_Regular_ttf.size(), 42, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));
     auto fonts_SF_Pro_Display_Bold_ttf = GET_RESOURCE(fonts_SF_Pro_Display_Bold_ttf);
     Resources.emplace("sf_pro_display_bold", fonts_SF_Pro_Display_Bold_ttf);
     FontHelper::Fonts.emplace("sf_pro_display_bold", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(fonts_SF_Pro_Display_Bold_ttf.data2(), fonts_SF_Pro_Display_Bold_ttf.size(), 20, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));

@@ -4,6 +4,19 @@
 void FontHelper::load()
 {
     ResourceLoader::loadResources();
+
+    // Roboto есть в Resources.hpp как LOAD_RESOURCE, но CMake не создал ImFont — грузим вручную
+    ImFontConfig font_config;
+    font_config.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_NoHinting;
+    font_config.FontDataOwnedByAtlas = false;
+
+    auto robotoRes = GET_RESOURCE(fonts_Roboto_Regular_ttf);
+    FontHelper::Fonts.emplace("roboto", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(
+        robotoRes.data2(), robotoRes.size(), 20, &font_config,
+        ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));
+    FontHelper::Fonts.emplace("roboto_large", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(
+        robotoRes.data2(), robotoRes.size(), 42, &font_config,
+        ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));
 }
 
 void FontHelper::setCurrentFont(const std::string& fontKey)
@@ -55,7 +68,15 @@ ImFont* FontHelper::getFont(bool large, bool bold, bool mForcePSans)
         return it->second;
     }
 
-    key = large ? "product_sans_large" : "product_sans";
+    // Фолбэк на roboto (кириллица гарантирована)
+    key = large ? "roboto_large" : "roboto";
+    it = Fonts.find(key);
+    if (it != Fonts.end() && it->second) {
+        return it->second;
+    }
+
+    // Последний фолбэк
+    key = large ? "comfortaa_large" : "comfortaa";
     it = Fonts.find(key);
     if (it != Fonts.end() && it->second) {
         return it->second;
