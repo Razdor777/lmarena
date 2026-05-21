@@ -8,10 +8,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 #include <Utils/GameUtils/ActorUtils.hpp>
-#include <Utils/MiscUtils/ImRenderUtils.hpp>
-#include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
 
+// ─── HUD element ─────────────────────────────────────────────────────────────
 static char sEnemyIndId[] = "EnemyIndicator";
 class EnemyIndElement : public HudElement {
 public:
@@ -28,7 +27,7 @@ void EnemyIndicator::onEnable() {
         gEnemyElem->mSize = {0.f, 0.f};
         if (HudEditor::gInstance) HudEditor::gInstance->registerElement(gEnemyElem);
     }
-    if (gEnemyElem) gEnemyElem->mVisible = true;
+    gEnemyElem->mVisible = true;
 }
 
 void EnemyIndicator::onDisable() {
@@ -36,224 +35,283 @@ void EnemyIndicator::onDisable() {
     if (gEnemyElem) gEnemyElem->mVisible = false;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// СТРЕЛКА — точная копия скриншота:
-//   - Треугольный шеврон с вырезом посередине (как курсор мышки / стрелка навигатора)
-//   - Цвет: розовый -> красный -> фиолетовый (анимированный)
-//   - Острие смотрит НА противника (наружу от центра)
-//   - Мягкое свечение вокруг
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Одна точка в системе координат: cx,cy — центр, angle — направление (0=вверх), 
-// lx,ly — локальные координаты (ось Y вверх)
+// ─── rotate point ────────────────────────────────────────────────────────────
 static ImVec2 rotPt(float cx, float cy, float angle, float lx, float ly) {
     float c = cosf(angle), s = sinf(angle);
-    return { cx + lx * c - ly * s, cy + lx * s + ly * c };
+    return { cx + lx*c - ly*s, cy + lx*s + ly*c };
 }
 
-// Рисует красивую навигационную стрелку (как на скрине)
-// angle: направление острия (0 = вверх экрана)
-static void drawNavArrow(ImDrawList* dl, float cx, float cy, float angle,
-                          float size, ImColor color, float glowStrength) {
-    // Форма: острие смотрит В направлении angle
-    // Шеврон с вырезом (как на скриншоте)
+// ─── Draw: chevron (Mode Arrows) ─────────────────────────────────────────────
+static void drawChevron(ImDrawList* dl, float cx, float cy, float angle,
+                         float size, ImColor col, bool glow)
+{
     float s = size;
+    ImVec2 tip   = rotPt(cx, cy, angle,  0.f,      -s);
+    ImVec2 bL    = rotPt(cx, cy, angle, -s*0.65f,   s*0.55f);
+    ImVec2 bR    = rotPt(cx, cy, angle,  s*0.65f,   s*0.55f);
+    ImVec2 inner = rotPt(cx, cy, angle,  0.f,        s*0.15f);
 
-    // Острие (tip) — в направлении angle
-    ImVec2 tip    = rotPt(cx, cy, angle,  0.f,    -s);
-    // Левый задний угол
-    ImVec2 bLeft  = rotPt(cx, cy, angle, -s*0.65f, s*0.55f);
-    // Правый задний угол
-    ImVec2 bRight = rotPt(cx, cy, angle,  s*0.65f, s*0.55f);
-    // Внутренний вырез (делает форму шеврона)
-    ImVec2 inner  = rotPt(cx, cy, angle,  0.f,     s*0.15f);
-
-    // Форма: tip -> bRight -> inner -> bLeft (квад = chevron)
-
-    // === СВЕЧЕНИЕ (несколько слоёв полупрозрачных) ===
-    if (glowStrength > 0.01f) {
+    if (glow) {
         for (int gi = 3; gi >= 1; gi--) {
-            float gs = s + gi * 3.5f * glowStrength;
-            ImVec2 gTip    = rotPt(cx, cy, angle,  0.f,    -gs);
-            ImVec2 gBLeft  = rotPt(cx, cy, angle, -gs*0.65f, gs*0.55f);
-            ImVec2 gBRight = rotPt(cx, cy, angle,  gs*0.65f, gs*0.55f);
-            ImVec2 gInner  = rotPt(cx, cy, angle,  0.f,     gs*0.15f);
+            float gs  = s + gi * 3.f;
+            ImVec2 gT = rotPt(cx, cy, angle, 0.f,      -gs);
+            ImVec2 gL = rotPt(cx, cy, angle,-gs*0.65f,  gs*0.55f);
+            ImVec2 gR = rotPt(cx, cy, angle, gs*0.65f,  gs*0.55f);
+            ImVec2 gI = rotPt(cx, cy, angle, 0.f,       gs*0.15f);
+            ImColor g = col; g.Value.w = col.Value.w * 0.1f * (4.f-gi)/3.f;
+            dl->AddQuadFilled(gT, gR, gI, gL, g);
+        }
+    }
+    dl->AddQuadFilled(tip, bR, inner, bL, col);
+    dl->AddQuad(tip, bR, inner, bL, ImColor(1.f,1.f,1.f,col.Value.w*0.4f), 1.1f);
+}
 
-            ImColor glow = color;
-            glow.Value.w = color.Value.w * 0.12f * glowStrength * (4.f - gi) / 3.f;
+// ─── Draw: triangle on circle edge (Mode Radar) ───────────────────────────────
+static void drawTriPointer(ImDrawList* dl, float cx, float cy, float angle,
+                            float circleR, float ptrSize, ImColor col, bool glow)
+{
+    float px = cx + sinf(angle) * circleR;
+    float py = cy - cosf(angle) * circleR;
+    ImVec2 tip = rotPt(px, py, angle,  0.f,            -ptrSize * 0.85f);
+    ImVec2 bL  = rotPt(px, py, angle, -ptrSize * 0.55f,  ptrSize * 0.5f);
+    ImVec2 bR  = rotPt(px, py, angle,  ptrSize * 0.55f,  ptrSize * 0.5f);
 
-            dl->AddQuadFilled(gTip, gBRight, gInner, gBLeft, glow);
+    if (glow) {
+        for (int gi = 2; gi >= 1; gi--) {
+            float gs = ptrSize * (1.f + gi * 0.5f);
+            ImVec2 gT = rotPt(px, py, angle,  0.f,          -gs * 0.85f);
+            ImVec2 gL = rotPt(px, py, angle, -gs * 0.55f,    gs * 0.5f);
+            ImVec2 gR = rotPt(px, py, angle,  gs * 0.55f,    gs * 0.5f);
+            ImColor g = col; g.Value.w = col.Value.w * 0.15f;
+            dl->AddTriangleFilled(gT, gL, gR, g);
+        }
+    }
+    dl->AddTriangleFilled(tip, bL, bR, col);
+    dl->AddTriangle(tip, bL, bR, ImColor(1.f,1.f,1.f, col.Value.w*0.45f), 1.f);
+}
+
+// ─── Draw: compass arrow (Mode Compass) ──────────────────────────────────────
+// Рисует одну стрелку — точно как на скрине: маленькая белая стрелка выше центра
+// angle = направление к врагу (уже повёрнута)
+static void drawCompassArrow(ImDrawList* dl, float cx, float cy, float angle,
+                              float size, ImColor col, bool glow)
+{
+    // Стрелка: острое тело + раздвоенный хвост (как на скрине)
+    float s  = size;
+    float s2 = s * 0.5f;
+
+    // Острие
+    ImVec2 tip  = rotPt(cx, cy, angle,  0.f,      -s);
+    // Тело-бока
+    ImVec2 mL   = rotPt(cx, cy, angle, -s2*0.45f,  s*0.1f);
+    ImVec2 mR   = rotPt(cx, cy, angle,  s2*0.45f,  s*0.1f);
+    // Хвост — раздвоен (V-форма снизу)
+    ImVec2 tL   = rotPt(cx, cy, angle, -s2*0.7f,   s*0.85f);
+    ImVec2 tR   = rotPt(cx, cy, angle,  s2*0.7f,   s*0.85f);
+    ImVec2 tCen = rotPt(cx, cy, angle,  0.f,        s*0.45f); // выемка в центре хвоста
+
+    if (glow) {
+        // Мягкое свечение вокруг острия
+        for (int gi = 3; gi >= 1; gi--) {
+            float r = s * 0.35f * gi;
+            ImColor g = col;
+            g.Value.w = col.Value.w * 0.08f * (4.f - gi) / 3.f;
+            dl->AddCircleFilled({tip.x, tip.y}, r, g, 12);
         }
     }
 
-    // === ОСНОВНАЯ ЗАЛИВКА ===
-    dl->AddQuadFilled(tip, bRight, inner, bLeft, color);
+    // Основная форма: треугольник-тело + раздвоенный хвост
+    // Тело (от острия до середины)
+    dl->AddTriangleFilled(tip, mL, mR, col);
+    // Хвост левый
+    dl->AddTriangleFilled(mL, tL, tCen, col);
+    // Хвост правый
+    dl->AddTriangleFilled(mR, tCen, tR, col);
 
-    // === ОБВОДКА для чёткости ===
-    ImColor outline = ImColor(1.f, 1.f, 1.f, color.Value.w * 0.45f);
-    dl->AddQuad(tip, bRight, inner, bLeft, outline, 1.2f);
-
-    // === НЕБОЛЬШОЙ БЛИК на острие ===
-    ImVec2 hlEnd = rotPt(cx, cy, angle,  0.f, -s * 0.55f);
-    ImColor hl = ImColor(1.f, 1.f, 1.f, color.Value.w * 0.35f);
-    dl->AddLine(tip, hlEnd, hl, 1.5f);
+    // Белая обводка
+    ImColor outline = ImColor(1.f, 1.f, 1.f, col.Value.w * 0.5f);
+    // Контур тела
+    dl->AddTriangle(tip, mL, mR, outline, 0.8f);
+    // Контур хвоста
+    dl->AddLine(mL, tL,   outline, 0.8f);
+    dl->AddLine(mR, tR,   outline, 0.8f);
+    dl->AddLine(tL, tCen, outline, 0.8f);
+    dl->AddLine(tR, tCen, outline, 0.8f);
 }
 
-// Анимированный цвет: розовый → красный → фиолетовый
-// phase: 0..1, t: время
-static ImColor getArrowColor(float t, float phase, float dist, float maxDist, bool colorByDist) {
-    if (colorByDist) {
-        // Близко = красный/розовый, далеко = фиолетовый
-        float nd = std::clamp(dist / maxDist, 0.f, 1.f); // 0=близко, 1=далеко
-
-        // Розовый (близко) → Красный (средне) → Фиолетовый (далеко)
-        // HSV: 340° розовый, 0°/360° красный, 270° фиолетовый
-        float hue;
-        if (nd < 0.5f) {
-            // Розовый → Красный: 340 → 360 (или 0)
-            hue = (340.f + nd * 2.f * 20.f) / 360.f;
-            if (hue > 1.f) hue -= 1.f;
-        } else {
-            // Красный → Фиолетовый: 0 → 270
-            hue = (nd - 0.5f) * 2.f * 270.f / 360.f;
-        }
-
-        // Насыщенность и яркость
-        float sat = 0.85f + 0.15f * (1.f - nd); // близко = ярче
-        float val = 1.f;
-
-        float r, g, b;
-        ImGui::ColorConvertHSVtoRGB(hue, sat, val, r, g, b);
-        return ImColor(r, g, b, 1.f);
-    } else {
-        // Анимированный: плавный цикл розовый→красный→фиолетовый
-        // phase сдвигает фазу для каждой стрелки (чтобы не все одинаковые)
-        float hue = fmodf(t * 0.25f + phase, 1.f);
-        // Ограничиваем диапазон: 270°..360°..340° (фиолетовый..красный..розовый)
-        // Переводим hue в эту зону:
-        // 0.75 = 270° фиолетовый, 1.0/0.0 = красный, 0.94 = розовый
-        hue = 0.75f + hue * 0.25f;
-        if (hue > 1.f) hue -= 1.f;
-
-        float r, g, b;
-        ImGui::ColorConvertHSVtoRGB(hue, 0.9f, 1.f, r, g, b);
-        return ImColor(r, g, b, 1.f);
-    }
-}
-
+// ─── Main render ──────────────────────────────────────────────────────────────
 void EnemyIndicator::onRenderEvent(RenderEvent& event) {
-    auto player = ClientInstance::get()->getLocalPlayer();
+    auto* player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
 
-    auto dl = ImGui::GetBackgroundDrawList();
+    auto* dl  = ImGui::GetBackgroundDrawList();
     float now = (float)ImGui::GetTime();
 
-    ImVec2 screenCenter;
+    ImVec2 sc;
     if (gEnemyElem && gEnemyElem->mVisible) {
-        screenCenter = gEnemyElem->getPos();
-        if (screenCenter.x == 0.f && screenCenter.y == 0.f) {
-            auto disp = ImGui::GetIO().DisplaySize;
-            screenCenter = {disp.x * 0.5f, disp.y * 0.5f};
+        sc = gEnemyElem->getPos();
+        if (sc.x == 0.f && sc.y == 0.f) {
+            auto d = ImGui::GetIO().DisplaySize;
+            sc = {d.x * 0.5f, d.y * 0.5f};
         }
     } else {
-        auto disp = ImGui::GetIO().DisplaySize;
-        screenCenter = {disp.x * 0.5f, disp.y * 0.5f};
+        auto d = ImGui::GetIO().DisplaySize;
+        sc = {d.x * 0.5f, d.y * 0.5f};
     }
 
     glm::vec3 myPos = *player->getPos();
     float myYaw = player->getActorRotationComponent()->mYaw;
 
     float maxRange = mRange.mValue;
-    float ringR    = mRadius.mValue;
-    float arrowSz  = mArrowSize.mValue;
-    int   maxN     = (int)mMaxArrows.mValue;
-    float opacity  = mOpacity.mValue;
+    float op       = mOpacity.mValue;
+    float R        = mRadius.mValue;
+    float sz       = mSize.mValue;
+    bool  showDist = mShowDist.mValue;
+    bool  showCnt  = mShowCount.mValue;
+    bool  glow     = mGlow.mValue;
+    auto  mode     = mMode.mValue;
 
-    struct EnemyData { Actor* a; float dist; float screenAngle; };
-    std::vector<EnemyData> enemies;
+    // Собираем врагов
+    struct Enemy { float dist; float angle; };
+    std::vector<Enemy> enemies;
 
-    for (auto* actor : ActorUtils::getActorList(true, true)) {
-        if (actor == player) continue;
-        glm::vec3 p = *actor->getPos();
+    for (auto* a : ActorUtils::getActorList(true, true)) {
+        if (a == player) continue;
+        glm::vec3 p = *a->getPos();
         float d = glm::distance(myPos, p);
         if (d > maxRange) continue;
 
-        float deltaX = p.x - myPos.x;
-        float deltaZ = p.z - myPos.z;
-        float worldYaw = atan2f(deltaZ, deltaX) * (180.f / (float)M_PI);
-        float relativeYaw = worldYaw - myYaw - 90.f;
-        float screenAngle = glm::radians(relativeYaw);
-
-        enemies.push_back({actor, d, screenAngle});
+        float dx = p.x - myPos.x, dz = p.z - myPos.z;
+        float worldYaw = atan2f(dz, dx) * (180.f / (float)M_PI);
+        float rel      = worldYaw - myYaw - 90.f;
+        enemies.push_back({d, glm::radians(rel)});
     }
 
-    std::sort(enemies.begin(), enemies.end(), [](const EnemyData& a, const EnemyData& b){
+    std::sort(enemies.begin(), enemies.end(), [](const Enemy& a, const Enemy& b){
         return a.dist < b.dist;
     });
-    if ((int)enemies.size() > maxN) enemies.resize(maxN);
-    if (enemies.empty()) return;
 
-    // Всего врагов — для счётчика
-    int totalCount = (int)enemies.size();
-
-    int i = 0;
-    for (auto& en : enemies) {
-        float angle = en.screenAngle;
-
-        float ax = screenCenter.x + sinf(angle) * ringR;
-        float ay = screenCenter.y - cosf(angle) * ringR;
-
-        // Цвет стрелки
-        ImColor arrowCol = getArrowColor(now, (float)i * 0.33f, en.dist, maxRange, mColorDist.mValue);
-
-        // Пульсация при близком противнике
-        float curSize = arrowSz;
-        float finalAlpha = opacity;
-        if (mPulseClose.mValue && en.dist < 10.f) {
-            float pulse = 0.75f + 0.25f * sinf(now * 10.f + (float)i);
-            finalAlpha  = std::min(finalAlpha * (0.8f + 0.4f * pulse), 1.f);
-            curSize     = arrowSz * (0.9f + 0.15f * pulse);
-        }
-        arrowCol.Value.w = finalAlpha;
-
-        // Рисуем стрелку
-        float glowStr = mGlow.mValue ? 1.f : 0.f;
-        drawNavArrow(dl, ax, ay, angle, curSize, arrowCol, glowStr);
-
-        // Дистанция под стрелкой
-        if (mShowDist.mValue) {
-            char distBuf[32];
-            snprintf(distBuf, sizeof(distBuf), "%.0fm", en.dist);
-            ImVec2 ts = ImGui::CalcTextSize(distBuf);
-
-            // Позиция текста: за стрелкой (снаружи кольца)
-            float textR = ringR + curSize + 4.f;
-            float tx = screenCenter.x + sinf(angle) * textR - ts.x * 0.5f;
-            float ty = screenCenter.y - cosf(angle) * textR - ts.y * 0.5f;
-
-            // Тень
-            dl->AddText({tx + 1, ty + 1}, IM_COL32(0, 0, 0, (int)(180 * finalAlpha)), distBuf);
-            ImColor tc = arrowCol;
-            tc.Value.w = finalAlpha * 0.9f;
-            dl->AddText({tx, ty}, tc, distBuf);
-        }
-
-        i++;
+    if (mode != IndicatorMode::Compass) {
+        int maxN = (int)mMaxCount.mValue;
+        if ((int)enemies.size() > maxN) enemies.resize(maxN);
+    } else {
+        // Compass — только ближайший
+        if (enemies.size() > 1) enemies.resize(1);
     }
 
-    // Счётчик врагов в центре
-    if (mShowCount.mValue && totalCount > 0) {
-        char cntBuf[16];
-        snprintf(cntBuf, sizeof(cntBuf), "%d", totalCount);
-        ImVec2 ts = ImGui::CalcTextSize(cntBuf);
-        float cx = screenCenter.x - ts.x * 0.5f;
-        float cy = screenCenter.y - ts.y * 0.5f;
+    if (enemies.empty()) return;
+    int total = (int)enemies.size();
 
-        // Анимированный цвет для счётчика
-        ImColor cc = getArrowColor(now, 0.f, 0.f, maxRange, false);
-        cc.Value.w = opacity;
+    // ─────────────────────────────────────────────────────────────────────────
+    // MODE 3: COMPASS — одна стрелка над перекрестием как на скрине
+    // ─────────────────────────────────────────────────────────────────────────
+    if (mode == IndicatorMode::Compass) {
+        float offsetY = mOffset.mValue; // пикселей выше центра
+        float dist    = enemies[0].dist;
+        float angle   = enemies[0].angle;
 
-        dl->AddText({cx + 1, cy + 1}, IM_COL32(0,0,0,160), cntBuf);
-        dl->AddText({cx, cy}, cc, cntBuf);
+        // Позиция стрелки — фиксированная над центром экрана
+        float ax = sc.x;
+        float ay = sc.y - offsetY;
+
+        // Пульсация
+        float pulse = 0.88f + 0.12f * sinf(now * 3.5f);
+        float curSz = sz * pulse;
+        float curOp = op * pulse;
+
+        // Тематический цвет
+        ImColor col = ColorUtils::getThemedColor(now * 30.f);
+        col.Value.w = curOp;
+
+        // Стрелка повёрнута на врага (angle = направление от игрока к врагу)
+        drawCompassArrow(dl, ax, ay, angle, curSz, col, glow);
+
+        // Дистанция над стрелкой (как на скрине — "46m" сверху)
+        if (showDist) {
+            char buf[24]; snprintf(buf, sizeof(buf), "%.0fm", dist);
+            ImVec2 ts = ImGui::CalcTextSize(buf);
+            float tx  = ax - ts.x * 0.5f;
+            float ty  = ay - curSz - ts.y - 4.f;  // выше острия стрелки
+            dl->AddText({tx+1, ty+1}, IM_COL32(0,0,0,(int)(180*curOp)), buf);
+            dl->AddText({tx,   ty  }, ImColor(1.f,1.f,1.f, curOp*0.95f), buf);
+        }
+        return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MODE 2: RADAR — большой круг + треугольники на краю
+    // ─────────────────────────────────────────────────────────────────────────
+    if (mode == IndicatorMode::Radar) {
+        dl->AddCircle({sc.x, sc.y}, R, ImColor(1.f,1.f,1.f, op*0.8f), 128, 1.5f);
+
+        for (int i = 0; i < total; i++) {
+            float angle = enemies[i].angle;
+            float pulse = 0.85f + 0.15f * sinf(now * 4.f + (float)i * 1.1f);
+            float curSz = sz * pulse;
+            float curOp = op * (0.85f + 0.15f * pulse);
+
+            ImColor col = ColorUtils::getThemedColor(now * 30.f + (float)i * 25.f);
+            col.Value.w = curOp;
+
+            drawTriPointer(dl, sc.x, sc.y, angle, R, curSz, col, glow);
+
+            if (showDist) {
+                char buf[24]; snprintf(buf, sizeof(buf), "%.0fm", enemies[i].dist);
+                ImVec2 ts = ImGui::CalcTextSize(buf);
+                float textR = R + curSz * 1.6f + 4.f;
+                float tx = sc.x + sinf(angle) * textR - ts.x * 0.5f;
+                float ty = sc.y - cosf(angle) * textR - ts.y * 0.5f;
+                dl->AddText({tx+1,ty+1}, IM_COL32(0,0,0,(int)(180*curOp)), buf);
+                dl->AddText({tx,  ty  }, ImColor(1.f,1.f,1.f, curOp*0.9f), buf);
+            }
+        }
+
+        if (showCnt && total > 0) {
+            char buf[8]; snprintf(buf, sizeof(buf), "%d", total);
+            ImVec2 ts = ImGui::CalcTextSize(buf);
+            float tx = sc.x - ts.x * 0.5f, ty = sc.y - ts.y * 0.5f;
+            dl->AddText({tx+1,ty+1}, IM_COL32(0,0,0,160), buf);
+            dl->AddText({tx,  ty  }, ImColor(1.f,1.f,1.f, op*0.75f), buf);
+        }
+        return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MODE 1: ARROWS — шевроны на кольце
+    // ─────────────────────────────────────────────────────────────────────────
+    for (int i = 0; i < total; i++) {
+        float angle = enemies[i].angle;
+        float ax    = sc.x + sinf(angle) * R;
+        float ay    = sc.y - cosf(angle) * R;
+
+        float pulse = 0.85f + 0.15f * sinf(now * 4.f + (float)i * 1.1f);
+        float curSz = sz * pulse;
+        float curOp = op * (0.85f + 0.15f * pulse);
+
+        ImColor col = ColorUtils::getThemedColor(now * 30.f + (float)i * 25.f);
+        col.Value.w = curOp;
+
+        drawChevron(dl, ax, ay, angle, curSz, col, glow);
+
+        if (showDist) {
+            char buf[24]; snprintf(buf, sizeof(buf), "%.0fm", enemies[i].dist);
+            ImVec2 ts = ImGui::CalcTextSize(buf);
+            float textR = R + curSz + 4.f;
+            float tx = sc.x + sinf(angle) * textR - ts.x * 0.5f;
+            float ty = sc.y - cosf(angle) * textR - ts.y * 0.5f;
+            dl->AddText({tx+1,ty+1}, IM_COL32(0,0,0,(int)(180*curOp)), buf);
+            ImColor tc = col; tc.Value.w = curOp * 0.9f;
+            dl->AddText({tx, ty}, tc, buf);
+        }
+    }
+
+    if (showCnt && total > 0) {
+        char buf[8]; snprintf(buf, sizeof(buf), "%d", total);
+        ImVec2 ts = ImGui::CalcTextSize(buf);
+        float tx = sc.x - ts.x * 0.5f, ty = sc.y - ts.y * 0.5f;
+        ImColor cc = ColorUtils::getThemedColor(now * 30.f);
+        cc.Value.w = op;
+        dl->AddText({tx+1,ty+1}, IM_COL32(0,0,0,160), buf);
+        dl->AddText({tx,  ty  }, cc, buf);
     }
 }

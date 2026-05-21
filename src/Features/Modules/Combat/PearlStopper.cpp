@@ -89,7 +89,13 @@ bool PearlStopper::isSpaceClear(glm::vec3 feetPos) {
 bool PearlStopper::isEnderPearl(Actor* a) {
     if (!a) return false;
     auto* tc = a->getActorTypeComponent();
-    return tc && (static_cast<uint32_t>(tc->mType) & 0xFFu) == 87u;
+    if (!tc) return false;
+    // ActorType::Enderpearl = 87 | Projectile (1<<22) = 0x400057
+    // Проверяем нижние 8 бит == 87 И что это снаряд
+    uint32_t t = static_cast<uint32_t>(tc->mType);
+    bool isBase      = (t & 0xFFu) == 87u;
+    bool isProjectile = (t & (1u << 22)) != 0;
+    return isBase && isProjectile;
 }
 
 Actor* PearlStopper::getPearlOwner(Actor* pearl) {
@@ -118,12 +124,38 @@ std::vector<PearlStopper::PearlData> PearlStopper::findEnemyPearls(Actor* local)
     std::vector<PearlData> result;
     if (!local) return result;
 
-    // Собираем текущие живые перлы
+    // Ищем перлы напрямую через ECS registry по ActorTypeComponent
+    // БЕЗ зависимости от ActorOwnerComponent — перлы кинутые издалека
+    // могут не иметь ActorOwnerComponent в клиентском реестре
     std::unordered_map<int64_t, Actor*> currentAlive;
+
+    try {
+        auto* reg = local->mContext.mRegistry;
+        if (reg) {
+            // View только по ActorTypeComponent + ActorOwnerComponent
+            // (минимальный набор компонентов у снарядов)
+            for (auto&& [entId, ownerComp, typeComp] :
+                reg->view<ActorOwnerComponent, ActorTypeComponent>().each())
+            {
+                if (!reg->valid(entId)) continue;
+                if (!ownerComp.mActor) continue;
+
+                Actor* a = ownerComp.mActor;
+                if (!isEnderPearl(a)) continue;
+                if (isOwnPearl(a, local)) continue;
+
+                currentAlive[a->getRuntimeID()] = a;
+            }
+        }
+    } catch (...) {}
+
+    // Дополнительно — стандартный getActorList на случай если выше не нашли
     for (Actor* a : ActorUtils::getActorList(false, false)) {
         if (!a || !isEnderPearl(a)) continue;
         if (isOwnPearl(a, local)) continue;
-        currentAlive[a->getRuntimeID()] = a;
+        int64_t rid = a->getRuntimeID();
+        if (currentAlive.find(rid) == currentAlive.end())
+            currentAlive[rid] = a;
     }
 
     // Удаляем из кеша перлы которых уже нет
@@ -229,7 +261,9 @@ std::vector<glm::vec3> PearlStopper::simulateTrajectory(glm::vec3 startPos,
         p   += v;
         path.push_back(p);
 
-        if (t > 3 && isSolidAt(p)) break;
+        // Прерываем только если перл врезался в блок И уже не летит вверх
+        // Если velocity.y > 0 — перл ещё летит вверх (брошен снизу), не прерываем
+        if (t > 3 && v.y <= 0.f && isSolidAt(p)) break;
         if (p.y < -64.f) break;
     }
     return path;
@@ -263,13 +297,26 @@ PearlStopper::InterceptResult PearlStopper::findIntercept(
     for (size_t t = 4; t < traj.size(); ++t) {
         const glm::vec3& pearlPos = traj[t];
 
+        if (static_cast<int>(t) <= ticksNeeded) continue;
+
+        // Базовая позиция ног
         glm::vec3 candidateFeet;
         candidateFeet.x = pearlPos.x;
         candidateFeet.z = pearlPos.z;
         candidateFeet.y = pearlPos.y - 0.9f + mYOffset.mValue;
 
-        if (!isSpaceClear(candidateFeet)) continue;
-        if (static_cast<int>(t) <= ticksNeeded) continue;
+        // Если базовая позиция занята — пробуем найти свободное место
+        // рядом по Y (перл мог прилететь снизу сквозь пол)
+        bool found = false;
+        for (int yTry = 0; yTry <= 3; yTry++) {
+            glm::vec3 tryPos = candidateFeet + glm::vec3(0.f, (float)yTry, 0.f);
+            if (isSpaceClear(tryPos)) {
+                candidateFeet = tryPos;
+                found = true;
+                break;
+            }
+        }
+        if (!found) continue;
 
         res.found     = true;
         res.feetPos   = candidateFeet;
@@ -464,11 +511,19 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
 
         float score = dist; // базово — ближайшая
 
-        // Если velocity известен — учитываем направление к нам
+        // Учитываем направление только в горизонтальной плоскости
+        // чтобы не штрафовать перлы летящие снизу вверх (вертикальные броски)
         if (speedLen > 0.02f) {
-            glm::vec3 toUs    = glm::normalize(myFeet - pearl.position);
-            float     approach = glm::dot(glm::normalize(pearl.velocity), toUs);
-            score = dist * (1.6f - approach * 1.4f);
+            glm::vec2 velXZ    = glm::vec2(pearl.velocity.x, pearl.velocity.z);
+            glm::vec2 toUsXZ   = glm::vec2(myFeet.x - pearl.position.x,
+                                            myFeet.z - pearl.position.z);
+            float lenXZ = glm::length(toUsXZ);
+            if (lenXZ > 0.01f) {
+                float approach = glm::dot(glm::normalize(velXZ),
+                                          glm::normalize(toUsXZ));
+                // Горизонтальное приближение важно, но вертикаль не штрафуем
+                score = dist * (1.3f - approach * 1.0f);
+            }
         }
 
         if (score < bestScore) { bestScore = score; best = &pearl; }

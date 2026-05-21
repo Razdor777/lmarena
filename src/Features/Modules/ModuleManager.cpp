@@ -136,6 +136,8 @@
 #include "Visual/ItemPhysics.hpp"
 #include "Visual/Kagune.hpp"
 #include "Visual/LevelInfo.hpp"
+#include "Visual/PlayerHUD.hpp"
+#include "Visual/InventoryHUD.hpp"
 #include "Visual/MotionBlur.hpp"
 #include "Visual/NameProtect.hpp"
 #include "Visual/Nametags.hpp"
@@ -269,6 +271,8 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<Interface>());
   mModules.emplace_back(std::make_shared<Arraylist>());
   mModules.emplace_back(std::make_shared<LevelInfo>());
+  mModules.emplace_back(std::make_shared<PlayerHUD>());
+  mModules.emplace_back(std::make_shared<InventoryHUD>());
   mModules.emplace_back(std::make_shared<Notifications>());
   mModules.emplace_back(std::make_shared<HitColor>());
   mModules.emplace_back(std::make_shared<DestroyProgress>());

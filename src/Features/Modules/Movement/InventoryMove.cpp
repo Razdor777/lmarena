@@ -17,7 +17,7 @@
 std::vector<unsigned char> gClrBytes = { 0x90, 0x90 };
 DEFINE_PATCH_FUNC(InventoryMove::patchFunc1, SigManager::PlayerMovement_clearInputStateInlined, gClrBytes);
 std::vector<unsigned char> gClrBytes2 = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-DEFINE_PATCH_FUNC(InventoryMove::patchFunc2, SigManager::PlayerMovement_clearInputStateInlined2, gClrBytes);
+DEFINE_PATCH_FUNC(InventoryMove::patchFunc2, SigManager::PlayerMovement_clearInputStateInlined2, gClrBytes2);
 
 
 void InventoryMove::onEnable()
@@ -163,26 +163,18 @@ void InventoryMove::onRenderEvent(RenderEvent& event)
 
 void InventoryMove::onPacketInEvent(PacketInEvent& event)
 {
-    if (event.mPacket->getId() == PacketID::ContainerOpen)
-    {
-        auto packet = event.getPacket<ContainerOpenPacket>();
+    PacketID pid = event.mPacket->getId();
+    // ContainerOpen — есть открытый контейнер
+    if (pid == PacketID::ContainerOpen)
         mHasOpenContainer = true;
-    }
-    if (event.mPacket->getId() == PacketID::ContainerClose)
-    {
+    // ContainerClose — закрыли
+    if (pid == PacketID::ContainerClose)
         mHasOpenContainer = false;
-    }
 }
 
 void InventoryMove::onPacketOutEvent(PacketOutEvent& event)
 {
-    if (event.mPacket->getId() == PacketID::ContainerClose)
-    {
+    PacketID pid = event.mPacket->getId();
+    if (pid == PacketID::ContainerClose)
         mHasOpenContainer = false;
-    }
-    else if (event.mPacket->getId() == PacketID::ContainerOpen)
-    {
-        auto packet = event.getPacket<ContainerOpenPacket>();
-        mHasOpenContainer = true;
-    }
 }
