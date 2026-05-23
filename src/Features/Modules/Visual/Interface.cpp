@@ -10,7 +10,6 @@
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/DrawImageEvent.hpp>
 #include <Features/Events/PreGameCheckEvent.hpp>
-#include <Features/Events/RenderEvent.hpp>
 
 #include <Features/Modules/Visual/Interface.hpp>
 #include <Hook/Hooks/RenderHooks/ActorRenderDispatcherHook.hpp>
@@ -69,22 +68,21 @@ std::string combine(T t, Args... args)
     return ss.str();
 }
 
+/*
+// ── Rotation variables (disabled — vanilla takes over) ─────────────────
 float pYaw;
 float pOldYaw;
-
 float pHeadYaw;
 float pOldHeadYaw;
-
 float pPitch;
 float pOldPitch;
-
 float pBodyYaw;
 float pOldBodyYaw;
-
 float pLerpedYaw;
 float pLerpedHeadYaw;
 float pLerpedPitch;
 float pLerpedBodyYaw;
+*/
 
 bool usingPaip = false;
 
@@ -234,28 +232,13 @@ void Interface::onRenderEvent(RenderEvent& event)
         usingPaip = false;
     }
 
-    static constexpr float LERP_SPEED = 20.f;
-    float deltaTime = ImGui::GetIO().DeltaTime;
-
-    float yaw = MathUtils::wrap(pLerpedYaw, pYaw - 180, pYaw + 180);
-    float headYaw = MathUtils::wrap(pLerpedHeadYaw, pHeadYaw - 180, pHeadYaw + 180);
-    float pitch = pLerpedPitch;
-    float bodyYaw = MathUtils::wrap(pLerpedBodyYaw, pBodyYaw - 180, pBodyYaw + 180);
-
-    float preLerpedYaw = MathUtils::lerp(yaw, pYaw, deltaTime * LERP_SPEED);
-    float preLerpedHeadYaw = MathUtils::lerp(headYaw, pHeadYaw, deltaTime * LERP_SPEED);
-    float preLerpedPitch = MathUtils::lerp(pitch, pPitch, deltaTime * LERP_SPEED);
-    float preLerpedBodyYaw = MathUtils::lerp(bodyYaw, pBodyYaw, deltaTime * LERP_SPEED);
-
-    pLerpedYaw = MathUtils::wrap(pLerpedYaw, preLerpedYaw - 180, preLerpedYaw + 180);
-    pLerpedHeadYaw = MathUtils::wrap(pLerpedHeadYaw, preLerpedHeadYaw - 180, preLerpedHeadYaw + 180);
-    pLerpedBodyYaw = MathUtils::wrap(pLerpedBodyYaw, preLerpedBodyYaw - 180, preLerpedBodyYaw + 180);
-
-    pLerpedYaw = MathUtils::lerp(preLerpedYaw, pLerpedYaw, deltaTime * LERP_SPEED);
-    pLerpedHeadYaw = MathUtils::lerp(preLerpedHeadYaw, pLerpedHeadYaw, deltaTime * LERP_SPEED);
-    pLerpedPitch = MathUtils::lerp(preLerpedPitch, pLerpedPitch, deltaTime * LERP_SPEED);
-    pLerpedBodyYaw = MathUtils::lerp(preLerpedBodyYaw, pLerpedBodyYaw, deltaTime * LERP_SPEED);
-
+    /*
+    // ── Disabled: no custom rotation interpolation ───────────────────────
+    pLerpedYaw     = pYaw;
+    pLerpedHeadYaw = pHeadYaw;
+    pLerpedPitch   = pPitch;
+    pLerpedBodyYaw = pBodyYaw;
+    */
 }
 
 void Interface::onActorRenderEvent(ActorRenderEvent& event)
@@ -270,7 +253,8 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     bool firstPerson = ClientInstance::get()->getOptions()->mThirdPerson->value == 0;
     if (firstPerson && !player->getFlag<RenderCameraComponent>()) return;
 
-
+    /*
+    // ── Disabled: no component patching (vanilla render angles) ────────
     const auto actorRotations = event.mEntity->getActorRotationComponent();
     const auto headRotations = event.mEntity->getActorHeadRotationComponent();
     const auto bodyRotations = event.mEntity->getMobBodyRotationComponent();
@@ -289,17 +273,21 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     headRotations->mOldHeadRot = pLerpedHeadYaw;
     bodyRotations->yBodyRot = pLerpedBodyYaw;
     bodyRotations->yOldBodyRot = pLerpedBodyYaw;
+    */
 
     auto original = event.mDetour->getOriginal<&ActorRenderDispatcherHook::render>();
     original(event._this, event.mEntityRenderContext, event.mEntity, event.mCameraTargetPos, event.mPos, event.mRot, event.mIgnoreLighting);
     event.cancel();
 
+    /*
+    // ── Disabled: restore original values ────────────────────────────────
     actorRotations->mOldPitch = realOldPitch;
     actorRotations->mPitch = realPitch;
     headRotations->mHeadRot = realHeadRot;
     headRotations->mOldHeadRot = realOldHeadRot;
     bodyRotations->yBodyRot = realBodyYaw;
     bodyRotations->yOldBodyRot = realOldBodyYaw;
+    */
 }
 
 void Interface::onDrawImageEvent(DrawImageEvent& event)
@@ -326,11 +314,13 @@ void Interface::onDrawImageEvent(DrawImageEvent& event)
 
 void Interface::onBaseTickEvent(BaseTickEvent& event)
 {
+    /*
+    // ── Disabled: no custom body-yaw logic ───────────────────────────────
     auto player = ClientInstance::get()->getLocalPlayer();
-
     BodyYaw::updateRenderAngles(player, pYaw);
     pOldBodyYaw = pBodyYaw;
     pBodyYaw = BodyYaw::bodyYaw;
+    */
 
     // Apply font setting
     static FontType lastFont = (FontType)-1;
@@ -353,6 +343,8 @@ void Interface::onPacketOutEvent(PacketOutEvent& event)
 {
     if (event.mPacket->getId() == PacketID::PlayerAuthInput) usingPaip = true;
 
+    /*
+    // ── Disabled: no custom rotation capture ────────────────────────────
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
     auto level = player->getLevel();
@@ -382,4 +374,5 @@ void Interface::onPacketOutEvent(PacketOutEvent& event)
         pPitch = mpp->mRot.x;
         pHeadYaw = mpp->mYHeadRot;
     }
+    */
 }

@@ -202,6 +202,7 @@ glm::vec3 PearlStopper::estimateVelocity(PearlData& pearl, uint64_t nowMs) {
     if (!std::isfinite(len) || len < 0.01f || len > 3.0f)
         vel = pearl.velocity;
 
+    pearl.velocity = vel;
     return vel;
 }
 
@@ -251,16 +252,13 @@ std::vector<glm::vec3> PearlStopper::simulateTrajectory(glm::vec3 startPos,
 
 PearlStopper::InterceptResult PearlStopper::findIntercept(
     const std::vector<glm::vec3>& traj,
-    glm::vec3 ourFeetPos)
+    glm::vec3 ourFeetPos,
+    int ticksNeeded)
 {
     InterceptResult res;
     if (traj.size() < 4) return res;
 
-    // Все пакеты TP улетают в один тик (как в ClickTP),
-    // поэтому нам нужно всего: 1 тик на TP + запас на движок и пинг
-    static constexpr int REACTION    = 3;
-    static constexpr int PING        = 2;
-    const int            ticksNeeded = 1 + REACTION + PING;
+    // ticksNeeded теперь передаётся извне (динамический — по расстоянию)
 
     for (size_t t = 4; t < traj.size(); ++t) {
         const glm::vec3& pearlPos = traj[t];
@@ -462,7 +460,7 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
     glm::vec3 myFeet = *player->getPos();
 
     // Обновляем историю скоростей — ОДИН вызов на пёрку за тик
-    for (auto& p : pearls) estimateVelocity(p, nowMs);
+    for (auto& p : pearls) p.velocity = estimateVelocity(p, nowMs);
 
     // Выбираем самую угрожающую пёрку
     PearlData* best      = nullptr;
@@ -503,27 +501,7 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
     // симуляция должна начинаться со следующего
     glm::vec3 simVel = best->velocity;
 
-    // Если velocity почти нулевой (лаг/первый тик) — пробуем восстановить из истории позиций
-    if (glm::length(simVel) < 0.02f) {
-        auto itPos  = mPearlPrevPos.find(best->runtimeId);
-        auto itTime = mPearlPrevTime.find(best->runtimeId);
-        if (itPos != mPearlPrevPos.end() && itTime != mPearlPrevTime.end()) {
-            float dtSec = static_cast<float>(nowMs - itTime->second) / 1000.0f;
-            if (dtSec > 0.01f && dtSec < 0.5f) {
-                glm::vec3 empirical = (best->position - itPos->second) / dtSec * 0.05f;
-                if (glm::length(empirical) > 0.02f)
-                    simVel = empirical;
-            }
-        }
-        // Если всё ещё нулевой — пропускаем эту перлу в этом тике
-        // но НЕ удаляем из кеша — поймаем в следующем тике
-        if (glm::length(simVel) < 0.005f) {
-            // Сохраняем позицию для следующего тика
-            mPearlPrevPos[best->runtimeId]  = best->position;
-            mPearlPrevTime[best->runtimeId] = nowMs;
-            return;
-        }
-    }
+    // velocity уже восстановлена в estimateVelocity (empirical blend)
 
     simVel   *= PEARL_DRAG;
     simVel.y -= PEARL_GRAVITY;
@@ -535,7 +513,9 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
         mPredictedPath = traj;
     }
 
-    auto intercept = findIntercept(traj, myFeet);
+    float pearlDist = glm::distance(myFeet, best->position);
+    int ticksNeeded = std::max(2, static_cast<int>(pearlDist / 3.0f) + 1);
+    auto intercept = findIntercept(traj, myFeet, ticksNeeded);
     if (!intercept.found) return;
 
     mOriginalPos   = myFeet;

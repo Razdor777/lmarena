@@ -113,7 +113,7 @@ public:
 
     std::vector<glm::vec3> simulateTrajectory(glm::vec3 startPos, glm::vec3 startVel, int maxTicks);
 
-    InterceptResult findIntercept(const std::vector<glm::vec3>& traj, glm::vec3 ourFeetPos);
+    InterceptResult findIntercept(const std::vector<glm::vec3>& traj, glm::vec3 ourFeetPos, int ticksNeeded = 6);
 
     bool isSolidAt(glm::vec3 pos);
     bool isSpaceClear(glm::vec3 feetPos);
