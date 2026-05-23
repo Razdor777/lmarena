@@ -102,8 +102,13 @@ void PlayerHUD::onBaseTickEvent(BaseTickEvent& event) {
             for (int i = 0; i < 36; i++) {
                 auto* st = cont->getItem(i);
                 if (!st || !st->mItem) continue;
-                if (st->mItem->mName == "ender_pearl") mPearls += st->mCount;
-                if (st->mItem->mName == "arrow")       mArrows += st->mCount;
+                
+                // Получаем одинарный указатель на Item
+                auto* item = st->getItem();
+                if (!item) continue;
+                
+                if (item->mName == "ender_pearl") mPearls += st->mCount;
+                if (item->mName == "arrow")       mArrows += st->mCount;
             }
         }
     }

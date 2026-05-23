@@ -89,13 +89,7 @@ bool PearlStopper::isSpaceClear(glm::vec3 feetPos) {
 bool PearlStopper::isEnderPearl(Actor* a) {
     if (!a) return false;
     auto* tc = a->getActorTypeComponent();
-    if (!tc) return false;
-    // ActorType::Enderpearl = 87 | Projectile (1<<22) = 0x400057
-    // Проверяем нижние 8 бит == 87 И что это снаряд
-    uint32_t t = static_cast<uint32_t>(tc->mType);
-    bool isBase      = (t & 0xFFu) == 87u;
-    bool isProjectile = (t & (1u << 22)) != 0;
-    return isBase && isProjectile;
+    return tc && (static_cast<uint32_t>(tc->mType) & 0xFFu) == 87u;
 }
 
 Actor* PearlStopper::getPearlOwner(Actor* pearl) {
@@ -124,38 +118,12 @@ std::vector<PearlStopper::PearlData> PearlStopper::findEnemyPearls(Actor* local)
     std::vector<PearlData> result;
     if (!local) return result;
 
-    // Ищем перлы напрямую через ECS registry по ActorTypeComponent
-    // БЕЗ зависимости от ActorOwnerComponent — перлы кинутые издалека
-    // могут не иметь ActorOwnerComponent в клиентском реестре
+    // Собираем текущие живые перлы
     std::unordered_map<int64_t, Actor*> currentAlive;
-
-    try {
-        auto* reg = local->mContext.mRegistry;
-        if (reg) {
-            // View только по ActorTypeComponent + ActorOwnerComponent
-            // (минимальный набор компонентов у снарядов)
-            for (auto&& [entId, ownerComp, typeComp] :
-                reg->view<ActorOwnerComponent, ActorTypeComponent>().each())
-            {
-                if (!reg->valid(entId)) continue;
-                if (!ownerComp.mActor) continue;
-
-                Actor* a = ownerComp.mActor;
-                if (!isEnderPearl(a)) continue;
-                if (isOwnPearl(a, local)) continue;
-
-                currentAlive[a->getRuntimeID()] = a;
-            }
-        }
-    } catch (...) {}
-
-    // Дополнительно — стандартный getActorList на случай если выше не нашли
     for (Actor* a : ActorUtils::getActorList(false, false)) {
         if (!a || !isEnderPearl(a)) continue;
         if (isOwnPearl(a, local)) continue;
-        int64_t rid = a->getRuntimeID();
-        if (currentAlive.find(rid) == currentAlive.end())
-            currentAlive[rid] = a;
+        currentAlive[a->getRuntimeID()] = a;
     }
 
     // Удаляем из кеша перлы которых уже нет
