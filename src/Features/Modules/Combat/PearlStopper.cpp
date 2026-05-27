@@ -22,17 +22,15 @@
 #include <cmath>
 #include <mutex>
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  Enable / Disable
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 void PearlStopper::onEnable() {
     auto* player = ClientInstance::get()->getLocalPlayer();
-    resetState(player);
+    fullReset(player);
 
-    mPearlPrevPos.clear();
-    mPearlPrevTime.clear();
-    mKnownPearls.clear();
+    mTrackedPearls.clear();
     mTotalStops = 0;
 
     if (player) {
@@ -40,29 +38,29 @@ void PearlStopper::onEnable() {
             mRots = glm::vec3(rot->mPitch, rot->mYaw, rot->mYaw);
     }
 
-    gFeatureManager->mDispatcher->listen<BaseTickEvent, &PearlStopper::onBaseTickEvent>(this);
-    gFeatureManager->mDispatcher->listen<PacketInEvent, &PearlStopper::onPacketInEvent>(this);
-    gFeatureManager->mDispatcher->listen<RenderEvent,   &PearlStopper::onRenderEvent>(this);
+    gFeatureManager->mDispatcher->listen<BaseTickEvent, &PearlStopper::onBaseTick>(this);
+    gFeatureManager->mDispatcher->listen<PacketInEvent, &PearlStopper::onPacketIn>(this);
+    gFeatureManager->mDispatcher->listen<RenderEvent,   &PearlStopper::onRender>(this);
 
     if (mNotifications.mValue)
         NotifyUtils::notify("[PearlStopper] Active", 2.0f, Notification::Type::Info);
 }
 
 void PearlStopper::onDisable() {
-    gFeatureManager->mDispatcher->deafen<BaseTickEvent, &PearlStopper::onBaseTickEvent>(this);
-    gFeatureManager->mDispatcher->deafen<PacketInEvent, &PearlStopper::onPacketInEvent>(this);
-    gFeatureManager->mDispatcher->deafen<RenderEvent,   &PearlStopper::onRenderEvent>(this);
+    gFeatureManager->mDispatcher->deafen<BaseTickEvent, &PearlStopper::onBaseTick>(this);
+    gFeatureManager->mDispatcher->deafen<PacketInEvent, &PearlStopper::onPacketIn>(this);
+    gFeatureManager->mDispatcher->deafen<RenderEvent,   &PearlStopper::onRender>(this);
 
     auto* player = ClientInstance::get()->getLocalPlayer();
-    resetState(player);
+    fullReset(player);
 
     if (mNotifications.mValue)
         NotifyUtils::notify("[PearlStopper] Disabled", 2.0f, Notification::Type::Info);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  Block helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 bool PearlStopper::isSolidAt(glm::vec3 pos) {
     auto* bs = ClientInstance::get()->getBlockSource();
@@ -71,20 +69,21 @@ bool PearlStopper::isSolidAt(glm::vec3 pos) {
     Block* block = bs->getBlock(bp);
     if (!block || !block->mLegacy) return false;
     int id = block->mLegacy->getBlockId();
-    if (id == 0 || (id >= 8 && id <= 11)) return false;
-    return true;
+    // Air=0, Water=8-9, Lava=10-11 — все считаются проходимыми
+    return id != 0 && !(id >= 8 && id <= 11);
 }
 
 bool PearlStopper::isSpaceClear(glm::vec3 feetPos) {
-    if (isSolidAt(feetPos))                               return false;
-    if (isSolidAt(feetPos + glm::vec3(0.f, 0.9f, 0.f)))  return false;
-    if (isSolidAt(feetPos + glm::vec3(0.f, 1.8f, 0.f)))  return false;
+    // Проверяем три точки по высоте хитбокса: ноги, середина, голова
+    if (isSolidAt(feetPos))                                return false;
+    if (isSolidAt(feetPos + glm::vec3(0.f, 0.9f,  0.f)))  return false;
+    if (isSolidAt(feetPos + glm::vec3(0.f, 1.62f, 0.f)))  return false;
     return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  Pearl detection
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 bool PearlStopper::isEnderPearl(Actor* a) {
     if (!a) return false;
@@ -92,350 +91,420 @@ bool PearlStopper::isEnderPearl(Actor* a) {
     return tc && (static_cast<uint32_t>(tc->mType) & 0xFFu) == 87u;
 }
 
-Actor* PearlStopper::getPearlOwner(Actor* pearl) {
-    if (!pearl) return nullptr;
-    try {
-        auto* reg = pearl->mContext.mRegistry;
-        if (!reg) return nullptr;
-        auto* oc = reg->try_get<ActorOwnerComponent>(pearl->mContext.mEntityId);
-        if (oc && oc->mActor) return oc->mActor;
-    } catch (...) {}
-    return nullptr;
-}
-
 bool PearlStopper::isOwnPearl(Actor* pearl, Actor* local) {
     if (!pearl || !local) return false;
-    return getPearlOwner(pearl) == local;
+    try {
+        auto* reg = pearl->mContext.mRegistry;
+        if (!reg) return false;
+        auto* oc = reg->try_get<ActorOwnerComponent>(pearl->mContext.mEntityId);
+        if (oc && oc->mActor) return oc->mActor == local;
+    } catch (...) {}
+    return false;
 }
 
-bool PearlStopper::isPearlStillAlive(int64_t runtimeId) {
-    if (runtimeId == 0) return false;
-    Actor* a = ActorUtils::getActorFromRuntimeID(runtimeId);
-    return a != nullptr && isEnderPearl(a);
-}
+// ═════════════════════════════════════════════════════════════════════════════
+//  Pearl tracking
+//  Каждый тик обновляем кеш TrackedPearl для всех вражеских пёрл.
+//  Сохраняем prevPos для вычисления velocity из дельты позиций.
+// ═════════════════════════════════════════════════════════════════════════════
 
-std::vector<PearlStopper::PearlData> PearlStopper::findEnemyPearls(Actor* local) {
-    std::vector<PearlData> result;
-    if (!local) return result;
+void PearlStopper::updateTrackedPearls(Actor* local) {
+    if (!local) return;
 
-    // Собираем текущие живые перлы
-    std::unordered_map<int64_t, Actor*> currentAlive;
+    // Собираем живые вражеские пёрлы
+    std::unordered_map<int64_t, Actor*> alive;
     for (Actor* a : ActorUtils::getActorList(false, false)) {
         if (!a || !isEnderPearl(a)) continue;
-        if (isOwnPearl(a, local)) continue;
-        currentAlive[a->getRuntimeID()] = a;
+        if (isOwnPearl(a, local))   continue;
+        alive[a->getRuntimeID()] = a;
     }
 
-    // Удаляем из кеша перлы которых уже нет
-    for (auto it = mKnownPearls.begin(); it != mKnownPearls.end(); ) {
-        if (currentAlive.find(it->first) == currentAlive.end())
-            it = mKnownPearls.erase(it);
+    // Удаляем из кеша мёртвые пёрлы
+    for (auto it = mTrackedPearls.begin(); it != mTrackedPearls.end(); ) {
+        if (alive.find(it->first) == alive.end())
+            it = mTrackedPearls.erase(it);
         else
             ++it;
     }
 
-    // Добавляем новые / обновляем существующие
-    for (auto& [id, a] : currentAlive) {
-        auto* sv = a->getStateVectorComponent();
+    // Обновляем / добавляем
+    for (auto& [id, actor] : alive) {
+        auto* sv = actor->getStateVectorComponent();
         if (!sv) continue;
 
         glm::vec3 pos = sv->mPos;
         glm::vec3 vel = sv->mVelocity;
 
-        if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z)) continue;
-        if (!std::isfinite(vel.x) || !std::isfinite(vel.y) || !std::isfinite(vel.z)) continue;
+        // Валидация NaN/Inf
+        if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z))
+            continue;
+        if (!std::isfinite(vel.x)) vel.x = 0.f;
+        if (!std::isfinite(vel.y)) vel.y = 0.f;
+        if (!std::isfinite(vel.z)) vel.z = 0.f;
 
-        // Если перла уже была в кеше — берём velocity из кеша если текущий нулевой
-        // (сервер иногда присылает vel=0 в первый тик из-за лага)
-        auto it = mKnownPearls.find(id);
-        if (it != mKnownPearls.end()) {
-            float curLen   = glm::length(vel);
-            float cacheLen = glm::length(it->second.velocity);
-            // Если текущий velocity подозрительно мал а кешированный нормальный — используем кеш
-            if (curLen < 0.02f && cacheLen > 0.05f) {
-                // Симулируем следующий тик из кеша
-                glm::vec3 predicted = it->second.velocity * PEARL_DRAG;
-                predicted.y -= PEARL_GRAVITY;
-                vel = predicted;
-            }
-        }
-
-        PearlData d;
-        d.actor     = a;
-        d.runtimeId = id;
-        d.position  = pos;
-        d.velocity  = vel;
-
-        mKnownPearls[id] = d;
-        result.push_back(d);
-    }
-
-    return result;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Velocity estimation
-//  Вызывается ОДИН РАЗ за тик на каждую пёрку.
-//  Берёт реальное смещение между тиками и блендит с сырым velocity из StateVector.
-// ─────────────────────────────────────────────────────────────────────────────
-
-glm::vec3 PearlStopper::estimateVelocity(PearlData& pearl, uint64_t nowMs) {
-    glm::vec3 vel = pearl.velocity;
-
-    auto itPos  = mPearlPrevPos.find(pearl.runtimeId);
-    auto itTime = mPearlPrevTime.find(pearl.runtimeId);
-
-    if (itPos != mPearlPrevPos.end() && itTime != mPearlPrevTime.end()) {
-        float dtSec = static_cast<float>(nowMs - itTime->second) / 1000.0f;
-        if (dtSec >= 0.035f && dtSec <= 0.12f) {
-            glm::vec3 empirical = (pearl.position - itPos->second) / dtSec * 0.05f;
-            float lenE = glm::length(empirical);
-            if (lenE > 0.05f && lenE < 2.5f)
-                vel = empirical * 0.7f + vel * 0.3f;
+        auto it = mTrackedPearls.find(id);
+        if (it != mTrackedPearls.end()) {
+            // Существующая пёрла — сохраняем предыдущую позицию для delta-velocity
+            it->second.prevPos = it->second.pos;
+            it->second.hasPrev = true;
+            it->second.pos     = pos;
+            it->second.vel     = vel;
+            it->second.age++;
+        } else {
+            // Новая пёрла
+            TrackedPearl tp;
+            tp.runtimeId = id;
+            tp.pos       = pos;
+            tp.vel       = vel;
+            tp.hasPrev   = false;
+            tp.age       = 0;
+            mTrackedPearls[id] = tp;
         }
     }
-
-    mPearlPrevPos[pearl.runtimeId]  = pearl.position;
-    mPearlPrevTime[pearl.runtimeId] = nowMs;
-
-    float len = glm::length(vel);
-    if (!std::isfinite(len) || len < 0.01f || len > 3.0f)
-        vel = pearl.velocity;
-
-    pearl.velocity = vel;
-    return vel;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+//  Velocity estimation — КЛЮЧЕВОЙ ФИКС
+//
+//  Старый код:
+//    empirical = (pos - prev) / dtSec * 0.05f  ← МУСОР
+//    vel = empirical * 0.7 + stateVel * 0.3    ← ещё хуже
+//
+//  Новый код:
+//    1. Берём velocity из StateVectorComponent (уже в blocks/tick)
+//    2. Если нулевой — используем (pos - prevPos) напрямую
+//       pos - prevPos = перемещение за 1 тик = velocity (blocks/tick)
+//       Без деления, без коэффициентов, без блендинга
+// ═════════════════════════════════════════════════════════════════════════════
+
+glm::vec3 PearlStopper::getReliableVelocity(TrackedPearl& pearl) {
+    // Источник 1 (ПРИОРИТЕТ): дельта позиций между тиками
+    // ВСЕГДА точная — вычисляется из реальных позиций синхронизированных сервером
+    // pos - prevPos = реальное перемещение за 1 тик = реальная velocity
+    if (pearl.hasPrev) {
+        glm::vec3 delta = pearl.pos - pearl.prevPos;
+        float deltaLen = glm::length(delta);
+        if (deltaLen > 0.01f && deltaLen < 5.0f) {
+            return delta;
+        }
+    }
+
+    // Источник 2 (FALLBACK): StateVector velocity
+    // Для ЧУЖИХ энтити может отставать на 1-3 тика из-за сетевой задержки!
+    // Используем ТОЛЬКО если дельты позиций ещё нет (первый тик)
+    float svLen = glm::length(pearl.vel);
+    if (svLen > 0.01f && svLen < 5.0f) {
+        return pearl.vel;
+    }
+
+    // Нет данных — пропускаем эту пёрлу в этом тике
+    return glm::vec3(0.f);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  Trajectory simulation
-//  Физика Bedrock EnderPearl каждый тик:
-//    1. vel *= 0.99    (drag — первым)
-//    2. vel.y -= 0.03  (gravity — после drag)
-//    3. pos += vel
-// ─────────────────────────────────────────────────────────────────────────────
+//
+//  Bedrock EnderPearl physics (правильный порядок каждый тик):
+//    1. vel *= 0.99      (drag — ПЕРВЫМ)
+//    2. vel.y -= 0.03    (gravity — ВТОРЫМ)
+//    3. pos += vel       (движение — ТРЕТЬИМ)
+//
+//  КЛЮЧЕВОЙ ФИКС: НЕ делаем предварительный шаг velocity перед симуляцией.
+//  Старый код делал simVel *= DRAG; simVel.y -= GRAVITY; ПЕРЕД вызовом
+//  simulateTrajectory, что сдвигало всю траекторию на 1 тик и давало промах.
+// ═════════════════════════════════════════════════════════════════════════════
 
-std::vector<glm::vec3> PearlStopper::simulateTrajectory(glm::vec3 startPos,
-                                                          glm::vec3 startVel,
-                                                          int       maxTicks) {
+std::vector<glm::vec3> PearlStopper::simulateTrajectory(glm::vec3 pos, glm::vec3 vel) {
     std::vector<glm::vec3> path;
-    path.reserve(static_cast<size_t>(maxTicks) + 1);
+    path.reserve(static_cast<size_t>(MAX_SIM_TICKS) + 1);
 
-    glm::vec3 p = startPos;
-    glm::vec3 v = startVel;
-    path.push_back(p);
+    glm::vec3 p = pos;
+    glm::vec3 v = vel;
+    path.push_back(p); // traj[0] = текущая позиция пёрлы
 
-    for (int t = 0; t < maxTicks; ++t) {
-        v   *= PEARL_DRAG;
-        v.y -= PEARL_GRAVITY;
+    for (int t = 0; t < MAX_SIM_TICKS; ++t) {
+        // Bedrock physics per tick
+        v   *= DRAG;
+        v.y -= GRAVITY;
         p   += v;
+
         path.push_back(p);
 
-        // Прерываем только если перл врезался в блок И уже не летит вверх
-        // Если velocity.y > 0 — перл ещё летит вверх (брошен снизу), не прерываем
-        if (t > 3 && v.y <= 0.f && isSolidAt(p)) break;
+        // Коллизия с блоком (пропускаем t=0 чтобы не зацепить блок под бросающим)
+        if (t >= 1 && isSolidAt(p)) break;
+
+        // Под воидом
         if (p.y < -64.f) break;
+
+        // Пёрла остановилась (застряла)
+        if (t > 10 && glm::length(v) < 0.001f) break;
     }
+
     return path;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Intercept finder
-//  Ищем первую точку траектории где:
-//    - место свободно (нет блоков в колонне игрока)
-//    - у нас есть достаточно тиков чтобы успеть телепортироваться
+// ═════════════════════════════════════════════════════════════════════════════
+//  Intercept finder — КЛЮЧЕВОЙ ФИКС
 //
-//  Позиция ног: candidateFeet.y = pearl.y - 0.9 + mYOffset
-//  (пёрка на уровне центра хитбокса = 0.9м над ногами)
+//  Старый код:
+//    - Начинал с тика 4, пропускал всё до тика 6 (ticksNeeded = 1+3+2 = 6)
+//    - Позиция ног: pearlPos.y - 0.9 + offset (без clamping)
+//    - Пробовал Y-корректировку только ВВЕРХ (yTry = 0,1,2,3)
+//    - Если не находил — пропускал (не пробовал другие оффсеты)
 //
-//  REACTION=3 и PING=2 — внутренние константы, пользователю не нужны.
-// ─────────────────────────────────────────────────────────────────────────────
+//  Новый код:
+//    - Начинает с тика 2 (все пакеты TP улетают за 1 тик, + 1 на сервер)
+//    - Позиция ног: pearlPos.y - 0.9 + offset, CLAMPED чтобы перла
+//      гарантированно попадала в хитбокс [feetY, feetY+1.8]
+//    - Пробует Y-корректировки И ВВЕРХ И ВНИЗ (±0.5, ±1.0)
+//    - Берёт ПЕРВЫЙ валидный тик = самый ранний перехват (быстрее ловим)
+// ═════════════════════════════════════════════════════════════════════════════
 
-PearlStopper::InterceptResult PearlStopper::findIntercept(
+PearlStopper::InterceptResult PearlStopper::findBestIntercept(
     const std::vector<glm::vec3>& traj,
-    glm::vec3 ourFeetPos,
-    int ticksNeeded)
+    glm::vec3 myPos)
 {
-    InterceptResult res;
-    if (traj.size() < 4) return res;
+    InterceptResult best;
 
-    // ticksNeeded теперь передаётся извне (динамический — по расстоянию)
+    if (traj.size() < 3) return best;
 
-    for (size_t t = 4; t < traj.size(); ++t) {
+    const size_t minTick = static_cast<size_t>(mInterceptTicks.mValue);
+
+    for (size_t t = minTick; t < traj.size(); ++t) {
         const glm::vec3& pearlPos = traj[t];
 
-        if (static_cast<int>(t) <= ticksNeeded) continue;
+        // ── Вычисляем позицию ног ────────────────────────────────────────
+        // Хитбокс игрока: от feetPos.y до feetPos.y + 1.8
+        // Перла должна быть ВНУТРИ: feetPos.y <= pearlPos.y <= feetPos.y + 1.8
+        // Оптимум: feetPos.y = pearlPos.y - 0.9 (перла в центре хитбокса)
+        glm::vec3 feetPos;
+        feetPos.x = pearlPos.x;
+        feetPos.z = pearlPos.z;
+        feetPos.y = pearlPos.y - 0.9f + mYOffset.mValue;
 
-        // Базовая позиция ног
-        glm::vec3 candidateFeet;
-        candidateFeet.x = pearlPos.x;
-        candidateFeet.z = pearlPos.z;
-        candidateFeet.y = pearlPos.y - 0.9f + mYOffset.mValue;
+        // Clamping: гарантируем что перла попадает в хитбокс
+        // pearlPos.y - PEARL_PLAYER_H <= feetPos.y <= pearlPos.y
+        feetPos.y = glm::clamp(feetPos.y, pearlPos.y - PEARL_PLAYER_H, pearlPos.y);
 
-        // Если базовая позиция занята — пробуем найти свободное место
-        // рядом по Y (перл мог прилететь снизу сквозь пол)
-        bool found = false;
-        for (int yTry = 0; yTry <= 3; yTry++) {
-            glm::vec3 tryPos = candidateFeet + glm::vec3(0.f, (float)yTry, 0.f);
-            if (isSpaceClear(tryPos)) {
-                candidateFeet = tryPos;
-                found = true;
-                break;
+        // ── Проверяем свободное пространство ─────────────────────────────
+        if (!isSpaceClear(feetPos)) {
+            // Пробуем сдвиги по Y (вверх и вниз)
+            bool found = false;
+            for (float dy : {0.5f, -0.5f, 1.0f, -1.0f, 1.5f, -1.5f}) {
+                glm::vec3 tryPos = feetPos + glm::vec3(0.f, dy, 0.f);
+                // Проверяем что перла всё ещё попадёт в хитбокс
+                float pearlRelY = pearlPos.y - tryPos.y;
+                if (pearlRelY < 0.f || pearlRelY > PEARL_PLAYER_H) continue;
+                if (isSpaceClear(tryPos)) {
+                    feetPos = tryPos;
+                    found = true;
+                    break;
+                }
             }
+            if (!found) continue;
         }
-        if (!found) continue;
 
-        res.found     = true;
-        res.feetPos   = candidateFeet;
-        res.tickIndex = static_cast<int>(t);
-        return res;
+        // ── Нашли валидную точку! ────────────────────────────────────────
+        // Берём ПЕРВУЮ (самую раннюю) — ловим пёрлу максимально быстро
+        best.valid    = true;
+        best.feetPos  = feetPos;
+        best.tick     = static_cast<int>(t);
+        best.distance = glm::distance(myPos, pearlPos);
+        return best;
     }
-    return res;
+
+    return best;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Teleport — 1:1 копия ClickTP
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+//  Teleport — ClickTP-style step teleportation
+// ═════════════════════════════════════════════════════════════════════════════
 
-std::shared_ptr<MovePlayerPacket> PearlStopper::createPacketForPos(glm::vec3 pos) {
-    auto* p = ClientInstance::get()->getLocalPlayer();
+std::shared_ptr<MovePlayerPacket> PearlStopper::makePacket(glm::vec3 pos) {
+    auto* p  = ClientInstance::get()->getLocalPlayer();
     auto  pk = MinecraftPackets::createPacket<MovePlayerPacket>();
+
     pk->mPos              = pos;
     pk->mPlayerID         = p->getRuntimeID();
     pk->mRot              = { mRots.x, mRots.y };
     pk->mYHeadRot         = mRots.z;
     pk->mResetPosition    = PositionMode::Teleport;
-    pk->mOnGround         = true;
+    pk->mOnGround         = false;  // Мы в воздухе (гравитация отключена)
     pk->mRidingID         = -1;
     pk->mCause            = TeleportationCause::Unknown;
     pk->mSourceEntityType = ActorType::Player;
     pk->mTick             = 0;
+
     return pk;
 }
 
-void PearlStopper::straightLineTP(glm::vec3 from, glm::vec3 to, bool save) {
+void PearlStopper::doStepTP(glm::vec3 from, glm::vec3 to, bool saveForRender) {
     auto* snd = ClientInstance::get()->getPacketSender();
     if (!snd) return;
-    float st = mStepDistance.mValue;
-    if (glm::length(to - from) < 0.01f) { snd->sendToServer(createPacketForPos(to).get()); return; }
-    glm::vec3 dir = glm::normalize(to - from), cur = from;
+
+    float step = mStepDistance.mValue;
+    float totalDist = glm::distance(from, to);
+
+    // Если расстояние меньше шага — один пакет
+    if (totalDist < 0.01f) {
+        snd->sendToServer(makePacket(to).get());
+        return;
+    }
+
+    glm::vec3 dir = glm::normalize(to - from);
+    glm::vec3 cur = from;
     std::vector<glm::vec3> pts;
-    while (glm::distance(cur, to) > st) { cur += dir * st; pts.push_back(cur); snd->sendToServer(createPacketForPos(cur).get()); }
-    pts.push_back(to); snd->sendToServer(createPacketForPos(to).get());
-    if (save) { std::lock_guard<std::mutex> lk(mMutex); mPacketPositions = pts; mLastPathTime = NOW; }
+
+    // Шагаем к цели
+    while (glm::distance(cur, to) > step) {
+        cur += dir * step;
+        pts.push_back(cur);
+        snd->sendToServer(makePacket(cur).get());
+    }
+
+    // Финальный пакет на точную позицию
+    pts.push_back(to);
+    snd->sendToServer(makePacket(to).get());
+
+    if (saveForRender) {
+        std::lock_guard<std::mutex> lk(mRenderMutex);
+        mTpPath        = pts;
+        mLastRenderTime = NOW;
+    }
 }
 
 void PearlStopper::teleportTo(glm::vec3 dest) {
     auto* p = ClientInstance::get()->getLocalPlayer();
     if (!p) return;
-    straightLineTP(*p->getPos(), dest, true);
+
+    // Берём актуальную позицию из StateVector (надёжнее чем getPos)
+    auto* sv = p->getStateVectorComponent();
+    glm::vec3 from = sv ? sv->mPos : *p->getPos();
+
+    doStepTP(from, dest, true);
+
+    // Синхронизируем клиентскую позицию
     p->setPosition(dest);
-    if (auto* sv = p->getStateVectorComponent()) sv->mVelocity = glm::vec3(0.f);
+    if (sv) {
+        sv->mPos      = dest;
+        sv->mPosOld   = dest;
+        sv->mVelocity = glm::vec3(0.f);
+    }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  Freeze / Unfreeze
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 void PearlStopper::freezeAt(Actor* player, glm::vec3 feetPos) {
     if (!player) return;
 
+    // Сохраняем оригинальные флаги
     mSavedCollision = player->getStatusFlag(ActorFlags::HasCollision);
     mSavedGravity   = player->getStatusFlag(ActorFlags::HasGravity);
     mSavedPush      = player->getStatusFlag(ActorFlags::PushTowardsClosestSpace);
 
+    // Отключаем физику
     player->setStatusFlag(ActorFlags::HasCollision, false);
     player->setStatusFlag(ActorFlags::HasGravity, false);
     player->setStatusFlag(ActorFlags::PushTowardsClosestSpace, false);
     player->setOnGround(false);
     player->setFallDistance(0.f);
-    if (auto* sv = player->getStateVectorComponent()) sv->mVelocity = glm::vec3(0.f);
 
+    // Телепортируемся на точку перехвата
     teleportTo(feetPos);
 
-    player->setPosition(feetPos);
-    if (auto* sv = player->getStateVectorComponent()) {
-        sv->mPos      = feetPos;
-        sv->mPosOld   = feetPos;
-        sv->mVelocity = glm::vec3(0.f);
-    }
-
-    mInterceptFeetPos = feetPos;
-    mIsFrozen         = true;
-    mFrozenTicks      = 0;
-    mMissedTicks      = 0;
+    // Фиксируем позицию
+    mInterceptPos = feetPos;
+    mIsFrozen     = true;
+    mFrozenTicks  = 0;
+    mGoneTicks    = 0;
 }
 
-void PearlStopper::maintainFreeze(Actor* player) {
+void PearlStopper::holdFreeze(Actor* player) {
     if (!player || !mIsFrozen) return;
     mFrozenTicks++;
 
+    // Поддерживаем отключение физики каждый тик
     player->setStatusFlag(ActorFlags::HasCollision, false);
     player->setStatusFlag(ActorFlags::HasGravity, false);
     player->setStatusFlag(ActorFlags::PushTowardsClosestSpace, false);
     player->setOnGround(false);
     player->setFallDistance(0.f);
 
-    player->setPosition(mInterceptFeetPos);
+    // Держим позицию
+    player->setPosition(mInterceptPos);
     if (auto* sv = player->getStateVectorComponent()) {
-        sv->mPos      = mInterceptFeetPos;
-        sv->mPosOld   = mInterceptFeetPos;
+        sv->mPos      = mInterceptPos;
+        sv->mPosOld   = mInterceptPos;
         sv->mVelocity = glm::vec3(0.f);
     }
 
+    // Отправляем пакет позиции каждый тик для борьбы с rubberband
     auto* snd = ClientInstance::get()->getPacketSender();
-    if (snd) snd->sendToServer(createPacketForPos(mInterceptFeetPos).get());
+    if (snd) snd->sendToServer(makePacket(mInterceptPos).get());
 }
 
 void PearlStopper::unfreeze(Actor* player) {
     if (!player || !mIsFrozen) return;
     player->setStatusFlag(ActorFlags::HasCollision, mSavedCollision);
-    player->setStatusFlag(ActorFlags::HasGravity, mSavedGravity);
+    player->setStatusFlag(ActorFlags::HasGravity,   mSavedGravity);
     player->setStatusFlag(ActorFlags::PushTowardsClosestSpace, mSavedPush);
     player->setFallDistance(0.f);
     mIsFrozen = false;
 }
 
-void PearlStopper::resetState(Actor* player) {
+void PearlStopper::fullReset(Actor* player) {
     if (mIsFrozen && player) unfreeze(player);
-    mIsActive      = false;
     mIsFrozen      = false;
-    mTargetPearlId = 0;
+    mLockedPearlId = 0;
     mFrozenTicks   = 0;
-    mMissedTicks   = 0;
-    std::lock_guard<std::mutex> lk(mMutex);
+    mGoneTicks     = 0;
+    std::lock_guard<std::mutex> lk(mRenderMutex);
     mPredictedPath.clear();
-    mPacketPositions.clear();
+    mTpPath.clear();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Main tick
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+//  Main tick — ядро модуля
+// ═════════════════════════════════════════════════════════════════════════════
 
-void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
+void PearlStopper::onBaseTick(BaseTickEvent& event) {
     auto* player = event.mActor;
     if (!player) return;
 
+    // Обновляем ротацию для пакетов
     if (auto* rot = player->getActorRotationComponent())
         mRots = glm::vec3(rot->mPitch, rot->mYaw, rot->mYaw);
 
-    // ── Заморожены: держим позицию, ждём пёрку ───────────────────────────────
+    // ═════════════════════════════════════════════════════════════════════
+    //  FROZEN: держим позицию, ждём пока пёрла попадёт в нас
+    // ═════════════════════════════════════════════════════════════════════
     if (mIsFrozen) {
+        // Таймаут — слишком долго ждём
         if (mFrozenTicks > MAX_FROZEN_TICKS) {
             unfreeze(player);
             if (mTeleportBack.mValue) teleportTo(mOriginalPos);
-            resetState(player);
+            fullReset(player);
             if (mNotifications.mValue)
                 NotifyUtils::notify("[PearlStopper] Timeout", 2.f, Notification::Type::Warning);
             return;
         }
 
-        maintainFreeze(player);
+        // Держим позицию
+        holdFreeze(player);
 
-        if (!isPearlStillAlive(mTargetPearlId)) {
-            mMissedTicks++;
-            if (mMissedTicks >= MISSED_TOLERANCE) {
+        // Проверяем жива ли целевая пёрла
+        Actor* pearlActor = ActorUtils::getActorFromRuntimeID(mLockedPearlId);
+        bool pearlAlive = pearlActor != nullptr && isEnderPearl(pearlActor);
+
+        if (!pearlAlive) {
+            mGoneTicks++;
+            if (mGoneTicks >= GONE_GRACE_TICKS) {
+                // Пёрла исчезла = мы её поймали!
                 mTotalStops++;
                 unfreeze(player);
+
                 if (mTeleportBack.mValue) {
                     teleportTo(mOriginalPos);
                     if (mNotifications.mValue)
@@ -444,97 +513,74 @@ void PearlStopper::onBaseTickEvent(BaseTickEvent& event) {
                     if (mNotifications.mValue)
                         NotifyUtils::notify("[PearlStopper] Pearl stopped!", 2.5f, Notification::Type::Info);
                 }
-                resetState(player);
+                fullReset(player);
             }
         } else {
-            mMissedTicks = 0;
+            mGoneTicks = 0;
         }
         return;
     }
 
-    // ── Сканируем: ищем вражеские пёрки ──────────────────────────────────────
-    auto pearls = findEnemyPearls(player);
-    if (pearls.empty()) return;
+    // ═════════════════════════════════════════════════════════════════════
+    //  SCANNING: ищем вражеские пёрлы для перехвата
+    // ═════════════════════════════════════════════════════════════════════
+    updateTrackedPearls(player);
 
-    uint64_t  nowMs  = NOW;
-    glm::vec3 myFeet = *player->getPos();
+    if (mTrackedPearls.empty()) return;
 
-    // Обновляем историю скоростей — ОДИН вызов на пёрку за тик
-    for (auto& p : pearls) p.velocity = estimateVelocity(p, nowMs);
+    glm::vec3 myPos = *player->getPos();
 
-    // Выбираем самую угрожающую пёрку
-    PearlData* best      = nullptr;
-    float      bestScore = 1e9f;
+    // Ищем лучшую пёрлу для перехвата
+    TrackedPearl*          bestPearl      = nullptr;
+    InterceptResult        bestIntercept;
+    std::vector<glm::vec3> bestTrajectory;
 
-    for (auto& pearl : pearls) {
-        float dist = glm::distance(pearl.position, myFeet);
-        if (dist > 120.f) continue; // увеличили радиус — ловим дальние броски
+    for (auto& [id, pearl] : mTrackedPearls) {
+        // Получаем надёжную velocity
+        glm::vec3 vel = getReliableVelocity(pearl);
+        if (glm::length(vel) < 0.005f) continue; // Нет данных — ждём следующий тик
 
-        float speedLen = glm::length(pearl.velocity);
-        // Снижен порог: даже если velocity почти 0 в первый тик — всё равно рассматриваем
-        // При лаге сервер может прислать vel=0 в первый пакет
-        if (speedLen < 0.005f) continue;
+        // Симулируем траекторию (без предварительного шага velocity!)
+        auto traj = simulateTrajectory(pearl.pos, vel);
 
-        float score = dist; // базово — ближайшая
+        // Ищем точку перехвата
+        auto intercept = findBestIntercept(traj, myPos);
+        if (!intercept.valid) continue;
 
-        // Учитываем направление только в горизонтальной плоскости
-        // чтобы не штрафовать перлы летящие снизу вверх (вертикальные броски)
-        if (speedLen > 0.02f) {
-            glm::vec2 velXZ    = glm::vec2(pearl.velocity.x, pearl.velocity.z);
-            glm::vec2 toUsXZ   = glm::vec2(myFeet.x - pearl.position.x,
-                                            myFeet.z - pearl.position.z);
-            float lenXZ = glm::length(toUsXZ);
-            if (lenXZ > 0.01f) {
-                float approach = glm::dot(glm::normalize(velXZ),
-                                          glm::normalize(toUsXZ));
-                // Горизонтальное приближение важно, но вертикаль не штрафуем
-                score = dist * (1.3f - approach * 1.0f);
-            }
+        // Выбираем пёрлу с самым ранним перехватом (ловим БЫСТРЕЕ)
+        if (!bestPearl || intercept.tick < bestIntercept.tick) {
+            bestPearl      = &pearl;
+            bestIntercept  = intercept;
+            bestTrajectory = traj;
         }
-
-        if (score < bestScore) { bestScore = score; best = &pearl; }
     }
 
-    if (!best) return;
+    if (!bestPearl) return;
 
-    // Продвигаем velocity на один шаг — StateVector уже применил текущий тик,
-    // симуляция должна начинаться со следующего
-    glm::vec3 simVel = best->velocity;
-
-    // velocity уже восстановлена в estimateVelocity (empirical blend)
-
-    simVel   *= PEARL_DRAG;
-    simVel.y -= PEARL_GRAVITY;
-
-    auto traj = simulateTrajectory(best->position, simVel, MAX_SIM_TICKS);
-
+    // Сохраняем траекторию для рендера
     {
-        std::lock_guard<std::mutex> lk(mMutex);
-        mPredictedPath = traj;
+        std::lock_guard<std::mutex> lk(mRenderMutex);
+        mPredictedPath  = bestTrajectory;
+        mLastRenderTime = NOW;
     }
 
-    float pearlDist = glm::distance(myFeet, best->position);
-    int ticksNeeded = std::max(2, static_cast<int>(pearlDist / 3.0f) + 1);
-    auto intercept = findIntercept(traj, myFeet, ticksNeeded);
-    if (!intercept.found) return;
-
-    mOriginalPos   = myFeet;
-    mTargetPearlId = best->runtimeId;
-    mIsActive      = true;
+    // ── ПЕРЕХВАТ! ────────────────────────────────────────────────────────
+    mOriginalPos   = myPos;
+    mLockedPearlId = bestPearl->runtimeId;
 
     if (mNotifications.mValue)
         NotifyUtils::notify(
-            "[PearlStopper] Intercepting in ~" + std::to_string(intercept.tickIndex) + " ticks",
+            "[PearlStopper] Intercepting in ~" + std::to_string(bestIntercept.tick) + " ticks",
             1.8f, Notification::Type::Info);
 
-    freezeAt(player, intercept.feetPos);
+    freezeAt(player, bestIntercept.feetPos);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  Packet filter — отменяем rubber-band от сервера пока заморожены
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
-void PearlStopper::onPacketInEvent(PacketInEvent& event) {
+void PearlStopper::onPacketIn(PacketInEvent& event) {
     if (!mIsFrozen) return;
     if (event.mPacket->getId() != PacketID::MovePlayer) return;
 
@@ -544,29 +590,31 @@ void PearlStopper::onPacketInEvent(PacketInEvent& event) {
     auto pkt = event.getPacket<MovePlayerPacket>();
     if (pkt->mPlayerID != player->getRuntimeID()) return;
 
+    // Отменяем серверный rubber-band
     event.cancel();
 
+    // Переподтверждаем нашу позицию
     auto* snd = ClientInstance::get()->getPacketSender();
-    if (snd) snd->sendToServer(createPacketForPos(mInterceptFeetPos).get());
+    if (snd) snd->sendToServer(makePacket(mInterceptPos).get());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  Render
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
-void PearlStopper::onRenderEvent(RenderEvent& event) {
+void PearlStopper::onRender(RenderEvent& event) {
     auto* dl = ImGui::GetBackgroundDrawList();
     if (!dl) return;
 
     uint64_t now = NOW;
 
-    // Жёлтая линия — траектория пёрки
+    // ── Жёлтая линия — предсказанная траектория пёрлы ────────────────────
     if (mDrawPrediction.mValue) {
-        std::lock_guard<std::mutex> lk(mMutex);
+        std::lock_guard<std::mutex> lk(mRenderMutex);
 
         float alpha = mIsFrozen ? 1.f : 0.f;
-        if (!mIsFrozen && now < mLastPathTime + 1500)
-            alpha = std::clamp(1.f - float(now - mLastPathTime) / 1500.f, 0.f, 1.f);
+        if (!mIsFrozen && now < mLastRenderTime + 1500)
+            alpha = std::clamp(1.f - float(now - mLastRenderTime) / 1500.f, 0.f, 1.f);
 
         if (alpha > 0.02f) {
             for (size_t i = 0; i + 1 < mPredictedPath.size(); ++i) {
@@ -578,22 +626,22 @@ void PearlStopper::onRenderEvent(RenderEvent& event) {
         }
     }
 
-    // Синяя линия — путь нашего TP (как mPacketPositions в ClickTP)
+    // ── Синяя линия — наш путь TP ────────────────────────────────────────
     {
-        std::lock_guard<std::mutex> lk(mMutex);
+        std::lock_guard<std::mutex> lk(mRenderMutex);
 
         float alpha = 0.f;
         if (mIsFrozen)
             alpha = 1.f;
-        else if (now < mLastPathTime + 1500)
-            alpha = std::clamp(1.f - float(now - mLastPathTime) / 1500.f, 0.f, 1.f);
+        else if (now < mLastRenderTime + 1500)
+            alpha = std::clamp(1.f - float(now - mLastRenderTime) / 1500.f, 0.f, 1.f);
         else
-            mPacketPositions.clear();
+            mTpPath.clear();
 
-        if (alpha > 0.02f && !mPacketPositions.empty()) {
+        if (alpha > 0.02f && !mTpPath.empty()) {
             std::vector<ImVec2> pts;
-            pts.reserve(mPacketPositions.size());
-            for (auto& p : mPacketPositions) {
+            pts.reserve(mTpPath.size());
+            for (auto& p : mTpPath) {
                 ImVec2 s;
                 if (RenderUtils::worldToScreen(p, s)) pts.push_back(s);
             }
@@ -602,16 +650,16 @@ void PearlStopper::onRenderEvent(RenderEvent& event) {
         }
     }
 
-    // Оранжевый кружок — точка перехвата
+    // ── Оранжевый маркер — точка перехвата ────────────────────────────────
     if (mIsFrozen) {
         ImVec2 sp;
-        if (RenderUtils::worldToScreen(mInterceptFeetPos, sp)) {
+        if (RenderUtils::worldToScreen(mInterceptPos, sp)) {
             dl->AddCircleFilled(sp, 6.f,  ImColor(1.0f, 0.5f,  0.0f, 0.95f));
             dl->AddCircle      (sp, 12.f, ImColor(1.0f, 0.75f, 0.0f, 0.55f), 0, 2.0f);
         }
     }
 
-    // Счётчик
+    // ── Счётчик остановленных пёрл ───────────────────────────────────────
     if (mTotalStops > 0) {
         ImVec2 scr = ImGui::GetIO().DisplaySize;
         std::string txt = "Pearls stopped: " + std::to_string(mTotalStops);

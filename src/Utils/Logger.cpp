@@ -4,93 +4,47 @@
 
 #include "Logger.hpp"
 
-#include <iostream>
-#include <cstdio>
-#include <fcntl.h>
-#include <io.h>
+#include <Solstice.hpp>
+#include <string>
+
+
 
 void Logger::initialize()
 {
-    if (initialized)
-        return;
+    if (initialized) return;
+    AllocConsole();
 
-#ifdef __DEBUG__
-    if (!GetConsoleWindow())
-    {
-        if (!AllocConsole())
-            return;
-    }
+    SetConsoleTitle("Solstice Console");
 
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (!hConsole || hConsole == INVALID_HANDLE_VALUE)
-        return;
+    freopen_s(reinterpret_cast<FILE**>(stdout), "CONOUT$", "w", stdout);
+    freopen_s(reinterpret_cast<FILE**>(stdin), "CONIN$", "r", stdin);
+    freopen_s(reinterpret_cast<FILE**>(stderr), "CONOUT$", "w", stderr);
 
-    SetConsoleTitleA("Solstice Debug Console");
-
-    FILE* fpOut = nullptr;
-    FILE* fpErr = nullptr;
-    FILE* fpIn  = nullptr;
-
-    freopen_s(&fpOut, "CONOUT$", "w", stdout);
-    freopen_s(&fpErr, "CONOUT$", "w", stderr);
-    freopen_s(&fpIn,  "CONIN$",  "r", stdin);
-
-    std::ios::sync_with_stdio(true);
-
-    DWORD mode = 0;
-    if (GetConsoleMode(hConsole, &mode))
-    {
-        mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        SetConsoleMode(hConsole, mode);
-    }
-
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    GetConsoleMode(hOut, &dwMode);
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hOut, dwMode);
     initialized = true;
-#else
-    initialized = true;
-#endif
 }
 
 void Logger::deinitialize()
 {
-#ifdef __DEBUG__
-    if (!initialized)
-        return;
-
-    fflush(stdout);
-    fflush(stderr);
-
+    // Close the console
     fclose(stdout);
-    fclose(stderr);
     fclose(stdin);
-
+    fclose(stderr);
+    // Free the console
     FreeConsole();
-#endif
-
-    initialized = false;
-    hConsole = nullptr;
-}
-
-bool Logger::hasConsole()
-{
-#ifdef __DEBUG__
-    return GetConsoleWindow() != nullptr;
-#else
-    return false;
-#endif
 }
 
 std::string Logger::getAnsiColor(float r, float g, float b)
 {
-    return "\033[38;2;" +
-        std::to_string(static_cast<int>(r * 255)) + ";" +
-        std::to_string(static_cast<int>(g * 255)) + ";" +
-        std::to_string(static_cast<int>(b * 255)) + "m";
+    return "\033[38;2;" + std::to_string(static_cast<int>(r * 255)) + ";" + std::to_string(static_cast<int>(g * 255)) + ";" + std::to_string(static_cast<int>(b * 255)) + "m";
 }
 
 std::string Logger::getAnsiColor(int r, int g, int b)
 {
-    return "\033[38;2;" +
-        std::to_string(r) + ";" +
-        std::to_string(g) + ";" +
-        std::to_string(b) + "m";
+    return "\033[38;2;" + std::to_string(r) + ";" + std::to_string(g) + ";" + std::to_string(b) + "m";
 }
+

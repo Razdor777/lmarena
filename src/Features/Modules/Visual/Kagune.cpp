@@ -177,6 +177,7 @@ void Kagune::onEnable()
     mJumpPush        = 0.f;
     mWasOnGround     = true;
     mDespawnProgress = 0.f;
+    mSmoothedBodyYaw = -999.f; // сигнал "не инициализирован"
 }
 
 void Kagune::onDisable()
@@ -206,9 +207,11 @@ void Kagune::onPacketOutEvent(PacketOutEvent& event)
     glm::vec3 tPos{};
     float     targetDist = mLength.mValue;
 
-    auto* rot   = player->getActorRotationComponent();
+    // ── FIX eyePos: используем стандарт проекта (как в Aimbot.cpp) ────────
+    auto* rot = player->getActorRotationComponent();
     auto* headR = player->getActorHeadRotationComponent();
 
+    // headYaw из HeadRotationComponent (обновляется каждый рендер-фрейм)
     float headYaw = (headR ? headR->mHeadRot : rot->mYaw) * (KPI / 180.f);
     float pitch   = rot->mPitch * (KPI / 180.f);
 
@@ -217,8 +220,9 @@ void Kagune::onPacketOutEvent(PacketOutEvent& event)
         -sinf(pitch),
          cosf(headYaw) * cosf(pitch));
 
+    // eyePos — стандарт проекта: getPos() + PLAYER_HEIGHT (1.62f)
     glm::vec3 eyePos = *player->getPos();
-    eyePos.y += PLAYER_HEIGHT;
+    eyePos.y += PLAYER_HEIGHT; // = 1.62f, как в Aimbot.cpp
 
     bool  found      = false;
     float bestDist   = FLT_MAX;
@@ -341,42 +345,78 @@ void Kagune::onRenderEvent(RenderEvent& event)
     auto* sh    = player->getAABBShapeComponent();
     auto* rot   = player->getActorRotationComponent();
     auto* headR = player->getActorHeadRotationComponent();
-    auto* bodyR = player->getMobBodyRotationComponent();
     auto* svc   = player->getStateVectorComponent();
     if (!rot) return;
 
-    // ── Позиция тела (визуальная, сглаженная) ─────────────────────────────
-    // RenderPositionComponent = eye level. Вычитаем PLAYER_HEIGHT → feet level.
-    // Эта точка синхронна с визуальной моделью игрока (прыжок, бег, bobbing).
+    // ── Позиция тела ──────────────────────────────────────────────────────
+    // getPos() = StateVectorComponent::mPos = физические ноги (стабильно)
+    // RenderPositionComponent для XZ-сглаживания
     glm::vec3 pPos = *player->getPos();
     {
         auto* rpc = player->getRenderPositionComponent();
         if (rpc) {
-            pPos = rpc->mPosition;
-            pPos.y -= PLAYER_HEIGHT; // eye → feet
+            pPos.x = rpc->mPosition.x;
+            pPos.z = rpc->mPosition.z;
+            // Y строго от getPos() — rpc->mPosition.y смещается при любом
+            // изменении ракурса камеры и не соответствует реальной позиции тела
         }
     }
 
     glm::vec3 vel    = svc ? svc->mVelocity : glm::vec3(0.f);
     float hSpd   = sqrtf(vel.x*vel.x + vel.z*vel.z);
     bool  moving = hSpd > 0.003f;
+    bool  onGround = player->isOnGround();
 
-    // ── Углы: тело, не голова/камера ──────────────────────────────────────
-    // fwdBody ориентирует tentacle по направлению тела (MobBodyRotationComponent).
-    // fwdAim нужен только для микро-смещения root в 1-м лице.
-    float bodyYawDeg = bodyR ? bodyR->yBodyRot : (headR ? headR->mHeadRot : rot->mYaw);
-    float headYawDeg = headR ? headR->mHeadRot : rot->mYaw;
-    float pitchDeg   = rot->mPitch;
+    // ── Прыжок ────────────────────────────────────────────────────────────
+    if (mWasOnGround && !onGround && vel.y > 0.05f) {
+        mJumpStart = NOW; mJumpPush = 1.f;
+    }
+    mWasOnGround = onGround;
+    if (mJumpPush > 0.f) {
+        float e = float(NOW - mJumpStart) / 350.f;
+        mJumpPush = (e >= 1.f) ? 0.f : sinf(e * KPI);
+    }
+    float jTgt = (vel.y > 0.08f) ? std::min(vel.y*0.9f, 1.2f) : 0.f;
+    mJumpVel = MathUtils::lerp(mJumpVel, jTgt, dt * 8.f);
 
-    float bodyYaw = glm::radians(bodyYawDeg);
-    float headYaw = glm::radians(headYawDeg);
-    float pitch   = glm::radians(pitchDeg);
+    // ── FIX BAG 1: Сглаженный body yaw (не из компонента) ────────────────
+    // Проблема: MobBodyRotationComponent::yBodyRot при ходьбе назад
+    // становится headYaw+180° — это ломает ориентацию щупалец.
+    //
+    // Решение: вычисляем bodyYaw сами через сглаживание headYaw.
+    // Щупальца на спине должны следовать за направлением движения/взгляда
+    // плавно, а не прыгать при повороте на 180°.
+    //
+    // Используем headYaw из HeadRotationComponent (обновляется каждый кадр)
+    float rawHeadYaw = (headR ? headR->mHeadRot : rot->mYaw) * (KPI / 180.f);
+    float pitch      = rot->mPitch * (KPI / 180.f);
 
+    // Инициализация при первом вызове
+    if (mSmoothedBodyYaw < -900.f) mSmoothedBodyYaw = rawHeadYaw;
+
+    // Угловая дельта с нормализацией [-π, π]
+    float dyaw = rawHeadYaw - mSmoothedBodyYaw;
+    while (dyaw >  KPI) dyaw -= K2PI;
+    while (dyaw < -KPI) dyaw += K2PI;
+
+    // Плавное следование: скорость зависит от движения
+    // При движении — быстрее (тело следует за головой)
+    // В покое — медленнее (щупальца не дёргаются)
+    float followSpeed = moving ? 8.f : 4.f;
+    mSmoothedBodyYaw += dyaw * std::clamp(dt * followSpeed, 0.f, 1.f);
+
+    // Нормализуем обратно
+    while (mSmoothedBodyYaw >  KPI) mSmoothedBodyYaw -= K2PI;
+    while (mSmoothedBodyYaw < -KPI) mSmoothedBodyYaw += K2PI;
+
+    float bodyYaw = mSmoothedBodyYaw;
+
+    // Векторы ориентации
     glm::vec3 fwdBody = kgVSafe({-sinf(bodyYaw), 0.f, cosf(bodyYaw)});
     glm::vec3 fwdAim  = kgVSafe({
-        -sinf(headYaw) * cosf(pitch),
+        -sinf(rawHeadYaw) * cosf(pitch),
         -sinf(pitch),
-         cosf(headYaw) * cosf(pitch)
+         cosf(rawHeadYaw) * cosf(pitch)
     });
     glm::vec3 worldUp(0, 1, 0);
     glm::vec3 right = kgVSafe(glm::cross(fwdBody, worldUp));
@@ -454,9 +494,11 @@ void Kagune::onRenderEvent(RenderEvent& event)
             globalScale = 1.f - mDespawnProgress;
         }
     } else {
+        // Hidden — ничего не рисуем (баг 3 исправлен: бугорков нет)
         return;
     }
 
+    // Если scale слишком мал — не рисуем
     if (globalScale < 0.01f) return;
 
     float scaledLen = maxLen * globalScale;
@@ -541,12 +583,16 @@ void Kagune::onRenderEvent(RenderEvent& event)
         glm::vec3 idleDir = kgVSafe(
             fwdBody * cosf(fanA) + right*(xSide*sinf(fanA)) - worldUp*0.35f);
 
-        // idleTip следует за плавной позицией root — никаких искусственных
-        // jump-push смещений, которые рассинхронизируют tentacle с телом.
         glm::vec3 idleTip = shoulder
             + idleDir * (scaledLen * tentSpawnT)
             + right   * (sinf(wPhase)      * wAmp * scaledLen)
-            + worldUp * (cosf(wPhase*1.2f) * wAmp * scaledLen * 0.45f);
+            + worldUp * (cosf(wPhase*1.2f) * wAmp * scaledLen * 0.45f)
+            + worldUp * (mJumpVel * scaledLen * 0.28f);
+
+        if (mJumpPush > 0.f && (ti == 2 || ti == 3 || (ti >= 2 && !isUp))) {
+            idleTip -= worldUp * (mJumpPush * scaledLen * 0.85f);
+            idleTip += fwdBody * (mJumpPush * scaledLen * 0.2f);
+        }
 
         if (!st.restInited) { st.restTip = idleTip; st.restInited = true; }
         st.restTip = MathUtils::lerp(st.restTip, idleTip,

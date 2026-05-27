@@ -37,7 +37,6 @@ enum struct EventPriorities {
 #include <glm/gtc/matrix_transform.hpp>
 #include <array>
 #include <libhat.hpp>
-#include <Psapi.h>
 
 #include <d2d1_3.h>
 #include <d3d11.h>

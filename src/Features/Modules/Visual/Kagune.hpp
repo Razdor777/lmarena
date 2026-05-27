@@ -115,6 +115,10 @@ public:
     float    mJumpPush    = 0.f;
     uint64_t mJumpStart   = 0;
 
+    // ── Сглаженный body yaw (вычисляем сами) ──────────────────────────────
+    // -999.f = не инициализирован
+    float mSmoothedBodyYaw = -999.f;
+
     Kagune() : ModuleBase("Kagune", "Tokyo Ghoul kagune cosmetic", ModuleCategory::Visual, 0, false)
     {
         addSettings(

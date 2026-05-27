@@ -404,6 +404,8 @@ void Aura::drawTrail(Actor* target, ImColor color) {
 
     if (now - sLastTrailUpdate > 50) {
         sLastTrailUpdate = now;
+        // Limit trail history to prevent memory buildup
+        if (sTrailHistory.size() >= 200) sTrailHistory.erase(sTrailHistory.begin());
         sTrailHistory.push_back({renderPos->mPosition, now, 1.f});
     }
 
@@ -700,26 +702,30 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
     if (mRotating) {
         glm::vec2 targetRots = calcRotations(player);
         if (std::isfinite(targetRots.x) && std::isfinite(targetRots.y)) {
+            // Wrap target yaw to shortest path relative to current
+            float deltaYaw = targetRots.y - mCurrentRotations.y;
+            while (deltaYaw >  180.f) deltaYaw -= 360.f;
+            while (deltaYaw < -180.f) deltaYaw += 360.f;
+
             if (mRotSpeed.mValue > 0.f) {
                 float dt      = 0.05f;
                 float maxStep = mRotSpeed.mValue * dt;
 
-                float deltaYaw = targetRots.y - mCurrentRotations.y;
-                while (deltaYaw >  180.f) deltaYaw -= 360.f;
-                while (deltaYaw < -180.f) deltaYaw += 360.f;
-
-                float deltaPitch = targetRots.x - mCurrentRotations.x;
-
+                // Interpolate mCurrentRotations toward targetRots
                 mCurrentRotations.y += MathUtils::clamp(deltaYaw,   -maxStep, maxStep);
-                mCurrentRotations.x += MathUtils::clamp(deltaPitch, -maxStep, maxStep);
+                mCurrentRotations.x += MathUtils::clamp(targetRots.x - mCurrentRotations.x, -maxStep, maxStep);
 
+                // Normalize
                 while (mCurrentRotations.y >  180.f) mCurrentRotations.y -= 360.f;
                 while (mCurrentRotations.y < -180.f) mCurrentRotations.y += 360.f;
                 mCurrentRotations.x = MathUtils::clamp(mCurrentRotations.x, -90.f, 90.f);
             } else {
+                // Instant snap
                 mCurrentRotations = targetRots;
             }
 
+            // Write to game components so the client renders the correct rotation
+            // This keeps the visual model in sync with what the server receives
             try {
                 if (auto* headRot = player->getActorHeadRotationComponent()) {
                     headRot->mHeadRot    = mCurrentRotations.y;

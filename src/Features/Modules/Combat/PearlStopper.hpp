@@ -16,7 +16,11 @@ public:
     );
 
     NumberSetting mYOffset = NumberSetting(
-        "Y Offset", "Extra Y offset at intercept point", 0.f, -2.f, 2.f, 0.1f
+        "Y Offset", "Extra Y offset at intercept point", 1.6f, -2.f, 2.f, 0.1f
+    );
+
+    NumberSetting mInterceptTicks = NumberSetting(
+        "Intercept Ticks", "How far ahead to intercept (higher = further, more reliable)", 8.f, 3.f, 25.f, 1.f
     );
 
     BoolSetting mTeleportBack = BoolSetting(
@@ -39,6 +43,7 @@ public:
         addSettings(
             &mStepDistance,
             &mYOffset,
+            &mInterceptTicks,
             &mTeleportBack,
             &mDrawPrediction,
             &mNotifications
@@ -52,81 +57,92 @@ public:
         };
     }
 
-    struct PearlData {
-        Actor*    actor     = nullptr;
+    // ── Tracked pearl data ───────────────────────────────────────────────────
+    struct TrackedPearl {
         int64_t   runtimeId = -1;
-        glm::vec3 position  = {};
-        glm::vec3 velocity  = {};
+        glm::vec3 pos       = {};
+        glm::vec3 vel       = {};      // from StateVectorComponent (blocks/tick)
+        glm::vec3 prevPos   = {};      // position on previous tick
+        bool      hasPrev   = false;   // do we have a valid previous position?
+        int       age       = 0;       // ticks since first detected
     };
 
+    // ── Intercept result ─────────────────────────────────────────────────────
     struct InterceptResult {
-        bool      found     = false;
-        glm::vec3 feetPos   = {};
-        int       tickIndex = -1;
+        bool      valid    = false;
+        glm::vec3 feetPos  = {};
+        int       tick     = -1;
+        float     distance = 0.f;
     };
 
-    bool      mIsActive         = false;
-    bool      mIsFrozen         = false;
-    int64_t   mTargetPearlId    = 0;
-    glm::vec3 mOriginalPos      = {};
-    glm::vec3 mInterceptFeetPos = {};
-    glm::vec3 mRots             = {};
-    int       mFrozenTicks      = 0;
-    int       mMissedTicks      = 0;
-    int       mTotalStops       = 0;
+    // ── Module state ─────────────────────────────────────────────────────────
+    bool      mIsFrozen      = false;
+    int64_t   mLockedPearlId = 0;
+    glm::vec3 mOriginalPos   = {};
+    glm::vec3 mInterceptPos  = {};
+    glm::vec3 mRots          = {};
+    int       mFrozenTicks   = 0;
+    int       mGoneTicks     = 0;       // ticks since locked pearl disappeared
+    int       mTotalStops    = 0;
 
-    bool      mSavedCollision   = true;
-    bool      mSavedGravity     = true;
-    bool      mSavedPush        = true;
+    // Saved player physics flags
+    bool      mSavedCollision = true;
+    bool      mSavedGravity   = true;
+    bool      mSavedPush      = true;
 
-    std::unordered_map<int64_t, glm::vec3>   mPearlPrevPos;
-    std::unordered_map<int64_t, uint64_t>    mPearlPrevTime;
-    // Кеш перл по runtimeId — не теряем перлы между тиками при лагах
-    std::unordered_map<int64_t, PearlData>   mKnownPearls;
+    // Pearl tracking cache
+    std::unordered_map<int64_t, TrackedPearl> mTrackedPearls;
 
+    // Render data (protected by mRenderMutex)
     std::vector<glm::vec3> mPredictedPath;
-    std::vector<glm::vec3> mPacketPositions;
-    uint64_t               mLastPathTime = 0;
-    std::mutex             mMutex;
+    std::vector<glm::vec3> mTpPath;
+    uint64_t               mLastRenderTime = 0;
+    std::mutex             mRenderMutex;
 
-    // Bedrock EnderPearl physics: vel *= drag -> vel.y -= gravity -> pos += vel
-    static constexpr float PEARL_DRAG       = 0.99f;
-    static constexpr float PEARL_GRAVITY    = 0.03f;
-    static constexpr int   MAX_SIM_TICKS    = 200;
-    static constexpr int   MAX_FROZEN_TICKS = 300;
-    static constexpr int   MISSED_TOLERANCE = 5;
+    // ── Bedrock EnderPearl physics constants ─────────────────────────────────
+    // Each tick: vel *= DRAG → vel.y -= GRAVITY → pos += vel
+    static constexpr float DRAG              = 0.99f;
+    static constexpr float GRAVITY           = 0.03f;
+    static constexpr int   MAX_SIM_TICKS     = 300;
+    static constexpr int   MAX_FROZEN_TICKS  = 400;
+    static constexpr int   GONE_GRACE_TICKS  = 5;
+    // MIN_INTERCEPT_TICK is now mInterceptTicks setting (default 8)
+    static constexpr float PEARL_PLAYER_H   = 1.8f;
 
+    // ── Event handlers ───────────────────────────────────────────────────────
     void onEnable()  override;
     void onDisable() override;
 
-    void onBaseTickEvent(BaseTickEvent& event);
-    void onPacketInEvent(PacketInEvent& event);
-    void onRenderEvent(RenderEvent& event);
+    void onBaseTick(BaseTickEvent& event);
+    void onPacketIn(PacketInEvent& event);
+    void onRender(RenderEvent& event);
 
-    bool   isEnderPearl(Actor* a);
-    bool   isOwnPearl(Actor* pearl, Actor* local);
-    Actor* getPearlOwner(Actor* pearl);
-    bool   isPearlStillAlive(int64_t runtimeId);
-    std::vector<PearlData> findEnemyPearls(Actor* local);
+    // ── Pearl detection ──────────────────────────────────────────────────────
+    bool isEnderPearl(Actor* a);
+    bool isOwnPearl(Actor* pearl, Actor* local);
+    void updateTrackedPearls(Actor* local);
 
-    glm::vec3 estimateVelocity(PearlData& pearl, uint64_t nowMs);
+    // ── Velocity ─────────────────────────────────────────────────────────────
+    glm::vec3 getReliableVelocity(TrackedPearl& pearl);
 
-    std::vector<glm::vec3> simulateTrajectory(glm::vec3 startPos, glm::vec3 startVel, int maxTicks);
-
-    InterceptResult findIntercept(const std::vector<glm::vec3>& traj, glm::vec3 ourFeetPos, int ticksNeeded = 6);
-
+    // ── Trajectory simulation ────────────────────────────────────────────────
+    std::vector<glm::vec3> simulateTrajectory(glm::vec3 pos, glm::vec3 vel);
     bool isSolidAt(glm::vec3 pos);
+
+    // ── Intercept ────────────────────────────────────────────────────────────
+    InterceptResult findBestIntercept(const std::vector<glm::vec3>& traj, glm::vec3 myPos);
     bool isSpaceClear(glm::vec3 feetPos);
 
-    // Teleport logic — 1:1 copy of ClickTP
-    std::shared_ptr<MovePlayerPacket> createPacketForPos(glm::vec3 pos);
-    void straightLineTP(glm::vec3 from, glm::vec3 to, bool save);
+    // ── Teleport (ClickTP-style) ─────────────────────────────────────────────
+    std::shared_ptr<MovePlayerPacket> makePacket(glm::vec3 pos);
+    void doStepTP(glm::vec3 from, glm::vec3 to, bool saveForRender);
     void teleportTo(glm::vec3 dest);
 
+    // ── Freeze management ────────────────────────────────────────────────────
     void freezeAt(Actor* player, glm::vec3 feetPos);
-    void maintainFreeze(Actor* player);
+    void holdFreeze(Actor* player);
     void unfreeze(Actor* player);
-    void resetState(Actor* player);
+    void fullReset(Actor* player);
 
     std::string getSettingDisplay() override {
         if (mIsFrozen) return "BLOCKING";

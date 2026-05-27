@@ -8,7 +8,6 @@
 #include <fstream>
 #include <Features/FeatureManager.hpp>
 #include <Features/Configs/ConfigManager.hpp>
-#include <Features/Modules/Visual/HudEditor.hpp>
 #include <Hook/HookManager.hpp>
 #include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 
@@ -28,6 +27,8 @@
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.UI.Core.h>
 #include <build_info.h>
+#include <Features/IRC/IrcClient.hpp>
+#include <Features/Modules/Misc/IRC.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/OAuthUtils.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
@@ -66,40 +67,28 @@ void Solstice::init(HMODULE hModule)
     mModule = hModule;
     mInitialized = true;
 
+#ifdef __DEBUG__
     Logger::initialize();
+#endif
 
-    std::string loggerName = CC(21, 207, 148) + std::string("solstice") + ANSI_COLOR_RESET;
+    console = spdlog::stdout_color_mt(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
+
+    // Create a file logger sink
     std::string logFile = FileUtils::getSolsticeDir() + xorstr_("solstice.log");
 
+    // Don't use the file sink if the log file doesn't exist
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
     console_sink->set_level(spdlog::level::trace);
-
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFile, true);
-    file_sink->set_pattern("[%H:%M:%S.%e] [%n] [%l] %v");
-    file_sink->set_level(spdlog::level::trace);
-
-    console = std::make_shared<spdlog::logger>(
-        loggerName,
-        spdlog::sinks_init_list{ console_sink, file_sink }
-    );
     console->set_level(spdlog::level::trace);
-    console->flush_on(spdlog::level::trace);
+    console->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
+    spdlog::set_default_logger(std::make_shared<spdlog::logger>(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::sinks_init_list{console_sink}));
 
-    spdlog::set_default_logger(console);
-
-    std::string welcomeMsg = "Welcome to " + CC(0, 255, 0) + "Solstice" + ANSI_COLOR_RESET + "!";
+    console->info("Welcome to " + CC(0, 255, 0) + "Solstice" + ANSI_COLOR_RESET + "!"
 #ifdef __DEBUG__
-    welcomeMsg += CC(255, 0, 0) + std::string(" [Debug] ") + ANSI_COLOR_RESET;
+        + CC(255, 0, 0) + " [Debug] " + ANSI_COLOR_RESET
 #endif
-    console->info(welcomeMsg);
-
-#ifdef __DEBUG__
-    if (Logger::hasConsole())
-        spdlog::info("Debug console attached successfully.");
-    else
-        spdlog::warn("Debug console was NOT attached.");
-#endif
+);
 
     spdlog::info("Minecraft version: {}", ProcUtils::getVersion());
 
@@ -280,14 +269,14 @@ void Solstice::shutdownThread()
             isLpValid = true;
             HookManager::init(true); // Initialize the base tick hook
 
+            auto ircModule = gFeatureManager->mModuleManager->getModule<IRC>();
+            if (ircModule && !ircModule->mEnabled) ircModule->toggle();
+
             if (!Prefs->mDefaultConfigName.empty())
             {
                 if (ConfigManager::configExists(Prefs->mDefaultConfigName))
                 {
                     ConfigManager::loadConfig(Prefs->mDefaultConfigName);
-                }
-                if (auto* hudEditor = gFeatureManager->mModuleManager->getModule<HudEditor>()) {
-                    hudEditor->loadFromFile();
                 }
                 else
                 {
@@ -306,10 +295,6 @@ void Solstice::shutdownThread()
         mLastTick = NOW;
         gFeatureManager->mModuleManager->onClientTick();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-
-    if (auto* hudEditor = gFeatureManager->mModuleManager->getModule<HudEditor>()) {
-        hudEditor->saveToFile();
     }
 
     mRequestEject = true;
