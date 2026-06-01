@@ -383,6 +383,35 @@ std::vector<glm::ivec3> OreMiner::getConnectedVein(const glm::ivec3& start, int 
 }
 
 // =========================================================
+// FOV check: is the block within the player's horizontal look angle?
+// =========================================================
+bool OreMiner::isInPlayerFOV(Actor* player, const glm::vec3& blockCenter)
+{
+    // FOV=360 means no filtering
+    if (mFOV.mValue >= 360.f) return true;
+
+    auto rot = player->getActorRotationComponent();
+    if (!rot) return true;
+
+    glm::vec3 pp = *player->getPos();
+    float yawRad = glm::radians(rot->mYaw);
+
+    // Player's horizontal look direction (Minecraft: yaw 0 = south, 90 = west)
+    glm::vec2 lookDir = glm::vec2(-sinf(yawRad), cosf(yawRad));
+    glm::vec2 toBlock = glm::vec2(blockCenter.x - pp.x, blockCenter.z - pp.z);
+
+    float lenSq = glm::dot(toBlock, toBlock);
+    if (lenSq < 1.0f) return true; // block is right on top of us
+
+    toBlock = glm::normalize(toBlock);
+    float dot = glm::dot(lookDir, toBlock);
+    dot = glm::clamp(dot, -1.0f, 1.0f);
+    float angle = glm::degrees(acosf(dot));
+
+    return angle <= mFOV.mValue * 0.5f;
+}
+
+// =========================================================
 // Find nearest target (sorted by distance)
 // =========================================================
 glm::ivec3 OreMiner::findBestTarget(Actor* player)
@@ -397,6 +426,9 @@ glm::ivec3 OreMiner::findBestTarget(Actor* player)
 
         // Skip protected blocks
         if (mProtectedPositions.count(pos)) continue;
+
+        // FOV check: only mine blocks the player is looking towards
+        if (!isInPlayerFOV(player, glm::vec3(pos) + 0.5f)) continue;
 
         float dx = pos.x - pp.x, dy = pos.y - pp.y, dz = pos.z - pp.z;
         float distSq = dx * dx + dy * dy + dz * dz;
@@ -792,6 +824,8 @@ void OreMiner::onRenderEvent(RenderEvent& event)
             const BlockPos& pos = pair.first;
             if (mProtectedPositions.count(pos)) continue;
             if (glm::distance(pp, glm::vec3(pos)) > 40.f) continue;
+            if (!isInPlayerFOV(player, glm::vec3(pos) + 0.5f)) continue;
+
             auto pts = MathUtils::getImBoxPoints(AABB(glm::vec3(pos), glm::vec3(1)));
             if (pts.empty()) continue;
             ImColor c = ColorUtils::getThemedColor(0);

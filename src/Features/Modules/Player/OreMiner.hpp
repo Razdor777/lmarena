@@ -22,6 +22,7 @@ public:
     BoolSetting mDrawPath = BoolSetting("Draw Path", "Draw TP path", true);
     BoolSetting mRenderTargets = BoolSetting("Render Targets", "Highlight found blocks", false);
     BoolSetting mShowBlockList = BoolSetting("Show Block List", "Show target block names", true);
+    NumberSetting mFOV = NumberSetting("FOV", "Mining field of view", 360.f, 30.f, 360.f, 10.f);
 
     BoolSetting mCoal = BoolSetting("Coal", "Coal ore", false);
     BoolSetting mIron = BoolSetting("Iron", "Iron ore", false);
@@ -44,7 +45,7 @@ public:
         addSettings(
             &mDestroySpeed, &mStepDistance, &mServerTimeout, &mSwing, &mHotbarOnly,
             &mVeinMiner, &mMineDelay, &mBlocksPerTick,
-            &mRenderBlock, &mDrawPath, &mRenderTargets, &mShowBlockList,
+            &mRenderBlock, &mDrawPath, &mRenderTargets, &mShowBlockList, &mFOV,
             &mCoal, &mIron, &mGold, &mDiamond, &mEmerald, &mLapis,
             &mRedstone, &mCopper, &mAncientDebris, &mQuartz,
             &mLeaves, &mWood, &mSandstone, &mSnow, &mSpawner
@@ -129,6 +130,7 @@ public:
     void straightLineTP(glm::vec3 from, glm::vec3 to, bool save);
     void mineBlockAtPos(const glm::ivec3& pos, Actor* player);
     glm::ivec3 findBestTarget(Actor* player);
+    bool isInPlayerFOV(Actor* player, const glm::vec3& blockCenter);
 
     // VeinMiner: BFS to find all connected blocks of same type
     std::vector<glm::ivec3> getConnectedVein(const glm::ivec3& start, int maxBlocks = 64);
