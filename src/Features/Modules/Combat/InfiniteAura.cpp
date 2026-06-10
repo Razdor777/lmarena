@@ -469,6 +469,10 @@ glm::vec3 InfiniteAura::getAttackPosition(Actor *target, Actor *player) {
 
   if (mKBDirection.mValue == KBDirection::Default) return predictedPos;
 
+  // Use raw targetPos (not predictedPos) for KB offset so that
+  // the attacker→target vector — and thus the knockback direction —
+  // is always exactly the one the user chose, regardless of the
+  // target's movement velocity.
   float targetYaw = 0.f;
   auto targetRot = target->getActorRotationComponent();
   if (targetRot) targetYaw = targetRot->mYaw;
@@ -479,13 +483,13 @@ glm::vec3 InfiniteAura::getAttackPosition(Actor *target, Actor *player) {
   glm::vec3 right = {cosf(yawRad), 0.f, sinf(yawRad)};
 
   switch (mKBDirection.mValue) {
-  case KBDirection::PushBack:   return predictedPos + forward * offset;
-  case KBDirection::PushForward: return predictedPos - forward * offset;
-  case KBDirection::PushLeft:   return predictedPos + right * offset;
-  case KBDirection::PushRight:  return predictedPos - right * offset;
+  case KBDirection::PushBack:   return targetPos + forward * offset;
+  case KBDirection::PushForward: return targetPos - forward * offset;
+  case KBDirection::PushLeft:   return targetPos + right * offset;
+  case KBDirection::PushRight:  return targetPos - right * offset;
   case KBDirection::Custom: {
     float rad = (targetYaw + mKBCustomAngle.mValue + 180.f) * (PI / 180.0f);
-    return predictedPos + glm::vec3(-sinf(rad) * offset, 0.f, cosf(rad) * offset);
+    return targetPos + glm::vec3(-sinf(rad) * offset, 0.f, cosf(rad) * offset);
   }
   default: return predictedPos;
   }

@@ -92,7 +92,6 @@ public:
     void onPacketOutEvent(class PacketOutEvent& event);
 };
 
-/*
 class BodyYaw
 {
 public:
@@ -140,4 +139,3 @@ public:
         return value;
     };
 };
-*/

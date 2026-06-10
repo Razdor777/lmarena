@@ -1,7 +1,6 @@
 #pragma once
 //
-// ArmorSlotUnlock — equip any item into any armor slot
-// Uses InventoryTransactionPacket to bypass client-side slot type validation
+// ArmorSlotUnlock — equip any item into any armor/offhand slot
 //
 
 #include <Features/Modules/Module.hpp>
@@ -10,8 +9,8 @@
 class ArmorSlotUnlock : public ModuleBase<ArmorSlotUnlock> {
 public:
     EnumSetting mTargetSlot = EnumSetting("Target Slot",
-        "Armor slot to equip item to", 0,
-        {"Head", "Chest", "Legs", "Feet"});
+        "Armor/offhand slot to equip item to", 0,
+        {"Head", "Chest", "Legs", "Feet", "Offhand"});
 
     NumberSetting mInventorySlot = NumberSetting("Inventory Slot",
         "Inventory slot to take item from (0-35)",
@@ -21,7 +20,7 @@ public:
         "Equip once on enable then auto-disable", true);
 
     ArmorSlotUnlock() : ModuleBase("ArmorSlotUnlock",
-        "Equip any item to any armor slot", ModuleCategory::Misc, 0, false)
+        "Equip any item to any armor/offhand slot", ModuleCategory::Misc, 0, false)
     {
         addSettings(&mTargetSlot, &mInventorySlot, &mAutoEquip);
         mNames = {
@@ -39,6 +38,5 @@ public:
 private:
     bool mHasEquipped = false;
 
-    // Move item from any inventory slot to any armor slot via transaction packet
-    void equipToSlot(int inventorySlot, int armorSlot);
+    void equipToSlot(int inventorySlot, int targetSlot);
 };

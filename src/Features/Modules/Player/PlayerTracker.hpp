@@ -68,7 +68,9 @@ public:
             if (hitResult && hitResult->mType == HitType::ENTITY) {
                 for (auto* actor : actors) {
                     if (!actor || !actor->isPlayer() || actor == player) continue;
-                    float dist = actor->distanceTo(*player->getPos());
+                    auto* playerPos = player->getPos();
+                    if (!playerPos) continue;
+                    float dist = actor->distanceTo(*playerPos);
                     if (dist < 7.f) {
                         std::string name = actor->getNameTag();
                         size_t nl = name.find('\n');
@@ -114,37 +116,43 @@ public:
 
         // SetTitle (ActionBar)
         if (event.mPacket->getId() == PacketID::SetTitle) {
-            auto* raw = reinterpret_cast<uint8_t*>(event.mPacket.get());
-            int titleType = *reinterpret_cast<int*>(raw + 0x30);
+            try {
+                auto* raw = reinterpret_cast<uint8_t*>(event.mPacket.get());
+                if (!raw) return;
+                int titleType = *reinterpret_cast<int*>(raw + 0x30);
 
-            if (mDebugPackets.mValue) {
-                try {
-                    std::string* text = reinterpret_cast<std::string*>(raw + 0x38);
-                    ChatUtils::displayClientMessage(
-                        "§7[PT] §eTitle §ftype=§a{} §ftext='§d{}§f'",
-                        titleType, *text);
-                } catch (...) {
-                    ChatUtils::displayClientMessage(
-                        "§7[PT] §eTitle §ftype=§a{} §c(read failed)", titleType);
-                }
-            }
-
-            if (titleType == 4 || titleType == 2 || titleType == 3) {
-                try {
-                    std::string* text = reinterpret_cast<std::string*>(raw + 0x38);
-                    std::string target = HealthTracker::getInstance().getLastAttacked();
-                    if (!target.empty()) {
-                        bool ok = HealthTracker::getInstance().parseHealthText(*text, target);
-                        if (ok && mDebugPackets.mValue) {
-                            float hp, maxHp;
-                            HealthTracker::getInstance().getHealth(target, hp, maxHp);
+                if (mDebugPackets.mValue) {
+                    try {
+                        std::string* text = reinterpret_cast<std::string*>(raw + 0x38);
+                        if (text && !text->empty()) {
                             ChatUtils::displayClientMessage(
-                                "§7[PT] §aTitle HP §ffor '§b{}§f': §c{:.1f}§f/§c{:.1f}",
-                                target, hp, maxHp);
+                                "§7[PT] §eTitle §ftype=§a{} §ftext='§d{}§f'",
+                                titleType, *text);
                         }
+                    } catch (...) {
+                        ChatUtils::displayClientMessage(
+                            "§7[PT] §eTitle §ftype=§a{} §c(read failed)", titleType);
                     }
-                } catch (...) {}
-            }
+                }
+
+                if (titleType == 4 || titleType == 2 || titleType == 3) {
+                    try {
+                        std::string* text = reinterpret_cast<std::string*>(raw + 0x38);
+                        if (!text || text->empty()) return;
+                        std::string target = HealthTracker::getInstance().getLastAttacked();
+                        if (!target.empty()) {
+                            bool ok = HealthTracker::getInstance().parseHealthText(*text, target);
+                            if (ok && mDebugPackets.mValue) {
+                                float hp, maxHp;
+                                HealthTracker::getInstance().getHealth(target, hp, maxHp);
+                                ChatUtils::displayClientMessage(
+                                    "§7[PT] §aTitle HP §ffor '§b{}§f': §c{:.1f}§f/§c{:.1f}",
+                                    target, hp, maxHp);
+                            }
+                        }
+                    } catch (...) {}
+                }
+            } catch (...) {}
         }
     }
 };

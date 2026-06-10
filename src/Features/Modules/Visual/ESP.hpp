@@ -1,41 +1,44 @@
 #pragma once
-//
-// Created by vastrakai on 7/7/2024.
-//
-
 #include <Features/Modules/Module.hpp>
+#include <Features/Modules/Visual/Interface.hpp>
 
 class ESP : public ModuleBase<ESP>
 {
 public:
-    enum class Style {
-        Style3D,
-        Glow,
-        Corners,
+    enum class BoxMode {
+        None,
+        Full2D,
+        Corners2D,
+        Box3D
     };
 
-    EnumSettingT<Style> mStyle = EnumSettingT<Style>("Style", "Visual style", Style::Glow, "3D", "Glow", "Corners");
-    BoolSetting mRenderFilled = BoolSetting("Render Filled", "Render the ESP filled", true);
-    BoolSetting mRenderLocal = BoolSetting("Render Local", "Render local player", false);
-    BoolSetting mShowFriends = BoolSetting("Show Friends", "Render friends", true);
-    BoolSetting mOuterGlow = BoolSetting("Outer Glow", "Add glow effect around box", true);
-    NumberSetting mGlowSize = NumberSetting("Glow Size", "Glow radius", 25.0f, 5.0f, 60.0f, 1.0f);
-    NumberSetting mCornerLength = NumberSetting("Corner Length", "Corner bracket length", 8.0f, 3.0f, 20.0f, 1.0f);
-    BoolSetting mDebug = BoolSetting("Debug", "Display bots", false);
+    EnumSettingT<BoxMode> mBoxMode = EnumSettingT<BoxMode>("Box Mode", "How the box is drawn", BoxMode::Corners2D, "None", "Full 2D", "Corners 2D", "3D");
+    
+    BoolSetting mSyncInterface = BoolSetting("Sync Interface", "Use colors from Interface module", true);
+    ColorSetting mColor = ColorSetting("Color", "Color of the ESP when not synced", 1.0f, 0.3f, 0.3f, 1.0f);
+    ColorSetting mTeamColor = ColorSetting("Team Color", "Color for players on your team", 0.0f, 1.0f, 0.3f, 1.0f);
+    BoolSetting mShimmer = BoolSetting("Shimmer", "Makes the color gently pulse and shift", true);
+    
+    BoolSetting mRenderFilled = BoolSetting("Render Filled", "Fill the box with transparent color", true);
+    BoolSetting mShadow = BoolSetting("Shadow", "Draw a shadow behind the box for better visibility", true);
+    NumberSetting mLineWidth = NumberSetting("Line Width", "Thickness of the lines", 1.5f, 0.5f, 5.f, 0.1f);
+    NumberSetting mCornerSize = NumberSetting("Corner Size", "Length of the corners (percentage)", 0.3f, 0.1f, 0.5f, 0.05f);
+    BoolSetting mInvisible = BoolSetting("Invisible", "Render ESP for invisible entities", false);
 
-    ESP() : ModuleBase("ESP", "Draws a box around entities", ModuleCategory::Visual, 0, false) {
+    ESP() : ModuleBase("ESP", "See entities through walls", ModuleCategory::Visual, 0, false)
+    {
         addSettings(
-            &mStyle,
+            &mBoxMode,
+            &mSyncInterface,
+            &mColor,
+            &mTeamColor,
+            &mShimmer,
             &mRenderFilled,
-            &mRenderLocal,
-            &mShowFriends,
-            &mOuterGlow,
-            &mGlowSize,
-            &mCornerLength
+            &mShadow,
+            &mLineWidth,
+            &mCornerSize,
+            &mInvisible
         );
-
-        VISIBILITY_CONDITION(mGlowSize, mOuterGlow.mValue);
-        VISIBILITY_CONDITION(mCornerLength, mStyle.mValue == Style::Corners);
 
         mNames = {
             {Lowercase, "esp"},
@@ -49,12 +52,6 @@ public:
     void onDisable() override;
     void onRenderEvent(class RenderEvent& event);
 
-    std::string getSettingDisplay() override {
-        return mStyle.mValues[mStyle.as<int>()];
-    }
-
 private:
-    void renderEntity(ImDrawList* drawList, Actor* actor, Actor* localPlayer, ImColor themeColor);
-    void renderGlowBox(ImDrawList* drawList, const std::vector<ImVec2>& points, ImColor color, float glowSize);
-    void renderCorners(ImDrawList* drawList, const ImVec2& min, const ImVec2& max, ImColor color, float length, float thickness);
+    ImColor getEntityColor(Actor* actor, float alpha);
 };

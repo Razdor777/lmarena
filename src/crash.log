@@ -1,0 +1,2718 @@
+----------------- Crash at 2026-05-25 20:51:05
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+C5368
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+C5368
+Solstice.dll+256973
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Disabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Disabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Disabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Enabled
+DestroyProgress - Enabled
+ESP - Disabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Disabled
+ArmorHUD - Enabled
+Nametags - Disabled
+NoHurtcam - Enabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-05-26 21:38:50
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+21B63E
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+21B63E
+Solstice.dll+217A98
+Solstice.dll+2F8A05
+Solstice.dll+30F8C9
+Solstice.dll+308A28
+Solstice.dll+2F85EE
+Solstice.dll+2FA93E
+Solstice.dll+256A88
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Enabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-05-27 17:04:47
+An unhandled exception occurred. (0xC000001D)
+Stack Trace:
+Minecraft.Windows.exe+1B1AAB9
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Minecraft.Windows.exe+1B1AAB9
+Solstice.dll+23A4F4
+Minecraft.Windows.exe+DD6928
+Solstice.dll+23AA60
+Minecraft.Windows.exe+1B3CF20
+Minecraft.Windows.exe+1B3BF2C
+Minecraft.Windows.exe+1B5E682
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C51043
+Minecraft.Windows.exe+1B2935
+Minecraft.Windows.exe+1B07AE
+Minecraft.Windows.exe+157E45
+Minecraft.Windows.exe+EB977
+Minecraft.Windows.exe+EEA89
+twinapi.appcore.dll+65B1A BiGetCancellationTimeoutInMs
+twinapi.appcore.dll+1E6AF UnregisterAppStateChangeNotification
+shcore.dll+2BD19 Ordinal172
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Disabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Disabled
+Fly - Disabled
+Velocity - Disabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Disabled
+Speed - Disabled
+InventoryMove - Disabled
+SafeWalk - Disabled
+NoJumpDelay - Disabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Disabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Disabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Disabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Disabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Disabled
+ChestAura - Disabled
+NoRotate - Disabled
+FastEat - Disabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Disabled
+ItemUseDelayFix - Disabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Disabled
+Friends - Disabled
+NoPacket - Disabled
+NoFilter - Enabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Disabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Enabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Disabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Disabled
+ESP - Disabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Disabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Disabled
+ItemESP - Disabled
+ArmorHUD - Disabled
+Nametags - Disabled
+NoHurtcam - Disabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Disabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Disabled
+Kagune - Disabled
+Ambience - Disabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Disabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC000001D
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-05-28 01:46:19
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Minecraft.Windows.exe+CF846D
+Solstice.dll+296C2E
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Minecraft.Windows.exe+CF846D
+Solstice.dll+59CB67
+Solstice.dll+5D4D7B
+Solstice.dll+5CD5BE
+Solstice.dll+5D7AE5
+Solstice.dll+426304
+Solstice.dll+42D8E4
+Solstice.dll+42F166
+Solstice.dll+41CF5D
+Solstice.dll+3FB362
+Minecraft.Windows.exe+63A176
+Minecraft.Windows.exe+87EC57
+Minecraft.Windows.exe+1519376
+Minecraft.Windows.exe+1B5D2B
+Minecraft.Windows.exe+1B23FF
+Minecraft.Windows.exe+1B07AE
+Minecraft.Windows.exe+157E45
+Minecraft.Windows.exe+EB977
+Minecraft.Windows.exe+EEA89
+twinapi.appcore.dll+65B1A BiGetCancellationTimeoutInMs
+twinapi.appcore.dll+1E6AF UnregisterAppStateChangeNotification
+shcore.dll+2BD19 Ordinal172
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Enabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Enabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Enabled
+Notifications - Enabled
+HitColor - Enabled
+DestroyProgress - Enabled
+ESP - Disabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Disabled
+ArmorHUD - Enabled
+Nametags - Disabled
+NoHurtcam - Enabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-05-28 20:59:43
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+21B63E
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+21B63E
+Solstice.dll+217A98
+Solstice.dll+2F8A05
+Solstice.dll+30F8C9
+Solstice.dll+308A28
+Solstice.dll+2F85EE
+Solstice.dll+2FA93E
+Solstice.dll+256A88
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Disabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-05-29 00:11:44
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+2F89EB
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+2F89EB
+Solstice.dll+30F8C9
+Solstice.dll+308A28
+Solstice.dll+2F85EE
+Solstice.dll+2FA93E
+Solstice.dll+256A88
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Enabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Enabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-05-30 23:37:05
+An unhandled exception occurred. (0xC000001D)
+Stack Trace:
+Minecraft.Windows.exe+1B1AAB9
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Minecraft.Windows.exe+1B1AAB9
+Solstice.dll+23A4F4
+Minecraft.Windows.exe+DD6928
+Solstice.dll+23AA60
+Minecraft.Windows.exe+1B3CF20
+Minecraft.Windows.exe+1B3BF2C
+Minecraft.Windows.exe+1B5E682
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C51043
+Minecraft.Windows.exe+1B2935
+Minecraft.Windows.exe+1B07AE
+Minecraft.Windows.exe+157E45
+Minecraft.Windows.exe+EB977
+Minecraft.Windows.exe+EEA89
+twinapi.appcore.dll+65B1A BiGetCancellationTimeoutInMs
+twinapi.appcore.dll+1E6AF UnregisterAppStateChangeNotification
+shcore.dll+2BD19 Ordinal172
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Disabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Disabled
+Fly - Disabled
+Velocity - Disabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Disabled
+Speed - Disabled
+InventoryMove - Disabled
+SafeWalk - Disabled
+NoJumpDelay - Disabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Disabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Disabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Disabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Disabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Disabled
+ChestAura - Disabled
+NoRotate - Disabled
+FastEat - Disabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Disabled
+ItemUseDelayFix - Disabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Disabled
+Friends - Disabled
+NoPacket - Disabled
+NoFilter - Enabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Disabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Enabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Disabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Disabled
+ESP - Disabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Disabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Disabled
+ItemESP - Disabled
+ArmorHUD - Disabled
+Nametags - Disabled
+NoHurtcam - Disabled
+FullBright - Disabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Disabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Disabled
+Kagune - Disabled
+Ambience - Disabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Disabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC000001D
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-01 18:32:08
+An error occurred while initializing: Signature out of bounds!
+
+(FeatureManager not initialized)
+Exception Code: 0xFF00
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-01 18:32:28
+An error occurred while initializing: Signature out of bounds!
+
+(FeatureManager not initialized)
+Exception Code: 0xFF00
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-02 02:24:24
+An error occurred while initializing: Signature out of bounds!
+
+(FeatureManager not initialized)
+Exception Code: 0xFF00
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-02 02:43:08
+An error occurred while initializing: Signature out of bounds!
+
+(FeatureManager not initialized)
+Exception Code: 0xFF00
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-02 03:57:15
+An error occurred while initializing: Signature out of bounds!
+
+(FeatureManager not initialized)
+Exception Code: 0xFF00
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-02 04:00:59
+An error occurred while initializing: Signature out of bounds!
+
+(FeatureManager not initialized)
+Exception Code: 0xFF00
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-02 05:53:26
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+29B62B
+Solstice.dll+131608
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+29B62B
+Solstice.dll+29C044
+Solstice.dll+256A28
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Enabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Disabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Disabled
+ArmorHUD - Enabled
+Nametags - Disabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-04 15:23:18
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+96BE5B
+Solstice.dll+1315F8
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+96BE5B
+Solstice.dll+4BF2AE
+Solstice.dll+4C0471
+Solstice.dll+256A78
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Enabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Disabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Disabled
+ArmorHUD - Enabled
+Nametags - Disabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-04 19:46:37
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+21B62E
+Solstice.dll+1315F8
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+21B62E
+Solstice.dll+217A88
+Solstice.dll+2F89E5
+Solstice.dll+30F8A9
+Solstice.dll+308A08
+Solstice.dll+2F85CE
+Solstice.dll+2FA91E
+Solstice.dll+256A78
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-05 22:01:35
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+968A5B
+Solstice.dll+1315F8
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+968A5B
+Solstice.dll+1CE5AE
+Solstice.dll+4BF204
+Solstice.dll+4BFE74
+Solstice.dll+26C3A7
+Minecraft.Windows.exe+313F2EA
+Minecraft.Windows.exe+2E31BBA
+Minecraft.Windows.exe+C63C23
+Minecraft.Windows.exe+2DC31DA
+Minecraft.Windows.exe+3F82860
+Minecraft.Windows.exe+3FA8E35
+Minecraft.Windows.exe+3F82A9B
+Minecraft.Windows.exe+4150AC4
+Minecraft.Windows.exe+4B8017E
+Minecraft.Windows.exe+4B7F8FB
+Minecraft.Windows.exe+41276FE
+Minecraft.Windows.exe+339351C
+Minecraft.Windows.exe+3393234
+Minecraft.Windows.exe+329EB7B
+Minecraft.Windows.exe+DB1A3A
+Minecraft.Windows.exe+329E2F0
+Minecraft.Windows.exe+2E97F65
+Minecraft.Windows.exe+2E968E1
+Minecraft.Windows.exe+3A78F8
+Minecraft.Windows.exe+1B0CED
+Minecraft.Windows.exe+1EA5C0
+Minecraft.Windows.exe+1B0A3B
+Minecraft.Windows.exe+1B1F39
+Minecraft.Windows.exe+1B07AE
+Minecraft.Windows.exe+157E45
+Minecraft.Windows.exe+EB977
+Minecraft.Windows.exe+EEA89
+twinapi.appcore.dll+65B1A BiGetCancellationTimeoutInMs
+twinapi.appcore.dll+1E6AF UnregisterAppStateChangeNotification
+shcore.dll+2BD19 Ordinal172
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-05 23:23:13
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+21B62E
+Solstice.dll+1315F8
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+21B62E
+Solstice.dll+217A88
+Solstice.dll+2F89E5
+Solstice.dll+30F8A9
+Solstice.dll+308A08
+Solstice.dll+2F85CE
+Solstice.dll+2FA91E
+Solstice.dll+256A78
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Enabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Enabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Disabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-09 17:26:10
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+2F89CB
+Solstice.dll+1315F8
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+2F89CB
+Solstice.dll+30F8A9
+Solstice.dll+308A08
+Solstice.dll+2F85CE
+Solstice.dll+2FA91E
+Solstice.dll+256A78
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Disabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Disabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
+----------------- Crash at 2026-06-09 17:44:25
+An unhandled exception occurred. (0xC0000005)
+Stack Trace:
+Solstice.dll+21B62E
+Solstice.dll+1315F8
+KERNELBASE.dll+12C507 UnhandledExceptionFilter
+ntdll.dll+A58D8 memset
+ntdll.dll+8CE46 _C_specific_handler
+ntdll.dll+A296F _chkstk
+ntdll.dll+52554 RtlRaiseException
+ntdll.dll+A147E KiUserExceptionDispatcher
+Solstice.dll+21B62E
+Solstice.dll+217A88
+Solstice.dll+2F89E5
+Solstice.dll+30F8A9
+Solstice.dll+308A08
+Solstice.dll+2F85CE
+Solstice.dll+2FA91E
+Solstice.dll+256A78
+Minecraft.Windows.exe+4514D4B
+Minecraft.Windows.exe+44CA7CB
+Minecraft.Windows.exe+44CA28E
+Minecraft.Windows.exe+44C9E1C
+Minecraft.Windows.exe+441D96E
+Minecraft.Windows.exe+4C4FA5B
+Minecraft.Windows.exe+217411
+Minecraft.Windows.exe+4368EF2
+Minecraft.Windows.exe+435E312
+Minecraft.Windows.exe+4364852
+Minecraft.Windows.exe+4C58979
+Minecraft.Windows.exe+4C4F5D3
+Minecraft.Windows.exe+4C4F78D
+Minecraft.Windows.exe+4C5CD18
+ucrtbase.dll+21BB2 configthreadlocale
+KERNEL32.DLL+17374 BaseThreadInitThunk
+ntdll.dll+4CC91 RtlUserThreadStart
+
+
+HudEditor - Disabled
+Aura - Disabled
+TriggerBot - Disabled
+AutoClicker - Enabled
+Reach - Disabled
+Criticals - Disabled
+InfiniteAura - Disabled
+InfiniteChestAura - Disabled
+Aimbot - Disabled
+ArrowTP - Disabled
+PearlStopper - Disabled
+GhostMode - Disabled
+Hit Boxes - Enabled
+Fly - Disabled
+Velocity - Disabled
+NoSlowdown - Disabled
+AntiImmobile - Disabled
+Sprint - Enabled
+Speed - Disabled
+InventoryMove - Enabled
+SafeWalk - Disabled
+NoJumpDelay - Enabled
+Step - Disabled
+LongJump - Disabled
+Spider - Disabled
+ServerSneak - Disabled
+AutoSneak - Disabled
+AirJump - Enabled
+TargetStrafe - Disabled
+Jesus - Disabled
+ReverseStep - Disabled
+Jetpack - Disabled
+AutoPatrol - Disabled
+Timer - Disabled
+ChestStealer - Disabled
+InvManager - Disabled
+PlayerTracker - Disabled
+Regen - Disabled
+SchematicBuilder - Disabled
+NoClip - Disabled
+ContainerActions - Enabled
+RegionFill - Disabled
+OreMinerV2 - Disabled
+AutoArmor - Enabled
+Scaffold - Disabled
+Nuker - Disabled
+OreMiner - Disabled
+AutoTool - Disabled
+MidclickAction - Enabled
+Freecam - Disabled
+NoFall - Disabled
+Teams - Disabled
+AntiVoid - Disabled
+FastMine - Disabled
+ClickTp - Enabled
+ChestAura - Disabled
+NoRotate - Enabled
+FastEat - Enabled
+SpawnerAura - Disabled
+ChainTP - Disabled
+AutoLoot - Disabled
+Cage - Disabled
+ToggleSounds - Enabled
+PacketLogger - Disabled
+ArmorSlotUnlock - Disabled
+DeviceSpoof - Enabled
+ItemUseDelayFix - Enabled
+KickSounds - Disabled
+AntiBot - Enabled
+AntiCheatDetector - Disabled
+FakeChat - Enabled
+Friends - Enabled
+NoPacket - Disabled
+NoFilter - Disabled
+AutoMessage - Disabled
+Killsults - Disabled
+NetSkip - Disabled
+Disabler - Disabled
+StaffAlert - Disabled
+JavaInventoryHotkeys - Disabled
+Spammer - Disabled
+IRC - Disabled
+SkinStealer - Disabled
+AutoDodge - Disabled
+TestModule - Disabled
+SkinChanger - Disabled
+SpectatorDetector - Enabled
+PlayerLogger - Disabled
+ItemDupe - Disabled
+SkinSpoofer - Disabled
+Watermark - Disabled
+ClickGui - Disabled
+Interface - Enabled
+Arraylist - Enabled
+LevelInfo - Enabled
+PlayerHUD - Disabled
+InventoryHUD - Disabled
+Notifications - Enabled
+HitColor - Disabled
+DestroyProgress - Enabled
+ESP - Enabled
+BlockESP - Disabled
+MotionBlur - Disabled
+PlayerPositionOffset - Enabled
+Animations - Disabled
+NoCameraClip - Disabled
+RobloxCamera - Disabled
+TargetHUD - Enabled
+ItemESP - Enabled
+ArmorHUD - Enabled
+Nametags - Enabled
+NoHurtcam - Enabled
+FullBright - Enabled
+ViewModel - Disabled
+SessionInfo - Disabled
+ReachCounter - Disabled
+OpponentReach - Disabled
+VSync - Enabled
+Tracers - Disabled
+ChinaHat - Disabled
+NameProtect - Disabled
+Zoom - Disabled
+Glint - Disabled
+NoDebuff - Disabled
+Freelook - Disabled
+NoRender - Enabled
+Kagune - Disabled
+Ambience - Enabled
+AmbientCubes - Disabled
+EntityRadar - Disabled
+AfterImage - Disabled
+PathTracer - Disabled
+FakePlayer - Disabled
+CustomFog - Disabled
+PotionHUD - Enabled
+NearbyPlayers - Disabled
+EnemyIndicator - Disabled
+ProjectileTracer - Disabled
+DamageLog - Disabled
+HealthBar - Disabled
+TeamHealthBars - Disabled
+HealthDisplay - Disabled
+SkinBlinker - Disabled
+Anticheat - Disabled
+AutoPath - Disabled
+Goofy - Disabled
+Module count: 146
+Exception Code: 0xC0000005
+Solstice commit: 
+Solstice branch: 
+Solstice commit msg: 
+Minecraft version: 1.21.44.1
+----------------------------------------
