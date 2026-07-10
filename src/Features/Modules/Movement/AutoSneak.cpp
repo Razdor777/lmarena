@@ -6,21 +6,13 @@
 #include <Features/Events/RenderEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
+#include <SDK/Minecraft/Actor/ActorFlags.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
-
-// Экраны при которых клиентский sneak не нужно форсить
-// (игра всё равно сбросит его после нашего события)
-static bool isInUIScreen() {
-    auto screenName = ClientInstance::get()->getScreenName();
-    return screenName != "hud_screen";
-}
 
 void AutoSneak::onEnable()
 {
-    // ABSOLUTE_LAST — чтобы установить sneak ПОСЛЕ того как GUI/инвентарь его сбросит
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &AutoSneak::onBaseTickEvent, nes::event_priority::ABSOLUTE_LAST>(this);
     gFeatureManager->mDispatcher->listen<PacketOutEvent, &AutoSneak::onPacketOutEvent, nes::event_priority::ABSOLUTE_LAST>(this);
-    // RenderEvent вызывается каждый кадр, даже когда открыт чат/инвентарь
     gFeatureManager->mDispatcher->listen<RenderEvent, &AutoSneak::onRenderEvent>(this);
 }
 
@@ -33,11 +25,13 @@ void AutoSneak::onDisable()
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
 
-    auto moveInput = player->getMoveInputComponent();
-    if (moveInput) moveInput->mIsSneakDown = false;
+    if (auto moveInput = player->getMoveInputComponent())
+        moveInput->mIsSneakDown = false;
 
-    auto rawInput = player->getRawMoveInputComponent();
-    if (rawInput) rawInput->mIsSneakDown = false;
+    if (auto rawInput = player->getRawMoveInputComponent())
+        rawInput->mIsSneakDown = false;
+
+    try { player->setStatusFlag(ActorFlags::Sneaking, false); } catch (...) {}
 }
 
 void AutoSneak::forceSneak()
@@ -45,44 +39,38 @@ void AutoSneak::forceSneak()
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
 
-    auto moveInput = player->getMoveInputComponent();
-    if (moveInput) moveInput->mIsSneakDown = true;
+    // Клиентская сторона (визуал у себя)
+    if (auto moveInput = player->getMoveInputComponent())
+        moveInput->mIsSneakDown = true;
 
-    auto rawInput = player->getRawMoveInputComponent();
-    if (rawInput) rawInput->mIsSneakDown = true;
+    if (auto rawInput = player->getRawMoveInputComponent())
+        rawInput->mIsSneakDown = true;
+
+    try { player->setStatusFlag(ActorFlags::Sneaking, true); } catch (...) {}
 }
 
 void AutoSneak::onBaseTickEvent(BaseTickEvent& event)
 {
-    // Клиентский sneak только в hud_screen.
-    // В чате/инвентаре игра принудительно сбрасывает mIsSneakDown после наших событий,
-    // поэтому просто не трогаем — серверная сторона (пакет) всё равно работает.
-    if (!isInUIScreen())
-        forceSneak();
+    forceSneak();
 }
 
 void AutoSneak::onRenderEvent(RenderEvent& event)
 {
-    if (!isInUIScreen())
-        forceSneak();
+    forceSneak();
 }
 
 void AutoSneak::onPacketOutEvent(PacketOutEvent& event)
 {
-    // Серверная сторона работает ВСЕГДА (в том числе в чате и инвентаре),
-    // потому что пакеты PlayerAuthInput отправляются независимо от UI-экрана.
-    if (!mServerSide.mValue) return;
+    if (event.mPacket->getId() != PacketID::PlayerAuthInput)
+        return;
 
-    if (event.mPacket->getId() == PacketID::PlayerAuthInput)
-    {
-        auto paip = event.getPacket<PlayerAuthInputPacket>();
-        if (!paip) return;
+    auto paip = event.getPacket<PlayerAuthInputPacket>();
+    if (!paip) return;
 
-        paip->mInputData |= AuthInputAction::SNEAK_DOWN
-                          | AuthInputAction::SNEAKING
-                          | AuthInputAction::START_SNEAKING;
+    // Всегда форсим серверный сник (независимо от mServerSide)
+    paip->mInputData |= AuthInputAction::SNEAK_DOWN
+                     | AuthInputAction::SNEAKING
+                     | AuthInputAction::START_SNEAKING;
 
-        // Убираем флаг остановки приседа — на случай если игра его выставила
-        paip->mInputData &= ~AuthInputAction::STOP_SNEAKING;
-    }
+    paip->mInputData &= ~AuthInputAction::STOP_SNEAKING;
 }

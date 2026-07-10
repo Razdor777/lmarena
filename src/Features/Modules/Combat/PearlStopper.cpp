@@ -223,10 +223,12 @@ std::vector<glm::vec3> PearlStopper::simulateTrajectory(glm::vec3 pos, glm::vec3
     path.push_back(p); // traj[0] = текущая позиция пёрлы
 
     for (int t = 0; t < MAX_SIM_TICKS; ++t) {
-        // Bedrock physics per tick
-        v   *= DRAG;
+        // Improved simulation order (fixes inconsistent tracer when throwing high / looking up)
+        // Move first with current velocity, then apply drag+gravity.
+        // This gives more accurate upward arcs for high vertical throws.
+        p += v;
+        v *= DRAG;
         v.y -= GRAVITY;
-        p   += v;
 
         path.push_back(p);
 
