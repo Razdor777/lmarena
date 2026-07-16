@@ -1,5 +1,10 @@
 #include "InfiniteChestAura.hpp"
 
+#include <SDK/Minecraft/Inventory/Item.hpp>
+#include <SDK/Minecraft/Inventory/ItemStack.hpp>
+#include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
+#include <Utils/MemUtils.hpp>
+
 #include <Features/FeatureManager.hpp>
 #include <Features/Modules/Player/ChestStealer.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
@@ -503,6 +508,45 @@ void InfiniteChestAura::onBaseTickEvent(BaseTickEvent& event)
 {
     auto player = event.mActor;
     if (!player) return;
+
+    // === Auto Eat ===
+    if (mAutoEat.mValue) {
+        auto supplies = player->getSupplies();
+        auto container = supplies ? supplies->getContainer() : nullptr;
+        const bool hungry = player->getHunger() < 20.f;
+        if (hungry && container) {
+            int foodSlot = -1;
+            for (int i = 0; i < 9; ++i) {
+                auto stack = container->getItem(i);
+                if (!stack || !stack->mItem || !stack->getItem()) continue;
+                if (MemUtils::callVirtualFunc<bool>(8, stack->getItem())) {
+                    foodSlot = i;
+                    break;
+                }
+            }
+            if (foodSlot != -1) {
+                if (!mWasAutoEating) mSlotBeforeEating = supplies->mSelectedSlot;
+                supplies->mSelectedSlot = foodSlot;
+                player->getGameMode()->baseUseItem(container->getItem(foodSlot));
+                mWasAutoEating = true;
+                return; // Do not teleport/open containers while using food.
+            }
+        }
+        if (mWasAutoEating && supplies) {
+            if (mSlotBeforeEating >= 0 && mSlotBeforeEating < 9)
+                supplies->mSelectedSlot = mSlotBeforeEating;
+            mWasAutoEating = false;
+            mSlotBeforeEating = -1;
+        }
+    }
+
+    if (!mAutoEat.mValue && mWasAutoEating) {
+        auto supplies = player->getSupplies();
+        if (supplies && mSlotBeforeEating >= 0 && mSlotBeforeEating < 9)
+            supplies->mSelectedSlot = mSlotBeforeEating;
+        mWasAutoEating = false;
+        mSlotBeforeEating = -1;
+    }
 
     // === Handle utility buttons ===
     if (mClearMemory.mValue) {

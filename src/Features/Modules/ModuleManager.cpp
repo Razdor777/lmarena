@@ -31,7 +31,6 @@
 #include "Misc/Disabler.hpp"
 #include "Misc/FakeChat.hpp"
 #include "Misc/Friends.hpp"
-#include "Misc/IRC.hpp"
 #include "Misc/ItemDupe.hpp"
 #include "Misc/ItemUseDelayFix.hpp"
 #include "Misc/JavaInventoryHotkeys.hpp"
@@ -256,7 +255,6 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<StaffAlert>());
   mModules.emplace_back(std::make_shared<JavaInventoryHotkeys>());
   mModules.emplace_back(std::make_shared<Spammer>());
-  mModules.emplace_back(std::make_shared<IRC>());
   mModules.emplace_back(std::make_shared<SkinStealer>());
   mModules.emplace_back(std::make_shared<AutoDodge>());
   mModules.emplace_back(std::make_shared<TestModule>());

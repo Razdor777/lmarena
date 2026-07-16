@@ -274,9 +274,6 @@ bool InfiniteAura::isLockedTargetValid() {
 
   if (!isActorSafeToUse(locked)) return false;
 
-  if (locked->isDead()) return false;
-  if (locked->getHealth() <= 0.f) return false;
-
   if (!isValidTarget(locked, player)) return false;
 
   if (mAutoUnlock.mValue && !mInfiniteRange.mValue) {
@@ -300,7 +297,6 @@ Actor *InfiniteAura::findActorByLockedName() {
   for (auto actor : actors) {
     if (!isActorSafeToUse(actor)) continue;
     if (actor == player) continue;
-    if (actor->isDead()) continue;
 
     try {
       if (actor->getRawName() == mLockedTargetName) return actor;
@@ -552,11 +548,10 @@ bool InfiniteAura::isValidTarget(Actor *actor, Actor *player) {
   if (!actor || !player) return false;
   if (actor == player) return false;
   if (!isActorSafeToUse(actor)) return false;
-  if (actor->isDead()) return false;
-
-  float hp = 0.f;
-  try { hp = actor->getHealth(); } catch (...) { return false; }
-  if (hp <= 0.f) return false;
+  // Match Nametags: the live player registry/components are authoritative.
+  // isDead()/health can remain stale for remotely streamed players.
+  if (!actor->isPlayer()) return false;
+  if (!actor->getAABBShapeComponent() || !actor->getRenderPositionComponent()) return false;
 
   if (!mInfiniteRange.mValue) {
     try { if (actor->distanceTo(player) > mRange.mValue) return false; } catch (...) { return false; }
@@ -705,7 +700,6 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
 
   for (auto actor : actors) {
     if (!isActorSafeToUse(actor)) continue;
-    if (actor->isDead()) continue;
 
     float hp = 0.f;
     try { hp = actor->getHealth(); } catch (...) { continue; }

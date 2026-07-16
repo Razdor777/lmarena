@@ -40,6 +40,10 @@ std::vector<int> OreMinerV2::getEnabledBlockIds() {
     ids.push_back(DIAMOND_ORE_ID);
     ids.push_back(DEEPSLATE_DIAMOND_ORE_ID);
   }
+  if (mEmerald.mValue) {
+    ids.push_back(EMERALD_ORE_ID);
+    ids.push_back(DEEPSLATE_EMERALD_ORE_ID);
+  }
   return ids;
 }
 
@@ -642,16 +646,32 @@ bool OreMinerV2::checkForFakeDrop(
         "netherrack", "end_stone", "deepslate"
     };
 
-    for (auto &fake : fakes) {
-        for (auto &[name, cnt] : after) {
+    // Prefer a confirmed ore drop over incidental garbage pickup. This avoids
+    // blacklisting a real cluster when inventory changes happen in one window.
+    std::string expectedDrop;
+    OreType type = getOreType(expectedOreId);
+    if (type == OreType::Diamond) expectedDrop = "diamond";
+    else if (type == OreType::Coal) expectedDrop = "coal";
+    else if (type == OreType::Emerald) expectedDrop = "emerald";
+
+    if (!expectedDrop.empty()) {
+        for (const auto &[name, cnt] : after) {
+            std::string ln = name;
+            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
+            if (ln.find(expectedDrop) == std::string::npos) continue;
+            auto it = before.find(name);
+            const int prev = it == before.end() ? 0 : it->second;
+            if (cnt > prev) return false;
+        }
+    }
+
+    for (const auto &fake : fakes) {
+        for (const auto &[name, cnt] : after) {
             std::string ln = name;
             std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
             if (ln.find(fake) == std::string::npos) continue;
-
-            int prev = 0;
             auto it = before.find(name);
-            if (it != before.end()) prev = it->second;
-
+            const int prev = it == before.end() ? 0 : it->second;
             if (cnt > prev) {
                 spdlog::warn("[OreMinerV2] FAKE! Got garbage '{}' ({} -> {})", name, prev, cnt);
                 return true;
@@ -661,11 +681,6 @@ bool OreMinerV2::checkForFakeDrop(
 
     // 2. Ghost-block check: если сервер просто стёр блок и не дал дропа,
     //    ожидаемой руды в инвентаре не прибавится.
-    std::string expectedDrop;
-    OreType type = getOreType(expectedOreId);
-    if (type == OreType::Diamond) expectedDrop = "diamond";
-    else if (type == OreType::Coal) expectedDrop = "coal";
-
     if (!expectedDrop.empty()) {
         bool gotIt = false;
         for (auto &[name, cnt] : after) {

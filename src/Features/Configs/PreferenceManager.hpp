@@ -10,7 +10,6 @@ struct Preferences
     std::vector<std::string> mFriends;
     bool mFallbackToD3D11 = false;
     bool mEnforceDebugging = false;
-    std::string mIrcName = "";
     std::string mStreamerName = "discord.gg/stretch";
 };
 
