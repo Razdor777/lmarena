@@ -1,7 +1,6 @@
 #include "Nametags.hpp"
 
 #include <Features/Events/NametagRenderEvent.hpp>
-#include <Features/IRC/IrcClient.hpp>
 #include <Features/Modules/Misc/Friends.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Options.hpp>
@@ -296,20 +295,6 @@ void Nametags::updatePlayerCache()
                 info.displayName = ColorUtils::removeColorCodes(info.displayName);
         } catch (...) {
             info.displayName = "???";
-        }
-
-        if (mShowIrcUsers.mValue && IrcManager::mClient) {
-            try {
-                for (const auto& user : IrcManager::mClient->getConnectedUsers()) {
-                    std::string cn = mCleanNames.mValue
-                        ? cleanPlayerName(user.playerName)
-                        : user.playerName;
-                    if (info.displayName.contains(cn) || cn.contains(info.displayName)) {
-                        info.displayName = user.username + " (" + info.displayName + ")";
-                        break;
-                    }
-                }
-            } catch (...) {}
         }
 
         try {

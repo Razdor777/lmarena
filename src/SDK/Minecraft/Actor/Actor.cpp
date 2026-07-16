@@ -389,6 +389,13 @@ float Actor::getHealth()
     return health->mCurrentValue;
 }
 
+float Actor::getHunger()
+{
+    auto hunger = getAttribute(PlayerHunger);
+    if (!hunger) return 20.f;
+    return hunger->mCurrentValue;
+}
+
 float Actor::getAbsorption()
 {
     auto absorption = getAttribute(Absorption);

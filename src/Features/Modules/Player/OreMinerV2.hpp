@@ -43,6 +43,7 @@ public:
   // === Ore toggles ===
   BoolSetting mCoal = BoolSetting("Coal", "Mine coal ore", true);
   BoolSetting mDiamond = BoolSetting("Diamond", "Mine diamond ore", true);
+  BoolSetting mEmerald = BoolSetting("Emerald", "Mine emerald ore", true);
 
   // === Render settings ===
   BoolSetting mDrawBlocks =
@@ -56,12 +57,12 @@ public:
   OreMinerV2()
       : ModuleBase(
             "OreMinerV2",
-            "Mine coal / diamond ores with infinite reach, auto-skip fakes",
+            "Mine coal / diamond / emerald ores with infinite reach, auto-skip fakes",
             ModuleCategory::Player, 0, false) {
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
                 &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
                 &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
-                &mDiamond, &mDrawBlocks, &mDrawPath, &mDrawTarget,
+                &mDiamond, &mEmerald, &mDrawBlocks, &mDrawPath, &mDrawTarget,
                 &mDrawCluster);
 
     mNames = {{Lowercase, "oreminerv2"},
@@ -77,14 +78,18 @@ public:
   static constexpr int DEEPSLATE_COAL_ORE_ID = 661;
   static constexpr int DIAMOND_ORE_ID = 56;
   static constexpr int DEEPSLATE_DIAMOND_ORE_ID = 660;
+  static constexpr int EMERALD_ORE_ID = 129;
+  static constexpr int DEEPSLATE_EMERALD_ORE_ID = 662;
 
-  enum class OreType { None, Coal, Diamond };
+  enum class OreType { None, Coal, Diamond, Emerald };
 
   static OreType getOreType(int id) {
     if (id == COAL_ORE_ID || id == DEEPSLATE_COAL_ORE_ID)
       return OreType::Coal;
     if (id == DIAMOND_ORE_ID || id == DEEPSLATE_DIAMOND_ORE_ID)
       return OreType::Diamond;
+    if (id == EMERALD_ORE_ID || id == DEEPSLATE_EMERALD_ORE_ID)
+      return OreType::Emerald;
     return OreType::None;
   }
 
@@ -100,6 +105,7 @@ public:
       hi = 24;
       break;
     case OreType::Diamond:
+    case OreType::Emerald:
       lo = 3;
       hi = 9;
       break;
@@ -116,6 +122,8 @@ public:
       return ImColor(0.35f, 0.35f, 0.35f, 1.f);
     case OreType::Diamond:
       return ImColor(0.f, 1.f, 1.f, 1.f);
+    case OreType::Emerald:
+      return ImColor(0.1f, 1.f, 0.25f, 1.f);
     default:
       return ImColor(1.f, 1.f, 1.f, 1.f);
     }

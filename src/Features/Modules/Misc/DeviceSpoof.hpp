@@ -7,7 +7,7 @@
 class DeviceSpoof : public ModuleBase<DeviceSpoof>
 {
 public:
-    DeviceSpoof() : ModuleBase("DeviceSpoof", "Spoofs all ur ids", ModuleCategory::Misc, 0, false)
+    DeviceSpoof() : ModuleBase("DeviceSpoof", "Spoofs all ur ids", ModuleCategory::Misc, 0, true)
     {
         // Enable by default so fresh configs always have spoofing active
         mEnabled = true;

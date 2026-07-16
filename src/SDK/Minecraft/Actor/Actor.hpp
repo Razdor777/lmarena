@@ -186,6 +186,7 @@ public:
     AttributesComponent* getAttributesComponent();
     float getMaxHealth();
     float getHealth();
+    float getHunger();
     float getAbsorption();
     float getMaxAbsorption();
     AttributeInstance* getAttribute(AttributeId id);

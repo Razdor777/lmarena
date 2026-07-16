@@ -6,7 +6,6 @@
 
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <magic_enum.hpp>
-#include <Features/IRC/WorkingVM.hpp>
 #include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 
 void TestCommand::execute(const std::vector<std::string>& args)
