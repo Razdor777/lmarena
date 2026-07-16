@@ -144,6 +144,7 @@
 #include "Visual/NearbyPlayers.hpp"
 #include "Visual/NoCameraClip.hpp"
 #include "Visual/NoDebuff.hpp"
+#include "Visual/CustomCrosshair.hpp"
 #include "Visual/NoHurtcam.hpp"
 #include "Visual/NoRender.hpp"
 #include "Visual/Notifications.hpp"
@@ -287,6 +288,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ItemESP>());
   mModules.emplace_back(std::make_shared<ArmorHUD>());
   mModules.emplace_back(std::make_shared<Nametags>());
+  mModules.emplace_back(std::make_shared<CustomCrosshair>());
   mModules.emplace_back(std::make_shared<NoHurtcam>());
   mModules.emplace_back(std::make_shared<FullBright>());
   mModules.emplace_back(std::make_shared<ViewModel>());

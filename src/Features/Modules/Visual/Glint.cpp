@@ -1,28 +1,50 @@
-//
-// Created by vastrakai on 10/19/2024.
-//
-
 #include "Glint.hpp"
+#include <SDK/SigManager.hpp>
+#include <Features/Modules/ModuleManager.hpp>
 
-#include <Features/Events/RenderItemInHandDescriptionEvent.hpp>
-#include <Hook/Hooks/RenderHooks/RenderItemInHandHook.hpp>
+struct RefCountBlock {
+    void* vtable;
+    uint32_t ref1;
+    uint32_t ref2;
+};
 
+static uint8_t fake_glint_data[16] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static RefCountBlock fake_refcount = { nullptr, 9999, 9999 };
 
-void Glint::onEnable()
-{
-    gFeatureManager->mDispatcher->listen<RenderItemInHandDescriptionEvent, &Glint::onRenderItemInHandDescriptionEvent>(this);
+Glint::Glint() : ModuleBase("Glint", "Forces the enchantment glint on all items", ModuleCategory::Visual, 0, false) {
+    instance = this;
+    addSettings(&mRainbow, &mColor, &mAlpha);
 }
 
-void Glint::onDisable()
-{
-    gFeatureManager->mDispatcher->deafen<RenderItemInHandDescriptionEvent, &Glint::onRenderItemInHandDescriptionEvent>(this);
+__int64 __fastcall Glint::onGetGlintComponent(__int64 a1, __int64 a2, void* a3) {
+    auto original = mDetour->getOriginal<&onGetGlintComponent>();
+    if (!original) return 0;
+
+    __int64 result = original(a1, a2, a3);
+
+    if (Glint::instance && Glint::instance->mEnabled) {
+        if (*(void**)a1 == nullptr) {
+            *(void**)a1 = &fake_glint_data;
+            *(RefCountBlock**)(a1 + 8) = &fake_refcount;
+        }
+    }
+
+    return result;
 }
 
-void Glint::onRenderItemInHandDescriptionEvent(RenderItemInHandDescriptionEvent& event)
-{
-    float sat = mSaturation.mValue;
+void Glint::onEnable() {
+    uintptr_t addr = SigManager::GlintComponentGetter;
+    if (addr) {
+        mDetour = std::make_unique<Detour>("GlintComponentGetter", reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&onGetGlintComponent));
+        mDetour->enable();
+    }
+    Module::onEnable();
+}
 
-    ImColor color = ColorUtils::getThemedColor(0);
-    event.mThis->mGlintColor = glm::vec3(color.Value.x * sat, color.Value.y * sat, color.Value.z * sat);
-    event.mThis->mGlintAlpha = 1.f;
+void Glint::onDisable() {
+    if (mDetour) {
+        mDetour->restore();
+        mDetour.reset();
+    }
+    Module::onDisable();
 }

@@ -1,27 +1,23 @@
 #pragma once
-//
-// Created by vastrakai on 10/19/2024.
-//
+#include <Features/Modules/Module.hpp>
+#include <glm/glm.hpp>
+#include <Hook/Detour.hpp>
 
-
-class Glint : public ModuleBase<Glint>
-{
+class Glint : public ModuleBase<Glint> {
 public:
-    NumberSetting mSaturation = NumberSetting("Saturation", "The saturation of the glint", 1, 0, 1, 0.01f);
+    Glint();
 
-    Glint() : ModuleBase("Glint", "Makes the glint on items more visible", ModuleCategory::Visual, 0, false) {
-        addSetting(&mSaturation);
+    static inline Glint* instance = nullptr;
+    static inline std::unique_ptr<Detour> mDetour = nullptr;
 
-        mNames = {
-            {Lowercase, "glint"},
-            {LowercaseSpaced, "glint"},
-            {Normal, "Glint"},
-            {NormalSpaced, "Glint"}
-        };
+    // Настройки — используем реальные классы из Setting.hpp
+    BoolSetting mRainbow   = BoolSetting("Rainbow", "Rainbow glint color", false);
+    ColorSetting mColor    = ColorSetting("Color", "Glint color", 1.0f, 0.0f, 0.0f, 1.0f);
+    NumberSetting mAlpha   = NumberSetting("Alpha", "Glint alpha", 1.0f, 0.0f, 1.0f, 0.01f);
 
-    }
+    using GlintGetFunc = __int64(__fastcall*)(__int64 a1, __int64 a2, void* a3);
+    static __int64 __fastcall onGetGlintComponent(__int64 a1, __int64 a2, void* a3);
 
     void onEnable() override;
     void onDisable() override;
-    void onRenderItemInHandDescriptionEvent(class RenderItemInHandDescriptionEvent& event);
 };

@@ -1,11 +1,18 @@
 #include "AutoArmor.hpp"
 
+#include <algorithm>
+
 #include <Features/FeatureManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
 #include <SDK/Minecraft/Inventory/Item.hpp>
 #include <SDK/Minecraft/Inventory/ItemStack.hpp>
+#include <SDK/Minecraft/Inventory/SimpleContainer.hpp>
+#include <SDK/Minecraft/Inventory/NetworkItemStackDescriptor.hpp>
+#include <SDK/Minecraft/Network/MinecraftPackets.hpp>
+#include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
+#include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <Utils/GameUtils/ItemUtils.hpp>
 #include <Utils/MiscUtils/NotifyUtils.hpp>
 
@@ -160,6 +167,88 @@ int AutoArmor::findBestArmor(int armorSlot, bool ignoreDurability)
 }
 
 // =========================================================
+// OFFHAND HELPERS
+// =========================================================
+
+static bool nameContains(ItemStack* stack, const std::string& sub)
+{
+    if (!stack || !stack->mItem) return false;
+    std::string name = stack->getItem()->mName;
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    return name.find(sub) != std::string::npos;
+}
+
+int AutoArmor::findTotem()
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return -1;
+    auto supplies = player->getSupplies();
+    if (!supplies) return -1;
+    auto container = supplies->getContainer();
+    if (!container) return -1;
+
+    for (int i = 0; i < 36; i++)
+    {
+        auto item = container->getItem(i);
+        if (nameContains(item, "totem")) return i;
+    }
+    return -1;
+}
+
+int AutoArmor::findShield()
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return -1;
+    auto supplies = player->getSupplies();
+    if (!supplies) return -1;
+    auto container = supplies->getContainer();
+    if (!container) return -1;
+
+    for (int i = 0; i < 36; i++)
+    {
+        auto item = container->getItem(i);
+        if (nameContains(item, "shield")) return i;
+    }
+    return -1;
+}
+
+void AutoArmor::equipOffhand(int inventorySlot)
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+    auto supplies = player->getSupplies();
+    if (!supplies) return;
+    auto inventory = supplies->getContainer();
+    if (!inventory) return;
+
+    auto* offhandContainer = player->getOffhandContainer();
+    if (!offhandContainer) return;
+
+    ItemStack* srcItem = inventory->getItem(inventorySlot);
+    if (!srcItem || !srcItem->mItem) return;
+
+    ItemStack* dstItem = offhandContainer->getItem(0);
+    static ItemStack emptyStack = ItemStack();
+    if (!dstItem) dstItem = &emptyStack;
+
+    InventoryAction action1(inventorySlot, srcItem, dstItem);
+    action1.mSource.mType        = InventorySourceType::ContainerInventory;
+    action1.mSource.mContainerId = static_cast<char>(ContainerID::Inventory);
+
+    InventoryAction action2(0, dstItem, srcItem);
+    action2.mSource.mType        = InventorySourceType::ContainerInventory;
+    action2.mSource.mContainerId = static_cast<char>(ContainerID::Offhand);
+
+    auto pkt = MinecraftPackets::createPacket<InventoryTransactionPacket>();
+    auto cit = std::make_unique<ComplexInventoryTransaction>();
+    cit->data.addAction(action1);
+    cit->data.addAction(action2);
+    pkt->mTransaction = std::move(cit);
+
+    ClientInstance::get()->getPacketSender()->sendToServer(pkt.get());
+}
+
+// =========================================================
 // MAIN TICK
 // =========================================================
 void AutoArmor::onBaseTickEvent(BaseTickEvent& event)
@@ -294,6 +383,40 @@ void AutoArmor::onBaseTickEvent(BaseTickEvent& event)
                 container->dropSlot(i);
                 mLastAction = NOW;
 
+                if (!mInstant.mValue) return;
+            }
+        }
+    }
+
+    // -------------------------------------------------------
+    // OFFHAND — Totem / Shield
+    // -------------------------------------------------------
+    if (mAutoTotem.mValue || mAutoShield.mValue)
+    {
+        auto* offhandContainer = player->getOffhandContainer();
+        if (offhandContainer)
+        {
+            auto* offhandItem = offhandContainer->getItem(0);
+            bool hasTotem  = nameContains(offhandItem, "totem");
+            bool hasShield = nameContains(offhandItem, "shield");
+
+            int invSlot = -1;
+
+            // Приоритет: Totem > Shield
+            if (mAutoTotem.mValue && !hasTotem)
+            {
+                invSlot = findTotem();
+            }
+
+            if (invSlot == -1 && mAutoShield.mValue && !hasShield)
+            {
+                invSlot = findShield();
+            }
+
+            if (invSlot != -1)
+            {
+                equipOffhand(invSlot);
+                mLastAction = NOW;
                 if (!mInstant.mValue) return;
             }
         }

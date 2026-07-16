@@ -15,13 +15,14 @@ public:
                                        2.f, 0.f, 20.f, 1.f);
   NumberSetting mStepDistance = NumberSetting(
       "Step Distance", "Blocks per TP step", 8.f, 1.f, 12.f, 0.5f);
-  NumberSetting mVerifyWait = NumberSetting(
-      "Verify Wait", "Ticks to wait for drop check", 5.f, 2.f, 15.f, 1.f);
   BoolSetting mSilentAccept =
       BoolSetting("Silent Accept", "Prevent rubber banding", true);
   BoolSetting mSwing = BoolSetting("Swing", "Swing animation", true);
   BoolSetting mVeinMiner =
       BoolSetting("Vein Miner", "Mine all connected ores of same type", false);
+
+  // === Follow mode (TP to cluster and stay there) ===
+  BoolSetting mFollow = BoolSetting("Follow", "Teleport to clusters and mine continuously without returning", false);
 
   // === Quick TP (keybind to TP forward) ===
   NumberSetting mQuickTPDist = NumberSetting(
@@ -57,8 +58,8 @@ public:
             "OreMinerV2",
             "Mine coal / diamond ores with infinite reach, auto-skip fakes",
             ModuleCategory::Player, 0, false) {
-    addSettings(&mSpeed, &mStepDistance, &mVerifyWait, &mSilentAccept, &mSwing,
-                &mVeinMiner, &mQuickTPDist, &mQuickTPKey, &mRadius,
+    addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
+                &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
                 &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
                 &mDiamond, &mDrawBlocks, &mDrawPath, &mDrawTarget,
                 &mDrawCluster);
@@ -146,17 +147,25 @@ public:
   // =====================================================
   // Mining state machine
   // =====================================================
-  enum class MineState { Idle, Verifying, Mining };
+  enum class MineState { Idle, Mining };
 
   MineState mState = MineState::Idle;
   glm::vec3 mRots = {0, 0, 0};
+
+  // В секции Mining state machine (после glm::vec3 mRots):
+  int mCurrentClusterOreId = 0;
+
+  // Сигнатуру checkForFakeDrop замени на:
+  bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
+                        const std::unordered_map<std::string, int> &after,
+                        int expectedOreId);
 
   std::vector<BlockPos> mCurrentCluster;
   int mCurrentClusterIdx = 0;
   BlockPos mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
 
-  int mVerifyTicksLeft = 0;
   std::unordered_map<std::string, int> mPreSnapshot;
+  bool mNeedFirstVerify = false;
 
   int mTickDelay = 0;
   int mBlocksMined = 0;
@@ -172,7 +181,7 @@ public:
   // Quick TP key state
   bool mQuickTPKeyWasDown = false;
 
-  // ← ДОБАВЛЕНО: Key binding state
+  // Key binding state
   bool mIsBindingKey = false;
   bool mBindWaitRelease = false;
 
@@ -212,7 +221,7 @@ public:
   bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
                         const std::unordered_map<std::string, int> &after);
 
-  // ← ДОБАВЛЕНО: Key helpers
+  // Key helpers
   static const char *getKeyName(int vk);
   static bool sIsAnyKeyHeld();
   static int sFindHeldKey();
@@ -231,9 +240,6 @@ public:
     switch (mState) {
     case MineState::Idle:
       s = "Idle";
-      break;
-    case MineState::Verifying:
-      s = "Verify";
       break;
     case MineState::Mining:
       s = std::to_string(mCurrentClusterIdx) + "/" +

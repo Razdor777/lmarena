@@ -461,7 +461,7 @@ void OreMinerV2::onEnable() {
   mCurrentCluster.clear();
   mCurrentClusterIdx = 0;
   mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
-  mVerifyTicksLeft = 0;
+  mNeedFirstVerify = false;
   mTickDelay = 0;
   mBlocksMined = 0;
   mFakeClusters = 0;
@@ -621,64 +621,97 @@ std::unordered_map<std::string, int> OreMinerV2::getInventorySnapshot() {
     auto item = container->getItem(i);
     if (!item || !item->mItem)
       continue;
-    snap[item->getItem()->getmName()] += item->mCount;
+    snap[item->getItem()->mName] += item->mCount;
   }
   return snap;
 }
 
 // =============================================================
-// FAKE DROP CHECK
+// FAKE DROP CHECK — case-insensitive + expected drop check
 // =============================================================
 
 bool OreMinerV2::checkForFakeDrop(
     const std::unordered_map<std::string, int> &before,
-    const std::unordered_map<std::string, int> &after) {
-  static const std::vector<std::string> fakes = {
-      "cobblestone", "cobbled_deepslate", "stone", "deepslate"};
+    const std::unordered_map<std::string, int> &after,
+    int expectedOreId)
+{
+    // 1. Прирост мусора (булыжник, камень, земля, гравий, etc.)
+    static const std::vector<std::string> fakes = {
+        "cobblestone", "cobbled_deepslate", "stone", "dirt", "grass",
+        "gravel", "andesite", "granite", "diorite", "tuff",
+        "netherrack", "end_stone", "deepslate"
+    };
 
-  for (auto &fake : fakes) {
-    for (auto &[name, cnt] : after) {
-      if (name.find(fake) == std::string::npos)
-        continue;
-      int prev = 0;
-      auto it = before.find(name);
-      if (it != before.end())
-        prev = it->second;
-      if (cnt > prev) {
-        spdlog::warn("[OreMinerV2] FAKE! Got {} ({} -> {})", name, prev, cnt);
-        return true;
-      }
+    for (auto &fake : fakes) {
+        for (auto &[name, cnt] : after) {
+            std::string ln = name;
+            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
+            if (ln.find(fake) == std::string::npos) continue;
+
+            int prev = 0;
+            auto it = before.find(name);
+            if (it != before.end()) prev = it->second;
+
+            if (cnt > prev) {
+                spdlog::warn("[OreMinerV2] FAKE! Got garbage '{}' ({} -> {})", name, prev, cnt);
+                return true;
+            }
+        }
     }
-  }
-  return false;
+
+    // 2. Ghost-block check: если сервер просто стёр блок и не дал дропа,
+    //    ожидаемой руды в инвентаре не прибавится.
+    std::string expectedDrop;
+    OreType type = getOreType(expectedOreId);
+    if (type == OreType::Diamond) expectedDrop = "diamond";
+    else if (type == OreType::Coal) expectedDrop = "coal";
+
+    if (!expectedDrop.empty()) {
+        bool gotIt = false;
+        for (auto &[name, cnt] : after) {
+            std::string ln = name;
+            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
+            if (ln.find(expectedDrop) == std::string::npos) continue;
+
+            int prev = 0;
+            auto it = before.find(name);
+            if (it != before.end()) prev = it->second;
+
+            if (cnt > prev) {
+                gotIt = true;
+                break;
+            }
+        }
+
+        if (!gotIt) {
+            spdlog::warn("[OreMinerV2] FAKE! No '{}' drop received for ore id {}", expectedDrop, expectedOreId);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // =============================================================
-// MINE BLOCK — chain TP → destroy → chain TP back
+// MINE BLOCK — chain TP → destroy → chain TP back (optional)
 // =============================================================
 
 void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
   auto sender = ClientInstance::get()->getPacketSender();
-  if (!sender)
-    return;
+  if (!sender) return;
   auto source = ClientInstance::get()->getBlockSource();
-  if (!source)
-    return;
+  if (!source) return;
 
   Block *block = source->getBlock(pos);
-  if (!block || block->mLegacy->isAir())
-    return;
+  if (!block || block->mLegacy->isAir()) return;
 
   int face = BlockUtils::getExposedFace(pos);
-  if (face == -1)
-    face = 1;
+  if (face == -1) face = 1;
 
   auto supplies = player->getSupplies();
-  if (!supplies)
-    return;
+  if (!supplies) return;
   auto container = supplies->getContainer();
-  if (!container)
-    return;
+  if (!container) return;
 
   int bestTool = ItemUtils::getBestBreakingTool(block, true);
   int oldSlot = supplies->mSelectedSlot;
@@ -695,8 +728,7 @@ void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
   }
 
   // 3) Swing
-  if (mSwing.mValue)
-    player->swing();
+  if (mSwing.mValue) player->swing();
 
   // 4) StartDestroyBlock
   auto sp = MinecraftPackets::createPacket<PlayerActionPacket>();
@@ -738,8 +770,14 @@ void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
     sender->sendToServer(r.get());
   }
 
-  // 8) TP back
-  straightLineTP(mp, pp, false);
+  // 8) TP back — только если Follow ВЫКЛЮЧЕН
+  if (!mFollow.mValue) {
+    straightLineTP(mp, pp, false);
+  } else {
+    player->setPosition(mp);
+    auto sv = player->getStateVectorComponent();
+    if (sv) sv->mVelocity = glm::vec3(0.f);
+  }
 
   // 9) Clear locally
   TRY_CALL([&]() { BlockUtils::clearBlock(pos); });
@@ -756,8 +794,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
   std::lock_guard<std::recursive_mutex> lk(mMutex);
 
   auto player = event.mActor;
-  if (!player)
-    return;
+  if (!player) return;
 
   if (!ClientInstance::get()->getLevelRenderer()) {
     resetScan();
@@ -767,8 +804,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
   }
 
   auto source = ClientInstance::get()->getBlockSource();
-  if (!source)
-    return;
+  if (!source) return;
 
   // =================== KEYBIND CAPTURE ===================
   if (mIsBindingKey) {
@@ -778,8 +814,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       return;
     }
     if (mBindWaitRelease) {
-      if (!sIsAnyKeyHeld())
-        mBindWaitRelease = false;
+      if (!sIsAnyKeyHeld()) mBindWaitRelease = false;
       return;
     }
     int pressed = sFindHeldKey();
@@ -800,8 +835,6 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       bool down = GetAsyncKeyState(vk) & 0x8000;
       if (down && !mQuickTPKeyWasDown &&
           !ClientInstance::get()->getMouseGrabbed()) {
-        // TP forward by mQuickTPDist blocks in looking direction (horizontal
-        // only)
         auto rot = player->getActorRotationComponent();
         if (rot) {
           float yaw = rot->mYaw * (3.14159265f / 180.f);
@@ -812,8 +845,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
           straightLineTP(from, to, true);
           player->setPosition(to);
           auto sv = player->getStateVectorComponent();
-          if (sv)
-            sv->mVelocity = glm::vec3(0.f);
+          if (sv) sv->mVelocity = glm::vec3(0.f);
 
           ChatUtils::displayClientMessage(
               "§a[QuickTP] Teleported " +
@@ -853,13 +885,11 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       moveToNext();
     }
 
-    // Also scan player's current sub-chunk
     BlockPos bp = *player->getPos();
     int sc = (bp.y - source->getBuildDepth()) >> 4;
     bool r = false;
     tryProcessSub(r, ChunkPos(bp), sc);
 
-    // Periodic cluster update
     if (mScanDirty) {
       uint64_t now = NOW;
       if (now - mLastClusterUpdate > 2000) {
@@ -882,12 +912,16 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
   // ----- IDLE -----
   case MineState::Idle: {
     auto cluster = findNearestCluster(playerPos, mMinedPositions);
-    if (cluster.empty())
-      return;
+    if (cluster.empty()) return;
 
     mCurrentCluster = cluster;
     mCurrentClusterIdx = 0;
-    mPreSnapshot = getInventorySnapshot();
+    mNeedFirstVerify = true;
+
+    // Запоминаем тип руды кластера по первому блоку
+    auto it = mFilteredBlocks.find(mCurrentCluster[0]);
+    mCurrentClusterOreId = (it != mFilteredBlocks.end())
+        ? it->second.block->mLegacy->getBlockId() : 0;
 
     const BlockPos &fp = mCurrentCluster[0];
     Block *fb = source->getBlock(fp);
@@ -897,64 +931,41 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       return;
     }
 
+    mPreSnapshot = getInventorySnapshot();
     mineBlockAtPos(fp, player);
     mMinedPositions.insert(fp);
     mCurrentClusterIdx = 1;
 
-    mVerifyTicksLeft = static_cast<int>(mVerifyWait.mValue);
-    mState = MineState::Verifying;
-    break;
-  }
-
-  // ----- VERIFYING -----
-  case MineState::Verifying: {
-    if (--mVerifyTicksLeft > 0)
-      return;
-
-    auto post = getInventorySnapshot();
-    bool fake = checkForFakeDrop(mPreSnapshot, post);
-
-    if (fake) {
-      mFakeClusters++;
-      spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
-                   mCurrentCluster.size());
-
-      blacklistPositions(mCurrentCluster);
-      for (auto &p : mCurrentCluster)
-        mMinedPositions.insert(p);
-
-      mCurrentCluster.clear();
-      mCurrentClusterIdx = 0;
-      mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
-      mState = MineState::Idle;
-      mTickDelay = 2;
-    } else {
-      spdlog::info("[OreMinerV2] Real cluster! Mining {} remaining.",
-                   static_cast<int>(mCurrentCluster.size()) -
-                       mCurrentClusterIdx);
-      mState = MineState::Mining;
-    }
+    mState = MineState::Mining;
+    mTickDelay = 1; // 1 тик на то чтобы сервер положил дроп в инвентарь
     break;
   }
 
   // ----- MINING -----
   case MineState::Mining: {
-    while (mCurrentClusterIdx < static_cast<int>(mCurrentCluster.size())) {
-      const BlockPos &p = mCurrentCluster[mCurrentClusterIdx];
-      if (mMinedPositions.contains(p)) {
-        mCurrentClusterIdx++;
-        continue;
-      }
+    // Verify first block immediately after 1 tick delay
+    if (mNeedFirstVerify) {
+      mNeedFirstVerify = false;
+      auto post = getInventorySnapshot();
+      if (checkForFakeDrop(mPreSnapshot, post, mCurrentClusterOreId)) {
+        mFakeClusters++;
+        spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
+                     mCurrentCluster.size());
 
-      Block *b = source->getBlock(p);
-      if (!b || b->mLegacy->isAir()) {
-        mMinedPositions.insert(p);
-        mCurrentClusterIdx++;
-        continue;
+        blacklistPositions(mCurrentCluster);
+        for (auto &p : mCurrentCluster) mMinedPositions.insert(p);
+
+        mCurrentCluster.clear();
+        mCurrentClusterIdx = 0;
+        mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+        mState = MineState::Idle;
+        mTickDelay = 2;
+        return;
       }
-      break;
+      // Real cluster — continue mining remaining blocks
     }
 
+    // Mine next block in cluster (strict order, no skipping)
     if (mCurrentClusterIdx >= static_cast<int>(mCurrentCluster.size())) {
       spdlog::info("[OreMinerV2] Cluster done! Mined: {}, Fakes: {}",
                    mBlocksMined, mFakeClusters);
@@ -967,8 +978,10 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     }
 
     const BlockPos &p = mCurrentCluster[mCurrentClusterIdx];
-    mineBlockAtPos(p, player);
-    mMinedPositions.insert(p);
+    if (!mMinedPositions.contains(p)) {
+      mineBlockAtPos(p, player);
+    }
+    mMinedPositions.insert(p); // помечаем в любом случае, чтобы не застрять
     mCurrentClusterIdx++;
     mTickDelay = static_cast<int>(mSpeed.mValue);
 
@@ -976,18 +989,12 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     if (mVeinMiner.mValue) {
       auto cluster = getCluster(p, mFoundBlocks);
       for (auto &cp : cluster) {
-        if (mMinedPositions.contains(cp))
-          continue;
-        // Check if already in current cluster
+        if (mMinedPositions.contains(cp)) continue;
         bool already = false;
         for (auto &ep : mCurrentCluster) {
-          if (ep == cp) {
-            already = true;
-            break;
-          }
+          if (ep == cp) { already = true; break; }
         }
-        if (!already)
-          mCurrentCluster.push_back(cp);
+        if (!already) mCurrentCluster.push_back(cp);
       }
     }
     break;
@@ -1060,7 +1067,6 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
 
   auto drawList = ImGui::GetBackgroundDrawList();
 
-  // Fade alpha for TP path
   float alpha = 1.0f;
   uint64_t fadeTime = 500;
   uint64_t now = NOW;
@@ -1150,7 +1156,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
   // ---------- REMAINING CLUSTER ----------
   if (mDrawCluster.mValue && !mCurrentCluster.empty() &&
       mState != MineState::Idle) {
-    ImColor cc = (mState == MineState::Verifying)
+    ImColor cc = mNeedFirstVerify
                      ? ImColor(255, 255, 0, static_cast<int>(60 * alpha))
                      : ImColor(0, 200, 255, static_cast<int>(60 * alpha));
 
@@ -1174,17 +1180,17 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     switch (mState) {
     case MineState::Idle:
       if (mFilteredBlocks.empty())
-        return; // nothing to show
+        return;
       status =
           "Scanning... [" + std::to_string(mFilteredBlocks.size()) + " ores]";
       break;
-    case MineState::Verifying:
-      status = "Verifying... (" + std::to_string(mVerifyTicksLeft) + " ticks)";
-      break;
     case MineState::Mining:
-      status = "Mining " + std::to_string(mCurrentClusterIdx) + "/" +
-               std::to_string(mCurrentCluster.size()) +
-               " | Fakes: " + std::to_string(mFakeClusters);
+      if (mNeedFirstVerify)
+        status = "Checking...";
+      else
+        status = "Mining " + std::to_string(mCurrentClusterIdx) + "/" +
+                 std::to_string(mCurrentCluster.size()) +
+                 " | Fakes: " + std::to_string(mFakeClusters);
       break;
     }
 

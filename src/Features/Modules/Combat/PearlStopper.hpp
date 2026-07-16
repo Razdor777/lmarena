@@ -4,6 +4,7 @@
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
+#include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
 #include <mutex>
 #include <unordered_map>
 #include <vector>

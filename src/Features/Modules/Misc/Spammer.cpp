@@ -1,14 +1,12 @@
-//
-// 8/30/2024.
-//
-
 #include "Spammer.hpp"
 
-#include <Features/Events/BaseTickEvent.hpp>
-#include <Features/Events/PacketInEvent.hpp>
+#include <Features/FeatureManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Network/Packets/TextPacket.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
+#include <Utils/GameUtils/ActorUtils.hpp>
+#include <Utils/GameUtils/PacketUtils.hpp>
+#include <Utils/StringUtils.hpp>
 
 Spammer::Spammer(): ModuleBase("Spammer", "Automatically sends a chat message in specified delay", ModuleCategory::Misc, 0, false)
 {
@@ -28,12 +26,47 @@ Spammer::Spammer(): ModuleBase("Spammer", "Automatically sends a chat message in
 void Spammer::onEnable()
 {
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &Spammer::onBaseTickEvent>(this);
+    gFeatureManager->mDispatcher->listen<PacketInEvent, &Spammer::onPacketInEvent>(this);
     mLastMessageSent = NOW;
 }
 
 void Spammer::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &Spammer::onBaseTickEvent>(this);
+    gFeatureManager->mDispatcher->deafen<PacketInEvent, &Spammer::onPacketInEvent>(this);
+}
+
+std::string Spammer::getNearestPlayerName(Actor* player)
+{
+    if (!player) return "";
+
+    auto actors = ActorUtils::getActorList(true, true);
+    Actor* nearest = nullptr;
+    float bestDist = FLT_MAX;
+
+    for (auto* actor : actors)
+    {
+        if (!actor || actor == player) continue;
+        if (actor->isDead()) continue;
+
+        float dist = 0.f;
+        try {
+            dist = actor->distanceTo(player);
+        } catch (...) { continue; }
+
+        if (dist < bestDist)
+        {
+            bestDist = dist;
+            nearest = actor;
+        }
+    }
+
+    if (!nearest) return "";
+    try {
+        return nearest->getRawName();
+    } catch (...) {
+        return "";
+    }
 }
 
 void Spammer::onBaseTickEvent(BaseTickEvent& event)
@@ -43,40 +76,14 @@ void Spammer::onBaseTickEvent(BaseTickEvent& event)
 
     if (NOW <= mLastMessageSent + mDelayMs.mValue) return;
 
-    std::string entry = mSpammerMessageTemplate.getEntry();
+    std::string entry = mCurrentMessage;
 
-    std::vector<std::string> mentions;
-
-    for (auto& [uuid, p] : *player->getLevel()->getPlayerList())
+    // Замена <near> на имя ближайшего игрока
+    while (StringUtils::contains(entry, "<near>"))
     {
-        if (p.mId == player->getActorUniqueIDComponent()->mUniqueID) continue;
-        if (p.mName.contains(player->getRawName())) continue;
-
-        // format mention
-        std::string name = p.mName;
-        if (mName.contains(" ")) name = "\"" + name + "\"";
-        name = "@" + name;
-
-        mentions.push_back(name);
+        std::string nearest = getNearestPlayerName(player);
+        entry = StringUtils::replace(entry, "<near>", nearest);
     }
-
-    static int mentionIndex = 0;
-    int maxMentionIndex = mentions.size() - 1;
-
-
-    // For each !randMention! in the message, replace it with a random player's name
-    while (StringUtils::contains(entry, "!randMention!"))
-    {
-        if (maxMentionIndex == -1) break;
-
-        if (mentionIndex > maxMentionIndex) mentionIndex = 0;
-
-        entry = StringUtils::replace(entry, "!randMention!", mentions[mentionIndex]);
-        mentionIndex++;
-    }
-
-    // replace leftover mentions with empty string
-    entry = StringUtils::replaceAll(entry, "!randMention!", "");
 
     PacketUtils::sendChatMessage(entry);
     mLastMessageSent = NOW;

@@ -469,26 +469,27 @@ glm::vec3 InfiniteAura::getAttackPosition(Actor *target, Actor *player) {
 
   if (mKBDirection.mValue == KBDirection::Default) return predictedPos;
 
-  // Use raw targetPos (not predictedPos) for KB offset so that
-  // the attacker→target vector — and thus the knockback direction —
-  // is always exactly the one the user chose, regardless of the
-  // target's movement velocity.
-  float targetYaw = 0.f;
-  auto targetRot = target->getActorRotationComponent();
-  if (targetRot) targetYaw = targetRot->mYaw;
+  // ── ИСПРАВЛЕНИЕ: yaw атакующего, знаки оригинальные ──
+  float playerYaw = 0.f;
+  auto playerRot = player->getActorRotationComponent();
+  if (playerRot) playerYaw = playerRot->mYaw;
 
-  float yawRad = targetYaw * (PI / 180.0f);
+  float yawRad = playerYaw * (PI / 180.0f);
   float offset = mKBOffset.mValue;
   glm::vec3 forward = {-sinf(yawRad), 0.f, cosf(yawRad)};
-  glm::vec3 right = {cosf(yawRad), 0.f, sinf(yawRad)};
+  glm::vec3 right   = {cosf(yawRad), 0.f, sinf(yawRad)};
 
   switch (mKBDirection.mValue) {
-  case KBDirection::PushBack:   return targetPos + forward * offset;
+  // Удар сзади → цель летит назад (ко мне)
+  case KBDirection::PushBack:    return targetPos + forward * offset;
+  // Удар спереди → цель летит вперёд (прочь)
   case KBDirection::PushForward: return targetPos - forward * offset;
-  case KBDirection::PushLeft:   return targetPos + right * offset;
-  case KBDirection::PushRight:  return targetPos - right * offset;
+  // Удар справа → цель летит влево
+  case KBDirection::PushLeft:    return targetPos + right * offset;
+  // Удар слева → цель летит вправо
+  case KBDirection::PushRight:   return targetPos - right * offset;
   case KBDirection::Custom: {
-    float rad = (targetYaw + mKBCustomAngle.mValue + 180.f) * (PI / 180.0f);
+    float rad = (playerYaw + mKBCustomAngle.mValue + 180.f) * (PI / 180.0f);
     return targetPos + glm::vec3(-sinf(rad) * offset, 0.f, cosf(rad) * offset);
   }
   default: return predictedPos;

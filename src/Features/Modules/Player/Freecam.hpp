@@ -58,6 +58,9 @@ public:
     glm::vec2 mHeadYaw;
     int mLastCameraState = 0;
 
+    // NoClip state
+    bool mHadCollision = true;
+    bool mHadGravity = true;
 
     glm::vec3 getLerpedOrigin()
     {

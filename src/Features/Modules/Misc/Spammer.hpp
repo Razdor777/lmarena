@@ -1,7 +1,8 @@
 #pragma once
-//
-// 8/30/2024.
-//
+
+#include <Features/Modules/Module.hpp>
+#include <Features/Events/BaseTickEvent.hpp>
+#include <Features/Events/PacketInEvent.hpp>
 
 class Spammer : public ModuleBase<Spammer> {
 public:
@@ -16,11 +17,16 @@ public:
 
     Spammer();
 
-    MessageTemplate mSpammerMessageTemplate = MessageTemplate("spammerMessageTemplate", "pvp", std::make_pair("!randMention!", "Randomly mention a player, excluding yourself"));
+    std::string mCurrentMessage = "Hello <near>";
     uint64_t mLastMessageSent = 0;
 
     void onEnable() override;
     void onDisable() override;
     void onBaseTickEvent(class BaseTickEvent& event);
     void onPacketInEvent(class PacketInEvent& event);
+
+    void setMessage(const std::string& msg) { mCurrentMessage = msg; }
+
+private:
+    std::string getNearestPlayerName(class Actor* player);
 };

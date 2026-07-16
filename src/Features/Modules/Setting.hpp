@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 
 //
-// Created by vastrakai on 6/30/2024.
+// Setting.hpp — with extra animation fields for ModernDropdown
 //
 
 enum class SettingType
@@ -35,16 +35,18 @@ public:
     {
     }
 
-    //had to do dis sorry :/
     float sliderEase = 0;
-    float boolScale = 0;
-    bool isDragging = false;
-    float hoverAnim = 0.f;
+    float boolScale  = 0;
+    bool  isDragging = false;
+    float hoverAnim  = 0.f;
+
+    // Extra animation field for click feedback (used by NumberSetting knob)
+    float clickScale = 1.f;
 
     bool enumExtended = false;
-    bool colourExtended = false; // I am a fucking sigma
-    float enumSlide = 0;
-    float colourSlide = 0; // to lerp it 🤤🤤
+    bool colourExtended = false;
+    float enumSlide  = 0;
+    float colourSlide = 0;
 
     virtual nlohmann::json serialize()
     {
@@ -55,7 +57,6 @@ public:
     }
 };
 
-// Define visible condition
 #define VISIBILITY_CONDITION(setting, condition) setting.mIsVisible = std::function<bool()>([&]() { return condition; });
 
 class BoolSetting : public Setting
@@ -67,18 +68,10 @@ public:
     BoolSetting(std::string name, std::string description, bool value, int key = -1)
        : Setting(std::move(name), std::move(description), SettingType::Bool), mValue(value), mKey(key)
     {
-
     }
 
-    void setValue(bool value)
-    {
-        mValue = value;
-    }
-
-    std::string getName()
-    {
-        return mName;
-    }
+    void setValue(bool value) { mValue = value; }
+    std::string getName() { return mName; }
 
     nlohmann::json serialize() override
     {
@@ -88,11 +81,7 @@ public:
         return j;
     }
 
-    // Operator overloading for easy access
-    explicit operator bool() const
-    {
-        return mValue;
-    }
+    explicit operator bool() const { return mValue; }
 };
 
 class NumberSetting : public Setting
@@ -103,10 +92,14 @@ public:
     float mMax = 0.0f;
     float mStep = 0.0f;
 
-    NumberSetting(std::string name, std::string description, float value, float min, float max, float step)
-        : Setting(std::move(name), std::move(description), SettingType::Number), mValue(value), mMin(min), mMax(max), mStep(step)
-    {
+    // Knob bounce animation — triggers when knob hits min/max
+    float knobBounce     = 0.f;
+    float prevSliderEase = 0.f;
 
+    NumberSetting(std::string name, std::string description, float value, float min, float max, float step)
+        : Setting(std::move(name), std::move(description), SettingType::Number),
+          mValue(value), mMin(min), mMax(max), mStep(step)
+    {
     }
 
     void setValue(float value)
@@ -122,10 +115,7 @@ public:
     }
 
     template <typename T>
-    T as() const
-    {
-        return static_cast<T>(mValue);
-    }
+    T as() const { return static_cast<T>(mValue); }
 };
 
 class EnumSetting : public Setting
@@ -134,23 +124,24 @@ public:
     int mValue = 0;
     std::vector<std::string> mValues;
 
-    EnumSetting(std::string name, std::string description, int index, std::vector<std::string> values)
-        : Setting(std::move(name), std::move(description), SettingType::Enum), mValue(index), mValues(std::move(values))
-    {
+    // Per-value hover animation cache (size = mValues.size())
+    std::vector<float> enumHoverCache;
 
+    EnumSetting(std::string name, std::string description, int index, std::vector<std::string> values)
+        : Setting(std::move(name), std::move(description), SettingType::Enum),
+          mValue(index), mValues(std::move(values))
+    {
     }
 
     template <typename IndexType, typename... Args>
     EnumSetting(std::string name, std::string description, IndexType index, Args... values)
-        : Setting(std::move(name), std::move(description), SettingType::Enum), mValue(static_cast<int>(index))
+        : Setting(std::move(name), std::move(description), SettingType::Enum),
+          mValue(static_cast<int>(index))
     {
         mValues = { values... };
     }
 
-    void setValue(int value)
-    {
-        mValue = value;
-    }
+    void setValue(int value) { mValue = value; }
 
     nlohmann::json serialize() override
     {
@@ -160,19 +151,12 @@ public:
     }
 
     template <typename T>
-    explicit operator T() const
-    {
-        return static_cast<T>(mValue);
-    }
+    explicit operator T() const { return static_cast<T>(mValue); }
 
     template <typename T>
-    T as() const
-    {
-        return static_cast<T>(mValue);
-    }
+    T as() const { return static_cast<T>(mValue); }
 };
 
-// EnumSetting, but the mValue is a custom type (should always be an enum)
 template <typename T>
 class EnumSettingT : public EnumSetting
 {
@@ -191,117 +175,80 @@ public:
     ValueProxy mValue;
 
     EnumSettingT(std::string name, std::string description, T index, std::vector<std::string> values)
-        : EnumSetting(std::move(name), std::move(description), static_cast<int>(index), std::move(values)), mValue{this}
+        : EnumSetting(std::move(name), std::move(description), static_cast<int>(index), std::move(values)),
+          mValue{this}
     {
     }
 
     template <typename... Args>
     EnumSettingT(std::string name, std::string description, T index, Args... values)
-        : EnumSetting(std::move(name), std::move(description), static_cast<int>(index), values...), mValue{this}
+        : EnumSetting(std::move(name), std::move(description), static_cast<int>(index), values...),
+          mValue{this}
     {
     }
 
-    void setValue(T value)
-    {
-        EnumSetting::setValue(static_cast<int>(value));
-    }
+    void setValue(T value) { EnumSetting::setValue(static_cast<int>(value)); }
 
     template <typename type>
-    type as() const
-    {
-        return static_cast<type>(EnumSetting::mValue);
-    }
+    type as() const { return static_cast<type>(EnumSetting::mValue); }
 };
 
 class ColorSetting : public Setting
 {
 public:
-    // Use ImColor to convert this to a color
     float mValue[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     bool mIsExtended = false;
     float mSlide = 0;
-    // vertical size of the color picker
     static inline float mColorPickerSize = 400;
-
 
     ColorSetting(std::string name, std::string description, float r, float g, float b, float a)
         : Setting(std::move(name), std::move(description), SettingType::Color)
     {
-        mValue[0] = r;
-        mValue[1] = g;
-        mValue[2] = b;
-        mValue[3] = a;
+        mValue[0] = r; mValue[1] = g; mValue[2] = b; mValue[3] = a;
     }
 
     ColorSetting(std::string name, std::string description, uint64_t color)
         : Setting(std::move(name), std::move(description), SettingType::Color)
     {
         mValue[0] = ((color >> 16) & 0xFF) / 255.0f;
-        mValue[1] = ((color >> 8) & 0xFF) / 255.0f;
-        mValue[2] = (color & 0xFF) / 255.0f;
+        mValue[1] = ((color >> 8)  & 0xFF) / 255.0f;
+        mValue[2] = (color         & 0xFF) / 255.0f;
         mValue[3] = ((color >> 24) & 0xFF) / 255.0f;
     }
 
-
-
-    void setValue(float r, float g, float b, float a)
-    {
-        mValue[0] = r;
-        mValue[1] = g;
-        mValue[2] = b;
-        mValue[3] = a;
+    void setValue(float r, float g, float b, float a) {
+        mValue[0] = r; mValue[1] = g; mValue[2] = b; mValue[3] = a;
     }
 
-    ImColor getAsImColor()
-    {
-        return { mValue[0], mValue[1], mValue[2], mValue[3] };
+    ImColor getAsImColor() { return { mValue[0], mValue[1], mValue[2], mValue[3] }; }
+
+    void setFromImColor(const ImColor& color) {
+        mValue[0] = color.Value.x; mValue[1] = color.Value.y;
+        mValue[2] = color.Value.z; mValue[3] = color.Value.w;
     }
 
-    void setFromImColor(const ImColor& color)
-    {
-        mValue[0] = color.Value.x;
-        mValue[1] = color.Value.y;
-        mValue[2] = color.Value.z;
-        mValue[3] = color.Value.w;
+    void setFromImVec4(const ImVec4& color) {
+        mValue[0] = color.x; mValue[1] = color.y;
+        mValue[2] = color.z; mValue[3] = color.w;
     }
 
-    void setFromImVec4(const ImVec4& color)
-    {
-        mValue[0] = color.x;
-        mValue[1] = color.y;
-        mValue[2] = color.z;
-        mValue[3] = color.w;
-    }
+    ImVec4 getAsImVec4() { return { mValue[0], mValue[1], mValue[2], mValue[3] }; }
 
-    ImVec4 getAsImVec4()
-    {
-        return { mValue[0], mValue[1], mValue[2], mValue[3] };
-    }
-
-    void setColor(float r, float g, float b, float a)
-    {
-        mValue[0] = r;
-        mValue[1] = g;
-        mValue[2] = b;
-        mValue[3] = a;
+    void setColor(float r, float g, float b, float a) {
+        mValue[0] = r; mValue[1] = g; mValue[2] = b; mValue[3] = a;
     }
 
     nlohmann::json serialize() override
     {
         nlohmann::json j = Setting::serialize();
-        j["colorValue"] = {
-            mValue[0],
-            mValue[1],
-            mValue[2],
-            mValue[3]
-        };
+        j["colorValue"] = { mValue[0], mValue[1], mValue[2], mValue[3] };
         return j;
     }
 
     void setFromHex(unsigned long val) {
         mValue[0] = ((val >> 16) & 0xFF) / 255.0f;
-        mValue[1] = ((val >> 8) & 0xFF) / 255.0f;
-        mValue[2] = (val & 0xFF) / 255.0f;
+        mValue[1] = ((val >> 8)  & 0xFF) / 255.0f;
+        mValue[2] = (val         & 0xFF) / 255.0f;
         mValue[3] = ((val >> 24) & 0xFF) / 255.0f;
     }
 };

@@ -16,12 +16,17 @@ public:
     NumberSetting mDurabilityThresh  = NumberSetting("Durability %", "Replace when durability below this %", 15.f, 1.f, 50.f, 1.f);
     BoolSetting   mNotifyLow        = BoolSetting("Notify Low", "Notify when no replacement found", true);
 
+    // --- Offhand ---
+    BoolSetting   mAutoTotem  = BoolSetting("Auto Totem", "Automatically equip totem to offhand", false);
+    BoolSetting   mAutoShield = BoolSetting("Auto Shield", "Automatically equip shield to offhand", false);
+
     AutoArmor() : ModuleBase("AutoArmor", "Automatically equips best armor",
         ModuleCategory::Player, 0, false)
     {
         addSettings(
             &mDelay, &mInstant, &mDropWorse, &mPreferFireProt,
-            &mDurabilityCheck, &mDurabilityThresh, &mNotifyLow
+            &mDurabilityCheck, &mDurabilityThresh, &mNotifyLow,
+            &mAutoTotem, &mAutoShield
         );
 
         VISIBILITY_CONDITION(mDelay,            !mInstant.mValue);
@@ -53,6 +58,11 @@ public:
 
     // Returns true если броня в слоте ниже порога прочности
     bool isArmorLow(int armorSlot);
+
+    // Offhand helpers
+    int  findTotem();
+    int  findShield();
+    void equipOffhand(int inventorySlot);
 
     std::string getSettingDisplay() override {
         return mInstant.mValue ? "Instant" : std::to_string((int)mDelay.mValue) + "ms";

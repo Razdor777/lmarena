@@ -17,6 +17,7 @@
 #include <SDK/Minecraft/KeyboardMouseSettings.hpp>
 #include <SDK/Minecraft/Options.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
+#include <SDK/Minecraft/Actor/ActorFlags.hpp>
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/TextPacket.hpp>
@@ -27,6 +28,12 @@ void Freecam::onEnable()
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
+
+    // NoClip: save and disable collision/gravity
+    mHadCollision = player->getStatusFlag(ActorFlags::HasCollision);
+    mHadGravity   = player->getStatusFlag(ActorFlags::HasGravity);
+    player->setStatusFlag(ActorFlags::HasCollision, false);
+    player->setStatusFlag(ActorFlags::HasGravity, false);
 
     player->setFlag<RenderCameraComponent>(true);
     player->setFlag<CameraRenderPlayerModelComponent>(true);
@@ -110,6 +117,14 @@ void Freecam::onDisable()
     player->setFlag<RenderCameraComponent>(false);
     player->setFlag<CameraRenderPlayerModelComponent>(false);
     player->setFlag<RedirectCameraInputComponent>(false);
+
+    // NoClip: restore flags and kill velocity
+    player->setStatusFlag(ActorFlags::HasCollision, mHadCollision);
+    player->setStatusFlag(ActorFlags::HasGravity, mHadGravity);
+
+    auto sv = player->getStateVectorComponent();
+    if (sv) sv->mVelocity = glm::vec3(0.f);
+    player->setFallDistance(0.f);
 
     if (mMode.mValue == Mode::Normal)
     {
@@ -195,6 +210,12 @@ void Freecam::onBaseTickEvent(BaseTickEvent& event)
     player->setFlag<RenderCameraComponent>(true);
     player->setFlag<CameraRenderPlayerModelComponent>(true);
     //player->setFlag<CameraRenderFirstPersonObjects>(false);
+
+    // NoClip: force collision off every tick
+    player->setStatusFlag(ActorFlags::HasCollision, false);
+    player->setStatusFlag(ActorFlags::HasGravity, false);
+    player->setOnGround(false);
+    player->setFallDistance(0.f);
 
     glm::vec3 motion = glm::vec3(0, 0, 0);
 

@@ -46,15 +46,15 @@ void Arraylist::onRenderEvent(RenderEvent& event)
 
     float scale      = mScale.mValue;
     const float fontSize   = mFontSize.mValue * scale * 0.64f;
-    const float suffixSize = fontSize * 0.72f;
-    const float lineH      = fontSize * 1.18f;
-    const float rightMargin= 8.f * scale;
-    const float accentW    = 2.5f * scale;
-    const float maxW       = 270.f * scale;
+    const float suffixSize = fontSize * 0.75f;
+    const float lineH      = fontSize * 1.22f; 
+    const float rightMargin= 12.f * scale;      
+    const float accentW    = 2.0f * scale;      
+    const float maxW       = 300.f * scale;
 
     auto& modules = gFeatureManager->mModuleManager->getModules();
 
-    // ── Animate ────────────────────────────────────────────────────────────
+    // ── Update Animations ───────────────────────────────────────────────────
     for (auto& mod : modules) {
         if (!mod->mVisibleInArrayList.mValue) continue;
         if (mVisibility.mValue == ModuleVisibility::Bound && mod->mKey == 0) continue;
@@ -65,7 +65,7 @@ void Arraylist::onRenderEvent(RenderEvent& event)
         mod->mArrayListAnim = MathUtils::clamp(mod->mArrayListAnim, 0.f, 1.f);
     }
 
-    // ── Collect active items ─────────────────────────────────────────────────
+    // ── Collect Active Items ────────────────────────────────────────────────
     std::vector<ALItem> items;
     int activeIndex = 0;
 
@@ -80,9 +80,9 @@ void Arraylist::onRenderEvent(RenderEvent& event)
 
         float nameW   = ImGui::GetFont()->CalcTextSizeA(fontSize,   FLT_MAX, 0, name.c_str()).x;
         float suffixW = suffix.empty() ? 0.f : ImGui::GetFont()->CalcTextSizeA(suffixSize, FLT_MAX, 0, suffix.c_str()).x;
-        float totalW  = std::min(nameW + (suffix.empty() ? 0.f : 5.f + suffixW), maxW);
+        float totalW  = std::min(nameW + (suffix.empty() ? 0.f : 6.f + suffixW), maxW);
 
-        float colorOffset = (float)activeIndex * 42.f;
+        float colorOffset = (float)activeIndex * 35.f; 
         ImColor color = ColorUtils::getThemedColor(colorOffset);
 
         ALItem item;
@@ -99,28 +99,28 @@ void Arraylist::onRenderEvent(RenderEvent& event)
         activeIndex++;
     }
 
-    // ── Sort by width ───────────────────────────────────────────────────────
+    // ── Sort by text width (longest to shortest) ───────────────────────────
     std::sort(items.begin(), items.end(), [](const ALItem& a, const ALItem& b) {
         return a.totalW > b.totalW;
     });
 
-    // ── Y layout ─────────────────────────────────────────────────────────────
-    float currentY = 4.f;
+    // ── Compute vertical Y layouts ──────────────────────────────────────────
+    float currentY = 12.f; 
     for (size_t i = 0; i < items.size(); i++) {
         items[i].targetY = currentY;
         if (items[i].y < -900.f) items[i].y = items[i].targetY;
-        items[i].y = MathUtils::lerp(items[i].y, items[i].targetY, delta * 14.f);
-        if (std::abs(items[i].y - items[i].targetY) < 0.2f) items[i].y = items[i].targetY;
+        items[i].y = MathUtils::lerp(items[i].y, items[i].targetY, delta * 16.f);
+        if (std::abs(items[i].y - items[i].targetY) < 0.1f) items[i].y = items[i].targetY;
         currentY += lineH * items[i].mod->mArrayListAnim;
     }
 
-    // ── X with elastic/slide ─────────────────────────────────────────────────
+    // ── Compute horizontal slide-in states ────────────────────────────
     for (auto& item : items) {
-        float baseX   = displayRes.x - rightMargin - item.totalW - accentW - 6.f;
-        float hiddenX = displayRes.x + 60.f;
+        float baseX   = displayRes.x - rightMargin - item.totalW - accentW - 8.f;
+        float hiddenX = displayRes.x + 80.f;
         float anim    = item.mod->mArrayListAnim;
 
-        float staggerDelay = mStaggerAnim.mValue ? (&item - items.data()) * 0.03f : 0.f;
+        float staggerDelay = mStaggerAnim.mValue ? (&item - items.data()) * 0.025f : 0.f;
         if (mStaggerAnim.mValue && staggerDelay > 0.f) {
             float raw = MathUtils::clamp((anim - staggerDelay) / 0.5f, 0.f, 1.f);
             EasingUtil e; e.percentage = raw; anim = e.easeOutExpo();
@@ -136,7 +136,7 @@ void Arraylist::onRenderEvent(RenderEvent& event)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // RENDER — text + accent strip only, NO background, NO dots, NO lines
+    // RENDER PASS: Ultra clean raw ImGui rendering
     // ═══════════════════════════════════════════════════════════════════════
     for (auto& item : items)
     {
@@ -148,33 +148,37 @@ void Arraylist::onRenderEvent(RenderEvent& event)
         float w = item.totalW;
         float h = lineH;
 
-        // ── ACCENT STRIP only ────────────────────────────────────────────────
-        float stripX = x + w + 2.f;
+        float stripX = x + w + 4.f;
         ImColor stripCol = item.color; stripCol.Value.w = alpha;
-        drawList->AddRectFilled({stripX, y + 2.f}, {stripX + accentW, y + h - 2.f}, stripCol, accentW * 0.5f);
+        
+        // Render Accent bar
+        drawList->AddRectFilled({stripX, y + 2.f}, {stripX + accentW, y + h - 2.f}, stripCol, 0.f);
 
-        // ── GLOW behind strip (optional) ─────────────────────────────────────
+        // Premium Neon Glow backing the strip
         if (mGlow.mValue) {
-            ImColor gc = item.color; gc.Value.w = alpha * 0.72f;
-            ImRenderUtils::fillShadowRectangle(
-                ImVec4(stripX, y + 2.f, stripX + accentW, y + h - 2.f),
-                gc, alpha, mGlowStrength.mValue * 55.f * alpha, 0, accentW * 0.5f, drawList);
+            ImColor gc = item.color; gc.Value.w = alpha * 0.5f;
+            drawList->AddShadowRect(
+                {stripX, y + 2.f}, {stripX + accentW, y + h - 2.f},
+                gc, mGlowStrength.mValue * 20.f * alpha, {0, 0}, 0, 0.f
+            );
         }
 
-        // ── TEXT ──────────────────────────────────────────────────────────────
-        ImColor nameCol = item.color; nameCol.Value.w = alpha;
-        drawList->AddText(ImGui::GetFont(), fontSize, {x, y}, nameCol, item.name.c_str());
+        // Crisp text with drop shadow
+        ImColor shadowCol(4, 4, 6, (int)(180 * alpha));
+        
+        // Module Name
+        drawList->AddText(ImGui::GetFont(), fontSize, {x + 1.0f, y + 1.0f}, shadowCol, item.name.c_str());
+        drawList->AddText(ImGui::GetFont(), fontSize, {x, y}, stripCol, item.name.c_str());
 
-        // ── SUFFIX ────────────────────────────────────────────────────────────
+        // Suffix Mode
         if (!item.suffix.empty()) {
-            ImColor sc(0.58f, 0.58f, 0.62f, alpha * 0.85f);
-            drawList->AddText(ImGui::GetFont(), suffixSize,
-                {x + item.nameW + 5.f, y + (h - ImGui::GetFont()->CalcTextSizeA(suffixSize, FLT_MAX, 0, item.suffix.c_str()).y) * 0.5f},
-                sc, item.suffix.c_str());
+            ImColor sc(160, 160, 175, (int)(180 * alpha)); 
+            float textOffset = (h - ImGui::GetFont()->CalcTextSizeA(suffixSize, FLT_MAX, 0, item.suffix.c_str()).y) * 0.5f;
+            drawList->AddText(ImGui::GetFont(), suffixSize, {x + item.nameW + 6.f + 1.0f, y + textOffset + 1.0f}, shadowCol, item.suffix.c_str());
+            drawList->AddText(ImGui::GetFont(), suffixSize, {x + item.nameW + 6.f, y + textOffset}, sc, item.suffix.c_str());
         }
 
-        // Click toggle
-        ImVec4 hitRect(x - 3.f, y - 1.f, x + w + accentW + 6.f, y + h + 1.f);
+        ImVec4 hitRect(x - 4.f, y - 1.f, x + w + accentW + 8.f, y + h + 1.f);
         bool hovered = ImGui::GetIO().MousePos.x >= hitRect.x && ImGui::GetIO().MousePos.x <= hitRect.z &&
                        ImGui::GetIO().MousePos.y >= hitRect.y && ImGui::GetIO().MousePos.y <= hitRect.w;
         if (hovered && ImGui::IsMouseClicked(0))
