@@ -280,9 +280,12 @@ void Scaffold::onLookInputEvent(LookInputEvent& event)
         if (rotations.y < -180.f) rotations.y += 360.f;
     }
 
-    // mRotRads = {yaw, pitch} в радианах
-    event.mCameraDirectLookComponent->mRotRads.x = glm::radians(rotations.y);
-    event.mCameraDirectLookComponent->mRotRads.y = glm::radians(rotations.x);
+    // rotations = {pitch, yaw} in MC degrees
+    // mRotRads uses atan2(-x,-z) convention for yaw and inverted pitch:
+    //   mRotRads.x (yaw)   = PI - radians(mc_yaw)
+    //   mRotRads.y (pitch) = -radians(mc_pitch)
+    event.mCameraDirectLookComponent->mRotRads.x = (float)IM_PI - glm::radians(rotations.y);
+    event.mCameraDirectLookComponent->mRotRads.y = -glm::radians(rotations.x);
 }
 
 // ═══════════════════════════════════════════════════════════════

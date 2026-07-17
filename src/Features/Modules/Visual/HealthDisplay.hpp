@@ -2,6 +2,8 @@
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Modules/Module.hpp>
 #include <Features/Modules/Setting.hpp>
+#include <map>
+#include <string>
 
 class HealthDisplay : public ModuleBase<HealthDisplay> {
 public:
@@ -21,7 +23,17 @@ public:
               {NormalSpaced, "Health Display"}};
   }
 
+  // ── Health tracking (same system as NearbyPlayers) ──────────────────────
+  struct HealthInfo {
+    float health = 20;
+    float lastAbsorption = 0;
+    float damage = 1;
+  };
+  std::map<std::string, HealthInfo> mHealths;
+  uint64_t mLastHealTime = 0;
+
   void onEnable() override;
   void onDisable() override;
-  void onRender(RenderEvent &event);
+  void onBaseTickEvent(class BaseTickEvent& event);
+  void onRender(RenderEvent& event);
 };
