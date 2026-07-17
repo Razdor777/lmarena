@@ -2,6 +2,9 @@
 // LevelInfo — separate draggable HUD widgets: Ping, Name, XYZ, FPS, BPS
 // Each widget is independently positioned via HudEditor.
 //
+// Visual style: clean "info pill" chips — soft gradient body, 1px hairline,
+// accent dot + dim label + bright value. Easy on the eyes.
+//
 
 #include "LevelInfo.hpp"
 #include "HudEditor.hpp"
@@ -22,6 +25,7 @@
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/StringUtils.hpp>
+#include <cctype>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // One HudElement per widget
@@ -64,31 +68,97 @@ static void registerWidget(InfoWidget*& ptr, char* id, float dx, float dy) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: draw a small pill chip at (x,y) with label text
+// Helper: draw a clean "info pill" chip at (x, y)
+//  [ ● LABEL  value ]
 // returns the chip width
 // ─────────────────────────────────────────────────────────────────────────────
 static float drawChip(ImDrawList* dl, ImFont* font, float fs,
-    float x, float y, const char* text, ImColor textColor,
-    float opacity, float rounding, bool blur)
+    float x, float y, const char* label, const char* value, ImColor accent,
+    float opacity, float rounding, bool blur, bool showDot, bool showDivider)
 {
-    float padH = 7.f, padV = 3.f;
-    float tw = font->CalcTextSizeA(fs, FLT_MAX, 0, text).x;
-    float w  = tw + padH * 2.f;
-    float h  = fs + padV * 2.f;
+    // Clamp rounding so pills keep a sane shape
+    float padH  = 9.f;
+    float padV  = 4.f;
+    float dotR  = 3.f;
+    float gap   = 6.f;
 
+    float labelFs = fs * 0.82f;
+    float valueFs = fs;
+
+    std::string labelUpper = label ? label : "";
+    for (auto& c : labelUpper) c = (char)toupper((unsigned char)c);
+
+    float labelW = labelUpper.empty()
+        ? 0.f
+        : font->CalcTextSizeA(labelFs, FLT_MAX, 0, labelUpper.c_str()).x;
+    float valueW = font->CalcTextSizeA(valueFs, FLT_MAX, 0, value).x;
+
+    float dotSpace  = showDot ? (dotR * 2.f + gap) : 0.f;
+    float divSpace  = (!labelUpper.empty() && showDivider) ? gap : 0.f;
+    float labelSpace = labelUpper.empty() ? 0.f : (labelW + gap * 0.75f);
+    if (labelUpper.empty()) divSpace = 0.f;
+
+    float w = padH * 2.f + dotSpace + labelSpace + divSpace + valueW;
+    float h = valueFs + padV * 2.f;
+
+    float round = std::min(rounding, h * 0.5f);
+
+    // Soft shadow
+    dl->AddShadowRect({x, y}, {x + w, y + h},
+        ImColor(0.f, 0.f, 0.f, 0.35f * opacity), 10.f, {0.f, 1.5f}, 0, round);
+
+    // Glass blur
     if (blur)
-        ImRenderUtils::addBlur(ImVec4(x, y, x+w, y+h), 3.f, rounding);
+        ImRenderUtils::addBlur(ImVec4(x, y, x + w, y + h), 3.f, round);
 
-    dl->AddRectFilled({x,y},{x+w,y+h},
-        ImColor(8,8,13,(int)(220*opacity)), rounding);
+    // Gradient body (top slightly lighter than bottom)
+    ImColor topCol(22, 23, 31, (int)(225 * opacity));
+    ImColor botCol(11, 11, 17, (int)(225 * opacity));
+    dl->AddRectFilledMultiColor({x, y}, {x + w, y + h},
+        topCol, topCol, botCol, botCol, round, ImDrawFlags_RoundCornersAll);
 
-    // thin colored top line
-    dl->AddRectFilled({x+rounding*0.5f, y}, {x+w-rounding*0.5f, y+1.f},
-        ImColor(textColor.Value.x, textColor.Value.y, textColor.Value.z, 0.6f));
+    // Hairline border
+    dl->AddRect({x, y}, {x + w, y + h},
+        ImColor(255, 255, 255, (int)(16 * opacity)), round, 0, 1.f);
 
-    // text shadow + text
-    dl->AddText(font, fs, {x+padH+1, y+padV+1}, ImColor(0,0,0,80), text);
-    dl->AddText(font, fs, {x+padH,   y+padV  }, textColor, text);
+    float cx = x + padH;
+    float textY = y + padV;
+
+    // Accent dot, vertically centered
+    if (showDot) {
+        float cy = y + h * 0.5f;
+        // faint halo + core
+        ImColor halo = accent; halo.Value.w = 0.18f * opacity;
+        ImColor core = accent; core.Value.w = 0.95f * opacity;
+        dl->AddCircleFilled({cx + dotR, cy}, dotR * 2.1f, halo, 12);
+        dl->AddCircleFilled({cx + dotR, cy}, dotR, core, 12);
+        cx += dotR * 2.f + gap;
+    }
+
+    // Dim label
+    if (!labelUpper.empty()) {
+        ImColor labelCol(148, 152, 168, (int)(235 * opacity));
+        // align baseline-ish with value text
+        float labelY = textY + (valueFs - labelFs) * 0.45f;
+        dl->AddText(font, labelFs, {cx, labelY}, labelCol, labelUpper.c_str());
+        cx += labelW;
+
+        if (showDivider) {
+            cx += gap * 0.75f;
+            ImColor divCol(255, 255, 255, (int)(28 * opacity));
+            float divH = h * 0.42f;
+            dl->AddLine({cx, y + h * 0.5f - divH * 0.5f}, {cx, y + h * 0.5f + divH * 0.5f}, divCol, 1.f);
+            cx += gap * 0.6f;
+        } else {
+            cx += gap * 0.75f;
+        }
+    }
+
+    // Bright value
+    ImColor valueCol = accent;
+    if (valueCol.Value.w > 0.98f) valueCol.Value.w = 0.98f;
+    valueCol.Value.w *= opacity;
+    dl->AddText(font, valueFs, {cx, textY}, valueCol, value);
 
     return w;
 }
@@ -108,14 +178,14 @@ void LevelInfo::onEnable()
         nes::event_priority::VERY_LAST>(this);
 
     // Register all widgets — bottom-left area, staggered horizontally
-    registerWidget(gWPing,  sIdPing,  10.f,  -14.f);
-    registerWidget(gWName,  sIdName,  75.f,  -14.f);
-    registerWidget(gWXYZ,   sIdXYZ,   175.f, -14.f);
-    registerWidget(gWFPS,   sIdFPS,   340.f, -14.f);
-    registerWidget(gWBPS,   sIdBPS,   400.f, -14.f);
-    registerWidget(gWArrow, sIdArrow, 460.f, -14.f);
-    registerWidget(gWPearl, sIdPearl, 520.f, -14.f);
-    registerWidget(gWKicks, sIdKicks, 580.f, -14.f);
+    registerWidget(gWPing,  sIdPing,  10.f,  -32.f);
+    registerWidget(gWName,  sIdName,  90.f,  -32.f);
+    registerWidget(gWXYZ,   sIdXYZ,   190.f, -32.f);
+    registerWidget(gWFPS,   sIdFPS,   330.f, -32.f);
+    registerWidget(gWBPS,   sIdBPS,   400.f, -32.f);
+    registerWidget(gWArrow, sIdArrow, 470.f, -32.f);
+    registerWidget(gWPearl, sIdPearl, 540.f, -32.f);
+    registerWidget(gWKicks, sIdKicks, 610.f, -32.f);
 }
 
 void LevelInfo::onDisable()
@@ -235,7 +305,7 @@ void LevelInfo::onPacketInEvent(PacketInEvent& event) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Render — one chip per enabled widget
+// Render — one pill per enabled widget
 // ─────────────────────────────────────────────────────────────────────────────
 
 void LevelInfo::onRenderEvent(RenderEvent& event)
@@ -246,27 +316,35 @@ void LevelInfo::onRenderEvent(RenderEvent& event)
     auto dl    = ImGui::GetBackgroundDrawList();
     float now  = (float)ImGui::GetTime();
     float fs   = mFontSize.mValue * mScale.mValue;
-    float round= mRounding.mValue * mScale.mValue;
+    float round= mRounding.mValue;
     float opacity = mOpacity.mValue;
     bool  blur  = mGlass.mValue;
+    bool  dots  = mIcons.mValue;
+    bool  divs  = mDividers.mValue;
 
     FontHelper::pushPrefFont(false);
+    ImFont* font = ImGui::GetFont();
 
-    // ── Ping chip ─────────────────────────────────────────────────────────
+    auto draw = [&](InfoWidget* w, const char* label, const char* value, ImColor accent) {
+        ImVec2 pos = w->getPos();
+        float width = drawChip(dl, font, fs, pos.x, pos.y, label, value,
+                               accent, opacity, round, blur, dots, divs);
+        w->mSize = {width, fs + 8.f};
+    };
+
+    // ── Ping pill ─────────────────────────────────────────────────────────
     if (mShowPing.mValue && gWPing && gWPing->mVisible) {
         int ping = (int)mPing;
-        ImColor pc = ImColor(100, 255, 150, 230);
+        ImColor pc(110, 255, 170, 255);
         if (mColorPing.mValue) {
-            if      (ping > 150) pc = ImColor(255, 80,  80,  230);
-            else if (ping >  80) pc = ImColor(255, 195, 60,  230);
+            if      (ping > 150) pc = ImColor(255, 105, 105, 255);
+            else if (ping >  80) pc = ImColor(255, 200, 95,  255);
         }
         char buf[32]; snprintf(buf, sizeof(buf), "%d ms", ping);
-        ImVec2 pos = gWPing->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, pc, opacity, round, blur);
-        gWPing->mSize = {w, fs + 6.f};
+        draw(gWPing, "ping", buf, pc);
     }
 
-    // ── Name chip ─────────────────────────────────────────────────────────
+    // ── Name pill ─────────────────────────────────────────────────────────
     if (mShowName.mValue && gWName && gWName->mVisible) {
         // Strip color codes from own name
         std::string raw = ColorUtils::removeColorCodes(player->getRawName());
@@ -282,68 +360,49 @@ void LevelInfo::onRenderEvent(RenderEvent& event)
         if (name.empty()) name = raw; // fallback
 
         ImColor nc = ColorUtils::getThemedColor(now * 20.f);
-        nc.Value.w = 0.9f;
-        ImVec2 pos = gWName->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, name.c_str(), nc, opacity, round, blur);
-        gWName->mSize = {w, fs + 6.f};
+        nc.Value.w = 1.f;
+        draw(gWName, "name", name.c_str(), nc);
     }
 
-    // ── XYZ chip ──────────────────────────────────────────────────────────
+    // ── XYZ pill ──────────────────────────────────────────────────────────
     if (mShowXYZ.mValue && gWXYZ && gWXYZ->mVisible) {
         glm::ivec3 p = *player->getPos();
-        char buf[64]; snprintf(buf, sizeof(buf), "%d / %d / %d", p.x, p.y, p.z);
-        ImColor xc = ImColor(100, 210, 255, 230);
-        ImVec2 pos = gWXYZ->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, xc, opacity, round, blur);
-        gWXYZ->mSize = {w, fs + 6.f};
+        char buf[64]; snprintf(buf, sizeof(buf), "%d  %d  %d", p.x, p.y, p.z);
+        draw(gWXYZ, "xyz", buf, ImColor(125, 200, 255, 255));
     }
 
-    // ── FPS chip ──────────────────────────────────────────────────────────
+    // ── FPS pill ──────────────────────────────────────────────────────────
     if (mShowFPS.mValue && gWFPS && gWFPS->mVisible) {
         int fps = (int)ImGui::GetIO().Framerate;
-        ImColor fc = ImColor(140, 255, 175, 230);
-        if      (fps < 30) fc = ImColor(255, 80,  80,  230);
-        else if (fps < 60) fc = ImColor(255, 195, 60,  230);
-        char buf[24]; snprintf(buf, sizeof(buf), "%d fps", fps);
-        ImVec2 pos = gWFPS->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, fc, opacity, round, blur);
-        gWFPS->mSize = {w, fs + 6.f};
+        ImColor fc(130, 240, 190, 255);
+        if      (fps < 30) fc = ImColor(255, 105, 105, 255);
+        else if (fps < 60) fc = ImColor(255, 200, 95,  255);
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", fps);
+        draw(gWFPS, "fps", buf, fc);
     }
 
-    // ── BPS chip ──────────────────────────────────────────────────────────
+    // ── BPS pill ──────────────────────────────────────────────────────────
     if (mShowBPS.mValue && gWBPS && gWBPS->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%.1f bps", mBps);
-        ImColor bc = ImColor(255, 180, 80, 230);
-        ImVec2 pos = gWBPS->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, bc, opacity, round, blur);
-        gWBPS->mSize = {w, fs + 6.f};
+        char buf[24]; snprintf(buf, sizeof(buf), "%.1f b/s", mBps);
+        draw(gWBPS, "speed", buf, ImColor(255, 190, 95, 255));
     }
 
-    // ── Arrows chip ───────────────────────────────────────────────────────
+    // ── Arrows pill ───────────────────────────────────────────────────────
     if (mShowArrows.mValue && gWArrow && gWArrow->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%d arrows", mArrows);
-        ImColor ac = ImColor(220, 200, 140, 230);
-        ImVec2 pos = gWArrow->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, ac, opacity, round, blur);
-        gWArrow->mSize = {w, fs + 6.f};
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", mArrows);
+        draw(gWArrow, "arrows", buf, ImColor(225, 210, 160, 255));
     }
 
-    // ── Pearls chip ───────────────────────────────────────────────────────
+    // ── Pearls pill ───────────────────────────────────────────────────────
     if (mShowEnderPearls.mValue && gWPearl && gWPearl->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%d pearls", mPearls);
-        ImColor pc2 = ImColor(80, 160, 255, 230);
-        ImVec2 pos = gWPearl->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, pc2, opacity, round, blur);
-        gWPearl->mSize = {w, fs + 6.f};
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", mPearls);
+        draw(gWPearl, "pearls", buf, ImColor(140, 175, 255, 255));
     }
 
-    // ── Kicks chip ────────────────────────────────────────────────────────
+    // ── Kicks pill ────────────────────────────────────────────────────────
     if (mShowKicksAmount.mValue && gWKicks && gWKicks->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%d kicks", mKicksAmount);
-        ImColor kc = ImColor(255, 80, 80, 230);
-        ImVec2 pos = gWKicks->getPos();
-        float w = drawChip(dl, ImGui::GetFont(), fs, pos.x, pos.y, buf, kc, opacity, round, blur);
-        gWKicks->mSize = {w, fs + 6.f};
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", mKicksAmount);
+        draw(gWKicks, "kicks", buf, ImColor(255, 110, 110, 255));
     }
 
     ImGui::PopFont();

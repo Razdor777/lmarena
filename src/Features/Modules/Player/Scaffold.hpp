@@ -127,6 +127,7 @@ public:
     void onRenderEvent(class RenderEvent& event);
     void onPacketOutEvent(class PacketOutEvent& event);
     void onLookInputEvent(class LookInputEvent& event);
+    glm::vec2 getTargetRots(); // {pitch, yaw} в MC-градусах с учётом RotateMode
     glm::vec3 getRotBasedPos(float extend, float yPos);
     glm::vec3 getPlacePos(float extend);
 

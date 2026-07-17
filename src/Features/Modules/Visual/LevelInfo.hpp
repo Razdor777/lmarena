@@ -26,7 +26,7 @@ public:
     // ── Visual ─────────────────────────────────────────────────────────────
     NumberSetting mScale     = NumberSetting("Scale",    "Bar scale",             1.f,  0.5f, 2.f,  0.05f);
     NumberSetting mOpacity   = NumberSetting("Opacity",  "Bar opacity",           0.88f,0.f,  1.f,  0.05f);
-    NumberSetting mRounding  = NumberSetting("Rounding", "Corner rounding",       20.f, 0.f,  30.f, 1.f);
+    NumberSetting mRounding  = NumberSetting("Rounding", "Corner rounding",       8.f,  0.f,  30.f, 1.f);
     NumberSetting mFontSize  = NumberSetting("Font Size","Label font size",        11.5f,7.f,  18.f, 0.5f);
     BoolSetting   mGlass     = BoolSetting  ("Glass",    "Glassmorphism blur bg", true);
     BoolSetting   mDividers  = BoolSetting  ("Dividers", "Show dividers between items", true);

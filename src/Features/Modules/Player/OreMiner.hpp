@@ -7,6 +7,8 @@
 #include <SDK/Minecraft/World/Chunk/LevelChunk.hpp>
 #include <SDK/Minecraft/World/Chunk/SubChunkBlockStorage.hpp>
 
+class Block;
+
 class OreMiner : public ModuleBase<OreMiner>
 {
 public:
@@ -23,6 +25,8 @@ public:
     BoolSetting mRenderTargets = BoolSetting("Render Targets", "Highlight found blocks", false);
     BoolSetting mShowBlockList = BoolSetting("Show Block List", "Show target block names", true);
     NumberSetting mFOV = NumberSetting("FOV", "Mining field of view", 360.f, 30.f, 360.f, 10.f);
+    BoolSetting mToolSaver = BoolSetting("Tool Saver", "Switch to another tool when durability is low, or pause mining when none is left", true);
+    NumberSetting mMinToolDurability = NumberSetting("Min Tool Durability %", "Stop using a tool below this durability%", 8.f, 1.f, 50.f, 1.f);
 
     BoolSetting mCoal = BoolSetting("Coal", "Coal ore", false);
     BoolSetting mIron = BoolSetting("Iron", "Iron ore", false);
@@ -46,10 +50,14 @@ public:
             &mDestroySpeed, &mStepDistance, &mServerTimeout, &mSwing, &mHotbarOnly,
             &mVeinMiner, &mMineDelay, &mBlocksPerTick,
             &mRenderBlock, &mDrawPath, &mRenderTargets, &mShowBlockList, &mFOV,
+            &mToolSaver, &mMinToolDurability,
             &mCoal, &mIron, &mGold, &mDiamond, &mEmerald, &mLapis,
             &mRedstone, &mCopper, &mAncientDebris, &mQuartz,
             &mLeaves, &mWood, &mSandstone, &mSnow, &mSpawner
         );
+
+        VISIBILITY_CONDITION(mMinToolDurability, mToolSaver.mValue);
+
         mNames = {{Lowercase,"oreminer"},{LowercaseSpaced,"ore miner"},{Normal,"OreMiner"},{NormalSpaced,"Ore Miner"}};
     }
 
@@ -76,9 +84,14 @@ public:
     std::vector<std::string> mCustomBlockNames;
 
     static constexpr float SCAN_RADIUS = 28.f;
-    static constexpr float CHUNK_RADIUS = 7.f;
+    // Spiral only covers chunks actually usable by findBestTarget
+    // (28 blocks ≈ 2 chunks — scanning 7 chunks out just wasted minutes)
+    static constexpr float CHUNK_RADIUS = 4.f;
     static constexpr float UPDATE_FREQ = 1.8f;
     static constexpr int CHUNKS_PER_TICK = 3;
+    // Subchunks of the player's OWN chunk scanned per batch (priority),
+    // so ores right next to you are picked up within ~1 second
+    static constexpr int OWN_SUBS_PER_TICK = 2;
 
     struct ScanState {
         ChunkPos center;
@@ -88,6 +101,7 @@ public:
         int steps = 1;
         int stepCount = 0;
     } mScan;
+    int mOwnSubIdx = 0; // round-robin subchunk index for the player's own chunk
 
     struct FoundBlock { glm::ivec3 position; std::string name; };
     std::unordered_map<BlockPos, FoundBlock> mFoundBlocks;
@@ -128,7 +142,11 @@ public:
 
     std::shared_ptr<class MovePlayerPacket> createPacketForPos(glm::vec3 pos);
     void straightLineTP(glm::vec3 from, glm::vec3 to, bool save);
-    void mineBlockAtPos(const glm::ivec3& pos, Actor* player);
+    // Returns false when no suitable tool exists (Tool Saver) — no packets sent
+    bool mineBlockAtPos(const glm::ivec3& pos, Actor* player);
+    // Best tool slot with enough durability, or -1 → mining must pause
+    int getMiningToolSlot(Block* block);
+    void notifyToolStop();
     glm::ivec3 findBestTarget(Actor* player);
     bool isInPlayerFOV(Actor* player, const glm::vec3& blockCenter);
 
@@ -136,6 +154,7 @@ public:
     std::vector<glm::ivec3> getConnectedVein(const glm::ivec3& start, int maxBlocks = 64);
     std::deque<glm::ivec3> mVeinQueue;
     uint64_t mLastMineTime = 0;
+    uint64_t mLastToolWarnTime = 0;
 
     void onBaseTickEvent(class BaseTickEvent& event);
     void onPacketOutEvent(class PacketOutEvent& event);

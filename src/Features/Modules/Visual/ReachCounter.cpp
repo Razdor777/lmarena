@@ -29,11 +29,14 @@ void ReachCounter::onEnable() {
     mLastHit = std::chrono::high_resolution_clock::now();
     gFeatureManager->mDispatcher->listen<PacketOutEvent, &ReachCounter::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->listen<RenderEvent, &ReachCounter::onRenderEvent>(this);
+    // HudEditor only drags visible elements
+    if (mElement) mElement->mVisible = true;
 }
 
 void ReachCounter::onDisable() {
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &ReachCounter::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->deafen<RenderEvent, &ReachCounter::onRenderEvent>(this);
+    if (mElement) mElement->mVisible = false;
 }
 
 void ReachCounter::onPacketOutEvent(PacketOutEvent& event) {

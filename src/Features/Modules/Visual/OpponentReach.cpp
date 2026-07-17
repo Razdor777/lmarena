@@ -101,11 +101,14 @@ void OpponentReach::onEnable() {
     mLastAttackerRuntimeId = -1;
     gFeatureManager->mDispatcher->listen<PacketInEvent, &OpponentReach::onPacketInEvent>(this);
     gFeatureManager->mDispatcher->listen<RenderEvent, &OpponentReach::onRenderEvent>(this);
+    // HudEditor only drags visible elements
+    if (mElement) mElement->mVisible = true;
 }
 
 void OpponentReach::onDisable() {
     gFeatureManager->mDispatcher->deafen<PacketInEvent, &OpponentReach::onPacketInEvent>(this);
     gFeatureManager->mDispatcher->deafen<RenderEvent, &OpponentReach::onRenderEvent>(this);
+    if (mElement) mElement->mVisible = false;
 }
 
 void OpponentReach::onPacketInEvent(PacketInEvent& event)
