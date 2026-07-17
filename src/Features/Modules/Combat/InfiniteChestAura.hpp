@@ -24,6 +24,8 @@ public:
     BoolSetting mIgnoreEnder = BoolSetting("Ignore Ender", "Skip ender chests", false);
     BoolSetting mPersistentMemory = BoolSetting("Persistent Memory", "Save memory to file", true);
     BoolSetting mEventMode = BoolSetting("Event Mode", "Wait for chat trigger between cycles", false);
+    BoolSetting mAutoEat = BoolSetting("Auto Eat", "Automatically eat food when hungry", false);
+    NumberSetting mAutoEatHunger = NumberSetting("Eat Hunger", "Start eating when hunger is at or below this", 18.f, 1.f, 20.f, 1.f);
     BoolSetting mDrawPath = BoolSetting("Draw Path", "Show TP path", true);
     BoolSetting mRenderTarget = BoolSetting("Render Target", "Highlight target chest", true);
     BoolSetting mClearMemory = BoolSetting("Clear Memory", "Clear chest memory", false);
@@ -37,9 +39,12 @@ public:
             &mSearchRadius, &mStepDistance, &mWaitAfterTP,
             &mReturnBack, &mIgnoreOpened, &mIgnoreTrapped, &mIgnoreEnder,
             &mPersistentMemory, &mEventMode,
+            &mAutoEat, &mAutoEatHunger,
             &mDrawPath, &mRenderTarget,
             &mClearMemory, &mForceStart, &mDebug
         );
+
+        VISIBILITY_CONDITION(mAutoEatHunger, mAutoEat.mValue);
 
         mNames = {
             {Lowercase, "infinitechestaura"},
@@ -70,6 +75,12 @@ public:
     int mChestsLooted = 0;
     uint64_t mStateStartTime = 0;
     bool mNeedsQuickScan = true;
+
+    // === AutoEat state ===
+    bool mIsEating = false;
+    int mEatSlot = -1;
+    int mEatPrevSlot = 0;
+    uint64_t mEatStartTime = 0;
 
     // === Cycle Timing (Debug) ===
     struct CycleTiming {
@@ -161,6 +172,11 @@ public:
     void saveChestMemory();
     void loadChestMemory();
     std::string getMemoryFilePath();
+
+    // AutoEat
+    void updateAutoEat(Actor* player);
+    int findFoodSlot(Actor* player);
+    static bool isFoodItem(const std::string& name);
 
     // Utils
     void setState(State newState);

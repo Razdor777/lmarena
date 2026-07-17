@@ -9,8 +9,8 @@ class DeviceSpoof : public ModuleBase<DeviceSpoof>
 public:
     DeviceSpoof() : ModuleBase("DeviceSpoof", "Spoofs all ur ids", ModuleCategory::Misc, 0, false)
     {
-        // Enable by default so fresh configs always have spoofing active
-        mEnabled = true;
+        // NOTE: не выставляем mEnabled здесь — onEnable/inject() вызывается
+        // через setEnabled() (Solstice принудительно включает модуль при инжекте).
         mNames = {
             {Lowercase, "devicespoof"},
             {LowercaseSpaced, "device spoof"},

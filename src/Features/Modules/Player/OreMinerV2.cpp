@@ -40,6 +40,10 @@ std::vector<int> OreMinerV2::getEnabledBlockIds() {
     ids.push_back(DIAMOND_ORE_ID);
     ids.push_back(DEEPSLATE_DIAMOND_ORE_ID);
   }
+  if (mEmerald.mValue) {
+    ids.push_back(EMERALD_ORE_ID);
+    ids.push_back(DEEPSLATE_EMERALD_ORE_ID);
+  }
   return ids;
 }
 
@@ -461,7 +465,8 @@ void OreMinerV2::onEnable() {
   mCurrentCluster.clear();
   mCurrentClusterIdx = 0;
   mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
-  mNeedFirstVerify = false;
+  mReturnPos = {0.f, 0.f, 0.f};
+  mVerifyTicks = 0;
   mTickDelay = 0;
   mBlocksMined = 0;
   mFakeClusters = 0;
@@ -627,7 +632,7 @@ std::unordered_map<std::string, int> OreMinerV2::getInventorySnapshot() {
 }
 
 // =============================================================
-// FAKE DROP CHECK — case-insensitive + expected drop check
+// FAKE DROP CHECK — garbage increase means fake (anti-xray ore)
 // =============================================================
 
 bool OreMinerV2::checkForFakeDrop(
@@ -635,7 +640,7 @@ bool OreMinerV2::checkForFakeDrop(
     const std::unordered_map<std::string, int> &after,
     int expectedOreId)
 {
-    // 1. Прирост мусора (булыжник, камень, земля, гравий, etc.)
+    // Прирост мусора (булыжник, камень, земля, гравий, etc.)
     static const std::vector<std::string> fakes = {
         "cobblestone", "cobbled_deepslate", "stone", "dirt", "grass",
         "gravel", "andesite", "granite", "diorite", "tuff",
@@ -659,34 +664,38 @@ bool OreMinerV2::checkForFakeDrop(
         }
     }
 
-    // 2. Ghost-block check: если сервер просто стёр блок и не дал дропа,
-    //    ожидаемой руды в инвентаре не прибавится.
+    return false;
+}
+
+// =============================================================
+// EXPECTED DROP CHECK — true once the mined ore reached inventory
+// =============================================================
+
+bool OreMinerV2::hasExpectedDrop(
+    const std::unordered_map<std::string, int> &before,
+    const std::unordered_map<std::string, int> &after,
+    int expectedOreId)
+{
     std::string expectedDrop;
     OreType type = getOreType(expectedOreId);
     if (type == OreType::Diamond) expectedDrop = "diamond";
     else if (type == OreType::Coal) expectedDrop = "coal";
+    else if (type == OreType::Emerald) expectedDrop = "emerald";
 
-    if (!expectedDrop.empty()) {
-        bool gotIt = false;
-        for (auto &[name, cnt] : after) {
-            std::string ln = name;
-            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
-            if (ln.find(expectedDrop) == std::string::npos) continue;
+    if (expectedDrop.empty())
+        return true; // unknown ore — считаем подтверждённым
 
-            int prev = 0;
-            auto it = before.find(name);
-            if (it != before.end()) prev = it->second;
+    for (auto &[name, cnt] : after) {
+        std::string ln = name;
+        std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
+        if (ln.find(expectedDrop) == std::string::npos) continue;
 
-            if (cnt > prev) {
-                gotIt = true;
-                break;
-            }
-        }
+        int prev = 0;
+        auto it = before.find(name);
+        if (it != before.end()) prev = it->second;
 
-        if (!gotIt) {
-            spdlog::warn("[OreMinerV2] FAKE! No '{}' drop received for ore id {}", expectedDrop, expectedOreId);
+        if (cnt > prev)
             return true;
-        }
     }
 
     return false;
@@ -696,7 +705,8 @@ bool OreMinerV2::checkForFakeDrop(
 // MINE BLOCK — chain TP → destroy → chain TP back (optional)
 // =============================================================
 
-void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
+void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player,
+                                bool tpBack) {
   auto sender = ClientInstance::get()->getPacketSender();
   if (!sender) return;
   auto source = ClientInstance::get()->getBlockSource();
@@ -770,8 +780,14 @@ void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
     sender->sendToServer(r.get());
   }
 
-  // 8) TP back — только если Follow ВЫКЛЮЧЕН
-  if (!mFollow.mValue) {
+  // 8) TP back — только если Follow ВЫКЛЮЧЕН и tpBack разрешён.
+  //    Если tpBack == false — остаёмся на блоке (нужно для подтверждения дропа,
+  //    чтобы сервер успел засчитать подбор предмета).
+  if (!tpBack) {
+    player->setPosition(mp);
+    auto sv = player->getStateVectorComponent();
+    if (sv) sv->mVelocity = glm::vec3(0.f);
+  } else if (!mFollow.mValue) {
     straightLineTP(mp, pp, false);
   } else {
     player->setPosition(mp);
@@ -784,6 +800,27 @@ void OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
 
   mBlocksMined++;
   mCurrentTarget = pos;
+}
+
+// =============================================================
+// RETURN FROM VERIFY — TP обратно после ожидания дропа
+// =============================================================
+
+void OreMinerV2::returnFromVerify(Actor *player) {
+  if (!player)
+    return;
+  if (mFollow.mValue)
+    return; // Follow: остаёмся на месте кластера
+
+  glm::vec3 cur = *player->getPos();
+  if (glm::distance(cur, mReturnPos) < 0.5f)
+    return;
+
+  straightLineTP(cur, mReturnPos, false);
+  player->setPosition(mReturnPos);
+  auto sv = player->getStateVectorComponent();
+  if (sv)
+    sv->mVelocity = glm::vec3(0.f);
 }
 
 // =============================================================
@@ -916,7 +953,6 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
 
     mCurrentCluster = cluster;
     mCurrentClusterIdx = 0;
-    mNeedFirstVerify = true;
 
     // Запоминаем тип руды кластера по первому блоку
     auto it = mFilteredBlocks.find(mCurrentCluster[0]);
@@ -931,40 +967,71 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       return;
     }
 
+    mReturnPos = playerPos;
     mPreSnapshot = getInventorySnapshot();
-    mineBlockAtPos(fp, player);
+    // Копаем первый блок и ОСТАЁМСЯ на нём (без TP назад), чтобы сервер
+    // успел засчитать подбор дропа — иначе реальный кластер палится как фейк.
+    mineBlockAtPos(fp, player, false);
     mMinedPositions.insert(fp);
     mCurrentClusterIdx = 1;
+    mVerifyTicks = 0;
 
-    mState = MineState::Mining;
-    mTickDelay = 1; // 1 тик на то чтобы сервер положил дроп в инвентарь
+    mState = MineState::Verifying;
+    break;
+  }
+
+  // ----- VERIFYING (ждём дроп с первого блока, стоя на руде) -----
+  case MineState::Verifying: {
+    auto post = getInventorySnapshot();
+
+    // Мусор вместо руды = фейк (анти-xray), блеклистим сразу
+    if (checkForFakeDrop(mPreSnapshot, post, mCurrentClusterOreId)) {
+      mFakeClusters++;
+      spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
+                   mCurrentCluster.size());
+
+      blacklistPositions(mCurrentCluster);
+      for (auto &p : mCurrentCluster) mMinedPositions.insert(p);
+
+      returnFromVerify(player);
+      mCurrentCluster.clear();
+      mCurrentClusterIdx = 0;
+      mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+      mState = MineState::Idle;
+      mTickDelay = 2;
+      return;
+    }
+
+    // Дроп пришёл = кластер настоящий — продолжаем копать
+    if (hasExpectedDrop(mPreSnapshot, post, mCurrentClusterOreId)) {
+      returnFromVerify(player);
+      mState = MineState::Mining;
+      break;
+    }
+
+    // Таймаут — дроп так и не пришёл = ghost-block / фейк
+    mVerifyTicks++;
+    if (mVerifyTicks > static_cast<int>(mVerifyTimeout.mValue)) {
+      mFakeClusters++;
+      spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks, no drop in {}t)! Blacklisting.",
+                   mCurrentCluster.size(), mVerifyTicks);
+
+      blacklistPositions(mCurrentCluster);
+      for (auto &p : mCurrentCluster) mMinedPositions.insert(p);
+
+      returnFromVerify(player);
+      mCurrentCluster.clear();
+      mCurrentClusterIdx = 0;
+      mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+      mState = MineState::Idle;
+      mTickDelay = 2;
+      return;
+    }
     break;
   }
 
   // ----- MINING -----
   case MineState::Mining: {
-    // Verify first block immediately after 1 tick delay
-    if (mNeedFirstVerify) {
-      mNeedFirstVerify = false;
-      auto post = getInventorySnapshot();
-      if (checkForFakeDrop(mPreSnapshot, post, mCurrentClusterOreId)) {
-        mFakeClusters++;
-        spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
-                     mCurrentCluster.size());
-
-        blacklistPositions(mCurrentCluster);
-        for (auto &p : mCurrentCluster) mMinedPositions.insert(p);
-
-        mCurrentCluster.clear();
-        mCurrentClusterIdx = 0;
-        mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
-        mState = MineState::Idle;
-        mTickDelay = 2;
-        return;
-      }
-      // Real cluster — continue mining remaining blocks
-    }
-
     // Mine next block in cluster (strict order, no skipping)
     if (mCurrentClusterIdx >= static_cast<int>(mCurrentCluster.size())) {
       spdlog::info("[OreMinerV2] Cluster done! Mined: {}, Fakes: {}",
@@ -1156,7 +1223,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
   // ---------- REMAINING CLUSTER ----------
   if (mDrawCluster.mValue && !mCurrentCluster.empty() &&
       mState != MineState::Idle) {
-    ImColor cc = mNeedFirstVerify
+    ImColor cc = mState == MineState::Verifying
                      ? ImColor(255, 255, 0, static_cast<int>(60 * alpha))
                      : ImColor(0, 200, 255, static_cast<int>(60 * alpha));
 
@@ -1184,13 +1251,15 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
       status =
           "Scanning... [" + std::to_string(mFilteredBlocks.size()) + " ores]";
       break;
+    case MineState::Verifying:
+      status = "Verifying drop... " + std::to_string(mVerifyTicks) + "/" +
+               std::to_string(static_cast<int>(mVerifyTimeout.mValue)) +
+               " | Fakes: " + std::to_string(mFakeClusters);
+      break;
     case MineState::Mining:
-      if (mNeedFirstVerify)
-        status = "Checking...";
-      else
-        status = "Mining " + std::to_string(mCurrentClusterIdx) + "/" +
-                 std::to_string(mCurrentCluster.size()) +
-                 " | Fakes: " + std::to_string(mFakeClusters);
+      status = "Mining " + std::to_string(mCurrentClusterIdx) + "/" +
+               std::to_string(mCurrentCluster.size()) +
+               " | Fakes: " + std::to_string(mFakeClusters);
       break;
     }
 

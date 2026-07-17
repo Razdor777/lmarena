@@ -274,8 +274,10 @@ bool InfiniteAura::isLockedTargetValid() {
 
   if (!isActorSafeToUse(locked)) return false;
 
-  if (locked->isDead()) return false;
-  if (locked->getHealth() <= 0.f) return false;
+  if (!mSkipDeadCheck.mValue) {
+    if (locked->isDead()) return false;
+    if (locked->getHealth() <= 0.f) return false;
+  }
 
   if (!isValidTarget(locked, player)) return false;
 
@@ -300,7 +302,7 @@ Actor *InfiniteAura::findActorByLockedName() {
   for (auto actor : actors) {
     if (!isActorSafeToUse(actor)) continue;
     if (actor == player) continue;
-    if (actor->isDead()) continue;
+    if (!mSkipDeadCheck.mValue && actor->isDead()) continue;
 
     try {
       if (actor->getRawName() == mLockedTargetName) return actor;
@@ -552,11 +554,20 @@ bool InfiniteAura::isValidTarget(Actor *actor, Actor *player) {
   if (!actor || !player) return false;
   if (actor == player) return false;
   if (!isActorSafeToUse(actor)) return false;
-  if (actor->isDead()) return false;
 
-  float hp = 0.f;
-  try { hp = actor->getHealth(); } catch (...) { return false; }
-  if (hp <= 0.f) return false;
+  if (mSkipDeadCheck.mValue) {
+    // Nametags-style detection: цель валидна, если это игрок с живыми
+    // компонентами — флаг isDead/хп клиента могут врать на некоторых серверах.
+    try { if (!actor->isPlayer()) return false; } catch (...) { return false; }
+    if (!actor->getAABBShapeComponent()) return false;
+    if (!actor->getRenderPositionComponent()) return false;
+  } else {
+    if (actor->isDead()) return false;
+
+    float hp = 0.f;
+    try { hp = actor->getHealth(); } catch (...) { return false; }
+    if (hp <= 0.f) return false;
+  }
 
   if (!mInfiniteRange.mValue) {
     try { if (actor->distanceTo(player) > mRange.mValue) return false; } catch (...) { return false; }
@@ -705,11 +716,14 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
 
   for (auto actor : actors) {
     if (!isActorSafeToUse(actor)) continue;
-    if (actor->isDead()) continue;
 
-    float hp = 0.f;
-    try { hp = actor->getHealth(); } catch (...) { continue; }
-    if (hp <= 0.f) continue;
+    if (!mSkipDeadCheck.mValue) {
+      if (actor->isDead()) continue;
+
+      float hp = 0.f;
+      try { hp = actor->getHealth(); } catch (...) { continue; }
+      if (hp <= 0.f) continue;
+    }
 
     int64_t actorID = 0;
     try { actorID = actor->getRuntimeID(); } catch (...) { continue; }
@@ -768,7 +782,11 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
     // STEP 4: Final check + attack
     bool shouldAttack = false;
     if (isActorSafeToUse(actor)) {
-      try { shouldAttack = !actor->isDead() && actor->getHealth() > 0.f; } catch (...) {}
+      if (mSkipDeadCheck.mValue) {
+        shouldAttack = true;
+      } else {
+        try { shouldAttack = !actor->isDead() && actor->getHealth() > 0.f; } catch (...) {}
+      }
     }
 
     if (shouldAttack) {

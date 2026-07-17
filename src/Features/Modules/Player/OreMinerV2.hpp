@@ -13,6 +13,10 @@ public:
   // === Mining settings ===
   NumberSetting mSpeed = NumberSetting("Speed", "Ticks between mining blocks",
                                        2.f, 0.f, 20.f, 1.f);
+  NumberSetting mVerifyTimeout = NumberSetting(
+      "Verify Timeout",
+      "Ticks to wait for the ore drop before calling a cluster fake",
+      40.f, 5.f, 200.f, 5.f);
   NumberSetting mStepDistance = NumberSetting(
       "Step Distance", "Blocks per TP step", 8.f, 1.f, 12.f, 0.5f);
   BoolSetting mSilentAccept =
@@ -43,6 +47,21 @@ public:
   // === Ore toggles ===
   BoolSetting mCoal = BoolSetting("Coal", "Mine coal ore", true);
   BoolSetting mDiamond = BoolSetting("Diamond", "Mine diamond ore", true);
+  BoolSetting mEmerald = BoolSetting("Emerald", "Mine emerald ore", true);
+
+  // === Cluster size settings (veins outside the range are skipped) ===
+  NumberSetting mCoalClusterMin = NumberSetting(
+      "Coal Cluster Min", "Min coal vein size", 8.f, 1.f, 64.f, 1.f);
+  NumberSetting mCoalClusterMax = NumberSetting(
+      "Coal Cluster Max", "Max coal vein size", 24.f, 1.f, 128.f, 1.f);
+  NumberSetting mDiamondClusterMin = NumberSetting(
+      "Diamond Cluster Min", "Min diamond vein size", 3.f, 1.f, 64.f, 1.f);
+  NumberSetting mDiamondClusterMax = NumberSetting(
+      "Diamond Cluster Max", "Max diamond vein size", 9.f, 1.f, 128.f, 1.f);
+  NumberSetting mEmeraldClusterMin = NumberSetting(
+      "Emerald Cluster Min", "Min emerald vein size", 3.f, 1.f, 64.f, 1.f);
+  NumberSetting mEmeraldClusterMax = NumberSetting(
+      "Emerald Cluster Max", "Max emerald vein size", 9.f, 1.f, 128.f, 1.f);
 
   // === Render settings ===
   BoolSetting mDrawBlocks =
@@ -56,13 +75,23 @@ public:
   OreMinerV2()
       : ModuleBase(
             "OreMinerV2",
-            "Mine coal / diamond ores with infinite reach, auto-skip fakes",
+            "Mine coal / diamond / emerald ores with infinite reach, auto-skip fakes",
             ModuleCategory::Player, 0, false) {
-    addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
-                &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
-                &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
-                &mDiamond, &mDrawBlocks, &mDrawPath, &mDrawTarget,
-                &mDrawCluster);
+    addSettings(&mSpeed, &mVerifyTimeout, &mStepDistance, &mSilentAccept,
+                &mSwing, &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey,
+                &mRadius, &mChunkRadius, &mChunkUpdatesPerTick,
+                &mOnlyExposedOres, &mCoal, &mDiamond, &mEmerald,
+                &mCoalClusterMin, &mCoalClusterMax,
+                &mDiamondClusterMin, &mDiamondClusterMax,
+                &mEmeraldClusterMin, &mEmeraldClusterMax,
+                &mDrawBlocks, &mDrawPath, &mDrawTarget, &mDrawCluster);
+
+    VISIBILITY_CONDITION(mCoalClusterMin, mCoal.mValue);
+    VISIBILITY_CONDITION(mCoalClusterMax, mCoal.mValue);
+    VISIBILITY_CONDITION(mDiamondClusterMin, mDiamond.mValue);
+    VISIBILITY_CONDITION(mDiamondClusterMax, mDiamond.mValue);
+    VISIBILITY_CONDITION(mEmeraldClusterMin, mEmerald.mValue);
+    VISIBILITY_CONDITION(mEmeraldClusterMax, mEmerald.mValue);
 
     mNames = {{Lowercase, "oreminerv2"},
               {LowercaseSpaced, "ore miner v2"},
@@ -77,14 +106,18 @@ public:
   static constexpr int DEEPSLATE_COAL_ORE_ID = 661;
   static constexpr int DIAMOND_ORE_ID = 56;
   static constexpr int DEEPSLATE_DIAMOND_ORE_ID = 660;
+  static constexpr int EMERALD_ORE_ID = 129;
+  static constexpr int DEEPSLATE_EMERALD_ORE_ID = 662;
 
-  enum class OreType { None, Coal, Diamond };
+  enum class OreType { None, Coal, Diamond, Emerald };
 
   static OreType getOreType(int id) {
     if (id == COAL_ORE_ID || id == DEEPSLATE_COAL_ORE_ID)
       return OreType::Coal;
     if (id == DIAMOND_ORE_ID || id == DEEPSLATE_DIAMOND_ORE_ID)
       return OreType::Diamond;
+    if (id == EMERALD_ORE_ID || id == DEEPSLATE_EMERALD_ORE_ID)
+      return OreType::Emerald;
     return OreType::None;
   }
 
@@ -93,15 +126,19 @@ public:
     return ta != OreType::None && ta == tb;
   }
 
-  static void getClusterRange(OreType t, int &lo, int &hi) {
+  void getClusterRange(OreType t, int &lo, int &hi) {
     switch (t) {
     case OreType::Coal:
-      lo = 8;
-      hi = 24;
+      lo = static_cast<int>(mCoalClusterMin.mValue);
+      hi = static_cast<int>(mCoalClusterMax.mValue);
       break;
     case OreType::Diamond:
-      lo = 3;
-      hi = 9;
+      lo = static_cast<int>(mDiamondClusterMin.mValue);
+      hi = static_cast<int>(mDiamondClusterMax.mValue);
+      break;
+    case OreType::Emerald:
+      lo = static_cast<int>(mEmeraldClusterMin.mValue);
+      hi = static_cast<int>(mEmeraldClusterMax.mValue);
       break;
     default:
       lo = 1;
@@ -116,6 +153,8 @@ public:
       return ImColor(0.35f, 0.35f, 0.35f, 1.f);
     case OreType::Diamond:
       return ImColor(0.f, 1.f, 1.f, 1.f);
+    case OreType::Emerald:
+      return ImColor(0.15f, 0.9f, 0.35f, 1.f);
     default:
       return ImColor(1.f, 1.f, 1.f, 1.f);
     }
@@ -147,25 +186,30 @@ public:
   // =====================================================
   // Mining state machine
   // =====================================================
-  enum class MineState { Idle, Mining };
+  enum class MineState { Idle, Verifying, Mining };
 
   MineState mState = MineState::Idle;
   glm::vec3 mRots = {0, 0, 0};
 
-  // В секции Mining state machine (после glm::vec3 mRots):
   int mCurrentClusterOreId = 0;
 
-  // Сигнатуру checkForFakeDrop замени на:
+  // Fake detection: garbage increase = fake, expected drop received = real
   bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
                         const std::unordered_map<std::string, int> &after,
                         int expectedOreId);
+  bool hasExpectedDrop(const std::unordered_map<std::string, int> &before,
+                       const std::unordered_map<std::string, int> &after,
+                       int expectedOreId);
 
   std::vector<BlockPos> mCurrentCluster;
   int mCurrentClusterIdx = 0;
   BlockPos mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
 
   std::unordered_map<std::string, int> mPreSnapshot;
-  bool mNeedFirstVerify = false;
+
+  // Drop verification (stays at the first mined block until the drop arrives)
+  glm::vec3 mReturnPos = {0.f, 0.f, 0.f};
+  int mVerifyTicks = 0;
 
   int mTickDelay = 0;
   int mBlocksMined = 0;
@@ -215,11 +259,10 @@ public:
 
   std::shared_ptr<class MovePlayerPacket> createPacketForPos(glm::vec3 pos);
   void straightLineTP(glm::vec3 from, glm::vec3 to, bool saveForRender);
-  void mineBlockAtPos(const BlockPos &pos, Actor *player);
+  void mineBlockAtPos(const BlockPos &pos, Actor *player, bool tpBack = true);
+  void returnFromVerify(Actor *player);
 
   std::unordered_map<std::string, int> getInventorySnapshot();
-  bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
-                        const std::unordered_map<std::string, int> &after);
 
   // Key helpers
   static const char *getKeyName(int vk);
@@ -240,6 +283,9 @@ public:
     switch (mState) {
     case MineState::Idle:
       s = "Idle";
+      break;
+    case MineState::Verifying:
+      s = "Verify " + std::to_string(mVerifyTicks);
       break;
     case MineState::Mining:
       s = std::to_string(mCurrentClusterIdx) + "/" +

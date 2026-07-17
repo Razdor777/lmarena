@@ -52,6 +52,8 @@ public:
     BoolSetting mFollow        = BoolSetting("Follow", "Teleport to target", false);
     BoolSetting mSilentAccept  = BoolSetting("Silent Accept", "Prevent rubber banding", true);
     BoolSetting mIgnoreFriends = BoolSetting("Ignore Friends", "Don't attack friends", true);
+    BoolSetting mSkipDeadCheck = BoolSetting("Skip Dead Check",
+        "Target players even if the client thinks they are dead (Nametags-style detection)", true);
 
     // --- Weapon ---
     EnumSettingT<SwapMode> mSwapMode   = EnumSettingT("Swap", "Weapon swap mode", SwapMode::None, "None", "Full", "Spoof");
@@ -76,7 +78,7 @@ public:
             &mFullVelocity,
             &mKBDirection, &mKBOffset, &mKBCustomAngle,
             &mOnlySameY, &mYOffset, &mOnlyOnGround,
-            &mFollow, &mSilentAccept, &mIgnoreFriends,
+            &mFollow, &mSilentAccept, &mIgnoreFriends, &mSkipDeadCheck,
             &mSwapMode, &mHotbarOnly,
             &mAutoShield,
             &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked

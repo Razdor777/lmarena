@@ -27,8 +27,7 @@
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.UI.Core.h>
 #include <build_info.h>
-#include <Features/IRC/IrcClient.hpp>
-#include <Features/Modules/Misc/IRC.hpp>
+#include <Features/Modules/Misc/DeviceSpoof.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/OAuthUtils.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
@@ -269,9 +268,6 @@ void Solstice::shutdownThread()
             isLpValid = true;
             HookManager::init(true); // Initialize the base tick hook
 
-            auto ircModule = gFeatureManager->mModuleManager->getModule<IRC>();
-            if (ircModule && !ircModule->mEnabled) ircModule->toggle();
-
             if (!Prefs->mDefaultConfigName.empty())
             {
                 if (ConfigManager::configExists(Prefs->mDefaultConfigName))
@@ -288,6 +284,11 @@ void Solstice::shutdownThread()
             } else {
                 console->warn("No default config set!");
             }
+
+            // Always force-enable DeviceSpoof on inject (after config load,
+            // so a saved config can't turn it off)
+            auto deviceSpoof = gFeatureManager->mModuleManager->getModule<DeviceSpoof>();
+            if (deviceSpoof) deviceSpoof->setEnabled(true);
         }
 
         patchInHandSlot(ClientInstance::get()->getLocalPlayer() != nullptr);

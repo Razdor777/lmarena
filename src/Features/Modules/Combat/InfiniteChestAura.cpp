@@ -5,6 +5,10 @@
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/GameMode.hpp>
+#include <SDK/Minecraft/Actor/Components/AttributesComponent.hpp>
+#include <SDK/Minecraft/Inventory/Item.hpp>
+#include <SDK/Minecraft/Inventory/ItemStack.hpp>
+#include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
 #include <SDK/Minecraft/World/BlockSource.hpp>
 #include <SDK/Minecraft/World/BlockLegacy.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
@@ -16,6 +20,7 @@
 #include <SDK/Minecraft/World/Chunk/LevelChunk.hpp>
 #include <SDK/Minecraft/World/Chunk/SubChunkBlockStorage.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
+#include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/MiscUtils/NotifyUtils.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
@@ -48,6 +53,8 @@ void InfiniteChestAura::onEnable()
     mNeedsQuickScan = true;
     mFoundChests.clear();
     mTiming = {};
+    mIsEating = false;
+    mEatSlot = -1;
 
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -79,6 +86,8 @@ void InfiniteChestAura::onDisable()
     mHasTarget = false;
     mIsChestOpen = false;
     mFoundChests.clear();
+    mIsEating = false;
+    mEatSlot = -1;
 
     std::lock_guard<std::mutex> lock(mMutex);
     mPacketPositions.clear();
@@ -496,6 +505,114 @@ void InfiniteChestAura::loadChestMemory()
 }
 
 // =========================================================
+// AUTO EAT
+// =========================================================
+
+bool InfiniteChestAura::isFoodItem(const std::string& name)
+{
+    std::string n = name;
+    std::transform(n.begin(), n.end(), n.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+
+    // Удочки-приманки не еда
+    if (n.find("on_a_stick") != std::string::npos) return false;
+
+    static const std::vector<std::string> foods = {
+        "apple", "bread", "porkchop", "beef", "chicken", "mutton", "rabbit",
+        "cod", "salmon", "tropical_fish", "cookie", "melon_slice", "carrot",
+        "potato", "beetroot", "mushroom_stew", "pumpkin_pie", "dried_kelp",
+        "sweet_berries", "glow_berries", "chorus_fruit", "honey_bottle",
+        "rotten_flesh", "spider_eye", "suspicious_stew", "pufferfish"
+    };
+    for (const auto& f : foods) {
+        if (n.find(f) != std::string::npos) return true;
+    }
+    return false;
+}
+
+int InfiniteChestAura::findFoodSlot(Actor* player)
+{
+    auto supplies = player->getSupplies();
+    if (!supplies) return -1;
+    auto container = supplies->getContainer();
+    if (!container) return -1;
+
+    for (int i = 0; i < 9; i++) {
+        auto stack = container->getItem(i);
+        if (!stack || !stack->mItem) continue;
+        if (stack->mCount <= 0) continue;
+        auto item = stack->getItem();
+        if (!item || item->mItemId == 0) continue;
+        if (isFoodItem(item->mName)) return i;
+    }
+    return -1;
+}
+
+void InfiniteChestAura::updateAutoEat(Actor* player)
+{
+    if (!player) { mIsEating = false; return; }
+
+    auto supplies = player->getSupplies();
+    if (!supplies) { mIsEating = false; return; }
+    auto container = supplies->getContainer();
+    if (!container) { mIsEating = false; return; }
+
+    auto stopEating = [&]() {
+        supplies->mSelectedSlot = mEatPrevSlot;
+        auto sender = ClientInstance::get()->getPacketSender();
+        if (sender)
+            sender->sendToServer(PacketUtils::createMobEquipmentPacket(mEatPrevSlot).get());
+        mIsEating = false;
+    };
+
+    if (!mAutoEat.mValue) {
+        if (mIsEating) stopEating();
+        return;
+    }
+
+    float hunger = 20.f, maxHunger = 20.f;
+    auto attr = player->getAttribute(AttributeId::PlayerHunger);
+    if (attr) { hunger = attr->mCurrentValue; maxHunger = attr->mMaximumValue; }
+
+    if (mIsEating) {
+        auto stack = container->getItem(mEatSlot);
+        bool stillFood = stack && stack->mItem && stack->mCount > 0 &&
+                         isFoodItem(stack->getItem()->mName);
+
+        if (hunger >= maxHunger || !stillFood || NOW - mEatStartTime > 5000) {
+            stopEating();
+            return;
+        }
+
+        // Продолжаем есть: держим еду в руке и «зажимаем» ПКМ
+        supplies->mSelectedSlot = mEatSlot;
+        player->getGameMode()->baseUseItem(stack);
+        return;
+    }
+
+    // Не начинаем есть посреди цикла сундука / с открытым контейнером
+    if (mState != State::Idle || mIsChestOpen) return;
+    if (hunger > mAutoEatHunger.mValue) return;
+
+    int slot = findFoodSlot(player);
+    if (slot == -1) return;
+
+    mEatPrevSlot = supplies->mSelectedSlot;
+    mEatSlot = slot;
+    mIsEating = true;
+    mEatStartTime = NOW;
+
+    supplies->mSelectedSlot = slot;
+    auto sender = ClientInstance::get()->getPacketSender();
+    if (sender)
+        sender->sendToServer(PacketUtils::createMobEquipmentPacket(slot).get());
+    player->getGameMode()->baseUseItem(container->getItem(slot));
+
+    if (mDebug.mValue)
+        ChatUtils::displayClientMessage("§7[ICA] §fAutoEat: eating from slot §e{}", slot);
+}
+
+// =========================================================
 // MAIN TICK
 // =========================================================
 
@@ -525,6 +642,9 @@ void InfiniteChestAura::onBaseTickEvent(BaseTickEvent& event)
         NotifyUtils::notify("Force started!", 2.f, Notification::Type::Info);
     }
 
+    // === AutoEat ===
+    updateAutoEat(player);
+
     // === WaitingForEvent — do nothing, just wait ===
     if (mState == State::WaitingForEvent) return;
 
@@ -543,6 +663,8 @@ void InfiniteChestAura::onBaseTickEvent(BaseTickEvent& event)
 
     // ---------------------------------------------------------
     case State::Idle: {
+        if (mIsEating) return; // не TP'аемся к сундуку посреди еды
+
         glm::ivec3 target = findNearestChest(player);
         if (target.x == INT_MAX) {
             mHasTarget = false;
@@ -786,6 +908,8 @@ void InfiniteChestAura::onPacketInEvent(PacketInEvent& event)
         mHasTarget = false;
         mIsChestOpen = false;
         mFoundChests.clear();
+        mIsEating = false;
+        mEatSlot = -1;
         resetScanner();
         mNeedsQuickScan = true;
         std::lock_guard<std::mutex> lock(mMutex);
