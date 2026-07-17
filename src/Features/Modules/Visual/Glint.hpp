@@ -1,23 +1,28 @@
 #pragma once
 #include <Features/Modules/Module.hpp>
 #include <glm/glm.hpp>
-#include <Hook/Detour.hpp>
 
+//
+// Glint — customize the enchantment glint.
+//
+// Implemented on top of RenderItemInHandHook, which hooks
+// mce::framebuilder::RenderItemInHandDescription's constructor.
+// That description carries documented glint fields:
+//   mGlintColor @ 0x8C, mGlintAlpha @ 0x9C
+// so we can safely restyle the glint of enchanted items without
+// inventing unverified function signatures.
+//
 class Glint : public ModuleBase<Glint> {
 public:
     Glint();
 
-    static inline Glint* instance = nullptr;
-    static inline std::unique_ptr<Detour> mDetour = nullptr;
-
-    // Настройки — используем реальные классы из Setting.hpp
-    BoolSetting mRainbow   = BoolSetting("Rainbow", "Rainbow glint color", false);
-    ColorSetting mColor    = ColorSetting("Color", "Glint color", 1.0f, 0.0f, 0.0f, 1.0f);
-    NumberSetting mAlpha   = NumberSetting("Alpha", "Glint alpha", 1.0f, 0.0f, 1.0f, 0.01f);
-
-    using GlintGetFunc = __int64(__fastcall*)(__int64 a1, __int64 a2, void* a3);
-    static __int64 __fastcall onGetGlintComponent(__int64 a1, __int64 a2, void* a3);
+    BoolSetting mRainbow     = BoolSetting("Rainbow", "Animated rainbow glint color", false);
+    ColorSetting mColor      = ColorSetting("Color", "Glint color", 0.75f, 0.25f, 1.0f, 1.0f);
+    NumberSetting mSaturation = NumberSetting("Saturation", "Glint saturation multiplier", 1.0f, 0.0f, 3.0f, 0.05f);
+    NumberSetting mAlpha     = NumberSetting("Alpha", "Glint alpha multiplier", 1.0f, 0.0f, 2.0f, 0.05f);
+    BoolSetting mShowInGui   = BoolSetting("Affect GUI", "Also restyle glint in inventory/GUI", true);
 
     void onEnable() override;
     void onDisable() override;
+    void onRenderItemInHandDesc(class RenderItemInHandDescriptionEvent& event);
 };

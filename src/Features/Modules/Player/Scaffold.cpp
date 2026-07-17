@@ -251,23 +251,21 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Visual rotation — поворот камеры клиента
+// Rotation helpers
 // ═══════════════════════════════════════════════════════════════
 
-void Scaffold::onLookInputEvent(LookInputEvent& event)
+// MC-конвенция ({pitch, yaw} в градусах) — та же, что использует Aura.
+// Считаем от глаз, а не от ног.
+glm::vec2 Scaffold::getTargetRots()
 {
-    if (mRotateMode.mValue == RotateMode::None) return;
-    if (!event.mCameraDirectLookComponent) return;
-
     auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
+    if (!player) return { 0.f, 0.f };
 
-    glm::vec3 side = (mLastFace >= 0 && mLastFace < 6) ? BlockUtils::blockFaceOffsets[mLastFace] * 0.5f : glm::vec3(0,0,0);
+    glm::vec3 side = BlockUtils::blockFaceOffsets[mLastFace] * 0.5f;
     glm::vec3 target = mLastBlock + side;
-    if (mLastFace == -1 || mLastBlock == glm::vec3(0,0,0)) {
-        target = *player->getPos() + glm::vec3(0, -1.5f, 0);
-    }
-    glm::vec2 rotations = MathUtils::getRots(*player->getPos(), target);
+    glm::vec3 eyePos = *player->getPos() + glm::vec3(0.f, PLAYER_HEIGHT, 0.f);
+
+    glm::vec2 rotations = MathUtils::getRots(eyePos, target); // {pitch, yaw}
 
     if (mRotateMode.mValue == RotateMode::Normal)
         rotations.x = fmax(rotations.x, 82.f);
@@ -280,12 +278,43 @@ void Scaffold::onLookInputEvent(LookInputEvent& event)
         if (rotations.y < -180.f) rotations.y += 360.f;
     }
 
-    // rotations = {pitch, yaw} in MC degrees
-    // mRotRads uses atan2(-x,-z) convention for yaw and inverted pitch:
-    //   mRotRads.x (yaw)   = PI - radians(mc_yaw)
-    //   mRotRads.y (pitch) = -radians(mc_pitch)
-    event.mCameraDirectLookComponent->mRotRads.x = (float)IM_PI - glm::radians(rotations.y);
-    event.mCameraDirectLookComponent->mRotRads.y = -glm::radians(rotations.x);
+    rotations.x = MathUtils::clamp(rotations.x, -90.f, 90.f);
+    rotations.y = MathUtils::wrap(rotations.y, -180.f, 180.f);
+    return rotations;
+}
+
+// Конвертация MC-ротации в формат камеры (CameraDirectLookComponent::mRotRads).
+// Проверено по Aimbot/Freecam:
+//   mRotRads.x = yaw   (радианы): atan2(-x, -z)  == -yawMC + 180
+//   mRotRads.y = pitch (радианы): atan2(y, hor)  == -pitchMC
+static inline glm::vec2 mcRotsToCameraRads(const glm::vec2& mcRots)
+{
+    float yawRad = glm::radians(-mcRots.y + 180.f);
+    while (yawRad > IM_PI)  yawRad -= 2.f * IM_PI;
+    while (yawRad < -IM_PI) yawRad += 2.f * IM_PI;
+    float pitchRad = glm::radians(-mcRots.x);
+    pitchRad = MathUtils::clamp(pitchRad, -1.55f, 1.55f); // не упираемся в полюс
+    return { yawRad, pitchRad };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Visual rotation — поворот камеры клиента
+// ═══════════════════════════════════════════════════════════════
+
+void Scaffold::onLookInputEvent(LookInputEvent& event)
+{
+    if (!mShouldRotate || mRotateMode.mValue == RotateMode::None) return;
+    if (!event.mCameraDirectLookComponent) return;
+    if (mLastFace < 0) return;
+
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+
+    glm::vec2 rotations = getTargetRots(); // {pitch, yaw} MC-градусы
+
+    // Камера живёт в другой системе координат — конвертируем, иначе
+    // взгляд зеркалится и уводит в потолок (это и ломало ротации)
+    event.mCameraDirectLookComponent->mRotRads = mcRotsToCameraRads(rotations);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -441,26 +470,9 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
             paip->mPos.y = paip->mPos.y - 0.01f;
         }
 
-        if (mRotateMode.mValue != RotateMode::None)
+        if (mShouldRotate && mRotateMode.mValue != RotateMode::None && mLastFace >= 0)
         {
-            glm::vec3 side = (mLastFace >= 0 && mLastFace < 6) ? BlockUtils::blockFaceOffsets[mLastFace] * 0.5f : glm::vec3(0,0,0);
-            glm::vec3 target = mLastBlock + side;
-            if (mLastFace == -1 || mLastBlock == glm::vec3(0,0,0)) {
-                target = *player->getPos() + glm::vec3(0, -1.5f, 0);
-            }
-            auto pos = *player->getPos();
-            glm::vec2 rotations = MathUtils::getRots(pos, target);
-
-            if (mRotateMode.mValue == RotateMode::Normal) {
-                rotations.x = fmax(rotations.x, 82.f);
-            }
-            if (mRotateMode.mValue == RotateMode::Down) rotations.x = 89.9f;
-            if (mRotateMode.mValue == RotateMode::Backwards)
-            {
-                rotations.y += 180.f;
-                if (rotations.y > 180.f) rotations.y -= 360.f;
-                if (rotations.y < -180.f) rotations.y += 360.f;
-            }
+            glm::vec2 rotations = getTargetRots(); // {pitch, yaw} MC-градусы, из глаз
 
             bool flickRotate = false;
             auto auraMod = gFeatureManager->mModuleManager->getModule<Aura>();
@@ -476,6 +488,9 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
                 paip->mRot = rotations;
                 paip->mYHeadRot = rotations.y;
             }
+
+            if (flickRotate || NOW - mLastSwitchTime > 500)
+                mShouldRotate = false;
         }
     }
 }

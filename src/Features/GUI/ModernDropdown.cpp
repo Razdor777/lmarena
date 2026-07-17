@@ -83,9 +83,25 @@ std::vector<std::shared_ptr<Module>> ModernGui::getFilteredModules(size_t catInd
 
     std::vector<std::shared_ptr<Module>> out;
     for (auto& m : all) {
-        std::string n = m->getName();
-        std::transform(n.begin(), n.end(), n.begin(), ::tolower);
-        if (n.find(q) != std::string::npos) out.push_back(m);
+        // Match against EVERY name the module has:
+        // the raw internal name + all naming-style aliases — so any
+        // spelling ("nearbyplayers", "nearby players", "NearbyPlayers"...)
+        // finds the module, regardless of the current naming style
+        bool hit = false;
+
+        std::string raw = m->mName;
+        std::transform(raw.begin(), raw.end(), raw.begin(), ::tolower);
+        if (raw.find(q) != std::string::npos) hit = true;
+
+        if (!hit) {
+            for (auto& [style, alias] : m->mNames) {
+                std::string n = alias;
+                std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+                if (n.find(q) != std::string::npos) { hit = true; break; }
+            }
+        }
+
+        if (hit) out.push_back(m);
     }
     return out;
 }

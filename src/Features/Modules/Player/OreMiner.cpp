@@ -27,6 +27,7 @@
 #include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
+#include <Utils/MiscUtils/NotifyUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
 
@@ -106,6 +107,7 @@ void OreMiner::onEnable()
     gFeatureManager->mDispatcher->listen<RenderEvent, &OreMiner::onRenderEvent>(this);
 
     mCurrentBlockPos = {INT_MAX, INT_MAX, INT_MAX};
+    mCurrentBlockFace = -1;
     mIsMiningBlock = false;
     mBreakingProgress = 0;
     mShouldSpoofSlot = true;
@@ -114,6 +116,12 @@ void OreMiner::onEnable()
     mWaitStartTime = 0;
     mWaitRetries = 0;
     mPendingVeinBlockName.clear();
+    // CRITICAL: clear ALL leftover mining state, otherwise after re-enabling
+    // the module keeps mining blocks around the OLD spot (e.g. where you
+    // disabled it 80 blocks away)
+    mVeinQueue.clear();
+    mLastMineTime = 0;
+    mLastToolWarnTime = 0;
     mFoundBlocks.clear();
     mProtectedPositions.clear();
     { std::lock_guard<std::mutex> lk(mMutex); mPacketPositions.clear(); }
@@ -139,9 +147,15 @@ void OreMiner::onDisable()
     if (player && mIsMiningBlock) player->getGameMode()->stopDestroyBlock(mCurrentBlockPos);
 
     mIsMiningBlock = false;
+    mCurrentBlockPos = { INT_MAX, INT_MAX, INT_MAX };
+    mCurrentBlockFace = -1;
+    mBreakingProgress = 0;
     mWaitingForBreak = false;
     mWaitRetries = 0;
     mPendingVeinBlockName.clear();
+    // Same stale-state cleanup as onEnable (leftover vein targets!)
+    mVeinQueue.clear();
+    mLastMineTime = 0;
     mFoundBlocks.clear();
     mProtectedPositions.clear();
     std::lock_guard<std::mutex> lk(mMutex);
@@ -153,16 +167,18 @@ void OreMiner::onDisable()
 // =========================================================
 void OreMiner::resetScanner()
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
-    mScan.center = ChunkPos(*player->getPos());
-    mScan.current = mScan.center;
     mScan.subChunkIdx = 0;
     mScan.dirIdx = 0;
     mScan.steps = 1;
     mScan.stepCount = 0;
+    mOwnSubIdx = 0;
     mFoundBlocks.clear();
     mProtectedPositions.clear();
+
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) { mScan.center = ChunkPos(0, 0); mScan.current = mScan.center; return; }
+    mScan.center = ChunkPos(*player->getPos());
+    mScan.current = mScan.center;
 }
 
 void OreMiner::moveToNextChunk()
@@ -171,6 +187,7 @@ void OreMiner::moveToNextChunk()
     auto source = ClientInstance::get()->getBlockSource();
     if (!source) { resetScanner(); return; }
     size_t numSubs = (source->getBuildHeight() - source->getBuildDepth()) / 16;
+    if (numSubs == 0) return;
     if ((size_t)mScan.subChunkIdx < numSubs - 1) { mScan.subChunkIdx++; return; }
     mScan.current.x += dirs[mScan.dirIdx].first;
     mScan.current.y += dirs[mScan.dirIdx].second;
@@ -273,24 +290,73 @@ void OreMiner::straightLineTP(glm::vec3 from, glm::vec3 to, bool save)
     }
 }
 
-void OreMiner::mineBlockAtPos(const glm::ivec3& pos, Actor* player)
+// =========================================================
+// Tool selection with durability protection (Tool Saver)
+// =========================================================
+int OreMiner::getMiningToolSlot(Block* block)
+{
+    if (!block) return -1;
+    if (!mToolSaver.mValue)
+        return ItemUtils::getBestBreakingTool(block, mHotbarOnly.mValue);
+
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return -1;
+    auto supplies = player->getSupplies();
+    if (!supplies) return -1;
+    auto container = supplies->getContainer();
+    if (!container) return -1;
+
+    int limit = mHotbarOnly.mValue ? 9 : 36;
+    int bestSlot = -1;
+    float bestSpeed = 0.f;
+
+    for (int i = 0; i < limit; i++)
+    {
+        auto item = container->getItem(i);
+        if (!item || !item->mItem) continue;
+
+        // Only real tools qualify (a bare hand doesn't), and skip tools
+        // that are about to break
+        if (!item->hasDurability()) continue;
+        if (item->getDurabilityPercent() * 100.f < mMinToolDurability.mValue) continue;
+
+        float speed = ItemUtils::getDestroySpeed(i, block);
+        if (speed > bestSpeed)
+        {
+            bestSpeed = speed;
+            bestSlot = i;
+        }
+    }
+
+    return bestSlot; // -1 → no usable tool → mining must pause
+}
+
+void OreMiner::notifyToolStop()
+{
+    if (NOW - mLastToolWarnTime < 4000) return;
+    mLastToolWarnTime = NOW;
+    NotifyUtils::notify("OreMiner: no tool with enough durability — mining paused!", 3.f, Notification::Type::Warning);
+}
+
+bool OreMiner::mineBlockAtPos(const glm::ivec3& pos, Actor* player)
 {
     auto sender = ClientInstance::get()->getPacketSender();
     auto source = ClientInstance::get()->getBlockSource();
-    if (!sender || !source) return;
+    if (!sender || !source) return false;
 
     Block* block = source->getBlock(pos);
-    if (!block || block->mLegacy->isAir()) return;
+    if (!block || block->mLegacy->isAir()) return false;
 
     int face = BlockUtils::getExposedFace(pos);
     if (face == -1) face = 1;
 
     auto supplies = player->getSupplies();
-    if (!supplies) return;
+    if (!supplies) return false;
     auto container = supplies->getContainer();
-    if (!container) return;
+    if (!container) return false;
 
-    int bestTool = ItemUtils::getBestBreakingTool(block, mHotbarOnly.mValue);
+    int bestTool = getMiningToolSlot(block);
+    if (bestTool == -1) return false; // Tool Saver: nothing usable — send nothing
     int oldSlot = supplies->mSelectedSlot;
     glm::vec3 playerPos = *player->getPos();
     glm::vec3 minePos = { pos.x + 0.5f, pos.y + 2.62f, pos.z + 0.5f };
@@ -334,6 +400,7 @@ void OreMiner::mineBlockAtPos(const glm::ivec3& pos, Actor* player)
     // NOTE: Do NOT call BlockUtils::clearBlock here!
     // Clearing the block locally before server confirms causes blocks to be
     // "skipped" — the code thinks they're mined but the server never processed it.
+    return true;
 }
 
 // =========================================================
@@ -499,16 +566,45 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
         if (now - lastScan >= freq)
         {
             lastScan = now;
-            if (glm::distance(glm::vec2(mScan.current), glm::vec2(mScan.center)) > CHUNK_RADIUS)
+            ChunkPos playerChunk(*player->getPos());
+
+            // Player walked away while the spiral was still scanning →
+            // restart it around the player right away
+            if (std::max(abs(mScan.center.x - playerChunk.x),
+                         abs(mScan.center.y - playerChunk.y)) > 1)
             {
-                mScan.center = ChunkPos(*player->getPos());
+                mScan.center = playerChunk;
                 mScan.current = mScan.center;
                 mScan.stepCount = 0;
                 mScan.steps = 1;
                 mScan.dirIdx = 0;
                 mScan.subChunkIdx = 0;
             }
-            for (int i = 0; i < CHUNKS_PER_TICK; i++)
+
+            // Spiral finished → restart it (keeps outer chunks fresh)
+            if (glm::distance(glm::vec2(mScan.current), glm::vec2(mScan.center)) > CHUNK_RADIUS)
+            {
+                mScan.center = playerChunk;
+                mScan.current = mScan.center;
+                mScan.stepCount = 0;
+                mScan.steps = 1;
+                mScan.dirIdx = 0;
+                mScan.subChunkIdx = 0;
+            }
+
+            // 1) Priority pass: the player's OWN chunk, round-robin through
+            // its subchunks. This is what makes ore right next to you show
+            // up in ~1s instead of "sometimes it sees it, sometimes not".
+            size_t numSubs = (source->getBuildHeight() - source->getBuildDepth()) / 16;
+            if (numSubs == 0) numSubs = 1;
+            for (int i = 0; i < OWN_SUBS_PER_TICK; i++)
+            {
+                TRY_CALL([&]() { scanSubChunk(playerChunk, mOwnSubIdx); });
+                mOwnSubIdx = (mOwnSubIdx + 1) % (int)numSubs;
+            }
+
+            // 2) Spiral pass for the surroundings
+            for (int i = 0; i < CHUNKS_PER_TICK - OWN_SUBS_PER_TICK; i++)
             {
                 TRY_CALL([&]() { scanSubChunk(mScan.current, mScan.subChunkIdx); });
                 moveToNextChunk();
@@ -522,6 +618,14 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
         if (mProtectedPositions.count(it->first))
         {
             it = mFoundBlocks.erase(it);
+            continue;
+        }
+        // Skip blocks in chunks that aren't loaded — otherwise valid targets
+        // get purged every time a chunk unloads, and the module "forgets"
+        // ores it already saw
+        if (!source->getChunk(ChunkPos(it->first.x >> 4, it->first.z >> 4)))
+        {
+            ++it;
             continue;
         }
         Block* block = source->getBlock(it->first);
@@ -595,7 +699,21 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
                 else
                 {
                     // Retry: send TP+break packets again
-                    mineBlockAtPos(mCurrentBlockPos, player);
+                    if (!mineBlockAtPos(mCurrentBlockPos, player))
+                    {
+                        // No usable tool (Tool Saver) → pause instead of
+                        // blacklisting the block for no reason
+                        player->getGameMode()->stopDestroyBlock(mCurrentBlockPos);
+                        mIsMiningBlock = false;
+                        mWaitingForBreak = false;
+                        mWaitRetries = 0;
+                        mCurrentBlockPos = { INT_MAX, INT_MAX, INT_MAX };
+                        mBreakingProgress = 0;
+                        mShouldSpoofSlot = true;
+                        mPendingVeinBlockName.clear();
+                        notifyToolStop();
+                        return;
+                    }
                     mWaitStartTime = NOW;
                 }
             }
@@ -605,7 +723,19 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
         else
         {
             // Close block: progressive mining
-            int bestTool = ItemUtils::getBestBreakingTool(block, mHotbarOnly.mValue);
+            int bestTool = getMiningToolSlot(block);
+            if (bestTool == -1)
+            {
+                // Tool Saver: tool got too damaged mid-block → pause
+                player->getGameMode()->stopDestroyBlock(mCurrentBlockPos);
+                mIsMiningBlock = false;
+                mCurrentBlockPos = { INT_MAX, INT_MAX, INT_MAX };
+                mBreakingProgress = 0;
+                mShouldSpoofSlot = true;
+                mPendingVeinBlockName.clear();
+                notifyToolStop();
+                return;
+            }
             if (mShouldSpoofSlot) { PacketUtils::spoofSlot(bestTool, false); mShouldSpoofSlot = false; return; }
             mToolSlot = bestTool;
 
@@ -625,10 +755,21 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
                 if (dist > 6.0f)
                 {
                     // Far block: TP + break, then WAIT for server
-                    mineBlockAtPos(mCurrentBlockPos, player);
-                    mWaitingForBreak = true;
-                    mWaitStartTime = NOW;
-                    mWaitRetries = 0;
+                    if (mineBlockAtPos(mCurrentBlockPos, player))
+                    {
+                        mWaitingForBreak = true;
+                        mWaitStartTime = NOW;
+                        mWaitRetries = 0;
+                    }
+                    else
+                    {
+                        player->getGameMode()->stopDestroyBlock(mCurrentBlockPos);
+                        mIsMiningBlock = false;
+                        mCurrentBlockPos = { INT_MAX, INT_MAX, INT_MAX };
+                        mShouldSpoofSlot = true;
+                        mPendingVeinBlockName.clear();
+                        notifyToolStop();
+                    }
                 }
                 else
                 {
@@ -652,6 +793,14 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
         uint64_t delayMs = static_cast<uint64_t>(mMineDelay.mValue);
         if (delayMs > 0 && now - mLastMineTime < delayMs) return;
 
+        // Tool Saver: don't even start the vein with a dying tool
+        if (Block* frontBlock = source->getBlock(mVeinQueue.front());
+            frontBlock && !frontBlock->mLegacy->isAir() && getMiningToolSlot(frontBlock) == -1)
+        {
+            notifyToolStop();
+            return;
+        }
+
         int blocksThisTick = static_cast<int>(mBlocksPerTick.mValue);
         for (int b = 0; b < blocksThisTick && !mVeinQueue.empty(); b++) {
             glm::ivec3 veinPos = mVeinQueue.front();
@@ -659,7 +808,11 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
 
             Block* vBlock = source->getBlock(veinPos);
             if (vBlock && !vBlock->mLegacy->isAir() && isTargetBlock(vBlock->mLegacy->getmName())) {
-                mineBlockAtPos(veinPos, player);
+                if (!mineBlockAtPos(veinPos, player))
+                {
+                    notifyToolStop();
+                    break;
+                }
                 mFoundBlocks.erase(veinPos);
             }
         }
@@ -680,6 +833,15 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
         Block* targetBlock = source->getBlock(target);
         if (!targetBlock || targetBlock->mLegacy->isAir()) return;
 
+        // Tool Saver: no usable tool → pause and warn (module stays enabled
+        // and resumes as soon as you get a fresh tool)
+        int toolSlot = getMiningToolSlot(targetBlock);
+        if (toolSlot == -1)
+        {
+            notifyToolStop();
+            return;
+        }
+
         // Save block name for VeinMiner
         mPendingVeinBlockName = targetBlock->mLegacy->getmName();
 
@@ -687,7 +849,7 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
         if (dist > 6.0f)
         {
             // Far block: TP + break, then wait for server confirmation
-            mineBlockAtPos(target, player);
+            if (!mineBlockAtPos(target, player)) { notifyToolStop(); return; }
             mCurrentBlockPos = target;
             mIsMiningBlock = true;
             mWaitingForBreak = true;
@@ -708,7 +870,7 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
             mWaitingForBreak = false;
             mWaitRetries = 0;
 
-            int bestTool = ItemUtils::getBestBreakingTool(targetBlock, mHotbarOnly.mValue);
+            int bestTool = toolSlot;
             PacketUtils::spoofSlot(bestTool, false);
             mShouldSpoofSlot = false;
             mToolSlot = bestTool;
