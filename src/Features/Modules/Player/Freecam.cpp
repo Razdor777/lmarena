@@ -289,9 +289,11 @@ void Freecam::onActorRenderEvent(ActorRenderEvent& event)
 
 void Freecam::onLookInputEvent(LookInputEvent& event)
 {
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+
     if (mResetRot)
     {
-        auto player = ClientInstance::get()->getLocalPlayer();
         for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
         {
             player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, true);
@@ -325,9 +327,7 @@ void Freecam::onLookInputEvent(LookInputEvent& event)
 
 
     if (!mEnabled) return;
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
-
+    if (!event.mCameraDirectLookComponent) return;
 
     ClientInstance::get()->getOptions()->mThirdPerson->value = 0;
 

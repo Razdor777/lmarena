@@ -27,19 +27,18 @@ static float calculateActorHealth(Actor* actor) {
         size_t nl = targetName.find('\n');
         if (nl != std::string::npos) targetName = targetName.substr(0, nl);
         
+        std::string cleanName = ColorUtils::removeColorCodes(actor->getRawName());
+        
         float th = health, tmh = maxHealth;
         bool tracked = false;
         if (HealthTracker::getInstance().getHealth(targetName, th, tmh)) {
             health = th;
             maxHealth = tmh;
             tracked = true;
-        } else {
-            std::string cleanName = actor->getRawName();
-            if (HealthTracker::getInstance().getHealth(cleanName, th, tmh)) {
-                health = th;
-                maxHealth = tmh;
-                tracked = true;
-            }
+        } else if (HealthTracker::getInstance().getHealth(cleanName, th, tmh)) {
+            health = th;
+            maxHealth = tmh;
+            tracked = true;
         }
     }
     return health;

@@ -1,8 +1,9 @@
 //
 // AmbientCubes.cpp — Soft floating ambient particles
 //
-// Small, subtle shapes that float around the player.
+// Small, subtle aesthetic shapes that float around the player.
 // Designed to be easy on the eyes: thin lines, soft glow, gentle movement.
+// Instantly adapts to high-speed movement and pearl teleports.
 //
 
 #include "AmbientCubes.hpp"
@@ -23,6 +24,12 @@
 void AmbientCubes::onEnable() {
     cubes.clear();
     spawnTimer = 0;
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (player) {
+        mLastPlayerPos = *player->getPos();
+    } else {
+        mLastPlayerPos = glm::vec3(0, 0, 0);
+    }
 }
 
 void AmbientCubes::onDisable() {
@@ -38,9 +45,29 @@ ImColor AmbientCubes::getColor() {
 
 void AmbientCubes::spawnCube(const glm::vec3& playerPos) {
     AmbientCube cube;
+    spawnCubeNear(cube, playerPos);
 
+    float baseSize = mCubeSize.mValue;
+    float variation = mSizeVariation.mValue;
+    cube.size = baseSize + ((rand() % 100) / 100.f - 0.5f) * variation * baseSize;
+    cube.size = std::max(cube.size, 0.05f);
+
+    switch (mStyle.mValue) {
+    case ParticleStyle::Mixed:    cube.style = rand() % 4; break;
+    case ParticleStyle::Diamonds: cube.style = 0; break;
+    case ParticleStyle::Rings:    cube.style = 1; break;
+    case ParticleStyle::Dots:     cube.style = 2; break;
+    case ParticleStyle::Stars:    cube.style = 3; break;
+    case ParticleStyle::Triangles:cube.style = 3; break;
+    }
+
+    cubes.push_back(cube);
+}
+
+void AmbientCubes::spawnCubeNear(AmbientCube& cube, const glm::vec3& playerPos) {
     float radius = mSpawnRadius.mValue;
     float angle = (rand() % 360) * (float)M_PI / 180.f;
+    float dist = (rand() % (int)(radius * 100)) / 100.f;
 
     switch (mSpawnArea.mValue) {
     case SpawnArea::Everywhere:
@@ -54,9 +81,9 @@ void AmbientCubes::spawnCube(const glm::vec3& playerPos) {
         cube.position.z = playerPos.z + ((rand() % (int)(radius * 2)) - radius);
         break;
     case SpawnArea::Front:
-        cube.position.x = playerPos.x + cosf(angle) * (rand() % (int)radius);
+        cube.position.x = playerPos.x + cosf(angle) * dist;
         cube.position.y = playerPos.y + ((rand() % (int)(radius)) - radius * 0.3f);
-        cube.position.z = playerPos.z + (rand() % (int)radius);
+        cube.position.z = playerPos.z + sinf(angle) * dist + radius * 0.3f;
         break;
     case SpawnArea::Surround:
         cube.position.x = playerPos.x + cosf(angle) * radius;
@@ -66,9 +93,9 @@ void AmbientCubes::spawnCube(const glm::vec3& playerPos) {
     }
 
     // Gentle drift velocity
-    cube.velocity.x = ((rand() % 100) - 50) / 100.f * 0.3f;
-    cube.velocity.y = ((rand() % 100) - 20) / 100.f * 0.2f;
-    cube.velocity.z = ((rand() % 100) - 50) / 100.f * 0.3f;
+    cube.velocity.x = ((rand() % 100) - 50) / 100.f * 0.25f;
+    cube.velocity.y = ((rand() % 100) - 20) / 100.f * 0.15f;
+    cube.velocity.z = ((rand() % 100) - 50) / 100.f * 0.25f;
 
     cube.rotation = glm::vec3(
         (rand() % 360) * (float)M_PI / 180.f,
@@ -77,30 +104,28 @@ void AmbientCubes::spawnCube(const glm::vec3& playerPos) {
     );
 
     cube.rotationSpeed = glm::vec3(
-        ((rand() % 100) - 50) / 50.f * mRotationSpeed.mValue,
-        ((rand() % 100) - 50) / 50.f * mRotationSpeed.mValue,
-        ((rand() % 100) - 50) / 50.f * mRotationSpeed.mValue
+        ((rand() % 100) - 50) / 50.f * mRotationSpeed.mValue * 0.6f,
+        ((rand() % 100) - 50) / 50.f * mRotationSpeed.mValue * 0.6f,
+        ((rand() % 100) - 50) / 50.f * mRotationSpeed.mValue * 0.6f
     );
+
+    cube.alpha = mAlpha.mValue;
+    cube.maxLifetime = mLifetime.mValue + ((rand() % 40) / 10.f - 2.f);
+    cube.lifetime = cube.maxLifetime;
 
     float baseSize = mCubeSize.mValue;
     float variation = mSizeVariation.mValue;
     cube.size = baseSize + ((rand() % 100) / 100.f - 0.5f) * variation * baseSize;
     cube.size = std::max(cube.size, 0.05f);
 
-    cube.alpha = mAlpha.mValue;
-    cube.maxLifetime = mLifetime.mValue + ((rand() % 40) / 10.f - 2.f);
-    cube.lifetime = cube.maxLifetime;
-
     switch (mStyle.mValue) {
-    case ParticleStyle::Mixed:    cube.style = rand() % 5; break;
+    case ParticleStyle::Mixed:    cube.style = rand() % 4; break;
     case ParticleStyle::Diamonds: cube.style = 0; break;
     case ParticleStyle::Rings:    cube.style = 1; break;
     case ParticleStyle::Dots:     cube.style = 2; break;
     case ParticleStyle::Stars:    cube.style = 3; break;
-    case ParticleStyle::Triangles:cube.style = 4; break;
+    case ParticleStyle::Triangles:cube.style = 3; break;
     }
-
-    cubes.push_back(cube);
 }
 
 void AmbientCubes::updateCube(AmbientCube& cube, float deltaTime) {
@@ -123,7 +148,7 @@ void AmbientCubes::updateCube(AmbientCube& cube, float deltaTime) {
 }
 
 // ============================================================
-// SHAPE RENDERING — soft, thin, gentle shapes
+// SHAPE RENDERING — clean, minimal, aesthetic ambient particles
 // ============================================================
 void AmbientCubes::renderShape(const glm::vec2& screenPos, float size,
                                 const glm::vec3& rotation, float alpha,
@@ -131,55 +156,42 @@ void AmbientCubes::renderShape(const glm::vec2& screenPos, float size,
     auto drawList = ImGui::GetBackgroundDrawList();
     color.Value.w = alpha;
 
-    // Small pixel size (12px per unit instead of 20)
-    float pixelSize = size * 12.f;
-    float rx = rotation.x;
-    float ry = rotation.y;
+    float pixelSize = size * 14.f;
 
     switch (style) {
-    case 0: { // Diamond — small rotating rhombus
-        float s = pixelSize;
-        float stretch = 1.0f + 0.2f * sinf(rx);
+    case 0: { // Soft Glowing Orb / Sparkle
+        ImColor glowColor = color;
+        glowColor.Value.w = alpha * 0.35f;
+        drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), pixelSize * 0.9f, glowColor, 12);
 
-        ImVec2 top(screenPos.x, screenPos.y - s * stretch);
-        ImVec2 right(screenPos.x + s * 0.5f, screenPos.y);
-        ImVec2 bottom(screenPos.x, screenPos.y + s * stretch * 0.5f);
-        ImVec2 left(screenPos.x - s * 0.5f, screenPos.y);
-
-        ImColor fillColor = color;
-        fillColor.Value.w = alpha * 0.25f;
-        drawList->AddQuadFilled(top, right, bottom, left, fillColor);
-
-        ImColor edgeColor = color;
-        edgeColor.Value.w = alpha * 0.65f;
-        drawList->AddQuad(top, right, bottom, left, edgeColor, 1.0f);
+        ImColor coreColor = ImColor(255, 255, 255, (int)(255 * alpha * 0.8f));
+        drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), pixelSize * 0.35f, coreColor, 8);
         break;
     }
-    case 1: { // Ring — thin circle outline
-        float s = pixelSize * 0.8f;
+    case 1: { // Thin Minimal Ring
+        float s = pixelSize * 0.85f;
         ImColor ringColor = color;
-        ringColor.Value.w = alpha * 0.55f;
+        ringColor.Value.w = alpha * 0.6f;
         drawList->AddCircle(ImVec2(screenPos.x, screenPos.y), s, ringColor, 16, 1.0f);
 
-        // Inner dot
         ImColor dotColor = color;
-        dotColor.Value.w = alpha * 0.3f;
-        drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), s * 0.2f, dotColor, 8);
+        dotColor.Value.w = alpha * 0.25f;
+        drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), s * 0.25f, dotColor, 8);
         break;
     }
-    case 2: { // Dot — soft filled circle
-        float s = pixelSize * 0.5f;
+    case 2: { // Soft Micro Dot
+        float s = pixelSize * 0.45f;
         ImColor dotColor = color;
-        dotColor.Value.w = alpha * 0.5f;
+        dotColor.Value.w = alpha * 0.7f;
         drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), s, dotColor, 12);
         break;
     }
-    case 3: { // Star — 4-pointed star
-        float s = pixelSize;
-        float inner = s * 0.3f;
+    case 3: { // Delicate 4-Pointed Sparkle Star
+        float s = pixelSize * 1.1f;
+        float inner = s * 0.25f;
 
         ImColor starColor = color;
-        starColor.Value.w = alpha * 0.6f;
+        starColor.Value.w = alpha * 0.65f;
 
         float baseAngle = rotation.z;
         for (int i = 0; i < 4; i++) {
@@ -194,30 +206,13 @@ void AmbientCubes::renderShape(const glm::vec2& screenPos, float size,
         }
         break;
     }
-    case 4: { // Triangle — small rotating triangle
-        float s = pixelSize * 0.7f;
-        ImVec2 points[3];
-        for (int i = 0; i < 3; i++) {
-            float a = rotation.z + i * (float)M_PI * 2.f / 3.f;
-            points[i] = ImVec2(screenPos.x + cosf(a) * s, screenPos.y + sinf(a) * s);
-        }
-
-        ImColor fillColor = color;
-        fillColor.Value.w = alpha * 0.2f;
-        drawList->AddTriangleFilled(points[0], points[1], points[2], fillColor);
-
-        ImColor edgeColor = color;
-        edgeColor.Value.w = alpha * 0.55f;
-        drawList->AddTriangle(points[0], points[1], points[2], edgeColor, 1.0f);
-        break;
-    }
     }
 
-    // Soft glow
+    // Soft background aura glow
     if (mGlow.mValue) {
-        ImColor glowColor = color;
-        glowColor.Value.w = alpha * 0.12f;
-        drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), pixelSize * 1.2f, glowColor, 12);
+        ImColor auraColor = color;
+        auraColor.Value.w = alpha * 0.1f;
+        drawList->AddCircleFilled(ImVec2(screenPos.x, screenPos.y), pixelSize * 1.6f, auraColor, 12);
     }
 }
 
@@ -249,22 +244,34 @@ void AmbientCubes::onRenderEvent(RenderEvent& event) {
     float deltaTime = ImGui::GetIO().DeltaTime;
     glm::vec3 playerPos = *player->getPos();
 
+    // Instantly redistribute/recycle particles if player moved very fast (pearl throw / elytra flight)
+    float moveDist = glm::distance(playerPos, mLastPlayerPos);
+    if (moveDist > mSpawnRadius.mValue || cubes.empty()) {
+        for (auto& cube : cubes) {
+            spawnCubeNear(cube, playerPos);
+        }
+    }
+    mLastPlayerPos = playerPos;
+
     float spawnRate = (float)mCubeCount.mValue / mLifetime.mValue;
     spawnTimer += deltaTime;
 
     while (spawnTimer > 1.f / spawnRate && cubes.size() < (size_t)mCubeCount.mValue) {
-        spawnCube(playerPos);
+        AmbientCube cube;
+        spawnCubeNear(cube, playerPos);
+        cubes.push_back(cube);
         spawnTimer -= 1.f / spawnRate;
     }
 
     for (auto it = cubes.begin(); it != cubes.end();) {
         updateCube(*it, deltaTime);
 
-        if (it->lifetime <= 0) {
-            it = cubes.erase(it);
-        } else {
-            renderCube(*it);
-            ++it;
+        // If particle drifted too far from player, recycle near player immediately
+        if (glm::distance(it->position, playerPos) > mSpawnRadius.mValue * 2.2f || it->lifetime <= 0) {
+            spawnCubeNear(*it, playerPos);
         }
+
+        renderCube(*it);
+        ++it;
     }
 }

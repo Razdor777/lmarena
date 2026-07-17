@@ -256,14 +256,17 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
 
 void Scaffold::onLookInputEvent(LookInputEvent& event)
 {
-    if (!mShouldRotate || mRotateMode.mValue == RotateMode::None) return;
+    if (mRotateMode.mValue == RotateMode::None) return;
     if (!event.mCameraDirectLookComponent) return;
 
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
 
-    glm::vec3 side = BlockUtils::blockFaceOffsets[mLastFace] * 0.5f;
+    glm::vec3 side = (mLastFace >= 0 && mLastFace < 6) ? BlockUtils::blockFaceOffsets[mLastFace] * 0.5f : glm::vec3(0,0,0);
     glm::vec3 target = mLastBlock + side;
+    if (mLastFace == -1 || mLastBlock == glm::vec3(0,0,0)) {
+        target = *player->getPos() + glm::vec3(0, -1.5f, 0);
+    }
     glm::vec2 rotations = MathUtils::getRots(*player->getPos(), target);
 
     if (mRotateMode.mValue == RotateMode::Normal)
@@ -435,10 +438,13 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
             paip->mPos.y = paip->mPos.y - 0.01f;
         }
 
-        if (mShouldRotate && mRotateMode.mValue != RotateMode::None)
+        if (mRotateMode.mValue != RotateMode::None)
         {
-            glm::vec3 side = BlockUtils::blockFaceOffsets[mLastFace] * 0.5f;
+            glm::vec3 side = (mLastFace >= 0 && mLastFace < 6) ? BlockUtils::blockFaceOffsets[mLastFace] * 0.5f : glm::vec3(0,0,0);
             glm::vec3 target = mLastBlock + side;
+            if (mLastFace == -1 || mLastBlock == glm::vec3(0,0,0)) {
+                target = *player->getPos() + glm::vec3(0, -1.5f, 0);
+            }
             auto pos = *player->getPos();
             glm::vec2 rotations = MathUtils::getRots(pos, target);
 
@@ -467,9 +473,6 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
                 paip->mRot = rotations;
                 paip->mYHeadRot = rotations.y;
             }
-
-            if (flickRotate || NOW - mLastSwitchTime > 500)
-                mShouldRotate = false;
         }
     }
 }

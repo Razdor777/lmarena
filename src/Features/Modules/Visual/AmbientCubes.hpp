@@ -91,6 +91,7 @@ public:
 
     std::deque<AmbientCube> cubes;
     float spawnTimer = 0;
+    glm::vec3 mLastPlayerPos = {0, 0, 0};
 
     void onEnable() override;
     void onDisable() override;
@@ -98,6 +99,7 @@ public:
 
 private:
     void spawnCube(const glm::vec3& playerPos);
+    void spawnCubeNear(AmbientCube& cube, const glm::vec3& playerPos);
     void updateCube(AmbientCube& cube, float deltaTime);
     void renderCube(const AmbientCube& cube);
     void renderShape(const glm::vec2& screenPos, float size,

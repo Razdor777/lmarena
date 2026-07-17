@@ -71,23 +71,28 @@ static float drawChip(ImDrawList* dl, ImFont* font, float fs,
     float x, float y, const char* text, ImColor textColor,
     float opacity, float rounding, bool blur)
 {
-    float padH = 7.f, padV = 3.f;
+    float padH = 9.f, padV = 4.f;
     float tw = font->CalcTextSizeA(fs, FLT_MAX, 0, text).x;
     float w  = tw + padH * 2.f;
     float h  = fs + padV * 2.f;
 
     if (blur)
-        ImRenderUtils::addBlur(ImVec4(x, y, x+w, y+h), 3.f, rounding);
+        ImRenderUtils::addBlur(ImVec4(x, y, x+w, y+h), 3.5f, rounding);
 
+    // Premium soft dark glass background
     dl->AddRectFilled({x,y},{x+w,y+h},
-        ImColor(8,8,13,(int)(220*opacity)), rounding);
+        ImColor(14, 14, 20, (int)(210 * opacity)), rounding);
 
-    // thin colored top line
-    dl->AddRectFilled({x+rounding*0.5f, y}, {x+w-rounding*0.5f, y+1.f},
-        ImColor(textColor.Value.x, textColor.Value.y, textColor.Value.z, 0.6f));
+    // Subtle crisp border
+    dl->AddRect({x,y},{x+w,y+h},
+        ImColor(255, 255, 255, 22), rounding, 0, 1.0f);
 
-    // text shadow + text
-    dl->AddText(font, fs, {x+padH+1, y+padV+1}, ImColor(0,0,0,80), text);
+    // Soft glowing top accent line
+    dl->AddRectFilled({x+rounding*0.5f, y}, {x+w-rounding*0.5f, y+1.5f},
+        ImColor(textColor.Value.x, textColor.Value.y, textColor.Value.z, 0.75f), rounding);
+
+    // Clean text
+    dl->AddText(font, fs, {x+padH+0.5f, y+padV+0.5f}, ImColor(0,0,0,100), text);
     dl->AddText(font, fs, {x+padH,   y+padV  }, textColor, text);
 
     return w;
