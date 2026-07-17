@@ -23,7 +23,7 @@ public:
               {NormalSpaced, "Health Display"}};
   }
 
-  // ── Health tracking (same system as NearbyPlayers) ──────────────────────
+  // Health tracking (same system as NearbyPlayers)
   struct HealthInfo {
     float health = 20;
     float lastAbsorption = 0;

@@ -6,7 +6,6 @@
 
 #include <Features/Events/ActorRenderEvent.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
-#include <SDK/Minecraft/Network/Packets/CameraInstructionPacket.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/LookInputEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
@@ -27,7 +26,10 @@
 void Freecam::onEnable()
 {
     auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
+    if (!player) {
+        setEnabled(false);
+        return;
+    }
 
     // NoClip: save and disable collision/gravity
     mHadCollision = player->getStatusFlag(ActorFlags::HasCollision);
@@ -69,38 +71,46 @@ void Freecam::onEnable()
 
 
     auto gock = player->getActorHeadRotationComponent();
-    mHeadYaw = { gock->mHeadRot, gock->mOldHeadRot };
+    if (gock) mHeadYaw = { gock->mHeadRot, gock->mOldHeadRot };
 
-    for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
-    {
-        player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, false);
-        player->mContext.mRegistry->set_flag<ExtendPlayerRenderingComponent>(id, true);
+    // Clear previous camera state to avoid stale data
+    mOriginalRotRads.clear();
+    mCameras.clear();
 
-        auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
-        if (mMode.mValue == Mode::Detached && storage->contains(id))
+    try {
+        for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
         {
-            mCameras[id] = storage->get(id).mUpdateMode;
-            storage->remove(id);
-        }
+            player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, false);
+            player->mContext.mRegistry->set_flag<ExtendPlayerRenderingComponent>(id, true);
 
-        if (cameraComponent.getMode() == CameraMode::FirstPerson)
-        {
-            auto* gaming = player->mContext.mRegistry->try_get<CameraDirectLookComponent>(id);
-            if (gaming)
+            auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
+            if (mMode.mValue == Mode::Detached && storage && storage->contains(id))
             {
-                mOriginalRotRads[cameraComponent.getMode()] = gaming->mRotRads;
+                mCameras[id] = storage->get(id).mUpdateMode;
+                storage->remove(id);
             }
 
-            // Remove the CameraRenderFirstPersonObjectsComponent flag
-            player->mContext.mRegistry->set_flag<CameraRenderFirstPersonObjectsComponent>(id, false);
-        } else if (cameraComponent.getMode() == CameraMode::ThirdPerson || cameraComponent.getMode() == CameraMode::ThirdPersonFront)
-        {
-            auto* gaming = player->mContext.mRegistry->try_get<CameraOrbitComponent>(id);
-            if (gaming)
+            if (cameraComponent.getMode() == CameraMode::FirstPerson)
             {
-                mOriginalRotRads[cameraComponent.getMode()] = gaming->mRotRads;
+                auto* gaming = player->mContext.mRegistry->try_get<CameraDirectLookComponent>(id);
+                if (gaming)
+                {
+                    mOriginalRotRads[cameraComponent.getMode()] = gaming->mRotRads;
+                }
+
+                // Remove the CameraRenderFirstPersonObjectsComponent flag
+                player->mContext.mRegistry->set_flag<CameraRenderFirstPersonObjectsComponent>(id, false);
+            } else if (cameraComponent.getMode() == CameraMode::ThirdPerson || cameraComponent.getMode() == CameraMode::ThirdPersonFront)
+            {
+                auto* gaming = player->mContext.mRegistry->try_get<CameraOrbitComponent>(id);
+                if (gaming)
+                {
+                    mOriginalRotRads[cameraComponent.getMode()] = gaming->mRotRads;
+                }
             }
         }
+    } catch (...) {
+        spdlog::warn("[Freecam] Exception during camera setup, continuing anyway");
     }
 }
 
@@ -128,10 +138,15 @@ void Freecam::onDisable()
 
     if (mMode.mValue == Mode::Normal)
     {
-        player->getAABBShapeComponent()->mMin = mAABBMin;
-        player->getAABBShapeComponent()->mMax = mAABBMax;
-        player->getStateVectorComponent()->mPos = mSvPos;
-        player->getStateVectorComponent()->mPosOld = mSvPosOld;
+        auto aabb = player->getAABBShapeComponent();
+        if (aabb) {
+            aabb->mMin = mAABBMin;
+            aabb->mMax = mAABBMax;
+        }
+        if (sv) {
+            sv->mPos = mSvPos;
+            sv->mPosOld = mSvPosOld;
+        }
     }
     player->getWalkAnimationComponent()->mWalkAnimSpeed = 1.0f;
     player->getMoveInputComponent()->reset( false);
@@ -209,7 +224,6 @@ void Freecam::onBaseTickEvent(BaseTickEvent& event)
 
     player->setFlag<RenderCameraComponent>(true);
     player->setFlag<CameraRenderPlayerModelComponent>(true);
-    //player->setFlag<CameraRenderFirstPersonObjects>(false);
 
     // NoClip: force collision off every tick
     player->setStatusFlag(ActorFlags::HasCollision, false);
@@ -244,7 +258,10 @@ void Freecam::onBaseTickEvent(BaseTickEvent& event)
             motion.y -= mSpeed.mValue / 10;
     }
 
-    if (mMode.mValue == Mode::Normal) player->getStateVectorComponent()->mVelocity = motion;
+    if (mMode.mValue == Mode::Normal) {
+        auto sv = player->getStateVectorComponent();
+        if (sv) sv->mVelocity = motion;
+    }
     else if (mMode.mValue == Mode::Detached)
     {
         mOldOrigin = mOrigin;
@@ -258,7 +275,14 @@ void Freecam::onActorRenderEvent(ActorRenderEvent& event)
     if (!player) return;
 
     if (event.mEntity != player) return;
-    if (*event.mPos == glm::vec3(0.f, 0.f, 0.f) && *event.mRot == glm::vec2(0.f, 0.f)) event.cancel(); // Prevents the hand from rendering
+
+    // Null-check event pointers before dereferencing
+    if (!event.mPos || !event.mRot) {
+        event.cancel();
+        return;
+    }
+
+    if (*event.mPos == glm::vec3(0.f, 0.f, 0.f) && *event.mRot == glm::vec2(0.f, 0.f)) event.cancel();
 
     auto oldRots = *player->getActorRotationComponent();
     auto oldHeadRots = *player->getActorHeadRotationComponent();
@@ -270,11 +294,20 @@ void Freecam::onActorRenderEvent(ActorRenderEvent& event)
     if (mMode.mValue == Mode::Detached)
     {
         player->getMoveInputComponent()->reset(true, false);
-        // TODO: Prevent the raycast from updating while in detached mode
     }
 
     auto original = event.mDetour->getOriginal<&ActorRenderDispatcherHook::render>();
-    auto newPos = *event.mPos - *event.mCameraTargetPos - *event.mPos + mOldPos;
+
+    // Null-check camera target pos
+    if (!event.mCameraTargetPos) {
+        event.cancel();
+        *player->getActorRotationComponent() = oldRots;
+        *player->getActorHeadRotationComponent() = oldHeadRots;
+        *player->getMobBodyRotationComponent() = oldBodyRots;
+        return;
+    }
+
+    glm::vec3 newPos = *event.mPos - *event.mCameraTargetPos - *event.mPos + mOldPos;
     if (mMode.mValue == Mode::Detached) newPos = *event.mPos - *event.mCameraTargetPos - *event.mPos + player->getRenderPositionComponent()->mPosition;
     original(event._this, event.mEntityRenderContext, event.mEntity, event.mCameraTargetPos, &newPos, event.mRot, event.mIgnoreLighting);
     event.cancel();
@@ -289,37 +322,52 @@ void Freecam::onActorRenderEvent(ActorRenderEvent& event)
 
 void Freecam::onLookInputEvent(LookInputEvent& event)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
-
     if (mResetRot)
     {
-        for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
-        {
-            player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, true);
-            auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
-            if (!storage->contains(id))
-            {
-                storage->emplace(id, UpdatePlayerFromCameraComponent(mCameras[id]));
-            }
+        auto player = ClientInstance::get()->getLocalPlayer();
+        if (!player) {
+            mResetRot = false;
+            return;
+        }
 
-            if (cameraComponent.getMode() == CameraMode::FirstPerson)
+        try {
+            for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
             {
-                auto* gaming = player->mContext.mRegistry->try_get<CameraDirectLookComponent>(id);
-                if (gaming)
+                player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, true);
+                auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
+                if (storage && !storage->contains(id))
                 {
-                    gaming->mRotRads = mOriginalRotRads[cameraComponent.getMode()];
+                    // Only emplace if we had a saved camera state for this id
+                    auto camIt = mCameras.find(id);
+                    if (camIt != mCameras.end()) {
+                        storage->emplace(id, UpdatePlayerFromCameraComponent(camIt->second));
+                    }
                 }
 
-                player->mContext.mRegistry->set_flag<CameraRenderFirstPersonObjectsComponent>(id, true);
-            } else if (cameraComponent.getMode() == CameraMode::ThirdPerson || cameraComponent.getMode() == CameraMode::ThirdPersonFront)
-            {
-                auto* gaming = player->mContext.mRegistry->try_get<CameraOrbitComponent>(id);
-                if (gaming)
+                if (cameraComponent.getMode() == CameraMode::FirstPerson)
                 {
-                    gaming->mRotRads = mOriginalRotRads[cameraComponent.getMode()];
+                    auto* gaming = player->mContext.mRegistry->try_get<CameraDirectLookComponent>(id);
+                    if (gaming)
+                    {
+                        auto rotIt = mOriginalRotRads.find(cameraComponent.getMode());
+                        if (rotIt != mOriginalRotRads.end())
+                            gaming->mRotRads = rotIt->second;
+                    }
+
+                    player->mContext.mRegistry->set_flag<CameraRenderFirstPersonObjectsComponent>(id, true);
+                } else if (cameraComponent.getMode() == CameraMode::ThirdPerson || cameraComponent.getMode() == CameraMode::ThirdPersonFront)
+                {
+                    auto* gaming = player->mContext.mRegistry->try_get<CameraOrbitComponent>(id);
+                    if (gaming)
+                    {
+                        auto rotIt = mOriginalRotRads.find(cameraComponent.getMode());
+                        if (rotIt != mOriginalRotRads.end())
+                            gaming->mRotRads = rotIt->second;
+                    }
                 }
             }
+        } catch (...) {
+            spdlog::warn("[Freecam] Exception during rotation reset");
         }
 
         mResetRot = false;
@@ -329,11 +377,16 @@ void Freecam::onLookInputEvent(LookInputEvent& event)
     if (!mEnabled) return;
     if (!event.mCameraDirectLookComponent) return;
 
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+
     ClientInstance::get()->getOptions()->mThirdPerson->value = 0;
 
     if (mMode.mValue == Mode::Detached)
     {
-        event.mFirstPersonCamera->mOrigin = getLerpedOrigin();
+        if (event.mFirstPersonCamera) {
+            event.mFirstPersonCamera->mOrigin = getLerpedOrigin();
+        }
     }
     mRotRads = event.mCameraDirectLookComponent->mRotRads;
 }
