@@ -531,30 +531,45 @@ void RegionFill::onBaseTickEvent(BaseTickEvent& event)
             return; // Ждём, не продвигаемся
         }
 
+        // За один проход обходим всю очередь. Позиции, которым пока не хватает
+        // соседней опоры (например последний блок полости), не выкидываем
+        // навсегда — оставляем на следующий проход, когда соседи появятся.
+        // placedThisPass показывает, сдвинулись ли мы вообще; если за проход
+        // ничего не поставили, значит оставшиеся позиции физически не к чему
+        // прикрепить (или кончились блоки) — повторять проход бессмысленно.
+        bool placedThisPass  = false;
+        bool unsupportedLeft = false;
+
         while (mFillIndex < mFillQueue.size()) {
             glm::ivec3 pos   = mFillQueue[mFillIndex];
             Block*     block = source->getBlock(pos);
 
-            // Уже заполнено → пропускаем
+            // Уже заполнено → пропускаем навсегда
             bool filled = (block && block->mLegacy && !block->mLegacy->isAir());
             if (filled) {
                 mFillIndex++;
                 continue;
             }
 
-            // Нет соседнего блока для опоры → пропускаем пока
+            // Нет соседнего блока для опоры → запоминаем и идём дальше.
+            // За этот проход его не поставить, но он может стать
+            // прикреплённым после установки соседей.
             if (BlockUtils::getBlockPlaceFace(pos) == -1) {
+                unsupportedLeft = true;
                 mFillIndex++;
                 continue;
             }
 
             if (placeAnyBlockAtPos(pos, player)) {
                 mBlocksPlaced++;
+                placedThisPass = true;
                 mFillIndex++;
                 mLastActionTime = NOW;
                 return; // 1 блок за тик
             }
 
+            // placeAnyBlockAtPos не смог (например не нашлось блока в слоте) —
+            // попробуем в следующий проход.
             mFillIndex++;
         }
 
@@ -575,10 +590,33 @@ void RegionFill::onBaseTickEvent(BaseTickEvent& event)
                 mBlocksPlaced, mBlocksCleared, elapsed);
             mState = State::Idle;
             setEnabled(false);
-        } else {
-            // Второй проход — блоки которым нужна опора
-            mFillIndex = 0;
+            return;
         }
+
+        // Что-то ещё не заполнено. Если за проход хоть что-то поставили —
+        // повторяем проход (могли появиться опоры). Иначе останавливаемся,
+        // чтобы не крутиться вечно на изолированной области / без блоков.
+        if (placedThisPass) {
+            mFillIndex = 0;
+            return;
+        }
+
+        if (unsupportedLeft) {
+            int remaining = 0;
+            for (auto& pos : mFillQueue) {
+                Block* block = source->getBlock(pos);
+                if (!block || !block->mLegacy || block->mLegacy->isAir()) remaining++;
+            }
+            ChatUtils::displayClientMessage(
+                "§e{} §eblocks left with no adjacent block to attach to — stopping. "
+                "Make sure the region touches an existing block.", remaining);
+        } else {
+            ChatUtils::displayClientMessage(
+                "§eNo more blocks could be placed (out of blocks?) — stopping.");
+        }
+
+        mState = State::Idle;
+        setEnabled(false);
     }
 }
 
