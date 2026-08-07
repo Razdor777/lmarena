@@ -14,10 +14,11 @@
 
 class InfiniteChestAura : public ModuleBase<InfiniteChestAura> {
 public:
-    // === Settings (14) ===
+    // === Settings ===
     NumberSetting mSearchRadius = NumberSetting("Search Radius", "Max search distance", 50.f, 10.f, 200.f, 1.f);
     NumberSetting mStepDistance = NumberSetting("Step Distance", "Blocks per TP step", 8.f, 1.f, 12.f, 0.5f);
     NumberSetting mWaitAfterTP = NumberSetting("Wait After TP", "Delay after TP before opening (ms)", 200.f, 50.f, 500.f, 10.f);
+    BoolSetting mAutoEat = BoolSetting("Auto Eat", "Automatically eat hotbar food when hungry", false);
     BoolSetting mReturnBack = BoolSetting("Return Back", "TP back after looting", true);
     BoolSetting mIgnoreOpened = BoolSetting("Ignore Opened", "Skip looted chests", true);
     BoolSetting mIgnoreTrapped = BoolSetting("Ignore Trapped", "Skip trapped chests", false);
@@ -35,7 +36,7 @@ public:
     {
         addSettings(
             &mSearchRadius, &mStepDistance, &mWaitAfterTP,
-            &mReturnBack, &mIgnoreOpened, &mIgnoreTrapped, &mIgnoreEnder,
+            &mAutoEat, &mReturnBack, &mIgnoreOpened, &mIgnoreTrapped, &mIgnoreEnder,
             &mPersistentMemory, &mEventMode,
             &mDrawPath, &mRenderTarget,
             &mClearMemory, &mForceStart, &mDebug
@@ -70,6 +71,8 @@ public:
     int mChestsLooted = 0;
     uint64_t mStateStartTime = 0;
     bool mNeedsQuickScan = true;
+    bool mWasAutoEating = false;
+    int mSlotBeforeEating = -1;
 
     // === Cycle Timing (Debug) ===
     struct CycleTiming {

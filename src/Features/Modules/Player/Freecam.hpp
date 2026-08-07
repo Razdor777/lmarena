@@ -10,6 +10,7 @@
 #include <SDK/Minecraft/Actor/Components/ActorRotationComponent.hpp>
 #include <SDK/Minecraft/Actor/Components/MobBodyRotationComponent.hpp>
 
+class Actor;
 
 class Freecam : public ModuleBase<Freecam> {
 public:
@@ -64,8 +65,15 @@ public:
 
     glm::vec3 getLerpedOrigin()
     {
-        return MathUtils::lerp(mOldOrigin, mOrigin, ClientInstance::get()->getMinecraftSim()->getGameSim()->mDeltaTime);
+        auto ci = ClientInstance::get();
+        if (!ci) return mOrigin;
+        auto sim = ci->getMinecraftSim();
+        if (!sim || !sim->getGameSim()) return mOrigin;
+        return MathUtils::lerp(mOldOrigin, mOrigin, sim->getGameSim()->mDeltaTime);
     }
+
+    // Returns true only if the player and all components Freecam needs exist.
+    static bool isPlayerReady(Actor* player);
 
     void onEnable() override;
     void onDisable() override;

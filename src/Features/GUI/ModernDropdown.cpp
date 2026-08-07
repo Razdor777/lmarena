@@ -83,9 +83,25 @@ std::vector<std::shared_ptr<Module>> ModernGui::getFilteredModules(size_t catInd
 
     std::vector<std::shared_ptr<Module>> out;
     for (auto& m : all) {
-        std::string n = m->getName();
-        std::transform(n.begin(), n.end(), n.begin(), ::tolower);
-        if (n.find(q) != std::string::npos) out.push_back(m);
+        // Match against EVERY name the module has:
+        // the raw internal name + all naming-style aliases — so any
+        // spelling ("nearbyplayers", "nearby players", "NearbyPlayers"...)
+        // finds the module, regardless of the current naming style
+        bool hit = false;
+
+        std::string raw = m->mName;
+        std::transform(raw.begin(), raw.end(), raw.begin(), ::tolower);
+        if (raw.find(q) != std::string::npos) hit = true;
+
+        if (!hit) {
+            for (auto& [style, alias] : m->mNames) {
+                std::string n = alias;
+                std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+                if (n.find(q) != std::string::npos) { hit = true; break; }
+            }
+        }
+
+        if (hit) out.push_back(m);
     }
     return out;
 }
@@ -223,7 +239,7 @@ void ModernGui::renderSearchBar()
     // Animated bottom accent line
     static float searchLineAnim = 0.f;
     searchLineAnim = MathUtils::animate(mSearching ? 1.f : 0.f, searchLineAnim, ImRenderUtils::getDeltaTime() * 10);
-    
+
     ImColor acc = ColorUtils::getThemedColor(0);
     float lineW = MathUtils::lerp(0, barW - 20.f, searchLineAnim);
     float lineX = rect.x + (barW - lineW) / 2.f;
@@ -233,14 +249,19 @@ void ModernGui::renderSearchBar()
     // Focus on click
     if (ImGui::IsMouseClicked(0)) mSearching = ImRenderUtils::isMouseOver(rect);
 
-    // Search Icon (из твоего шрифта tenacity_icons)
-    FontHelper::pushPrefFont(true, true, true);
-    ImRenderUtils::drawText(ImVec2(rect.x + 10, rect.y + 8), "s", ImColor(255, 255, 255, 90), mTextSize * 0.8f, mAnimation, false);
-    ImGui::PopFont();
+    // ИСПРАВЛЕНО: иконка лупы должна рисоваться иконочным шрифтом
+    // tenacity_icons напрямую, а не форсированным Product Sans
+    {
+        ImFont* iconFont = FontHelper::Fonts.count("tenacity_icons")
+            ? FontHelper::Fonts["tenacity_icons"] : ImGui::GetFont();
+        ImGui::PushFont(iconFont);
+        ImRenderUtils::drawText(ImVec2(rect.x + 10, rect.y + 8), "s", ImColor(255, 255, 255, 90), mTextSize * 0.8f, mAnimation, false);
+        ImGui::PopFont();
+    }
 
-    // Text rendering
+    // ИСПРАВЛЕНО: текст поиска теперь использует выбранный в Interface шрифт
     std::string display(mSearchBuffer);
-    FontHelper::pushPrefFont(true, false, true);
+    FontHelper::pushPrefFont(true, false, false);
 
     if (display.empty() && !mSearching) {
         ImRenderUtils::drawText(ImVec2(rect.x + 26, rect.y + 8), "Search...", ImColor(255, 255, 255, 60), mTextSize * 0.9f, mAnimation, false);
@@ -270,7 +291,8 @@ void ModernGui::renderColorPickerWindow()
 {
     if (!displayColorPicker || !mIsEnabled) return;
 
-    FontHelper::pushPrefFont(false, false, true);
+    // ИСПРАВЛЕНО: убрали mForcePSans=true
+    FontHelper::pushPrefFont(false, false, false);
     ColorSetting* cs = lastColorSetting;
 
     ImGui::SetNextWindowPos({mScreenSize.x * 0.5f - 200.f, mScreenSize.y * 0.5f});
@@ -356,7 +378,9 @@ void ModernGui::render(float animation, float inScale, int& scrollDirection,
 
     cacheFrameData(animation, inScale, blur, midclickRounding, isPressingShift, isEnabled);
 
-    FontHelper::pushPrefFont(true, false, true);
+    // ИСПРАВЛЕНО: убрали mForcePSans=true — теперь ClickGui использует
+    // тот шрифт, который выбран в Interface -> Font (с поддержкой кириллицы)
+    FontHelper::pushPrefFont(true, false, false);
 
     initCategoryPositions();
     updateRipples(mDeltaTime);
@@ -648,9 +672,11 @@ void ModernGui::renderModule(size_t catIndex, const ImVec4& catRect,
     }
     dl->PopClipRect();
 
-    FontHelper::pushPrefFont(true, false, true);
+    // ИСПРАВЛЕНО: убрали mForcePSans=true — название модуля теперь
+    // тоже рисуется выбранным в Interface шрифтом (с кириллицей)
+    FontHelper::pushPrefFont(true, false, false);
     std::string modName = mod->getName();
-    float nameX = modRect.x + 12.f; 
+    float nameX = modRect.x + 12.f;
     float nameY = center.y - mTextHeight * 0.5f;
 
     // ====================================================================
@@ -662,7 +688,7 @@ void ModernGui::renderModule(size_t catIndex, const ImVec4& catRect,
         float lum = modColor.Value.x * 0.299f + modColor.Value.y * 0.587f + modColor.Value.z * 0.114f;
         // Если цвет светлый (тема Ocean и т.д.) — делаем текст черным, иначе белым
         if (lum > 0.5f) {
-            nameCol = ImColor(0.f, 0.f, 0.f, mAnimation); 
+            nameCol = ImColor(0.f, 0.f, 0.f, mAnimation);
         } else {
             nameCol = ImColor(1.f, 1.f, 1.f, mAnimation);
         }

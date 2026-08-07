@@ -75,11 +75,17 @@ static void calcTargetRotRads(const glm::vec3& eyePos, const glm::vec3& target, 
     glm::vec3 diff = target - eyePos;
     float horizontalDist = std::sqrtf(diff.x * diff.x + diff.z * diff.z);
 
-    // mRotRads.x = yaw: atan2(z, x) - PI/2
-    // Проверка из данных:
-    //   Вправо (+X): atan2(0, +) = 0, yaw = -PI/2 = -90° ✓
-    //   Влево (-X):  atan2(0, -) = PI, yaw = PI/2 = +90° ✓
-    outYawRad = std::atan2f(diff.z, diff.x) - (IM_PI / 2.0f);
+    // mRotRads.x = PI - yawMC(rad), где yawMC = atan2(-x, z)
+    // (конвенция CameraDirectLookComponent — та же, что в Freecam/GhostMode:
+    //  yawMC = -degrees(mRotRads.x) + 180).
+    // Старая формула atan2(z,x)-PI/2 давала ошибку 180° на севере/юге —
+    // в комментарии-проверке были только +X/-X, где обе формулы совпадают :)
+    //   Восток (+X): yawMC=-90°  → mRotRads.x = 270° ≡ -90°  ✓
+    //   Север (-Z):  yawMC=180°  → mRotRads.x = 0            ✓
+    //   Юг (+Z):     yawMC=0°    → mRotRads.x = 180°         ✓
+    outYawRad = IM_PI - std::atan2f(-diff.x, diff.z);
+    while (outYawRad > IM_PI)  outYawRad -= 2.0f * IM_PI;
+    while (outYawRad < -IM_PI) outYawRad += 2.0f * IM_PI;
 
     // mRotRads.y = pitch: atan2(y, horizontal)
     // Проверка из данных:
@@ -124,12 +130,11 @@ void Aimbot::onLookInputEvent(LookInputEvent& event) {
     sHasTarget = true;
 
     glm::vec3 aimPoint = getAimPoint(bestTarget);
-    glm::vec3 diff = aimPoint - eyePos;
-    float horizontalDist = std::sqrtf(diff.x * diff.x + diff.z * diff.z);
 
-    // Целевые углы
-    float targetYaw = std::atan2f(-diff.x, -diff.z);
-    float targetPitch = std::atan2f(diff.y, horizontalDist);
+    // Целевые углы (та же математика, что была тут инлайном:
+    // yaw = atan2(-x, -z) ≡ PI - atan2(-x, z))
+    float targetYaw, targetPitch;
+    calcTargetRotRads(eyePos, aimPoint, targetYaw, targetPitch);
 
     // ==========================================
     // AimLock
