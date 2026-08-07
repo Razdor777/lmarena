@@ -20,12 +20,38 @@
 #include <SDK/Minecraft/Network/Packets/MobEquipmentPacket.hpp>
 #include <Utils/GameUtils/ItemUtils.hpp>
 #include <Utils/GameUtils/PacketUtils.hpp>
+#include <Utils/StringUtils.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <algorithm>
+
+namespace {
+// Some placeable items (notably campfires) do not expose an ItemStack::mBlock
+// pointer in the current Bedrock client.  They are still valid ItemUse::Place
+// items, so relying only on mBlock makes RegionFill report an empty hotbar.
+bool isRegionFillPlaceable(const ItemStack* stack)
+{
+    if (!stack || !stack->mItem || stack->mCount <= 0) return false;
+
+    if (stack->mBlock) {
+        BlockLegacy* block = stack->mBlock->toLegacy();
+        return block && !block->isAir();
+    }
+
+    const Item* item = stack->getItem();
+    if (!item) return false;
+
+    // Keep this fallback deliberately narrow: unlike mBlock, an arbitrary
+    // usable item (a sword, food, etc.) must not be treated as building fuel.
+    // Add special block-items here when a Bedrock version omits mBlock for them.
+    const std::string& name = item->getmName();
+    return StringUtils::containsIgnoreCase(name, "campfire") ||
+           StringUtils::containsIgnoreCase(name, "decorated_pot");
+}
+} // namespace
 
 // =========================================================
 // ENABLE / DISABLE
@@ -205,11 +231,7 @@ int RegionFill::findAnyPlaceableSlot()
 
     for (int i = 0; i < 9; i++) {
         ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
-        if (stack->mBlock) {
-            BlockLegacy* bl = stack->mBlock->toLegacy();
-            if (bl && !bl->isAir()) return i;
-        }
+        if (isRegionFillPlaceable(stack)) return i;
     }
     return -1;
 }
@@ -233,14 +255,14 @@ int RegionFill::findMixedSlot()
 
     for (int i = 0; i < 9; i++) {
         ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
-        if (!stack->mBlock) continue;
-        BlockLegacy* bl = stack->mBlock->toLegacy();
-        if (!bl || bl->isAir()) continue;
+        if (!isRegionFillPlaceable(stack)) continue;
 
         if (mDiverseOnly.mValue) {
-            // Only include this slot if its block name hasn't been seen yet
-            std::string blockName = bl->getmName();
+            // mBlock is absent for a few valid special block-items, so use the
+            // item name as a stable fallback for diverse-fill deduplication.
+            std::string blockName = stack->mBlock
+                ? stack->mBlock->toLegacy()->getmName()
+                : stack->getItem()->getmName();
             bool duplicate = false;
             for (const auto& n : seenNames)
                 if (n == blockName) { duplicate = true; break; }
