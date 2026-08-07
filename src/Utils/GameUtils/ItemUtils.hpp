@@ -18,6 +18,12 @@ public:
     static int getAllPlaceables(bool hotbarOnly = true);
     static int getFirstPlaceable(bool hotbarOnly);
     static int getPlaceableItemOnBlock(glm::vec3 blockPos, bool hotbarOnly = true, bool prioHighest = true);
+
+    // Some Bedrock block-items (for example campfires) do not populate
+    // ItemStackBase::mBlock.  Keep the item-name fallback in one place so
+    // modules do not incorrectly report a valid block as a missing item.
+    static std::string getPlaceableName(ItemStack* stack);
+    static bool isPlaceableBlock(ItemStack* stack);
     static bool isUsableBlock(ItemStack* stack);
     static int getSwiftnessSpellbook(bool hotbarOnly = true);
     static int getBoombox(bool hotbarOnly = true, bool tnt = false);

@@ -205,11 +205,10 @@ int RegionFill::findAnyPlaceableSlot()
 
     for (int i = 0; i < 9; i++) {
         ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
-        if (stack->mBlock) {
-            BlockLegacy* bl = stack->mBlock->toLegacy();
-            if (bl && !bl->isAir()) return i;
-        }
+        // Do not rely only on ItemStackBase::mBlock.  Bedrock leaves that
+        // pointer empty for some legitimate block-items (campfire is one
+        // example), while the item itself is still valid for a Place txn.
+        if (ItemUtils::isPlaceableBlock(stack)) return i;
     }
     return -1;
 }
@@ -233,14 +232,13 @@ int RegionFill::findMixedSlot()
 
     for (int i = 0; i < 9; i++) {
         ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
-        if (!stack->mBlock) continue;
-        BlockLegacy* bl = stack->mBlock->toLegacy();
-        if (!bl || bl->isAir()) continue;
+        if (!ItemUtils::isPlaceableBlock(stack)) continue;
 
         if (mDiverseOnly.mValue) {
-            // Only include this slot if its block name hasn't been seen yet
-            std::string blockName = bl->getmName();
+            // Only include this slot if its block/item name hasn't been seen.
+            // Use the item name fallback as well so campfires participate in
+            // mixed filling just like ordinary blocks.
+            std::string blockName = ItemUtils::getPlaceableName(stack);
             bool duplicate = false;
             for (const auto& n : seenNames)
                 if (n == blockName) { duplicate = true; break; }
