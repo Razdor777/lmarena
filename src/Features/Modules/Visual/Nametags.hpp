@@ -17,8 +17,6 @@ public:
         "Remove donation tags and color codes.", true);
     BoolSetting mDistanceScaledFont = BoolSetting("Distance Scaled Font",
         "Scale font based on distance.", true);
-    BoolSetting mShowIrcUsers   = BoolSetting("Show IRC Users",
-        "Show IRC users in nametags.", true);
     NumberSetting mBlurStrength = NumberSetting("Blur Strength",
         "Blur strength.", 0.f, 0.f, 10.f, 0.1f);
     NumberSetting mFontSize     = NumberSetting("Font Size",
@@ -62,7 +60,7 @@ public:
         addSettings(
             &mStyle, &mShowFriends, &mRenderLocal, &mCleanNames,
             &mDistanceScaledFont, &mFontSize, &mScalingMultiplier, &mMinScale,
-            &mShowIrcUsers, &mBlurStrength, &mShowHealth,
+            &mBlurStrength, &mShowHealth,
             &mShowArmor, &mShowHeldItem, &mShowOffhand,
             &mShowEnchants, &mShowDurability, &mShowDurPercent,
             &mUseTextures, &mIconSize, &mItemSpacing,

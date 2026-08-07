@@ -24,7 +24,26 @@ bool BlockLegacy::mayPlaceOn(glm::ivec3 pos)
 
 bool BlockLegacy::isAir()
 {
-    return getBlockId() == 0;
+    // Legacy block ID 0 is air, BUT many modern Bedrock blocks (campfire,
+    // soul campfire, sweet berry bush, etc.) also report blockId == 0 because
+    // they don't have a legacy ID.  We therefore also check the block name:
+    // if the name is non-empty and is NOT "air" / "minecraft:air",
+    // then it is NOT air — it's a real block that just lacks a legacy ID.
+    if (getBlockId() != 0) return false;
+
+    // CLASS_FIELD members are accessed through generated property getters.
+    // mName is at offset 0xA0, mTileName at 0x28 — both are std::string
+    std::string name     = mName;     // calls getmName()
+    std::string tileName = mTileName; // calls getmTileName()
+
+    if (name.empty() && tileName.empty()) return true; // no name → treat as air
+
+    // Standard air names
+    if (name == "air" || name == "minecraft:air") return true;
+    if (tileName == "tile.air" || tileName == "air") return true;
+
+    // The block has a real name but ID 0 → it's NOT air (campfire, etc.)
+    return false;
 }
 
 template <typename T>

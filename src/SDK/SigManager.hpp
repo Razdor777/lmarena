@@ -221,9 +221,10 @@ public:
   DEFINE_SIG(ItemRenderer_renderGuiItem, 
              "48 89 5C 24 ? 55 56 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 49 8B E8 4C 8B 84 24", 
              SigType::Sig, 0);
-  DEFINE_SIG(GlintComponentGetter,
-             "48 89 5C 24 ? 55 56 57 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 49 8B E8 48 8B FA 48 8B D9 48 89 4C 24 ? 4C 89 44 24 ? 33 F6 49 8B C8 E8 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 48 8D 54 24 ? 48 8B C8 E8 ? ? ? ? ? ? ? 48 89 73 ? 48 89 73 ? 40 88 73 ?",
-             SigType::Sig, 0);
+  // NOTE: the hand-written "GlintComponentGetter" signature was removed.
+  // It could not be verified, and one failed sig kills the whole client at
+  // init in release builds. Glint now works through RenderItemInHandHook
+  // (mce_framebuilder_RenderItemInHandDescription_ctor) instead.
   DEFINE_SIG(
       ItemPositionConst,
       "F3 0F ? ? ? ? ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F B7",

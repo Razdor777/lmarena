@@ -65,6 +65,23 @@ void ClickGui::onKeyEvent(KeyEvent& event)
         int key = event.mKey;
         bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
 
+        // Layout-independent typing: the game's key codes follow the ACTIVE
+        // keyboard layout, so with a non-English (e.g. Russian) layout the
+        // physical letter keys report non-ASCII codes and the search appears
+        // "sometimes working, sometimes not". Translate the physical key to
+        // its US-layout equivalent so typing always works.
+        {
+            static HKL usLayout = LoadKeyboardLayoutA("00000409", KLF_NOTELLSHELL);
+            if (usLayout) {
+                UINT sc = MapVirtualKeyExA((UINT)key, MAPVK_VK_TO_VSC, GetKeyboardLayout(0));
+                if (sc) {
+                    UINT usVk = MapVirtualKeyExA(sc, MAPVK_VSC_TO_VK, usLayout) & 0xFF;
+                    if ((usVk >= 'A' && usVk <= 'Z') || (usVk >= '0' && usVk <= '9'))
+                        key = (int)usVk;
+                }
+            }
+        }
+
         if (key == VK_BACK)
         {
             int len = (int)strlen(modernGui.mSearchBuffer);

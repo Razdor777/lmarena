@@ -1,50 +1,79 @@
+//
+// Glint.cpp — recolor/restyle the enchantment glint
+//
+// Uses the existing RenderItemInHandHook (registered in HookManager) — the
+// hooked frame-description constructor exposes mGlintColor / mGlintAlpha.
+// No custom signatures = nothing to silently break on game updates.
+//
+
 #include "Glint.hpp"
-#include <SDK/SigManager.hpp>
-#include <Features/Modules/ModuleManager.hpp>
 
-struct RefCountBlock {
-    void* vtable;
-    uint32_t ref1;
-    uint32_t ref2;
-};
+#include <Features/Events/RenderItemInHandDescriptionEvent.hpp>
+#include <Hook/Hooks/RenderHooks/RenderItemInHandHook.hpp>
+#include <Utils/MiscUtils/ColorUtils.hpp>
+#include <Utils/MiscUtils/MathUtils.hpp>
 
-static uint8_t fake_glint_data[16] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-static RefCountBlock fake_refcount = { nullptr, 9999, 9999 };
+Glint::Glint()
+    : ModuleBase("Glint", "Customize the enchantment glint (color, saturation, alpha)",
+                 ModuleCategory::Visual, 0, false)
+{
+    addSettings(&mRainbow, &mColor, &mSaturation, &mAlpha, &mShowInGui);
 
-Glint::Glint() : ModuleBase("Glint", "Forces the enchantment glint on all items", ModuleCategory::Visual, 0, false) {
-    instance = this;
-    addSettings(&mRainbow, &mColor, &mAlpha);
+    VISIBILITY_CONDITION(mColor, !mRainbow.mValue);
+
+    mNames = {
+        {Lowercase, "glint"},
+        {LowercaseSpaced, "glint"},
+        {Normal, "Glint"},
+        {NormalSpaced, "Glint"}
+    };
 }
 
-__int64 __fastcall Glint::onGetGlintComponent(__int64 a1, __int64 a2, void* a3) {
-    auto original = mDetour->getOriginal<&onGetGlintComponent>();
-    if (!original) return 0;
-
-    __int64 result = original(a1, a2, a3);
-
-    if (Glint::instance && Glint::instance->mEnabled) {
-        if (*(void**)a1 == nullptr) {
-            *(void**)a1 = &fake_glint_data;
-            *(RefCountBlock**)(a1 + 8) = &fake_refcount;
-        }
-    }
-
-    return result;
+void Glint::onEnable()
+{
+    gFeatureManager->mDispatcher
+        ->listen<RenderItemInHandDescriptionEvent, &Glint::onRenderItemInHandDesc>(this);
 }
 
-void Glint::onEnable() {
-    uintptr_t addr = SigManager::GlintComponentGetter;
-    if (addr) {
-        mDetour = std::make_unique<Detour>("GlintComponentGetter", reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&onGetGlintComponent));
-        mDetour->enable();
-    }
-    Module::onEnable();
+void Glint::onDisable()
+{
+    gFeatureManager->mDispatcher
+        ->deafen<RenderItemInHandDescriptionEvent, &Glint::onRenderItemInHandDesc>(this);
 }
 
-void Glint::onDisable() {
-    if (mDetour) {
-        mDetour->restore();
-        mDetour.reset();
+// Scale saturation of an RGB color via HSV
+static glm::vec3 saturate(glm::vec3 rgb, float mul)
+{
+    float h, s, v;
+    ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, h, s, v);
+    s = MathUtils::clamp(s * mul, 0.f, 1.f);
+    float r, g, b;
+    ImGui::ColorConvertHSVtoRGB(h, s, v, r, g, b);
+    return { r, g, b };
+}
+
+void Glint::onRenderItemInHandDesc(RenderItemInHandDescriptionEvent& event)
+{
+    if (!event.mThis) return;
+    if (event.mIsDrawingUI && !mShowInGui.mValue) return;
+
+    glm::vec3 color;
+    if (mRainbow.mValue)
+    {
+        ImColor c = ColorUtils::getThemedColor(0.f);
+        color = { c.Value.x, c.Value.y, c.Value.z };
     }
-    Module::onDisable();
+    else
+    {
+        ImColor c = mColor.getAsImColor();
+        color = { c.Value.x, c.Value.y, c.Value.z };
+    }
+
+    color = saturate(color, mSaturation.mValue);
+
+    // NB: CLASS_FIELD generates accessors as get/set + field name,
+    // so for mGlintColor/mGlintAlpha the names are setmGlintColor etc.
+    event.mThis->setmGlintColor(color);
+    event.mThis->setmGlintAlpha(
+        MathUtils::clamp(event.mThis->getmGlintAlpha() * mAlpha.mValue, 0.f, 1.f));
 }

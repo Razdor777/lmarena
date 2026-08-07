@@ -88,19 +88,22 @@ float pLerpedBodyYaw;
 
 bool usingPaip = false;
 
+// Returns the FontHelper key string for the currently selected FontType
+static std::string fontTypeToKey(Interface::FontType t) {
+    switch (t) {
+        case Interface::FontType::ProductSans: return "product_sans";
+        case Interface::FontType::Mojangles:   return "mojangles";
+        case Interface::FontType::Comfortaa:   return "comfortaa";
+        case Interface::FontType::OpenSans:    return "open_sans";
+        case Interface::FontType::SFPro:       return "sf_pro_display";
+        case Interface::FontType::Sarabun:     return "sarabun_light";
+        default:                               return "roboto";
+    }
+}
+
 void Interface::onEnable()
 {
-    // Apply initial font setting
-    std::string fontKey;
-    switch (mFont.mValue) {
-        case FontType::ProductSans: fontKey = "product_sans"; break;
-        case FontType::Mojangles:   fontKey = "mojangles"; break;
-        case FontType::Comfortaa:   fontKey = "comfortaa"; break;
-        case FontType::OpenSans:    fontKey = "open_sans"; break;
-        case FontType::SFPro:       fontKey = "sf_pro_display"; break;
-        case FontType::Sarabun:     fontKey = "sarabun_light"; break;
-    }
-    FontHelper::setCurrentFont(fontKey);
+    FontHelper::setCurrentFont(fontTypeToKey(mFont.mValue));
 }
 
 void Interface::onDisable()
@@ -332,20 +335,11 @@ void Interface::onBaseTickEvent(BaseTickEvent& event)
     pOldBodyYaw = pBodyYaw;
     pBodyYaw = BodyYaw::bodyYaw;
 
-    // Apply font setting
+    // Apply font setting on change
     static FontType lastFont = (FontType)-1;
     if (mFont.mValue != lastFont) {
         lastFont = mFont.mValue;
-        std::string fontKey;
-        switch (mFont.mValue) {
-            case FontType::ProductSans: fontKey = "product_sans"; break;
-            case FontType::Mojangles:   fontKey = "mojangles"; break;
-            case FontType::Comfortaa:   fontKey = "comfortaa"; break;
-            case FontType::OpenSans:    fontKey = "open_sans"; break;
-            case FontType::SFPro:       fontKey = "sf_pro_display"; break;
-            case FontType::Sarabun:     fontKey = "sarabun_light"; break;
-        }
-        FontHelper::setCurrentFont(fontKey);
+        FontHelper::setCurrentFont(fontTypeToKey(mFont.mValue));
     }
 }
 

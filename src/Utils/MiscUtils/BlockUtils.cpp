@@ -30,9 +30,20 @@ bool BlockUtils::isGoodBlock(glm::ivec3 blockPos)
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
     Block* block = ClientInstance::get()->getBlockSource()->getBlock(blockPos);
-    int blockId = block->toLegacy()->getBlockId();
-    bool isLiquid = 8 <= blockId && blockId <= 11;
-    return blockId != 0 && !isLiquid && block->toLegacy()->mMaterial->mIsBlockingMotion;
+    if (!block) return false;
+    BlockLegacy* legacy = block->toLegacy();
+    if (!legacy) return false;
+
+    // Use isAir() which correctly handles modern blocks (campfire etc.)
+    if (legacy->isAir()) return false;
+
+    int blockId = legacy->getBlockId();
+    bool isLiquid = (8 <= blockId && blockId <= 11);
+    if (isLiquid) return false;
+
+    // Must block motion to be considered a "good" (solid) block
+    if (!legacy->mMaterial || !legacy->mMaterial->mIsBlockingMotion) return false;
+    return true;
 }
 
 
@@ -139,9 +150,21 @@ bool BlockUtils::isAirBlock(glm::ivec3 blockPos)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
-    int blockId = ClientInstance::get()->getBlockSource()->getBlock(blockPos)->toLegacy()->getBlockId();
-    bool isLiquid = 8 <= blockId && blockId <= 11;
-    return blockId == 0 || isLiquid;
+    Block* block = ClientInstance::get()->getBlockSource()->getBlock(blockPos);
+    if (!block) return true;
+    BlockLegacy* legacy = block->toLegacy();
+    if (!legacy) return true;
+
+    // Use BlockLegacy::isAir() which now correctly handles modern blocks
+    // (campfire, soul campfire, etc.) that have legacy ID 0 but are NOT air
+    if (!legacy->isAir()) return false;
+
+    // Also treat liquids (water/lava, legacy IDs 8-11) as non-air for placement purposes
+    int blockId = legacy->getBlockId();
+    bool isLiquid = (8 <= blockId && blockId <= 11);
+    if (isLiquid) return false;
+
+    return true;
 }
 
 glm::ivec3 BlockUtils::getClosestPlacePos(glm::ivec3 pos, float distance)

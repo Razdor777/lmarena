@@ -23,6 +23,7 @@
 #include "Hooks/RenderHooks/D3DHook.hpp"
 #include "Hooks/RenderHooks/HoverTextRendererHook.hpp"
 #include "Hooks/RenderHooks/ItemRendererHook.hpp"
+#include "Hooks/RenderHooks/RenderItemInHandHook.hpp"
 #include "Hooks/RenderHooks/LookInputHook.hpp"
 #include "Hooks/RenderHooks/SetupAndRenderHook.hpp"
 #include "Hooks/ActorHooks/NametagRenderHook.hpp"
@@ -63,6 +64,7 @@ void HookManager::init(bool initLp)
         ADD_HOOK(LookInputHook);
         ADD_HOOK(ActorModelHook);
         ADD_HOOK(ItemRendererHook);
+        ADD_HOOK(RenderItemInHandHook);
         ADD_HOOK(FireBlockChangedHook);
         ADD_HOOK(PreGameHook);
         ADD_HOOK(NametagRenderHook);
