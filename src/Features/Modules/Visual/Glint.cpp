@@ -71,16 +71,9 @@ void Glint::onRenderItemInHandDesc(RenderItemInHandDescriptionEvent& event)
 
     color = saturate(color, mSaturation.mValue);
 
-<<<<<<< HEAD
     // NB: CLASS_FIELD generates accessors as get/set + field name,
     // so for mGlintColor/mGlintAlpha the names are setmGlintColor etc.
     event.mThis->setmGlintColor(color);
     event.mThis->setmGlintAlpha(
         MathUtils::clamp(event.mThis->getmGlintAlpha() * mAlpha.mValue, 0.f, 1.f));
 }
-=======
-    event.mThis->setGlintColor(color);
-    event.mThis->setGlintAlpha(
-        MathUtils::clamp(event.mThis->getGlintAlpha() * mAlpha.mValue, 0.f, 1.f));
-}
->>>>>>> 1b574722c8acd93f7a29318ca8923dd4c27f2f1d

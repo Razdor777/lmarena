@@ -32,6 +32,13 @@ public:
         return MemUtils::callVirtualFunc<short>(35, const_cast<Item*>(this));
     }
 
+    // vtable index 15 = Item::isBlockItem() — "является ли предмет блоком".
+    // Это надёжный способ отличить блоки (в т.ч. те, у которых mBlock в ItemStack
+    // не заполнен, например campfire/костёр) от инструментов и прочих предметов.
+    bool isBlockItem() const {
+        return MemUtils::callVirtualFunc<bool>(15, const_cast<Item*>(this));
+    }
+
     int getArmorSlot();
     bool isHelmet();
     bool isChestplate();

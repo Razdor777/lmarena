@@ -194,6 +194,26 @@ void RegionFill::buildQueues()
 // FIND ANY PLACEABLE BLOCK IN HOTBAR
 // =========================================================
 
+// Надёжно определяет, можно ли поставить предмет как блок.
+// Обычные блоки распознаются по ItemStack::mBlock, но у некоторых блоков
+// (например, campfire/костёр) mBlock может быть не заполнен — для них
+// используем Item::isBlockItem() из vtable игры.
+bool RegionFill::isPlaceableBlock(ItemStack* stack)
+{
+    if (!stack || !stack->mItem || stack->mCount <= 0) return false;
+    Item* item = stack->getItem();
+    if (!item) return false;
+
+    // Основной путь: mBlock заполнен и это не воздух
+    if (stack->mBlock) {
+        BlockLegacy* bl = stack->mBlock->toLegacy();
+        if (bl && !bl->isAir()) return true;
+    }
+
+    // Запасной путь: предмет зарегистрирован в игре как блок-предмет
+    return item->isBlockItem();
+}
+
 int RegionFill::findAnyPlaceableSlot()
 {
     auto player = ClientInstance::get()->getLocalPlayer();
@@ -204,12 +224,7 @@ int RegionFill::findAnyPlaceableSlot()
     if (!container) return -1;
 
     for (int i = 0; i < 9; i++) {
-        ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
-        if (stack->mBlock) {
-            BlockLegacy* bl = stack->mBlock->toLegacy();
-            if (bl && !bl->isAir()) return i;
-        }
+        if (isPlaceableBlock(container->getItem(i))) return i;
     }
     return -1;
 }
@@ -233,14 +248,21 @@ int RegionFill::findMixedSlot()
 
     for (int i = 0; i < 9; i++) {
         ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem || stack->mCount <= 0) continue;
-        if (!stack->mBlock) continue;
-        BlockLegacy* bl = stack->mBlock->toLegacy();
-        if (!bl || bl->isAir()) continue;
+        if (!isPlaceableBlock(stack)) continue;
 
         if (mDiverseOnly.mValue) {
-            // Only include this slot if its block name hasn't been seen yet
-            std::string blockName = bl->getmName();
+            // Only include this slot if its block name hasn't been seen yet.
+            // mBlock может быть null (напр. campfire) — тогда берём имя предмета.
+            std::string blockName;
+            if (stack->mBlock) {
+                BlockLegacy* bl = stack->mBlock->toLegacy();
+                if (bl) blockName = bl->getmName();
+            }
+            if (blockName.empty()) {
+                Item* item = stack->getItem();
+                if (item) blockName = item->getmName();
+            }
+
             bool duplicate = false;
             for (const auto& n : seenNames)
                 if (n == blockName) { duplicate = true; break; }

@@ -7,6 +7,8 @@
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
 
+class ItemStack;
+
 class RegionFill : public ModuleBase<RegionFill>
 {
 public:
@@ -84,6 +86,7 @@ public:
     // Block ops
     void breakBlockAtPos(glm::ivec3 pos, Actor* player);
     bool placeAnyBlockAtPos(glm::ivec3 pos, Actor* player);
+    bool isPlaceableBlock(ItemStack* stack);   // robust block-item check (handles null mBlock)
     int  findAnyPlaceableSlot();         // single-type: always picks first available
     int  findMixedSlot();                // mixed-type: rotates through all block types
     int  mMixedSlotCursor = 0;          // current position in mixed rotation
