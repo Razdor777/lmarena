@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Arraylist — превью стилей</title>
+<style>
+@font-face { font-family:'Product Sans'; src:url('../resources/fonts/Product-Sans.ttf'); }
+@font-face { font-family:'Product Sans'; font-weight:700; src:url('../resources/fonts/Product-Sans-Bold.ttf'); }
+
+* { box-sizing: border-box; }
+html, body {
+    margin:0; padding:0; height:100%;
+    background:#05050a;
+    color:#e8e8f2;
+    font-family:'Product Sans', system-ui, sans-serif;
+    overflow:hidden;
+}
+#app { display:flex; height:100vh; }
+
+/* ── Settings panel (mirrors the in-game ClickGui look) ───────────────── */
+#panel {
+    width:340px; flex:0 0 340px; height:100%;
+    background:#08080e;
+    border-right:1px solid rgba(255,255,255,0.06);
+    padding:16px 14px 60px 14px;
+    overflow-y:auto;
+}
+#panel h1 { font-size:19px; margin:0 0 2px 0; letter-spacing:.2px; }
+#panel .sub { font-size:12px; color:rgba(255,255,255,0.45); margin-bottom:14px; line-height:1.45; }
+.group { margin-bottom:16px; }
+.group-title {
+    font-size:11px; text-transform:uppercase; letter-spacing:1.1px;
+    color:rgba(255,255,255,0.35); margin-bottom:8px;
+}
+.row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:7px 0; font-size:13px; }
+.row .lbl { color:rgba(255,255,255,0.82); }
+select, .val {
+    background:#111119; color:#fff; border:1px solid rgba(255,255,255,0.09);
+    border-radius:7px; padding:5px 8px; font-size:12px; font-family:inherit; outline:none;
+}
+select { min-width:118px; cursor:pointer; }
+input[type=range] { -webkit-appearance:none; width:130px; height:4px; background:rgba(255,255,255,0.12); border-radius:2px; }
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+    background:var(--acc,#ff6a9c); cursor:pointer; box-shadow:0 0 8px var(--acc,#ff6a9c);
+}
+input[type=checkbox] { accent-color:var(--acc,#ff6a9c); width:15px; height:15px; cursor:pointer; }
+.num { color:rgba(255,255,255,0.5); font-size:11px; min-width:34px; text-align:right; }
+.presets { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.presets button {
+    flex:1 1 calc(50% - 6px); background:#101018; color:#dfe0ee;
+    border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:7px 6px;
+    font-size:12px; font-family:inherit; cursor:pointer; transition:.15s;
+}
+.presets button:hover { background:#16161f; border-color:var(--acc,#ff6a9c); color:#fff; }
+.tag { font-size:10.5px; color:rgba(255,255,255,0.32); line-height:1.5; margin-top:6px; }
+
+/* ── Preview stage ────────────────────────────────────────────────────── */
+#stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+#view { width:100%; height:100%; display:block; image-rendering:auto; }
+#badge {
+    position:absolute; left:16px; bottom:14px; font-size:11.5px; color:rgba(255,255,255,0.32);
+    background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.07);
+    padding:6px 11px; border-radius:8px; backdrop-filter:blur(6px);
+}
+#badge b { color:rgba(255,255,255,0.7); font-weight:600; }
+</style>
+</head>
+<body>
+<div id="app">
+    <div id="panel">
+        <h1>Arraylist — превью</h1>
+        <div class="sub">Рендер портирован 1:1 из <b>Arraylist.cpp</b>. Крути настройки, води мышкой по строкам (есть hover) и кликай — модуль выключается.</div>
+
+        <div class="group">
+            <div class="group-title">Пресеты</div>
+            <div class="presets" id="presets"></div>
+        </div>
+
+        <div class="group">
+            <div class="group-title">Внешний вид</div>
+            <div class="row"><span class="lbl">Background</span><select id="background"></select></div>
+            <div class="row"><span class="lbl">Display</span><select id="display"></select></div>
+            <div class="row"><span class="lbl">Color Mode</span><select id="colorMode"></select></div>
+            <div class="row"><span class="lbl">Side</span><select id="side"></select></div>
+            <div class="row"><span class="lbl">Sorting</span><select id="sorting"></select></div>
+            <div class="row"><span class="lbl">Visibility</span><select id="visibility"></select></div>
+            <div class="row"><span class="lbl">Solid Color</span><input type="color" id="solidColor" style="background:none;border:none;width:34px;height:22px;padding:0;cursor:pointer"></div>
+        </div>
+
+        <div class="group">
+            <div class="group-title">Текст</div>
+            <div class="row"><span class="lbl">Font Size</span><input type="range" id="fontSize" min="10" max="40" step="0.5"><span class="num" id="fontSize_v"></span></div>
+            <div class="row"><span class="lbl">Scale</span><input type="range" id="scale" min="0.5" max="2" step="0.01"><span class="num" id="scale_v"></span></div>
+            <div class="row"><span class="lbl">Bold</span><input type="checkbox" id="bold"></div>
+            <div class="row"><span class="lbl">Text Shadow</span><input type="checkbox" id="textShadow"></div>
+            <div class="row"><span class="lbl">Accent Suffix</span><input type="checkbox" id="accentSuffix"></div>
+            <div class="row"><span class="lbl">Render Mode</span><input type="checkbox" id="renderMode"></div>
+        </div>
+
+        <div class="group">
+            <div class="group-title">Геометрия</div>
+            <div class="row"><span class="lbl">Rounding</span><input type="range" id="rounding" min="0" max="16" step="0.5"><span class="num" id="rounding_v"></span></div>
+            <div class="row"><span class="lbl">Padding</span><input type="range" id="padding" min="0" max="24" step="0.5"><span class="num" id="padding_v"></span></div>
+            <div class="row"><span class="lbl">Spacing</span><input type="range" id="spacing" min="0" max="16" step="0.5"><span class="num" id="spacing_v"></span></div>
+            <div class="row"><span class="lbl">Offset X</span><input type="range" id="offsetX" min="0" max="120" step="1"><span class="num" id="offsetX_v"></span></div>
+            <div class="row"><span class="lbl">Offset Y</span><input type="range" id="offsetY" min="0" max="200" step="1"><span class="num" id="offsetY_v"></span></div>
+        </div>
+
+        <div class="group">
+            <div class="group-title">Эффекты</div>
+            <div class="row"><span class="lbl">Glow</span><input type="checkbox" id="glow"></div>
+            <div class="row"><span class="lbl">Glow Strength</span><input type="range" id="glowStrength" min="0.1" max="1" step="0.05"><span class="num" id="glowStrength_v"></span></div>
+            <div class="row"><span class="lbl">Blur Strength</span><input type="range" id="blurStrength" min="1" max="20" step="0.5"><span class="num" id="blurStrength_v"></span></div>
+            <div class="row"><span class="lbl">Hover Effect</span><input type="checkbox" id="hoverEffect"></div>
+        </div>
+
+        <div class="group">
+            <div class="group-title">Анимация</div>
+            <div class="row"><span class="lbl">Enable Speed</span><input type="range" id="enableSpeed" min="5" max="40" step="0.5"><span class="num" id="enableSpeed_v"></span></div>
+            <div class="row"><span class="lbl">Disable Speed</span><input type="range" id="disableSpeed" min="1" max="20" step="0.5"><span class="num" id="disableSpeed_v"></span></div>
+            <div class="row"><span class="lbl">Elastic</span><input type="checkbox" id="elastic"></div>
+            <div class="row"><span class="lbl">Stagger</span><input type="checkbox" id="stagger"></div>
+            <div class="row"><span class="lbl">Color Theme</span><select id="theme"></select></div>
+        </div>
+
+        <div class="tag">Демо само включает/выключает модули, чтобы ты видел анимации. <b>Было</b> — старая версия рендера, <b>Стало</b> — новая.</div>
+    </div>
+
+    <div id="stage">
+        <canvas id="view"></canvas>
+        <div id="badge">Стиль: <b id="badge-style">Dark + Bar</b> · <span id="badge-fps">–</span></div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  Arraylist preview — 1:1 port of the ImGui renderer
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BG_STYLES = ['None', 'Dark', 'Gradient', 'Glass', 'Blur'];
+const DISPLAYS  = ['Bar', 'Outline', 'Split', 'Glow', 'None'];
+const COLOR_MODES = ['Theme', 'Rainbow', 'Category', 'Solid'];
+const SIDES = ['Right', 'Left'];
+const SORTINGS = ['Width', 'Alphabetical', 'Register'];
+const VISIBILITIES = ['All', 'Bound'];
+
+const THEMES = {
+    Midnight: [[45,55,75],[60,75,100],[35,45,65],[55,70,95]],
+    Slate:    [[85,90,100],[100,105,115],[70,75,85],[90,95,105]],
+    Ruby:     [[160,50,60],[190,70,80],[130,40,50],[180,60,70]],
+    Forest:   [[50,110,80],[65,135,100],[40,90,65],[60,125,90]],
+    Amethyst: [[110,80,150],[130,100,175],[95,70,130],[120,90,160]],
+};
+
+const CATEGORY_COLORS = {
+    Combat:   [255,104,104],
+    Movement: [96,200,255],
+    Player:   [120,240,172],
+    Visual:   [190,142,255],
+    Misc:     [255,200,110],
+};
+
+const settings = {
+    background: 'Dark',
+    display: 'Bar',
+    colorMode: 'Theme',
+    side: 'Right',
+    sorting: 'Width',
+    visibility: 'All',
+    fontSize: 23,
+    scale: 1,
+    rounding: 5,
+    padding: 7,
+    spacing: 2,
+    offsetX: 10,
+    offsetY: 8,
+    bold: false,
+    textShadow: true,
+    accentSuffix: true,
+    renderMode: true,
+    glow: true,
+    glowStrength: 0.8,
+    blurStrength: 6,
+    hoverEffect: true,
+    enableSpeed: 14,
+    disableSpeed: 8,
+    elastic: true,
+    stagger: true,
+    theme: 'Midnight',
+    solidColor: [255,140,90],
+    legacy: false,
+};
+
+const PRESETS = {
+    'Sleek':      { background:'Dark',     display:'Bar',     glow:true,  rounding:5,  colorMode:'Theme',    offsetX:10, offsetY:8 },
+    'Gradient':   { background:'Gradient', display:'Bar',     glow:true,  rounding:6,  colorMode:'Theme',    offsetX:10, offsetY:8 },
+    'Glass':      { background:'Glass',    display:'Outline', glow:true,  rounding:10, colorMode:'Theme',    offsetX:10, offsetY:8 },
+    'Blur':       { background:'Blur',     display:'Bar',     glow:true,  rounding:10, colorMode:'Theme',    offsetX:10, offsetY:8, blurStrength:7 },
+    'Outline':    { background:'None',     display:'Outline', glow:true,  rounding:6,  colorMode:'Theme',    offsetX:10, offsetY:8 },
+    'Split':      { background:'Dark',     display:'Split',   glow:true,  rounding:4,  colorMode:'Theme',    offsetX:10, offsetY:8 },
+    'Category':   { background:'Dark',     display:'Bar',     glow:true,  rounding:5,  colorMode:'Category', offsetX:10, offsetY:8 },
+    'Minimal':    { background:'None',     display:'Glow',    glow:true,  rounding:0,  colorMode:'Theme',    offsetX:10, offsetY:8 },
+};
+
+// ── demo modules ────────────────────────────────────────────────────────────
+const modules = [
+    { name:'Kill Aura',       suffix:'Multi',   category:'Combat',   enabled:true,  bound:true },
+    { name:'Infinite Aura',   suffix:'5.0',     category:'Combat',   enabled:true,  bound:true },
+    { name:'Scaffold',        suffix:'Telly',   category:'Movement', enabled:true,  bound:true },
+    { name:'Speed',           suffix:'2.4',     category:'Movement', enabled:true,  bound:true },
+    { name:'Fly',             suffix:'Vanilla', category:'Movement', enabled:false, bound:true },
+    { name:'Ore Miner',       suffix:'Diamond', category:'Player',   enabled:true,  bound:true },
+    { name:'Regen',           suffix:'Fast',    category:'Player',   enabled:true,  bound:true },
+    { name:'Inv Manager',     suffix:'',        category:'Player',   enabled:true,  bound:true },
+    { name:'Pearl Stopper',   suffix:'3.5',     category:'Combat',   enabled:true,  bound:true },
+    { name:'Block ESP',       suffix:'Diamond', category:'Visual',   enabled:true,  bound:true },
+    { name:'Nametags',        suffix:'Scale 1.2',category:'Visual',  enabled:true,  bound:true },
+    { name:'Tracers',         suffix:'Rainbow', category:'Visual',   enabled:true,  bound:true },
+    { name:'Target HUD',      suffix:'Rise',    category:'Visual',   enabled:true,  bound:true },
+    { name:'Keystrokes',      suffix:'WASD',    category:'Visual',   enabled:true,  bound:true },
+    { name:'Watermark',       suffix:'SevenDays',category:'Visual',  enabled:true,  bound:true },
+    { name:'Arraylist',       suffix:'Dark',    category:'Visual',   enabled:true,  bound:true },
+    { name:'Notifications',   suffix:'',        category:'Visual',   enabled:true,  bound:true },
+    { name:'China Hat',       suffix:'Wave',    category:'Visual',   enabled:true,  bound:true },
+    { name:'Hit Effects',     suffix:'Spark',   category:'Visual',   enabled:true,  bound:true },
+    { name:'Jump Circles',    suffix:'',        category:'Visual',   enabled:true,  bound:true },
+    { name:'Potion HUD',      suffix:'Ticks',   category:'Visual',   enabled:true,  bound:true },
+    { name:'Freelook',        suffix:'',        category:'Misc',     enabled:true,  bound:true },
+    { name:'Name Protect',    suffix:'',        category:'Misc',     enabled:true,  bound:true },
+    { name:'Anti Void',       suffix:'',        category:'Misc',     enabled:false, bound:false },
+];
+
+for (const m of modules) {
+    m.anim = m.enabled ? 1 : 0;
+    m.prevAnim = m.anim;
+    m.hover = 0;
+    m.burst = 0;
+    m.wasEnabled = m.enabled;
+    m.fullWidth = 0;
+}
+
+// ── canvas / scene ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('view');
+const ctx = canvas.getContext('2d');
+let W = 1280, H = 720, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+const backdrop = document.createElement('canvas');
+const bctx = backdrop.getContext('2d');
+
+function resize() {
+    const stage = document.getElementById('stage');
+    W = Math.max(640, stage.clientWidth);
+    H = Math.max(420, stage.clientHeight);
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    backdrop.width = W * DPR; backdrop.height = H * DPR;
+    bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+// Minecraft-ish procedural scene so blur / glow have something to eat
+function drawScene(c, w, h) {
+    const sky = c.createLinearGradient(0, 0, 0, h * 0.75);
+    sky.addColorStop(0, '#3f7fd0'); sky.addColorStop(0.55, '#6fb1e8'); sky.addColorStop(1, '#a9d8f5');
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+
+    // sun
+    const sunX = w * 0.78, sunY = h * 0.16;
+    const sg = c.createRadialGradient(sunX, sunY, 4, sunX, sunY, 90);
+    sg.addColorStop(0, 'rgba(255,252,220,0.95)'); sg.addColorStop(1, 'rgba(255,240,180,0)');
+    c.fillStyle = sg; c.beginPath(); c.arc(sunX, sunY, 90, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#fff8d0'; c.fillRect(sunX - 22, sunY - 22, 44, 44);
+
+    // clouds
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    const clouds = [[0.08,0.16,7,2],[0.32,0.09,5,2],[0.52,0.2,4,1],[0.66,0.11,6,2]];
+    for (const [cx, cy, cw, ch] of clouds) {
+        for (let i = 0; i < cw; i++) for (let j = 0; j < ch; j++) {
+            if ((i + j) % 3 === 2) continue;
+            c.fillRect(cx * w + i * 34, cy * h + j * 26, 34, 26);
+        }
+    }
+    c.fillStyle = 'rgba(255,255,255,0.45)';
+    for (let i = 0; i < 5; i++) c.fillRect(w * 0.14 + i * 34, h * 0.31, 34, 22);
+
+    // terrain
+    const groundY = h * 0.62;
+    const grassTop = '#6aa84f', grassSide = '#5b9445', dirt = '#8b6239', dirtDark = '#7a5630', stone = '#7f7f7f';
+    const tile = 46;
+    for (let x = 0; x < w; x += tile) {
+        const hh = Math.sin((x / w) * Math.PI * 2.2) * 26 + Math.sin(x * 0.021) * 15;
+        const top = groundY + hh;
+        for (let y = top; y < h + tile; y += tile) {
+            const idx = Math.round((y - top) / tile);
+            const shade = (Math.round(x / tile) * 7 + idx * 13) % 5;
+            let col = idx === 0 ? grassTop : (idx < 4 ? dirt : stone);
+            if (idx === 0 && shade > 3) col = grassSide;
+            if (idx > 0 && idx < 4 && shade > 3) col = dirtDark;
+            if (idx >= 4 && shade > 3) col = '#6f6f6f';
+            c.fillStyle = col;
+            c.fillRect(x, y, tile + 1, tile + 1);
+            c.fillStyle = 'rgba(0,0,0,0.06)';
+            c.fillRect(x, y, 4, tile + 1);
+            c.fillStyle = 'rgba(255,255,255,0.05)';
+            c.fillRect(x, y, tile + 1, 3);
+        }
+    }
+
+    // a few foreground blocks for depth
+    c.fillStyle = '#6aa84f'; c.fillRect(w * 0.06, h * 0.72, tile * 2, tile);
+    c.fillStyle = '#5b9445'; c.fillRect(w * 0.06, h * 0.72, tile * 2, 12);
+    c.fillStyle = '#8b6239'; c.fillRect(w * 0.06, h * 0.72 + tile, tile * 2, tile * 3);
+
+    // hotbar
+    const hbW = 9 * 44, hbX = (w - hbW) / 2, hbY = h - 62;
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    roundRect(c, hbX - 6, hbY - 6, hbW + 12, 56, 8); c.fill();
+    for (let i = 0; i < 9; i++) {
+        c.fillStyle = 'rgba(20,20,26,0.55)';
+        roundRect(c, hbX + i * 44 + 3, hbY + 3, 38, 38, 5); c.fill();
+        c.strokeStyle = i === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.18)';
+        c.lineWidth = i === 0 ? 2 : 1.2;
+        roundRect(c, hbX + i * 44 + 3, hbY + 3, 38, 38, 5); c.stroke();
+    }
+}
+
+function roundRect(c, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2));
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+}
+
+// ── color utils (same math as ColorUtils.cpp) ──────────────────────────────
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function clamp01(v) { return clamp(v, 0, 1); }
+function smoothStep(t) { t = clamp01(t); return t * t * (3 - 2 * t); }
+function easeOutQuad(t) { return t * (2 - t); }
+function easeOutExpo(t) { return 1 - Math.pow(2, -8 * t); }
+function easeInBack(t) { return t * t * (2.70158 * t - 1.70158); }
+function easeOutElastic(t) { const t2 = (t - 1) * (t - 1); return 1 - t2 * t2 * Math.cos(t * Math.PI * 2.25); }
+function rgba(c, a) { return `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${clamp01(a)})`; }
+function mix(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+
+function lerpColors(colors, speed, index) {
+    const time = 10000 / speed;
+    const angle = ((performance.now() + index) % time);
+    const seg = time / colors.length;
+    const i = Math.floor(angle / seg) % colors.length;
+    const f = angle / seg - Math.floor(angle / seg);
+    const a = colors[i], b = colors[(i + 1) % colors.length];
+    return mix(a, b, f);
+}
+
+function themedColor(index) {
+    if (settings.colorMode === 'Rainbow') {
+        const hue = (((performance.now() * 0.001) / 3 + index / 1000) % 1) * 360;
+        return hsv(hue, 1, 1);
+    }
+    if (settings.colorMode === 'Solid') return settings.solidColor;
+    if (settings.colorMode === 'Category') return [255,255,255];
+    return lerpColors(THEMES[settings.theme], 3, index);
+}
+
+function hsv(h, s, v) {
+    h = ((h % 360) + 360) % 360 / 60;
+    const c = v * s, x = c * (1 - Math.abs(h % 2 - 1)), m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 1) { r = c; g = x; } else if (h < 2) { r = x; g = c; }
+    else if (h < 3) { g = c; b = x; } else if (h < 4) { g = x; b = c; }
+    else if (h < 5) { r = x; b = c; } else { r = c; b = x; }
+    return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+
+// ── font handling ───────────────────────────────────────────────────────────
+function fontString(size, bold) {
+    return `${bold ? '700 ' : ''}${size}px "Product Sans", system-ui, sans-serif`;
+}
+function textWidth(text, size, bold) {
+    ctx.font = fontString(size, bold);
+    return ctx.measureText(text).width;
+}
+
+// ── legacy renderer (the "before" look) ────────────────────────────────────
+function renderLegacy(screenW) {
+    const scale = settings.scale;
+    const fontSize = settings.fontSize * scale * 0.64;
+    const suffixSize = fontSize * 0.75;
+    const lineH = fontSize * 1.22;
+    const rightMargin = 12 * scale;
+    const accentW = 2 * scale;
+
+    const list = modules.filter(m => m.anim > 0.005);
+    const items = list.map((m, i) => {
+        const name = m.name;
+        const suffix = settings.renderMode ? m.suffix : '';
+        const nameW = textWidth(name, fontSize, settings.bold);
+        const suffixW = suffix ? textWidth(suffix, suffixSize, settings.bold) : 0;
+        return { m, name, suffix, nameW, suffixW, totalW: Math.min(nameW + (suffix ? 6 + suffixW : 0), 300 * scale), color: themedColor(i * 35) };
+    }).sort((a, b) => b.totalW - a.totalW);
+
+    let y = 12;
+    for (const it of items) {
+        const alpha = it.m.anim;
+        const baseX = screenW - rightMargin - it.totalW - accentW - 8;
+        const hiddenX = screenW + 80;
+        const raw = clamp01(it.m.anim);
+        const slide = it.m.anim < it.m.prevAnim ? raw : easeOutExpo(raw);
+        const x = lerp(hiddenX, baseX, settings.elastic && it.m.enabled ? (slide) : slide);
+        const stripX = x + it.totalW + 4;
+        const col = it.color;
+
+        ctx.fillStyle = rgba(col, alpha);
+        ctx.fillRect(stripX, y + 2, accentW, lineH - 4);
+        if (settings.glow) {
+            ctx.save();
+            ctx.shadowColor = rgba(col, alpha * 0.5);
+            ctx.shadowBlur = settings.glowStrength * 20 * alpha;
+            ctx.fillStyle = rgba(col, alpha);
+            ctx.fillRect(stripX, y + 2, accentW, lineH - 4);
+            ctx.restore();
+        }
+
+        ctx.textBaseline = 'top';
+        ctx.font = fontString(fontSize, settings.bold);
+        ctx.fillStyle = `rgba(4,4,6,${0.7 * alpha})`;
+        ctx.fillText(it.name, x + 1, y + 1);
+        ctx.fillStyle = rgba(col, alpha);
+        ctx.fillText(it.name, x, y);
+
+        if (it.suffix) {
+            ctx.font = fontString(suffixSize, settings.bold);
+            const oy = (lineH - suffixSize) * 0.5;
+            ctx.fillStyle = `rgba(4,4,6,${0.7 * alpha})`;
+            ctx.fillText(it.suffix, x + it.nameW + 6 + 1, y + oy + 1);
+            ctx.fillStyle = `rgba(160,160,175,${0.7 * alpha})`;
+            ctx.fillText(it.suffix, x + it.nameW + 6, y + oy);
+        }
+        y += lineH * alpha;
+    }
+}
+
+// ── new renderer ────────────────────────────────────────────────────────────
+function renderArraylist(screenW, screenH, dt) {
+    const scale = settings.scale;
+    const fontSize = settings.fontSize * scale * 0.64;
+    const suffixSize = fontSize * 0.78;
+    const rounding = settings.rounding * scale;
+    const hasPlate = settings.background !== 'None';
+    const panelMode = settings.background === 'Blur' || settings.background === 'Glass';
+    const padX = hasPlate ? settings.padding * scale : fontSize * 0.25;
+    const padY = hasPlate ? fontSize * 0.30 : fontSize * 0.10;
+    const rowH = fontSize + padY * 2;
+    const spacing = panelMode ? 0 : settings.spacing * scale;
+    const step = rowH + spacing;
+    const accentGap = fontSize * 0.24;
+    const accentW = Math.max(2, fontSize * 0.16);
+    const suffixGap = fontSize * 0.42;
+    const edge = settings.offsetX * scale;
+    const topY = settings.offsetY * scale;
+    const rightSide = settings.side === 'Right';
+    const maxContentW = screenW * 0.55;
+
+    // ── collect ──
+    let items = modules
+        .filter(m => m.anim > 0.004)
+        .filter(m => settings.visibility === 'All' || m.bound)
+        .map((m, i) => {
+            const name = m.name;
+            const suffix = settings.renderMode ? m.suffix : '';
+            const nameW = textWidth(name, fontSize, settings.bold);
+            const suffixW = suffix ? textWidth(suffix, suffixSize, settings.bold) : 0;
+            return {
+                m, name, suffix, nameW, suffixW,
+                contentW: Math.min(nameW + (suffix ? suffixGap + suffixW : 0), maxContentW),
+                alpha: clamp01(easeOutQuad(m.anim)),
+                burst: clamp01(m.burst),
+                color: settings.colorMode === 'Category' ? (CATEGORY_COLORS[m.category] || [230,230,235]) : themedColor(i * 30),
+                y: -99999, falling: m.anim < m.prevAnim - 0.0005,
+            };
+        });
+
+    if (!items.length) return;
+
+    if (settings.sorting === 'Width') items.sort((a, b) => b.contentW - a.contentW);
+    else if (settings.sorting === 'Alphabetical') items.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+
+    // ── vertical layout ──
+    let cursorY = topY, widest = 0;
+    for (const it of items) {
+        it.targetY = cursorY;
+        if (it.y < -9000) it.y = it.targetY;
+        it.y = lerp(it.y, it.targetY, clamp01(dt * 15));
+        if (Math.abs(it.y - it.targetY) < 0.15) it.y = it.targetY;
+        cursorY += step * smoothStep(it.m.anim);
+        widest = Math.max(widest, it.contentW);
+    }
+
+    // ── horizontal geometry ──
+    let panelMinX = 0, panelMaxX = 0;
+    if (panelMode) {
+        const panelW = widest + padX * 2 + accentW + accentGap;
+        if (rightSide) { panelMaxX = screenW - edge; panelMinX = panelMaxX - panelW; }
+        else { panelMinX = edge; panelMaxX = panelMinX + panelW; }
+    }
+
+    const mouse = { x: lastMouse.x, y: lastMouse.y };
+    items.forEach((it, index) => {
+        const rowW = it.contentW + padX * 2;
+        if (panelMode) { it.cardMinX = panelMinX; it.cardMaxX = panelMaxX; }
+        else if (rightSide) { it.cardMaxX = screenW - edge - accentW - accentGap; it.cardMinX = it.cardMaxX - rowW; }
+        else { it.cardMinX = edge + accentW + accentGap; it.cardMaxX = it.cardMinX + rowW; }
+
+        const hiddenOffset = rightSide ? (screenW + 40) : (-rowW - 40);
+        let slide;
+        if (it.falling) slide = easeInBack(it.m.anim);
+        else if (settings.elastic && it.m.enabled) slide = easeOutElastic(it.m.anim);
+        else slide = easeOutExpo(it.m.anim);
+
+        if (settings.stagger && !it.falling && !panelMode) {
+            const delay = index * 0.03;
+            if (delay > 0) {
+                const raw = clamp01((it.m.anim - delay) / Math.max(0.05, 1 - delay));
+                slide = (settings.elastic && it.m.enabled) ? easeOutElastic(raw) : easeOutExpo(raw);
+            }
+        }
+
+        const offset = lerp(hiddenOffset, 0, slide);
+        it.cardMinX += offset; it.cardMaxX += offset;
+        it.cardMinY = it.y; it.cardMaxY = it.y + rowH;
+
+        let hoverTarget = 0;
+        let hMinX = it.cardMinX, hMaxX = it.cardMaxX;
+        if (rightSide) hMaxX += accentGap + accentW; else hMinX -= accentGap + accentW;
+        if (settings.hoverEffect && mouse.x >= hMinX - 2 && mouse.x <= hMaxX + 2 &&
+            mouse.y >= it.cardMinY - 1 && mouse.y <= it.cardMaxY + 1) hoverTarget = 1;
+
+        it.m.hover = lerp(it.m.hover, hoverTarget, clamp01(dt * 14));
+        it.hover = clamp01(it.m.hover);
+
+        if (hoverTarget > 0 && clicked) {
+            it.m.burst = 1;
+            it.m.enabled = !it.m.enabled;
+            it.m.wasEnabled = it.m.enabled;
+        }
+    });
+    if (clicked) clicked = false;
+
+    // ══ render ══════════════════════════════════════════════════════════════
+    let minRowY = Infinity, maxRowY = -Infinity, panelAlpha = 0;
+    for (const it of items) {
+        minRowY = Math.min(minRowY, it.cardMinY);
+        maxRowY = Math.max(maxRowY, it.cardMaxY);
+        panelAlpha = Math.max(panelAlpha, it.alpha);
+    }
+
+    // shared panel
+    if (panelMode) {
+        if (settings.background === 'Blur') {
+            ctx.save();
+            roundRect(ctx, panelMinX, minRowY, panelMaxX - panelMinX, maxRowY - minRowY, rounding);
+            ctx.clip();
+            ctx.filter = `blur(${settings.blurStrength}px)`;
+            ctx.drawImage(backdrop, 0, 0, W, H);
+            ctx.filter = 'none';
+            ctx.restore();
+
+            ctx.fillStyle = `rgba(9,9,15,${0.53 * panelAlpha})`;
+            roundRect(ctx, panelMinX, minRowY, panelMaxX - panelMinX, maxRowY - minRowY, rounding); ctx.fill();
+            ctx.strokeStyle = `rgba(255,255,255,${0.055 * panelAlpha})`; ctx.lineWidth = 1;
+            roundRect(ctx, panelMinX + .5, minRowY + .5, panelMaxX - panelMinX - 1, maxRowY - minRowY - 1, rounding); ctx.stroke();
+        } else {
+            const g = ctx.createLinearGradient(0, minRowY, 0, maxRowY);
+            g.addColorStop(0, `rgba(255,255,255,${0.10 * panelAlpha})`);
+            g.addColorStop(1, `rgba(255,255,255,${0.016 * panelAlpha})`);
+            ctx.fillStyle = g;
+            roundRect(ctx, panelMinX, minRowY, panelMaxX - panelMinX, maxRowY - minRowY, rounding); ctx.fill();
+
+            ctx.fillStyle = `rgba(10,10,17,${0.59 * panelAlpha})`;
+            roundRect(ctx, panelMinX, minRowY, panelMaxX - panelMinX, maxRowY - minRowY, rounding); ctx.fill();
+            ctx.strokeStyle = `rgba(255,255,255,${0.086 * panelAlpha})`; ctx.lineWidth = 1;
+            roundRect(ctx, panelMinX + .5, minRowY + .5, panelMaxX - panelMinX - 1, maxRowY - minRowY - 1, rounding); ctx.stroke();
+        }
+        ctx.fillStyle = `rgba(255,255,255,${0.07 * panelAlpha})`;
+        ctx.fillRect(panelMinX + rounding, minRowY + 1, (panelMaxX - panelMinX) - rounding * 2, 1.2);
+    }
+
+    // plates
+    for (const it of items) {
+        if (it.alpha <= 0.01) continue;
+        if (panelMode) {
+            if (it.hover > 0.01 || it.burst > 0.01) {
+                ctx.fillStyle = `rgba(255,255,255,${(0.023 * it.hover + 0.086 * it.burst) * it.alpha})`;
+                roundRect(ctx, it.cardMinX + 3, it.cardMinY + 1, (it.cardMaxX - 3) - (it.cardMinX + 3), rowH - 2, 3);
+                ctx.fill();
+            }
+            continue;
+        }
+
+        const grow = (it.hover * 7 + it.burst * 5) * scale;
+        let mnX = it.cardMinX, mxX = it.cardMaxX;
+        if (rightSide) mnX -= grow; else mxX += grow;
+
+        const col = it.color;
+        const style = settings.background;
+        const w = mxX - mnX, h = rowH;
+
+        if (style === 'Dark') {
+            ctx.fillStyle = `rgba(9,9,15,${(0.784 + 0.098 * it.hover) * it.alpha})`;
+            roundRect(ctx, mnX, it.cardMinY, w, h, rounding); ctx.fill();
+            ctx.strokeStyle = `rgba(255,255,255,${(0.039 + 0.055 * it.hover) * it.alpha})`; ctx.lineWidth = 1;
+            roundRect(ctx, mnX + .5, it.cardMinY + .5, w - 1, h - 1, rounding); ctx.stroke();
+        } else if (style === 'Gradient') {
+            ctx.fillStyle = `rgba(9,9,15,${0.804 * it.alpha})`;
+            roundRect(ctx, mnX, it.cardMinY, w, h, rounding); ctx.fill();
+            const g = ctx.createLinearGradient(0, it.cardMinY, 0, it.cardMinY + h);
+            g.addColorStop(0, rgba(col, 0.42 * it.alpha));
+            g.addColorStop(1, rgba(col, 0.05 * it.alpha));
+            ctx.fillStyle = g;
+            roundRect(ctx, mnX, it.cardMinY, w, h, rounding); ctx.fill();
+            ctx.strokeStyle = rgba(col, 0.35 * it.alpha); ctx.lineWidth = 1;
+            roundRect(ctx, mnX + .5, it.cardMinY + .5, w - 1, h - 1, rounding); ctx.stroke();
+        } else if (style === 'Glass') {
+            const g = ctx.createLinearGradient(0, it.cardMinY, 0, it.cardMinY + h);
+            g.addColorStop(0, `rgba(255,255,255,${(0.118 + 0.118 * it.hover) * it.alpha})`);
+            g.addColorStop(1, `rgba(255,255,255,${0.024 * it.alpha})`);
+            ctx.fillStyle = g;
+            roundRect(ctx, mnX, it.cardMinY, w, h, rounding); ctx.fill();
+            ctx.fillStyle = `rgba(10,10,17,${(0.57 + 0.137 * it.hover) * it.alpha})`;
+            roundRect(ctx, mnX, it.cardMinY, w, h, rounding); ctx.fill();
+            ctx.strokeStyle = `rgba(255,255,255,${(0.086 + 0.078 * it.hover) * it.alpha})`; ctx.lineWidth = 1;
+            roundRect(ctx, mnX + .5, it.cardMinY + .5, w - 1, h - 1, rounding); ctx.stroke();
+        }
+
+        if (it.burst > 0.01) {
+            ctx.fillStyle = `rgba(255,255,255,${0.102 * it.burst * it.alpha})`;
+            roundRect(ctx, mnX, it.cardMinY, w, h, rounding); ctx.fill();
+        }
+    }
+
+    // accents + text
+    for (const it of items) {
+        if (it.alpha <= 0.01) continue;
+        const col = it.color;
+        const grow = (it.hover * 7 + it.burst * 5) * scale;
+        let barMinX, barMaxX;
+        if (!panelMode) {
+            const cardEdge = rightSide ? it.cardMaxX : it.cardMinX;
+            const barW = accentW + (it.hover * 1.2 + it.burst * 1.5) * scale;
+            if (rightSide) { barMaxX = cardEdge + accentGap + accentW; barMinX = barMaxX - barW; }
+            else { barMinX = cardEdge - accentGap - accentW; barMaxX = barMinX + barW; }
+        } else {
+            const barW = accentW + (it.hover * 1.2 + it.burst * 1.5) * scale;
+            if (rightSide) { barMaxX = it.cardMaxX - 1.5; barMinX = barMaxX - barW; }
+            else { barMinX = it.cardMinX + 1.5; barMaxX = barMinX + barW; }
+        }
+        const barMinY = it.cardMinY + 2.5, barMaxY = it.cardMaxY - 2.5;
+        const barR = Math.min(barMaxX - barMinX, barMaxY - barMinY) * 0.5;
+
+        const drawBar = () => {
+            ctx.fillStyle = rgba(col, it.alpha);
+            roundRect(ctx, barMinX, barMinY, barMaxX - barMinX, barMaxY - barMinY, barR); ctx.fill();
+        };
+
+        let glowRects = [];
+        if (settings.display === 'Bar') {
+            if (settings.glow) glowRects.push([barMinX, barMinY, barMaxX, barMaxY, barR]);
+            drawBar();
+        } else if (settings.display === 'Outline') {
+            let mnX = it.cardMinX, mxX = it.cardMaxX;
+            if (rightSide) mnX -= grow; else mxX += grow;
+            ctx.fillStyle = rgba(col, 0.07 * it.alpha);
+            roundRect(ctx, mnX, it.cardMinY, mxX - mnX, rowH, rounding); ctx.fill();
+            ctx.strokeStyle = rgba(col, (0.75 + 0.25 * it.hover) * it.alpha);
+            ctx.lineWidth = 1.6 * scale;
+            roundRect(ctx, mnX + 1, it.cardMinY + 1, mxX - mnX - 2, rowH - 2, rounding); ctx.stroke();
+            if (settings.glow) glowRects.push([mnX, it.cardMinY, mxX, it.cardMinY + rowH, rounding]);
+        } else if (settings.display === 'Split') {
+            let mnX = it.cardMinX, mxX = it.cardMaxX;
+            if (rightSide) mnX -= grow; else mxX += grow;
+            const g = ctx.createLinearGradient(mnX, 0, mxX, 0);
+            if (rightSide) { g.addColorStop(0, rgba(col, 0)); g.addColorStop(1, rgba(col, 0.38 * it.alpha)); }
+            else { g.addColorStop(0, rgba(col, 0.38 * it.alpha)); g.addColorStop(1, rgba(col, 0)); }
+            ctx.fillStyle = g;
+            roundRect(ctx, mnX, it.cardMinY, mxX - mnX, rowH, rounding); ctx.fill();
+            if (settings.glow) glowRects.push([barMinX, barMinY, barMaxX, barMaxY, barR]);
+            drawBar();
+        } else if (settings.display === 'Glow') {
+            let mnX = it.cardMinX, mxX = it.cardMaxX;
+            if (rightSide) mnX -= grow; else mxX += grow;
+            ctx.fillStyle = rgba(col, 0.9 * it.alpha);
+            roundRect(ctx, mnX + rounding, it.cardMaxY - 1.6 * scale, (mxX - rounding) - (mnX + rounding), 1.2 * scale, 1); ctx.fill();
+            glowRects.push([mnX, it.cardMinY, mxX, it.cardMinY + rowH, rounding, (0.35 + 0.25 * it.hover) * it.alpha]);
+        }
+
+        if (settings.glow && glowRects.length) {
+            ctx.save();
+            for (const r of glowRects) {
+                const strength = r[5] !== undefined ? r[5] : (0.45 + 0.30 * it.hover) * it.alpha;
+                ctx.shadowColor = rgba(col, strength);
+                ctx.shadowBlur = settings.glowStrength * 22 * it.alpha * scale;
+                ctx.fillStyle = rgba(col, settings.display === 'Glow' ? 0.35 : 0.0);
+                if (settings.display === 'Bar' || settings.display === 'Split') {
+                    ctx.fillStyle = rgba(col, it.alpha);
+                    roundRect(ctx, barMinX, barMinY, barMaxX - barMinX, barMaxY - barMinY, barR); ctx.fill();
+                } else if (settings.display === 'Outline') {
+                    ctx.strokeStyle = rgba(col, 0.5 * it.alpha);
+                    ctx.lineWidth = 1.4 * scale;
+                    roundRect(ctx, r[0], r[1], r[2] - r[0], r[3] - r[1], r[4]); ctx.stroke();
+                } else {
+                    ctx.fillStyle = rgba(col, 0.18 * it.alpha);
+                    roundRect(ctx, r[0], r[1], r[2] - r[0], r[3] - r[1], r[4] || 0); ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        // text
+        const textShift = it.hover * 2 * scale;
+        const textX = it.cardMinX + padX + (rightSide ? -textShift : textShift);
+        const textY = it.cardMinY + (rowH - fontSize) * 0.5;
+
+        ctx.textBaseline = 'top';
+        ctx.font = fontString(fontSize, settings.bold);
+        if (settings.textShadow) {
+            const so = Math.max(1, fontSize * 0.07);
+            ctx.fillStyle = `rgba(0,0,0,${0.588 * it.alpha})`;
+            ctx.fillText(it.name, textX + so, textY + so);
+        }
+        ctx.fillStyle = `rgba(255,255,255,${(0.933 + 0.067 * it.hover) * it.alpha})`;
+        ctx.fillText(it.name, textX, textY);
+
+        if (it.suffix) {
+            ctx.font = fontString(suffixSize, settings.bold);
+            const suffixX = textX + it.nameW + suffixGap;
+            const suffixY = it.cardMinY + (rowH - suffixSize) * 0.5;
+            ctx.fillStyle = settings.accentSuffix
+                ? rgba(col, (0.80 + 0.20 * it.hover) * it.alpha)
+                : `rgba(196,200,214,${(0.745 + 0.157 * it.hover) * it.alpha})`;
+            if (settings.textShadow) {
+                const so = Math.max(1, suffixSize * 0.07);
+                ctx.fillStyle = `rgba(0,0,0,${0.549 * it.alpha})`;
+                ctx.fillText(it.suffix, suffixX + so, suffixY + so);
+                ctx.fillStyle = settings.accentSuffix
+                    ? rgba(col, (0.80 + 0.20 * it.hover) * it.alpha)
+                    : `rgba(196,200,214,${(0.745 + 0.157 * it.hover) * it.alpha})`;
+            }
+            ctx.fillText(it.suffix, suffixX, suffixY);
+        }
+    }
+}
+
+// ── main loop ───────────────────────────────────────────────────────────────
+let lastTime = performance.now();
+let lastMouse = { x: -1, y: -1 };
+let clicked = false;
+let fpsSmooth = 60;
+
+function frame(now) {
+    const dt = clamp((now - lastTime) / 1000, 0, 0.1);
+    lastTime = now;
+    fpsSmooth = lerp(fpsSmooth, 1 / Math.max(dt, 0.0001), 0.08);
+
+    // animate demo modules
+    for (const m of modules) {
+        if (m.enabled !== m.wasEnabled) { m.burst = 1; m.wasEnabled = m.enabled; }
+        const target = m.enabled ? 1 : 0;
+        const speed = target > m.anim ? settings.enableSpeed : settings.disableSpeed;
+        m.anim = lerp(m.anim, target, clamp01(dt * speed));
+        if (Math.abs(m.anim - target) < 0.002) m.anim = target;
+        m.anim = clamp01(m.anim);
+        m.burst = Math.max(0, m.burst - dt * 2.6);
+        m.prevAnim = m.prevAnim === undefined ? m.anim : m.prevAnim;
+    }
+
+    // random demo toggles
+    demoTimer -= dt;
+    if (demoTimer <= 0) {
+        demoTimer = 0.9 + Math.random() * 1.4;
+        const candidates = modules.filter(m => !m.name.startsWith('Arraylist'));
+        const m = candidates[Math.floor(Math.random() * candidates.length)];
+        if (m) m.enabled = !m.enabled;
+    }
+
+    drawScene(bctx, W, H);
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(backdrop, 0, 0, W, H);
+
+    if (settings.legacy) renderLegacy(W);
+    else renderArraylist(W, H, dt);
+
+    for (const m of modules) m.prevAnim = m.anim;
+
+    document.getElementById('badge-fps').textContent = `${fpsSmooth.toFixed(0)} fps`;
+    document.getElementById('badge-style').textContent = settings.legacy
+        ? 'старый рендер'
+        : `${settings.background} + ${settings.display}`;
+
+    requestAnimationFrame(frame);
+}
+let demoTimer = 0.6;
+
+canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    lastMouse.x = (e.clientX - r.left) * (W / r.width);
+    lastMouse.y = (e.clientY - r.top) * (H / r.height);
+});
+canvas.addEventListener('mouseleave', () => { lastMouse.x = -1; lastMouse.y = -1; });
+canvas.addEventListener('mousedown', () => { clicked = true; });
+
+// ── UI wiring ───────────────────────────────────────────────────────────────
+function fillSelect(id, values, key) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = values.map(v => `<option value="${v}">${v}</option>`).join('');
+    sel.value = settings[key];
+    sel.addEventListener('change', () => { settings[key] = sel.value; syncUI(); });
+}
+
+fillSelect('background', BG_STYLES, 'background');
+fillSelect('display', DISPLAYS, 'display');
+fillSelect('colorMode', COLOR_MODES, 'colorMode');
+fillSelect('side', SIDES, 'side');
+fillSelect('sorting', SORTINGS, 'sorting');
+fillSelect('visibility', VISIBILITIES, 'visibility');
+fillSelect('theme', Object.keys(THEMES), 'theme');
+
+const sliders = [
+    ['fontSize', 'fontSize', 1], ['scale', 'scale', 2], ['rounding', 'rounding', 1],
+    ['padding', 'padding', 1], ['spacing', 'spacing', 1], ['offsetX', 'offsetX', 0],
+    ['offsetY', 'offsetY', 0], ['glowStrength', 'glowStrength', 2], ['blurStrength', 'blurStrength', 1],
+    ['enableSpeed', 'enableSpeed', 1], ['disableSpeed', 'disableSpeed', 1],
+];
+for (const [id, key, dec] of sliders) {
+    const el = document.getElementById(id);
+    el.value = settings[key];
+    document.getElementById(id + '_v').textContent = Number(settings[key]).toFixed(dec);
+    el.addEventListener('input', () => {
+        settings[key] = parseFloat(el.value);
+        document.getElementById(id + '_v').textContent = settings[key].toFixed(dec);
+    });
+}
+const solidPicker = document.getElementById('solidColor');
+function rgbToHex(c) { return '#' + c.map(v => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join(''); }
+function hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]; }
+solidPicker.value = rgbToHex(settings.solidColor);
+solidPicker.addEventListener('input', () => { settings.solidColor = hexToRgb(solidPicker.value); });
+
+const toggles = ['bold', 'textShadow', 'accentSuffix', 'renderMode', 'glow', 'hoverEffect', 'elastic', 'stagger'];
+for (const id of toggles) {
+    const el = document.getElementById(id);
+    el.checked = settings[id];
+    el.addEventListener('change', () => { settings[id] = el.checked; syncUI(); });
+}
+
+const presetBox = document.getElementById('presets');
+for (const [name, patch] of Object.entries(PRESETS)) {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.addEventListener('click', () => { Object.assign(settings, patch); syncUI(); });
+    presetBox.appendChild(b);
+}
+const legacyBtn = document.createElement('button');
+legacyBtn.textContent = 'Было / Стало';
+legacyBtn.style.flex = '1 1 100%';
+legacyBtn.addEventListener('click', () => { settings.legacy = !settings.legacy; syncUI(); });
+presetBox.appendChild(legacyBtn);
+
+function syncUI() {
+    document.getElementById('background').value = settings.background;
+    document.getElementById('display').value = settings.display;
+    document.getElementById('colorMode').value = settings.colorMode;
+    document.getElementById('side').value = settings.side;
+    document.getElementById('sorting').value = settings.sorting;
+    document.getElementById('visibility').value = settings.visibility;
+    document.getElementById('theme').value = settings.theme;
+    for (const [id, key] of sliders) {
+        document.getElementById(id).value = settings[key];
+        const dec = id === 'scale' ? 2 : (id === 'glowStrength' ? 2 : 1);
+        document.getElementById(id + '_v').textContent = Number(settings[key]).toFixed(dec);
+    }
+    for (const id of toggles) document.getElementById(id).checked = settings[id];
+    solidPicker.value = rgbToHex(settings.solidColor);
+    document.getElementById('badge-style').textContent = settings.legacy
+        ? 'старый рендер'
+        : `${settings.background} + ${settings.display}`;
+}
+
+window.addEventListener('resize', resize);
+resize();
+syncUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
