@@ -36,6 +36,42 @@ BASE_RE = re.compile(r"^\s*(?:class|struct)\s+(\w+)\s*:\s*public\s+(.+?)\s*\{", 
 DECL_RE = re.compile(r"^\s*(?:class|struct)\s+" + r"(\w+)" + r"\b[^{;]*\{", re.M)
 
 
+def keep_client_branch(text: str) -> str:
+    """Разрешает #ifdef LL_PLAT_S / #else // LL_PLAT_C / #endif.
+
+    В хидерах LeviLamina встречаются поля, у которых серверный и клиентский
+    варианты различаются размером, например:
+
+        #ifdef LL_PLAT_S
+            TypedStorage<8, 504, RenderParams> mRenderParams;
+        #else // LL_PLAT_C
+            TypedStorage<8, 520, RenderParams> mRenderParams;
+        #endif
+
+    Проект клиентский — берём ветку #else и выбрасываем #ifdef, иначе
+    в сгенерированном хидере получаются дубли имён и он не компилируется.
+    """
+    out: list[str] = []
+    skipping = False
+    for line in text.splitlines():
+        st = line.strip()
+        if st.startswith("#ifdef") and "LL_PLAT_S" in st:
+            skipping = True
+            continue
+        if skipping and st.startswith("#else"):
+            skipping = False
+            continue
+        if skipping and st.startswith("#endif"):
+            skipping = False
+            continue
+        if skipping:
+            continue
+        if st.startswith("#ifdef") or st.startswith("#ifndef") or \
+           st.startswith("#else") or st.startswith("#endif") or st.startswith("#if "):
+            continue
+        out.append(line)
+    return "\n".join(out)
+
 def find_class_file(ll: Path, name: str) -> Path | None:
     """Выбираем файл, где класса больше всего описан:
     у одного имени бывает несколько хидеров (настоящий + клиентская заглушка),
@@ -77,10 +113,16 @@ def compute(ll: Path, name: str, depth: int = 0) -> dict | None:
     bases = [b.strip().lstrip(":").replace("::", "::") for b in (base_m.group(2).split(",") if base_m else [])]
     bases = [b.split("::")[-1] for b in bases]
 
+    body = keep_client_branch(body)
+
     fields: list[dict] = []
+    seen: set[str] = set()
     off = 0
     for m in FIELD_RE.finditer(body):
         align, size, typ, fname, arr = m.group(1), m.group(2), m.group(3).strip(), m.group(4), m.group(5)
+        if fname in seen:          # подстраховка от дублей
+            continue
+        seen.add(fname)
         a, s = int(align), int(size)
         if a > 1 and off % a:
             off += a - (off % a)

@@ -2121,12 +2121,11 @@ namespace HeartbeatClientComponent {
     constexpr ptrdiff_t Size = 0x20;
 }  // namespace HeartbeatClientComponent
 
-// HeartbeatServerComponent  [src/mc/entity/components/HeartbeatServerComponent.h]  расчётный размер 0x410
+// HeartbeatServerComponent  [src/mc/entity/components/HeartbeatServerComponent.h]  расчётный размер 0x218
 namespace HeartbeatServerComponent {
     constexpr ptrdiff_t mHeartRateExpression = 0x0;  // ::ExpressionNode, 16 байт
-    constexpr ptrdiff_t mRenderParams = 0x10;  // ::RenderParams, 504 байт
-    constexpr ptrdiff_t mRenderParams = 0x208;  // ::RenderParams, 520 байт
-    constexpr ptrdiff_t Size = 0x410;
+    constexpr ptrdiff_t mRenderParams = 0x10;  // ::RenderParams, 520 байт
+    constexpr ptrdiff_t Size = 0x218;
 }  // namespace HeartbeatServerComponent
 
 // HideComponent  [src/mc/entity/components_json_legacy/HideComponent.h]  расчётный размер 0x2
@@ -3565,16 +3564,15 @@ namespace OpenDoorAnnotationComponent {
     constexpr ptrdiff_t Size = 0x28;
 }  // namespace OpenDoorAnnotationComponent
 
-// OverworldGenerationRulesBiomeJsonComponent  [src/mc/deps/shared_types/v1_20_60/biome/components/OverworldGenerationRulesBiomeJsonComponent.h]  расчётный размер 0xF8  ⚠ BASE_UNKNOWN
+// OverworldGenerationRulesBiomeJsonComponent  [src/mc/deps/shared_types/v1_20_60/biome/components/OverworldGenerationRulesBiomeJsonComponent.h]  расчётный размер 0xE8  ⚠ BASE_UNKNOWN
 namespace OverworldGenerationRulesBiomeJsonComponent {
     constexpr ptrdiff_t mValues = 0x0;  // ::std::array<::std::variant<::SharedTypes::Reference<3>, uint>, 2>, 80 байт
     constexpr ptrdiff_t mWeightedBiomeNames = 0x50;  // ::std::vector<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeName>, 24 байт
-    constexpr ptrdiff_t mValues = 0x68;  // ::std::array<::std::variant<::BiomeTemperatureCategory, uint>, 2>, 16 байт
-    constexpr ptrdiff_t mHillsTransformation = 0x78;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
-    constexpr ptrdiff_t mMutateTransformation = 0x98;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
-    constexpr ptrdiff_t mRiverTransformation = 0xB8;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
-    constexpr ptrdiff_t mShoreTransformation = 0xD8;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
-    constexpr ptrdiff_t Size = 0xF8;
+    constexpr ptrdiff_t mHillsTransformation = 0x68;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
+    constexpr ptrdiff_t mMutateTransformation = 0x88;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
+    constexpr ptrdiff_t mRiverTransformation = 0xA8;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
+    constexpr ptrdiff_t mShoreTransformation = 0xC8;  // ::std::optional<::SharedTypes::v1_20_60::OverworldGenerationRulesBiomeJsonComponent::WeightedBiomeNameVector>, 32 байт
+    constexpr ptrdiff_t Size = 0xE8;
 }  // namespace OverworldGenerationRulesBiomeJsonComponent
 
 // OverworldHeightBiomeJsonComponent  [src/mc/deps/shared_types/v1_20_60/biome/components/OverworldHeightBiomeJsonComponent.h]  расчётный размер 0x14  ⚠ BASE_UNKNOWN
@@ -3641,17 +3639,15 @@ namespace PickComponent {
     constexpr ptrdiff_t Size = 0x4;
 }  // namespace PickComponent
 
-// PlanterItemComponent  [src/mc/world/item/components/PlanterItemComponent.h]  расчётный размер 0x43  ⚠ BASE_UNKNOWN
+// PlanterItemComponent  [src/mc/world/item/components/PlanterItemComponent.h]  расчётный размер 0x3A  ⚠ BASE_UNKNOWN
 namespace PlanterItemComponent {
     constexpr ptrdiff_t mBlock = 0x0;  // ::BlockType const*, 8 байт
     constexpr ptrdiff_t mAlignedPlacement = 0x8;  // bool const, 1 байт
-    constexpr ptrdiff_t mBlock = 0x10;  // ::BlockTypePtr, 8 байт
-    constexpr ptrdiff_t mAllowedUseBlocks = 0x18;  // ::std::vector<::BlockDescriptor>, 24 байт
-    constexpr ptrdiff_t mOnUseOnSubscription = 0x30;  // ::Bedrock::PubSub::Subscription, 16 байт
-    constexpr ptrdiff_t mCanUseBlockAsIcon = 0x40;  // bool, 1 байт
-    constexpr ptrdiff_t mReplaceBlockItem = 0x41;  // bool, 1 байт
-    constexpr ptrdiff_t mAlignedPlacement = 0x42;  // bool, 1 байт
-    constexpr ptrdiff_t Size = 0x43;
+    constexpr ptrdiff_t mAllowedUseBlocks = 0x10;  // ::std::vector<::BlockDescriptor>, 24 байт
+    constexpr ptrdiff_t mOnUseOnSubscription = 0x28;  // ::Bedrock::PubSub::Subscription, 16 байт
+    constexpr ptrdiff_t mCanUseBlockAsIcon = 0x38;  // bool, 1 байт
+    constexpr ptrdiff_t mReplaceBlockItem = 0x39;  // bool, 1 байт
+    constexpr ptrdiff_t Size = 0x3A;
 }  // namespace PlanterItemComponent
 
 // PlaySoundPacket  [src/mc/network/packet/PlaySoundPacket.h]  расчётный размер 0x4  ⚠ BASE_UNKNOWN
@@ -3986,15 +3982,13 @@ namespace PropertyComponent {
     constexpr ptrdiff_t Size = 0xA0;
 }  // namespace PropertyComponent
 
-// PropertySyncData  [src/mc/world/actor/state/PropertySyncData.h]  расчётный размер 0x40
+// PropertySyncData  [src/mc/world/actor/state/PropertySyncData.h]  расчётный размер 0x38
 namespace PropertySyncData {
     constexpr ptrdiff_t mPropertyIndex = 0x0;  // uint, 4 байт
     constexpr ptrdiff_t mData = 0x4;  // float, 4 байт
-    constexpr ptrdiff_t mPropertyIndex = 0x8;  // uint, 4 байт
-    constexpr ptrdiff_t mData = 0xC;  // int, 4 байт
-    constexpr ptrdiff_t mIntEntries = 0x10;  // ::std::vector<::PropertySyncData::PropertySyncIntEntry>, 24 байт
-    constexpr ptrdiff_t mFloatEntries = 0x28;  // ::std::vector<::PropertySyncData::PropertySyncFloatEntry>, 24 байт
-    constexpr ptrdiff_t Size = 0x40;
+    constexpr ptrdiff_t mIntEntries = 0x8;  // ::std::vector<::PropertySyncData::PropertySyncIntEntry>, 24 байт
+    constexpr ptrdiff_t mFloatEntries = 0x20;  // ::std::vector<::PropertySyncData::PropertySyncFloatEntry>, 24 байт
+    constexpr ptrdiff_t Size = 0x38;
 }  // namespace PropertySyncData
 
 // PushedByComponent  [src/mc/entity/components/PushedByComponent.h]  расчётный размер 0x10
@@ -4056,7 +4050,7 @@ namespace RawMoveInputComponent {
     constexpr ptrdiff_t Size = 0x18;
 }  // namespace RawMoveInputComponent
 
-// Reader  [src/mc/deps/json/Reader.h]  расчётный размер 0x123
+// Reader  [src/mc/deps/json/Reader.h]  расчётный размер 0x11B
 namespace Reader {
     constexpr ptrdiff_t type_ = 0x0;  // ::Json::Reader::TokenType, 4 байт
     constexpr ptrdiff_t start_ = 0x8;  // char const*, 8 байт
@@ -4069,14 +4063,13 @@ namespace Reader {
     constexpr ptrdiff_t errors_ = 0x90;  // ::std::deque<::Json::Reader::ErrorInfo>, 40 байт
     constexpr ptrdiff_t document_ = 0xB8;  // ::std::string, 32 байт
     constexpr ptrdiff_t begin_ = 0xD8;  // char const*, 8 байт
-    constexpr ptrdiff_t end_ = 0xE0;  // char const*, 8 байт
-    constexpr ptrdiff_t current_ = 0xE8;  // char const*, 8 байт
-    constexpr ptrdiff_t lastValueEnd_ = 0xF0;  // char const*, 8 байт
-    constexpr ptrdiff_t lastValue_ = 0xF8;  // ::Json::Value*, 8 байт
-    constexpr ptrdiff_t commentsBefore_ = 0x100;  // ::std::string, 32 байт
-    constexpr ptrdiff_t features_ = 0x120;  // ::Json::Features, 2 байт
-    constexpr ptrdiff_t collectComments_ = 0x122;  // bool, 1 байт
-    constexpr ptrdiff_t Size = 0x123;
+    constexpr ptrdiff_t current_ = 0xE0;  // char const*, 8 байт
+    constexpr ptrdiff_t lastValueEnd_ = 0xE8;  // char const*, 8 байт
+    constexpr ptrdiff_t lastValue_ = 0xF0;  // ::Json::Value*, 8 байт
+    constexpr ptrdiff_t commentsBefore_ = 0xF8;  // ::std::string, 32 байт
+    constexpr ptrdiff_t features_ = 0x118;  // ::Json::Features, 2 байт
+    constexpr ptrdiff_t collectComments_ = 0x11A;  // bool, 1 байт
+    constexpr ptrdiff_t Size = 0x11B;
 }  // namespace Reader
 
 // RecordItemComponent  [src/mc/deps/shared_types/beta/item/RecordItemComponent.h]  расчётный размер 0x28
@@ -4284,7 +4277,7 @@ namespace SetActorMotionPacket {
     constexpr ptrdiff_t Size = 0x4;
 }  // namespace SetActorMotionPacket
 
-// SetInstruction  [src/mc/deps/minecraft_camera/camera_instruction_options/SetInstruction.h]  расчётный размер 0x97
+// SetInstruction  [src/mc/deps/minecraft_camera/camera_instruction_options/SetInstruction.h]  расчётный размер 0x87
 namespace SetInstruction {
     constexpr ptrdiff_t mEasingType = 0x0;  // ::EasingType, 4 байт
     constexpr ptrdiff_t mEasingTime = 0x4;  // float, 4 байт
@@ -4299,14 +4292,13 @@ namespace SetInstruction {
     constexpr ptrdiff_t mViewOffsetY = 0x38;  // float, 4 байт
     constexpr ptrdiff_t mPresetIndex = 0x3C;  // uint, 4 байт
     constexpr ptrdiff_t mEase = 0x40;  // ::std::optional<::CameraInstructionOptions::SetInstruction::EaseOption>, 12 байт
-    constexpr ptrdiff_t mPos = 0x4C;  // ::std::optional<::CameraInstructionOptions::SetInstruction::PosOption>, 16 байт
-    constexpr ptrdiff_t mRot = 0x5C;  // ::std::optional<::CameraInstructionOptions::SetInstruction::RotOption>, 12 байт
-    constexpr ptrdiff_t mFacing = 0x68;  // ::std::optional<::CameraInstructionOptions::SetInstruction::FacingOption>, 16 байт
-    constexpr ptrdiff_t mViewOffset = 0x78;  // ::std::optional<::CameraInstructionOptions::SetInstruction::ViewOffsetOption>, 12 байт
-    constexpr ptrdiff_t mEntityOffset = 0x84;  // ::std::optional<::CameraInstructionOptions::SetInstruction::EntityOffsetOption>, 16 байт
-    constexpr ptrdiff_t mDefault = 0x94;  // ::std::optional<bool>, 2 байт
-    constexpr ptrdiff_t mRemoveIgnoreStartingValuesComponent = 0x96;  // bool, 1 байт
-    constexpr ptrdiff_t Size = 0x97;
+    constexpr ptrdiff_t mRot = 0x4C;  // ::std::optional<::CameraInstructionOptions::SetInstruction::RotOption>, 12 байт
+    constexpr ptrdiff_t mFacing = 0x58;  // ::std::optional<::CameraInstructionOptions::SetInstruction::FacingOption>, 16 байт
+    constexpr ptrdiff_t mViewOffset = 0x68;  // ::std::optional<::CameraInstructionOptions::SetInstruction::ViewOffsetOption>, 12 байт
+    constexpr ptrdiff_t mEntityOffset = 0x74;  // ::std::optional<::CameraInstructionOptions::SetInstruction::EntityOffsetOption>, 16 байт
+    constexpr ptrdiff_t mDefault = 0x84;  // ::std::optional<bool>, 2 байт
+    constexpr ptrdiff_t mRemoveIgnoreStartingValuesComponent = 0x86;  // bool, 1 байт
+    constexpr ptrdiff_t Size = 0x87;
 }  // namespace SetInstruction
 
 // SetPlayerGameTypePacket  [src/mc/network/packet/SetPlayerGameTypePacket.h]  расчётный размер 0x4  ⚠ BASE_UNKNOWN

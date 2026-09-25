@@ -12,18 +12,18 @@
 
 | Класс | Хидер LeviLamina | Размер | Полей | Упоминаний в проекте |
 |---|---|---|---|---|
-| `ClientInstance` | `src-client/mc/client/game/ClientInstance.h` | 0x28 | 2 | 1049 |
-| `Actor` | `src/mc/world/actor/Actor.h` | 0x3A8 | 93 | 948 |
+| `ClientInstance` | `src-client/mc/client/game/ClientInstance.h` | 0x28 | 2 | 1044 |
+| `Actor` | `src/mc/world/actor/Actor.h` | 0x3A8 | 93 | 935 |
 | `Value` | `src/mc/deps/json/Value.h` | 0x40 | 8 | 723 |
 | `ItemStack` | `src/mc/world/item/ItemStack.h` | 0x18 | 1 | 205 |
 | `Block` | `src/mc/world/level/block/Block.h` | 0x11B | 12 | 176 |
 | `PlayerAuthInputPacket` | `src/mc/network/packet/PlayerAuthInputPacket.h` | 0x4 | 1 | 105 |
 | `MovePlayerPacket` | `src/mc/network/packet/MovePlayerPacket.h` | 0x4 | 1 | 103 |
-| `Item` | `src/mc/world/item/Item.h` | 0x208 | 35 | 98 |
-| `Level` | `src/mc/world/level/Level.h` | 0x728 | 127 | 85 |
+| `Item` | `src/mc/world/item/Item.h` | 0x208 | 35 | 97 |
+| `Level` | `src/mc/world/level/Level.h` | 0x728 | 127 | 80 |
 | `InventoryTransactionPacket` | `src/mc/network/packet/InventoryTransactionPacket.h` | 0x4 | 1 | 77 |
-| `BlockSource` | `src/mc/world/level/BlockSource.h` | 0x160 | 26 | 73 |
-| `PlayerInventory` | `src/mc/world/actor/player/PlayerInventory.h` | 0xD8 | 6 | 66 |
+| `BlockSource` | `src/mc/world/level/BlockSource.h` | 0x160 | 26 | 71 |
+| `PlayerInventory` | `src/mc/world/actor/player/PlayerInventory.h` | 0xD8 | 6 | 70 |
 | `ItemUseInventoryTransaction` | `src/mc/world/inventory/transaction/ItemUseInventoryTransaction.h` | 0xA2 | 12 | 59 |
 | `LoopbackPacketSender` | `src/mc/network/LoopbackPacketSender.h` | 0x48 | 4 | 55 |
 | `Action` | `src-client/mc/client/input/vanilla/remapping/Action.h` | 0x10 | 2 | 54 |
@@ -35,7 +35,7 @@
 | `GameMode` | `src/mc/world/gamemode/GameMode.h` | 0x128 | 36 | 42 |
 | `InventoryTransaction` | `src/mc/world/inventory/transaction/InventoryTransaction.h` | 0x58 | 2 | 37 |
 | `GuiData` | `src-client/mc/client/gui/GuiData.h` | 0xEB0 | 73 | 35 |
-| `LevelChunk` | `src/mc/world/level/chunk/LevelChunk.h` | 0x18D2 | 94 | 34 |
+| `LevelChunk` | `src/mc/world/level/chunk/LevelChunk.h` | 0x18D2 | 94 | 33 |
 | `ModalFormResponsePacket` | `src/mc/network/packet/ModalFormResponsePacket.h` | 0x4 | 1 | 31 |
 | `PlayerActionPacket` | `src/mc/network/packet/PlayerActionPacket.h` | 0x4 | 1 | 30 |
 | `AABBShapeComponent` | `src/mc/deps/vanilla_components/AABBShapeComponent.h` | 0x20 | 2 | 28 |
@@ -45,7 +45,7 @@
 | `StateVectorComponent` | `src/mc/deps/vanilla_components/StateVectorComponent.h` | 0x24 | 3 | 27 |
 | `ContainerScreenController` | `src-client/mc/client/gui/screens/controllers/ContainerScreenController.h` | 0x570 | 60 | 26 |
 | `ItemUseOnActorInventoryTransaction` | `src/mc/world/inventory/transaction/ItemUseOnActorInventoryTransaction.h` | 0x88 | 6 | 26 |
-| `SimpleContainer` | `src/mc/world/SimpleContainer.h` | 0x20 | 2 | 24 |
+| `SimpleContainer` | `src/mc/world/SimpleContainer.h` | 0x20 | 2 | 25 |
 | `Blob` | `src/mc/deps/cereal/schema/blob/Blob.h` | 0x18 | 2 | 23 |
 | `ContainerManagerModel` | `src/mc/world/containers/managers/models/ContainerManagerModel.h` | 0x178 | 11 | 23 |
 | `ItemDescriptor` | `src/mc/world/item/ItemDescriptor.h` | 0x18 | 3 | 23 |
@@ -65,13 +65,13 @@
 | `MoveInputState` | `src/mc/input/MoveInputState.h` | 0xF | 5 | 17 |
 | `ActorBlockSyncMessage` | `src/mc/world/level/ActorBlockSyncMessage.h` | 0xC | 2 | 16 |
 | `InteractPacket` | `src/mc/network/packet/InteractPacket.h` | 0x4 | 1 | 16 |
-| `SetInstruction` | `src/mc/deps/minecraft_camera/camera_instruction_options/SetInstruction.h` | 0x97 | 20 | 16 |
 | `ActorRotationComponent` | `src/mc/entity/components/ActorRotationComponent.h` | 0x10 | 2 | 15 |
 | `DebugCameraComponent` | `src-client/mc/deps/minecraft_camera/components/DebugCameraComponent.h` | 0x125 | 3 | 15 |
 | `ItemActor` | `src/mc/world/actor/item/ItemActor.h` | 0xC8 | 12 | 15 |
 | `ItemStackNetIdVariant` | `src/mc/world/inventory/network/ItemStackNetIdVariant.h` | 0x18 | 1 | 15 |
 | `PlayerListEntry` | `src/mc/world/actor/player/PlayerListEntry.h` | 0xA3 | 11 | 15 |
-| `PropertySyncData` | `src/mc/world/actor/state/PropertySyncData.h` | 0x40 | 6 | 15 |
+| `PropertySyncData` | `src/mc/world/actor/state/PropertySyncData.h` | 0x38 | 4 | 15 |
+| `SetInstruction` | `src/mc/deps/minecraft_camera/camera_instruction_options/SetInstruction.h` | 0x87 | 19 | 15 |
 | `ActorRenderData` | `src-client/mc/client/renderer/actor/ActorRenderData.h` | 0x50 | 12 | 14 |
 | `AttributeInstance` | `src/mc/world/attribute/AttributeInstance.h` | 0x91 | 14 | 14 |
 | `Material` | `src-client/mc/client/renderer/block/tessellation_pipeline/Material.h` | 0x30 | 6 | 14 |
@@ -82,13 +82,13 @@
 | `RemoveActorPacket` | `src/mc/network/packet/RemoveActorPacket.h` | 0x4 | 1 | 13 |
 | `SubChunk` | `src/mc/world/level/chunk/SubChunk.h` | 0x65 | 16 | 13 |
 | `SyncedPlayerMovementSettings` | `src/mc/world/actor/player/SyncedPlayerMovementSettings.h` | 0x5 | 2 | 13 |
-| `ClientInputMappingFactory` | `src-client/mc/client/input/ClientInputMappingFactory.h` | 0x118 | 8 | 12 |
 | `ContainerClosePacket` | `src/mc/network/packet/ContainerClosePacket.h` | 0x4 | 1 | 12 |
 | `FadeInstruction` | `src/mc/deps/minecraft_camera/camera_instruction_options/FadeInstruction.h` | 0x38 | 8 | 12 |
 | `InventoryTransactionItemGroup` | `src/mc/world/inventory/transaction/InventoryTransactionItemGroup.h` | 0x15 | 5 | 12 |
 | `ItemStackRequestData` | `src/mc/world/inventory/network/ItemStackRequestData.h` | 0x48 | 4 | 12 |
 | `LevelData` | `src/mc/world/level/storage/LevelData.h` | 0x654 | 83 | 12 |
 | `MobBodyRotationComponent` | `src/mc/entity/components/MobBodyRotationComponent.h` | 0x8 | 2 | 12 |
+| `ActorEquipmentComponent` | `src/mc/entity/components/ActorEquipmentComponent.h` | 0x10 | 2 | 11 |
 | `ActorEventPacket` | `src/mc/network/packet/ActorEventPacket.h` | 0x4 | 1 | 11 |
 | `ActorHeadRotationComponent` | `src/mc/entity/components/ActorHeadRotationComponent.h` | 0x8 | 2 | 11 |
 | `ActorUniqueIDComponent` | `src/mc/entity/components/ActorUniqueIDComponent.h` | 0x8 | 1 | 11 |
@@ -96,18 +96,20 @@
 | `AttributesComponent` | `src/mc/entity/components/AttributesComponent.h` | 0x50 | 1 | 11 |
 | `CameraInstruction` | `src/mc/deps/minecraft_camera/CameraInstruction.h` | 0x14E | 9 | 11 |
 | `ClientInputHandler` | `src-client/mc/client/input/ClientInputHandler.h` | 0x88 | 20 | 11 |
+| `ClientInputMappingFactory` | `src-client/mc/client/input/ClientInputMappingFactory.h` | 0x118 | 8 | 11 |
 | `JumpControlComponent` | `src/mc/entity/components_json_legacy/JumpControlComponent.h` | 0x58 | 6 | 11 |
 | `LevelEventPacket` | `src/mc/network/packet/LevelEventPacket.h` | 0x4 | 1 | 11 |
 | `PlayerSkinPacket` | `src/mc/network/packet/PlayerSkinPacket.h` | 0x4 | 1 | 11 |
+| `ActorGameTypeComponent` | `src/mc/entity/components/ActorGameTypeComponent.h` | 0x4 | 1 | 10 |
 | `CameraOrbitComponent` | `src/mc/deps/minecraft_camera/components/CameraOrbitComponent.h` | 0x4C | 16 | 10 |
 | `CameraPresetComponent` | `src/mc/deps/minecraft_camera/components/CameraPresetComponent.h` | 0x8 | 1 | 10 |
 | `FallDistanceComponent` | `src/mc/entity/components/FallDistanceComponent.h` | 0x6 | 3 | 10 |
 | `ModalFormRequestPacket` | `src/mc/network/packet/ModalFormRequestPacket.h` | 0x4 | 1 | 10 |
 | `MoveActorAbsoluteData` | `src/mc/network/packet/MoveActorAbsoluteData.h` | 0x30 | 9 | 10 |
-| `OverworldGenerationRulesBiomeJsonComponent` | `src/mc/deps/shared_types/v1_20_60/biome/components/OverworldGenerationRulesBiomeJsonComponent.h` | 0xF8 | 7 | 10 |
+| `OverworldGenerationRulesBiomeJsonComponent` | `src/mc/deps/shared_types/v1_20_60/biome/components/OverworldGenerationRulesBiomeJsonComponent.h` | 0xE8 | 6 | 10 |
+| `ProjectileComponent` | `src/mc/entity/components_json_legacy/ProjectileComponent.h` | 0x2FB | 74 | 10 |
 | `RawMoveInputComponent` | `src/mc/entity/components/RawMoveInputComponent.h` | 0x18 | 2 | 10 |
 | `SetPlayerGameTypePacket` | `src/mc/network/packet/SetPlayerGameTypePacket.h` | 0x4 | 1 | 10 |
-| `ActorEquipmentComponent` | `src/mc/entity/components/ActorEquipmentComponent.h` | 0x10 | 2 | 9 |
 | `AngerLevelComponent` | `src/mc/entity/components_json_legacy/AngerLevelComponent.h` | 0xD8 | 19 | 9 |
 | `BaseAttributeMap` | `src/mc/world/attribute/BaseAttributeMap.h` | 0x20 | 2 | 9 |
 | `CameraAvoidanceComponent` | `src/mc/deps/minecraft_camera/components/CameraAvoidanceComponent.h` | 0x40 | 6 | 9 |
@@ -116,11 +118,9 @@
 | `OnFireComponent` | `src/mc/entity/components/OnFireComponent.h` | 0x5 | 2 | 9 |
 | `PlaySoundPacket` | `src/mc/network/packet/PlaySoundPacket.h` | 0x4 | 1 | 9 |
 | `PredictedMovementComponent` | `src/mc/entity/components/PredictedMovementComponent.h` | 0x90 | 10 | 9 |
-| `ProjectileComponent` | `src/mc/entity/components_json_legacy/ProjectileComponent.h` | 0x2FB | 74 | 9 |
-| `Reader` | `src/mc/deps/json/Reader.h` | 0x123 | 18 | 9 |
+| `Reader` | `src/mc/deps/json/Reader.h` | 0x11B | 17 | 9 |
 | `RenderOffsetsItemComponent` | `src/mc/deps/shared_types/legacy/item/RenderOffsetsItemComponent.h` | 0xFC | 7 | 9 |
 | `ResourceLocation` | `src/mc/deps/core/resource/ResourceLocation.h` | 0x38 | 4 | 9 |
-| `ActorGameTypeComponent` | `src/mc/entity/components/ActorGameTypeComponent.h` | 0x4 | 1 | 8 |
 | `BlockLayer` | `src/mc/world/level/levelgen/flat/BlockLayer.h` | 0xC | 2 | 8 |
 | `CommandRequestPacket` | `src/mc/network/packet/CommandRequestPacket.h` | 0x4 | 1 | 8 |
 | `ContainerOpenPacket` | `src/mc/network/packet/ContainerOpenPacket.h` | 0x4 | 1 | 8 |
@@ -322,7 +322,7 @@
 | `GrowsCropComponent` | `src/mc/entity/components_json_legacy/GrowsCropComponent.h` | 0x1C | 3 | 5 |
 | `HandEquippedItemComponent` | `src/mc/deps/shared_types/v1_20_50/item/HandEquippedItemComponent.h` | 0x1 | 1 | 5 |
 | `HeartbeatClientComponent` | `src/mc/entity/components/HeartbeatClientComponent.h` | 0x20 | 5 | 5 |
-| `HeartbeatServerComponent` | `src/mc/entity/components/HeartbeatServerComponent.h` | 0x410 | 3 | 5 |
+| `HeartbeatServerComponent` | `src/mc/entity/components/HeartbeatServerComponent.h` | 0x218 | 2 | 5 |
 | `HideComponent` | `src/mc/entity/components_json_legacy/HideComponent.h` | 0x2 | 2 | 5 |
 | `HitResultComponent` | `src/mc/entity/components/HitResultComponent.h` | 0x8 | 1 | 5 |
 | `HitboxComponent` | `src/mc/deps/vanilla_components/HitboxComponent.h` | 0x18 | 1 | 5 |
@@ -395,7 +395,7 @@
 | `PeekComponent` | `src/mc/entity/components/PeekComponent.h` | 0x8 | 2 | 5 |
 | `PendingRemovePassengersComponent` | `src/mc/entity/components/PendingRemovePassengersComponent.h` | 0x18 | 1 | 5 |
 | `PickComponent` | `src/mc/entity/components/PickComponent.h` | 0x4 | 1 | 5 |
-| `PlanterItemComponent` | `src/mc/world/item/components/PlanterItemComponent.h` | 0x43 | 8 | 5 |
+| `PlanterItemComponent` | `src/mc/world/item/components/PlanterItemComponent.h` | 0x3A | 6 | 5 |
 | `PlayerActionComponent` | `src/mc/entity/components/PlayerActionComponent.h` | 0x170 | 5 | 5 |
 | `PlayerDestroyProgressCacheComponent` | `src/mc/entity/components/PlayerDestroyProgressCacheComponent.h` | 0x28 | 4 | 5 |
 | `PlayerDimensionTransferSaveSuspensionComponent` | `src/mc/entity/components/PlayerDimensionTransferSaveSuspensionComponent.h` | 0x28 | 1 | 5 |
@@ -510,7 +510,7 @@
 
 | Класс | Хидер | Упоминаний |
 |---|---|---|
-| `Inventory` | `src/mc/world/actor/player/Inventory.h` | 173 |
+| `Inventory` | `src/mc/world/actor/player/Inventory.h` | 174 |
 | `Type` | `src/mc/world/level/poi/Type.h` | 164 |
 | `Packet` | `src/mc/deps/raknet/Packet.h` | 129 |
 | `MinecraftPackets` | `src/mc/network/MinecraftPackets.h` | 123 |
@@ -519,10 +519,10 @@
 | `HitResult` | `src/mc/world/phys/HitResult.h` | 59 |
 | `EntityId` | `src/mc/deps/ecs/EntityId.h` | 51 |
 | `UUID` | `src/mc/platform/UUID.h` | 48 |
-| `MinecraftGame` | `src-client/mc/client/game/MinecraftGame.h` | 37 |
 | `Tag` | `src/mc/deps/nbt/Tag.h` | 36 |
-| `Container` | `src/mc/editor/datastore/container/Container.h` | 20 |
+| `MinecraftGame` | `src-client/mc/client/game/MinecraftGame.h` | 35 |
 | `EntityContext` | `src/mc/deps/ecs/gamerefs_entity/EntityContext.h` | 20 |
+| `Container` | `src/mc/editor/datastore/container/Container.h` | 19 |
 | `CompoundTag` | `src/mc/deps/nbt/CompoundTag.h` | 18 |
 | `ConnectionRequest` | `src/mc/network/ConnectionRequest.h` | 16 |
 | `Image` | `src/mc/deps/core/image/Image.h` | 15 |
@@ -572,7 +572,7 @@
 
 | Класс | Упоминаний |
 |---|---|
-| `std` | 5870 |
+| `std` | 5867 |
 | `name` | 779 |
 | `PacketID` | 307 |
 | `AuthInputAction` | 153 |
@@ -580,7 +580,7 @@
 | `hash` | 93 |
 | `SItemType` | 86 |
 | `EffectType` | 83 |
-| `ActorFlags` | 74 |
+| `ActorFlags` | 75 |
 | `ChunkPos` | 63 |
 | `BuildPlatform` | 60 |
 | `ActorType` | 58 |
@@ -595,7 +595,7 @@
 | `RenderCameraComponent` | 25 |
 | `Component` | 23 |
 | `ContainerType` | 23 |
-| `SerializedSkin` | 22 |
+| `SerializedSkin` | 23 |
 | `Options` | 21 |
 | `PositionMode` | 20 |
 | `KeyboardMouseSettings` | 19 |
@@ -611,15 +611,16 @@
 | `TextPacketType` | 13 |
 | `bgfx_context` | 12 |
 | `ActorPartModel` | 11 |
+| `MobHurtTimeComponent` | 11 |
 | `ModalFormCancelReason` | 11 |
 | `BaseDescriptor` | 10 |
 | `CameraRenderFirstPersonObjectsComponent` | 10 |
 | `RedirectCameraInputComponent` | 10 |
 | `CZString` | 9 |
 | `Certificate` | 9 |
-| `MobHurtTimeComponent` | 9 |
 | `UIProfanityContext` | 9 |
 | `BedrockPlatformUWP` | 8 |
+| `ActorDataFlagComponent` | 7 |
 | `ActorDataPacket` | 7 |
 | `CameraAlignWithTargetForwardComponent` | 7 |
 | `OnGroundFlagComponent` | 7 |
@@ -630,7 +631,6 @@
 | `MaxAutoStepComponent` | 6 |
 | `RenderPositionComponent` | 6 |
 | `WasOnGroundFlagComponent` | 6 |
-| `ActorDataFlagComponent` | 5 |
 | `BlockMovementSlowdownMultiplierComponent` | 5 |
 | `EaseOption` | 5 |
 | `IsDeadFlagComponent` | 5 |
@@ -652,7 +652,6 @@
 | `MobIsJumpingFlagComponent` | 4 |
 | `PieceType` | 4 |
 | `PlayerStateAffectsRenderingComponent` | 4 |
-| `PosOption` | 4 |
 | `PredictedResult` | 4 |
 | `PropertySyncFloatEntry` | 4 |
 | `PropertySyncIntEntry` | 4 |
@@ -759,6 +758,7 @@
 | `PassengersChangedFlagComponent` | 3 |
 | `PermissionFlyFlagComponent` | 3 |
 | `PlayerIsSleepingFlagComponent` | 3 |
+| `PosOption` | 3 |
 | `PowerJumpFlagComponent` | 3 |
 | `PrevPosRotSetThisTickFlagComponent` | 3 |
 | `PrimedTntFlagComponent` | 3 |
