@@ -412,3 +412,93 @@ IDA нужна, чтобы **понять**. адреса, импорты, со�
 **«А если символа нет в symdb (Linux/нет PDB)?»**
 Есть фоллбэки: `SignatureView` — байт-паттерн (`src/ll/api/memory/Signature.h`), и сырой адрес.
 То есть ровно то, чем ты занимаешься сейчас — но как запасной вариант, а не основной.
+
+---
+
+## 10. «Значит, с LeviLamina я могу обновить проект с 1.21.44 до 1.26 ничего не реверся?»
+
+**Коротко: нет.** LeviLamina снимает с тебя *поиск адресов и имён*, но не *адаптацию к изменившемуся
+игровому коду*. Разложим по слоям (слои 1–3 — экономия, слои 4–6 — твоя работа как была).
+
+| Слой | Кто обновляет | LeviLamina помогает? |
+|---|---|---|
+| 1. Адреса функций | symdb под версию | **Да, полностью** |
+| 2. Имена функций/классов | автосгенерённые хидеры | **Да**, если функция ещё жива |
+| 3. Оффсеты полей, которые кто-то уже задокументировал | `TypedStorage` в хидерах | **Да**, если поле описано |
+| 4. Сигнатуры функций, которые Mojang поменял | ты | Нет, переписываешь тело хука |
+| 5. Твои собственные/комьюнити-структуры (`Bone`, `ActorPartModel`, `ClientInstance::get()`…) | ты | Нет |
+| 6. D3D/ImGui/ввод, твои фичи | ты | Нет (это не BDS-символы) |
+
+### 10.1 Кейс: твой же хук `applyToPose` — живой пример
+
+Было у тебя (1.21.44, `src/Hook/Hooks/ActorHooks/ActorModelHook.cpp`):
+
+```cpp
+mDetour = std::make_unique<Detour>("ActorAnimationControllerPlayer::applyToPose",
+    reinterpret_cast<void*>(SigManager::ActorAnimationControllerPlayer_applyToPose),
+    &ActorModelHook::onActorModel);
+
+void ActorModelHook::onActorModel(uintptr_t a1, uintptr_t a2, uintptr_t a3, float a4, int a5) {
+    auto ent = *reinterpret_cast<Actor**>(a2 + 0x38);   // хардкод
+    ...
+}
+```
+
+Что про это есть в хидерах 26.51 (`src/mc/world/actor/animation/ActorAnimationControllerPlayer.h`):
+
+```cpp
+class ActorAnimationControllerPlayer : public ::ActorAnimationPlayer {
+    ::ll::TypedStorage<8, 16, ::ActorAnimationControllerPtr> mAnimationControllerPtr;
+    ::ll::TypedStorage<4, 4, int> mCurrStateIndex;   // ...и ещё поля с размерами
+public:
+    virtual void applyToPose(
+        ::ApplyAnimationContext const& applyContext,
+        ::RenderParams& renderParams,
+        ::std::unordered_map<::SkeletalHierarchyIndex, ::std::vector<::BoneOrientation>>& destBoneOrientationsMap,
+        float blendWeight
+    ) /*override*/;
+    // транк для хука:
+    MCAPI void $applyToPose(...);   // строка 122
+};
+```
+
+Что это значит на практике:
+
+* **Сигнатуру можно выбросить** — `SigManager::ActorAnimationControllerPlayer_applyToPose` больше не нужен,
+  пишешь `&ActorAnimationControllerPlayer::$applyToPose`.
+* **Но сигнатура функции изменилась**: у тебя было 5 «безликих» параметров `(a1..a5)`,
+  в 1.26 — 4 типизированных, и `int a5` исчез. Тело хука переписывать.
+* **Оффсет `a2 + 0x38` превращается в имя**: в `src/mc/world/actor/RenderParams.h` есть
+  `::ll::TypedStorage<8, 8, ::Actor*> mActor;` — пишешь `renderParams.mActor`, и правильный
+  оффсет для 1.26 подставит компилятор (это как раз то, что обновляется «само»).
+* **А вот `ActorPartModel`, `Bone`, `bone->getActorPartModel()` — в хидерах нет вообще**
+  (grep по `src/mc` + `src-client/mc`: 0 совпадений). Это имена из читерского комьюнити,
+  а не из символов Mojang. Их, как и раньше, реверсишь ты.
+  Рядом показательно: `struct BoneAnimationPlayer {}; struct BoneAnimationChannelPlayer {};` — пустые.
+
+### 10.2 Три ограничения, о которых важно знать до старта
+
+1. **LeviLamina живёт одной версией игры.** В `xmake.lua` — `bedrockdata v26.51.1-server.6`,
+   в `tooth.json` — `bedrock-runtime-data 26.51.1-server.6`. Слоя совместимости «1.21.44 или 1.26»
+   не существует: чтобы остаться на 1.21.44, нужен релиз LeviLamina той эпохи
+   (и его уже не обновляют). Обновление = переезд на новые хидеры + починка того, что отвалилось.
+2. **Клиентская сборка — отдельная и «не главная».** Она есть (`tooth.json`, вариант `client`,
+   `bedrock-runtime-data 26.51.1-client.6`), но ставится патчем exe
+   (`PeEditor.exe -mb --exe Minecraft.Windows.exe --inplace`), и 470 файлов хидеров содержат
+   `#ifdef LL_PLAT_S / #else // LL_PLAT_C` — то есть сервер и клиент местами реально разные.
+3. **Правила использования прямым текстом**: `docs/main/contents/common_guides/usage_guidelines.en.md` —
+   *«avoid any illegal activities (such as writing cheats)»* и *«we do not want you to use LeviLamina
+   to develop any programs that could compromise Minecraft's security»*. LeviLamina делалась
+   для серверных модов; клиентский чит — не её сценарий.
+
+### 10.3 Что реально стоит сделать (по убыванию пользы)
+
+1. **Использовать хидеры как бесплатный дамп 1.26**, не переезжая на лоадер:
+   держишь свой инжектор + MinHook, но берёшь из `src-client/mc` актуальные имена,
+   сигнатуры и размеры полей (`TypedStorage<align, size, type>` = готовый оффсет).
+   Это уже убирает большую часть работы по апдейту.
+2. **Собрать LeviLamina под клиент** и переписать хуки на `LL_AUTO_TYPE_INSTANCE_HOOK`
+   там, где символы есть; для `Bone`/`ActorPartModel`/D3D оставить свой старый код.
+3. **Если отвлечься от чита и посмотреть на серверные моды** — вот там ответ «да»:
+   события, команды, формы, `ll::service` стабильны между версиями, и большинство модов
+   обновляются банальной перекомпиляцией под новую symdb.
