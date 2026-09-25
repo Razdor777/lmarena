@@ -502,3 +502,102 @@ public:
 3. **Если отвлечься от чита и посмотреть на серверные моды** — вот там ответ «да»:
    события, команды, формы, `ll::service` стабильны между версиями, и большинство модов
    обновляются банальной перекомпиляцией под новую symdb.
+
+---
+
+## 11. Разделение труда при переезде конкретно этого проекта (Solstice, 1.21.44 → 1.26)
+
+Объём проекта (замерено по репо): **27 файлов хуков**, **108 записей** в `src/SDK/OffsetProvider.hpp`
+(сигнатуры), **832 строки** в `offset.txt`, 12 подкаталогов модулей, ~123k строк C++ (с вендором:
+ImGui, entt, libhat, minhook, nes).
+
+### 11.1 Что LeviLamina делает за тебя
+
+| Задача | Кто | Где это в LeviLamina |
+|---|---|---|
+| Адрес функции | **она** | symdb `bedrock-runtime-data 26.51.1-client.6` |
+| Имя + тип + размеры полей | **она** | `src/mc/**` + `src-client/mc/**` (автоген из символов) |
+| Хук клавиш / мыши | **она** | `src-client/ll/api/event/input/KeyInputEvent.h`, `MouseInputEvent.h` |
+| Бинды с перепривязкой в ванильном меню | **она** | `ll::input::KeyRegistry::getOrCreateKey(name, keyCodes, allowRemap=true)` |
+| Хук рендера UI | **она** | `BeforeUIRenderEvent` / `AfterUIRenderEvent` (`ScreenView&`, `MinecraftUIRenderContext&`) |
+| Тик клиентского уровня | **она** | `ll::event::world::ClientLevelTickEvent` |
+| Вход/выход в мир | **она** | `ClientStartJoinLevelEvent`, `ClientJoinLevelEvent`, `ClientExitLevelEvent` |
+| Логи, конфиги, i18n, команды, крашлоггер | **она** | `ll/api/io`, `ll/api/data`, `ll/api/i18n`, `ll/api/command`, CrashLogger |
+
+То есть три твоих хука вообще удаляются — вместо них подписка на событие:
+
+```cpp
+// было: KeyHook / MouseHook (MinHook + сигнатура)
+ll::event::EventBus::getInstance().emplaceListener<ll::event::input::KeyInputEvent>(
+    [](ll::event::input::KeyInputEvent& ev) {
+        if (ev.action() == ll::event::input::KeyInputEvent::Action::Down && ev.keyCode() == VK_F8) {
+            /* твой модуль */
+        }
+    }
+);
+
+// было: SetupAndRenderHook (ScreenView::setupAndRender)
+ll::event::EventBus::getInstance().emplaceListener<ll::event::render::AfterUIRenderEvent>(
+    [](ll::event::render::AfterUIRenderEvent& ev) {
+        auto& ctx = ev.uiRenderContext();   // MinecraftUIRenderContext&
+        /* твой ESP / отрисовка */
+    }
+);
+```
+
+### 11.2 Твои 27 хуков: что с ними в 1.26
+
+| Хук в Solstice | Что нашлось в хидерах 26.51 | Вердикт |
+|---|---|---|
+| `KeyHook`, `MouseHook` | готовые события ввода | **удалить, заменить на события** |
+| `SetupAndRenderHook` | `&ScreenView::render` + `Before/AfterUIRenderEvent` | **заменить на событие** |
+| `PreGameHook` (`ClientInstance::isPreGame`) | `ClientInstance.h:764`, транк `$isPreGame` | символ есть |
+| `BaseTickHook` | `Actor::baseTick` (`Actor.h:388`) | символ есть |
+| `ActorModelHook` (`applyToPose`) | `ActorAnimationControllerPlayer.h:47`, `$applyToPose` | символ есть, **сигнатура изменилась** |
+| `AnimationHooks` (`getCurrentSwingDuration`) | `Item::getSwingDuration` (`Item.h:231`), `$getSwingDuration` | имя другое, проверить |
+| `PacketSendHook` | `LoopbackPacketSender.h:36 virtual void send(Packet&)` | символ есть |
+| `RakPeerHooks` | `src/mc/deps/raknet/RakPeer.h:326 Send`, транк `$Send`; **и появился `src/mc/external/webrtc/`** | сеть менялась — проверять вживую |
+| `ConnectionRequestHook` | `ConnectionRequest` как класс не нашёлся (есть `webrtc::Connection::ConnectionRequest`) | перепроверять |
+| `ContainerScreenControllerHook` | `src-client/mc/client/gui/screens/controllers/ContainerScreenController.h` | есть |
+| `ActorRenderDispatcherHook`, `ItemRendererHook`, `HoverTextRendererHook` | файлы есть (`src-client/mc/client/renderer/...`) | сверить сигнатуры |
+| `NametagRenderHook` | рендер переехал на объекты: `NameTagRenderObject.h` | пайплайн другой |
+| `AmbienceHook` — `SkyRender = 0x14438FD10`, `EndSkyRender`, `ChunkRender`, `SunMoonRender`, `CloudRender` | `LevelRendererCamera::renderSky(ScreenContext&, ViewRenderObject const&, BaseSceneDirectionalLightRenderData const&)` найден; EndSky/SunMoon/Clouds как функций **нет** — есть `SkyRenderObject`, `CloudRenderObject`, `WeatherRenderObject` | **переписывать модуль целиком** |
+| `D3DHook` (kiero + ImGui) | — | вне зоны LeviLamina |
+| `Bone`, `ActorPartModel`, `SDK/Minecraft/**` | 0 совпадений в хидерах | как раньше — сам |
+
+### 11.3 Что остаётся на тебе (честный список)
+
+1. **`AmbienceHook` — самая дорогая часть.** Пять захардкоженных абсолютных адресов, а рендер
+   1.26 — это framebuilder с «объектами рендера». Даже там, где имя нашлось (`renderSky`),
+   аргументы другие. Это не «обновить оффсет», а переосмыслить модуль.
+2. **Сеть.** RakNet в хидерах жив, но в дереве появился WebRTC — транспорт точно переделывали.
+3. **Свои SDK-структуры** (`Bone`, `ActorPartModel`, твои обёртки над `Actor`/`ClientInstance`/`Level`).
+   Частично заменяются на типы из хидеров, частично — только реверс.
+4. **D3D/ImGui/kiero** — LeviLamina тут не помощник. (Для части UI можно уйти на `UIRenderEvent`.)
+5. **Логика модулей** (Combat/Misc/Movement/Player/Visual, GUI, Configs) — обычно выживает,
+   если выжили типы, к которым она обращается.
+6. **Инфраструктура загрузки**: свой инжектор → `manifest.json` (`"type": "preload-native"`) +
+   PreLoader + PeEditor, патч `Minecraft.Windows.exe --inplace`, сборка на xmake вместо CMake.
+
+### 11.4 Грубая оценка (вилка, по объёму кода, не обещание)
+
+| Сценарий | Что делаешь | Оценка |
+|---|---|---|
+| **А. Хидеры как дамп, свой инжектор оставить** | 108 сигнатур → имена из `src-client/mc` (~60–80 % найдётся), обновить SDK-структуры, переписать Ambience + сеть | ~2–4 недели |
+| **Б. Полный переезд на LeviLamina client** | всё из А + xmake/tooth/manifest, Key/Mouse/UI → события, хуки → макросы `LL_*` | ~4–6 недель, но дальше **каждый апдейт игры = пересборка**, а не пересъёмка сигнатур |
+| **В. Остаться на 1.21.44** | найти релиз LeviLamina той эпохи | апдейтов игры не будет вовсе |
+
+### 11.5 Порядок работ (чтобы не утонуть)
+
+1. Поднять клиентскую сборку LeviLamina (xmake, `target_type=client`) и убедиться, что
+   PreLoader + PeEditor запускают `Minecraft.Windows.exe` нужной версии.
+2. Собрать болванку мода (`levilamina-mod-template`), получить первые логи.
+3. Пройти по 27 хукам: `grep` имени в `src-client/mc` → таблица «найден / нет / сигнатура изменилась».
+4. Сначала быстрые победы: Key/Mouse/UI render/тик — минус 4–5 хуков за вечер.
+5. Потом символы-одиночки (`isPreGame`, `baseTick`, `send`, `getSwingDuration`).
+6. Ambience и сеть — последними: там настоящий реверс, а не перекомпиляция.
+
+> Отдельно, не по технике: `usage_guidelines.en.md` прямо просит не использовать LeviLamina
+> для программ, «compromising Minecraft's security», а клиентская установка патчит
+> `Minecraft.Windows.exe` на месте (`PeEditor.exe -mb --exe Minecraft.Windows.exe --inplace`) —
+> это видно античитами и подписью Store-версии. LeviLamina рассчитана на серверные моды.
