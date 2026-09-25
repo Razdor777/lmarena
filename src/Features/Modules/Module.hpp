@@ -72,11 +72,6 @@ public:
     float cScale  = 0;
     float boolScale = 0;
     float mArrayListAnim = 0.f;
-    // Arraylist render state (kept on the module so every renderer can animate it)
-    float mArrayListPrevAnim  = 0.f;   // animation value of the previous frame (detects in/out direction)
-    float mArrayListHover     = 0.f;   // 0..1 hover highlight of the entry
-    float mArrayListBurst     = 0.f;   // 1 -> 0 flash played right after the module was toggled
-    bool  mArrayListWasEnabled = false;
     float toggleBurst = 0.f;
 
     // ClickGUI hover / pulse animations

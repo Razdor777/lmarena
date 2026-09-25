@@ -1,0 +1,58 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Dev — быстрая сборка (для итераций)",
+      "description": "Без /GL + /LTCG, с /MP и инкрементальной линковкой. Правка одного файла собирается за секунды.",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build-dev",
+      "cacheVariables": {
+        "SOLSTICE_FAST_DEV": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release — как раньше (для релиза)",
+      "description": "Полные линк-тайм оптимизации /GL + /LTCG.",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "SOLSTICE_FAST_DEV": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "displayName": "Собрать dev",
+      "configurePreset": "dev",
+      "configuration": "Release",
+      "targets": [
+        "Solstice"
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "Собрать release",
+      "configurePreset": "release",
+      "configuration": "Release",
+      "targets": [
+        "Solstice"
+      ]
+    }
+  ]
+}

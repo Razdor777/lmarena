@@ -12,6 +12,31 @@ add_compile_definitions(__PRIVATE_DEBUG__)
 add_compile_definitions(__PRIVATE_BUILD__)
 add_compile_definitions(__DEBUG__)
 add_compile_options(/utf-8)
+add_compile_options(/MP) # параллельная компиляция: и наш проект, и зависимости (DirectXTK, cryptopp, ImGui)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  SOLSTICE_FAST_DEV — профиль для быстрых итераций.
+#
+#  Выключает линк-тайм оптимизации (/GL + /LTCG — это главный пожиратель времени
+#  на больших DLL), включает инкрементальную линковку и уменьшает unity-батч,
+#  чтобы правка одного файла пересобирала меньше кода.
+#
+#      cmake -S . -B build-dev -G "Visual Studio 17 2022" -A x64 -DSOLSTICE_FAST_DEV=ON
+#      cmake --build build-dev --config Release --target Solstice
+#
+#  Финальную/релизную сборку собирать БЕЗ этого флага.
+# ─────────────────────────────────────────────────────────────────────────────
+option(SOLSTICE_FAST_DEV "Профиль быстрой разработки: без /GL + /LTCG, с /MP и инкрементальной линковкой" OFF)
+
+if (SOLSTICE_FAST_DEV)
+    # не ходить в git за зависимостями (DirectXTK / cryptopp-cmake) на каждом configure
+    set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "Skip dependency updates" FORCE)
+
+    # меньше файлов в одном unity-блоке => правка одного файла пересобирает меньше кода
+    set(CMAKE_UNITY_BUILD_BATCH_SIZE 4)
+
+    message(STATUS "SOLSTICE_FAST_DEV=ON :: /GL + /LTCG выключены, /MP и инкрементальная линковка включены")
+endif()
 
 find_program(LD_COMMAND ld)
 
@@ -131,23 +156,43 @@ add_link_options($<$<CONFIG:Debug>:/DEBUG>) # enable debugging
 add_compile_options($<$<CONFIG:Debug>:/Zi>)
 
 add_link_options($<$<CONFIG:Release>:/Zi>) # generate pdb
-add_link_options($<$<CONFIG:Release>:/INCREMENTAL:NO>) # disable incremental linking
-add_link_options($<$<CONFIG:Release>:/LTCG>) # link-time code generation
-add_link_options($<$<CONFIG:Release>:/DEBUG>) # enable debugging
-add_compile_options($<$<CONFIG:Release>:/O2>) # optimize for speed
-add_compile_options($<$<CONFIG:Release>:/Oi>) # enable intrinsic functions
-add_compile_options($<$<CONFIG:Release>:/GL>) # enable link-time code generation
-add_compile_options($<$<CONFIG:Release>:/Gy>) # separate functions for linker
-add_compile_options($<$<CONFIG:Release>:/Gw>) # optimize global data
-add_compile_options($<$<CONFIG:Release>:/Gm->) # disable minimal rebuild
-add_compile_options($<$<CONFIG:Release>:/GF>) # enable string pooling
-add_compile_options($<$<CONFIG:Release>:/fp:fast>) # optimize floating point
-add_compile_options($<$<CONFIG:Release>:/GR->) # disable RTTI
-add_compile_options($<$<CONFIG:Release>:/Gd>) # use __cdecl for all functions
-add_compile_options($<$<CONFIG:Release>:/MT>) # use static multithreaded runtime
-add_compile_options($<$<CONFIG:Release>:/Ob2>) # inline any suitable function
-add_compile_options($<$<CONFIG:Release>:/Ot>) # favor fast code
-add_compile_options($<$<CONFIG:Release>:/Oy->) # omit frame pointers
+if (SOLSTICE_FAST_DEV)
+    # ── быстрый профиль: /GL + /LTCG полностью пропускаются ───────────────
+    add_link_options($<$<CONFIG:Release>:/INCREMENTAL>) # инкрементальная линковка
+    add_link_options($<$<CONFIG:Release>:/DEBUG:FASTLINK>) # быстрый PDB без слияния
+
+    add_compile_options($<$<CONFIG:Release>:/O2>) # optimize for speed
+    add_compile_options($<$<CONFIG:Release>:/Oi>) # enable intrinsic functions
+    add_compile_options($<$<CONFIG:Release>:/Gy>) # separate functions for linker
+    add_compile_options($<$<CONFIG:Release>:/Gw>) # optimize global data
+    add_compile_options($<$<CONFIG:Release>:/Gm->) # disable minimal rebuild
+    add_compile_options($<$<CONFIG:Release>:/GF>) # enable string pooling
+    add_compile_options($<$<CONFIG:Release>:/fp:fast>) # optimize floating point
+    add_compile_options($<$<CONFIG:Release>:/GR->) # disable RTTI
+    add_compile_options($<$<CONFIG:Release>:/Gd>) # use __cdecl for all functions
+    add_compile_options($<$<CONFIG:Release>:/MT>) # use static multithreaded runtime
+    add_compile_options($<$<CONFIG:Release>:/Ob2>) # inline any suitable function
+    add_compile_options($<$<CONFIG:Release>:/Ot>) # favor fast code
+    add_compile_options($<$<CONFIG:Release>:/Oy->) # omit frame pointers
+else()
+    add_link_options($<$<CONFIG:Release>:/INCREMENTAL:NO>) # disable incremental linking
+    add_link_options($<$<CONFIG:Release>:/LTCG>) # link-time code generation
+    add_link_options($<$<CONFIG:Release>:/DEBUG>) # enable debugging
+    add_compile_options($<$<CONFIG:Release>:/O2>) # optimize for speed
+    add_compile_options($<$<CONFIG:Release>:/Oi>) # enable intrinsic functions
+    add_compile_options($<$<CONFIG:Release>:/GL>) # enable link-time code generation
+    add_compile_options($<$<CONFIG:Release>:/Gy>) # separate functions for linker
+    add_compile_options($<$<CONFIG:Release>:/Gw>) # optimize global data
+    add_compile_options($<$<CONFIG:Release>:/Gm->) # disable minimal rebuild
+    add_compile_options($<$<CONFIG:Release>:/GF>) # enable string pooling
+    add_compile_options($<$<CONFIG:Release>:/fp:fast>) # optimize floating point
+    add_compile_options($<$<CONFIG:Release>:/GR->) # disable RTTI
+    add_compile_options($<$<CONFIG:Release>:/Gd>) # use __cdecl for all functions
+    add_compile_options($<$<CONFIG:Release>:/MT>) # use static multithreaded runtime
+    add_compile_options($<$<CONFIG:Release>:/Ob2>) # inline any suitable function
+    add_compile_options($<$<CONFIG:Release>:/Ot>) # favor fast code
+    add_compile_options($<$<CONFIG:Release>:/Oy->) # omit frame pointers
+endif()
 
 
 
@@ -207,7 +252,31 @@ endforeach()
 add_resources(resource_files ${resource_files})
 
 add_library(Solstice SHARED ${sourceFiles} ${resource_files})
-add_dependencies(${PROJECT_NAME} generate_build_info SolsticeShaders)
+
+if (SOLSTICE_FAST_DEV)
+    # В fast-dev build_info.h генерируется на configure, а не на каждый билд:
+    # иначе git/powershell дёргаются каждый раз, а изменение "files changed"
+    # пересобирает все файлы, которые его включают.
+    execute_process(
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/GenerateBuildInfo.cmake
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_dependencies(${PROJECT_NAME} SolsticeShaders)
+else()
+    add_dependencies(${PROJECT_NAME} generate_build_info SolsticeShaders)
+endif()
+
+# Пишет файл только при изменении содержимого (не трогает mtime зря)
+function(solstice_write_if_changed path content)
+    set(previous "")
+    if (EXISTS "${path}")
+        file(READ "${path}" previous)
+    endif()
+    if (NOT "${previous}" STREQUAL "${content}")
+        file(WRITE "${path}" "${content}")
+        message(STATUS "Updated ${path}")
+    endif()
+endfunction()
 
 set(RESOURCE_HEADER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.hpp")
 set(RESOURCE_SOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.cpp")
@@ -236,9 +305,12 @@ set(RESOURCE_HEADER_CONTENT "${RESOURCE_HEADER_CONTENT}    static void loadResou
 set(RESOURCE_HEADER_CONTENT "${RESOURCE_HEADER_CONTENT}};\n")
 
 
-file(WRITE ${RESOURCE_HEADER_FILE} "${RESOURCE_HEADER_CONTENT}")
+# ВАЖНО: пишем файл только если содержимое реально изменилось.
+# Resources.hpp подключается через pch.hpp (Utils.hpp) во ВСЕХ единицах
+# трансляции, поэтому безусловная запись на каждом configure = полная
+# пересборка проекта (и как следствие полный /LTCG-линк) на каждую правку.
+solstice_write_if_changed("${RESOURCE_HEADER_FILE}" "${RESOURCE_HEADER_CONTENT}")
 
-message(STATUS "Generated Resources.hpp")
 
 
 set(RESOURCE_SOURCE_CONTENT "// This file is generated by CMake. Do not edit it manually.\n")
@@ -278,9 +350,8 @@ endforeach()
 
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}}\n")
 
-file(WRITE ${RESOURCE_SOURCE_FILE} "${RESOURCE_SOURCE_CONTENT}")
+solstice_write_if_changed("${RESOURCE_SOURCE_FILE}" "${RESOURCE_SOURCE_CONTENT}")
 
-message(STATUS "Generated Resources.cpp")
 
 add_subdirectory(include/minhook)
 add_subdirectory(include/libhat)

@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cfloat>
 #include <cmath>
+#include <unordered_map>
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Arraylist — redesigned renderer
@@ -24,6 +25,27 @@
 
 namespace
 {
+    // Состояние анимации/наведения каждого модуля держим ЛОКАЛЬНО здесь, а не в
+    // Module.hpp: правка этого файла тогда не заставляет пересобирать весь проект.
+    // (Модули живут всё время работы приложения, так что указатели стабильны.)
+    struct ALState
+    {
+        float anim      = 0.f;
+        float prevAnim  = 0.f;
+        float hover     = 0.f;
+        float burst     = 0.f;
+        float y         = -99999.f;
+        bool  wasEnabled = false;
+    };
+
+    std::unordered_map<Module*, ALState>& states()
+    {
+        static std::unordered_map<Module*, ALState> instance;
+        return instance;
+    }
+
+    inline ALState& stateOf(Module* module) { return states()[module]; }
+
     struct ALItem
     {
         Module*     mod      = nullptr;
@@ -122,16 +144,7 @@ void Arraylist::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<RenderEvent, &Arraylist::onRenderEvent>(this);
 
-    for (auto& mod : gFeatureManager->mModuleManager->getModules())
-    {
-        if (!mod) continue;
-        mod->mArrayListAnim       = 0.f;
-        mod->mArrayListPrevAnim   = 0.f;
-        mod->mArrayListHover      = 0.f;
-        mod->mArrayListBurst      = 0.f;
-        mod->mArrayListWasEnabled = mod->mEnabled;
-        mod->pos.y                = -999.f;
-    }
+    states().clear();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,21 +216,23 @@ void Arraylist::onRenderEvent(RenderEvent& event)
         if (!mod->mVisibleInArrayList.mValue) continue;
         if (mVisibility.mValue == ModuleVisibility::Bound && mod->mKey == 0) continue;
 
+        ALState& st = stateOf(mod.get());
+
         // Any state change (keybind, ClickGui, command) plays the flash
-        if (mod->mEnabled != mod->mArrayListWasEnabled)
+        if (mod->mEnabled != st.wasEnabled)
         {
-            mod->mArrayListBurst = 1.f;
-            mod->mArrayListWasEnabled = mod->mEnabled;
+            st.burst = 1.f;
+            st.wasEnabled = mod->mEnabled;
         }
 
         const float target = mod->mEnabled ? 1.f : 0.f;
-        const float speed  = (target > mod->mArrayListAnim) ? mEnableAnimSpeed.mValue : mDisableAnimSpeed.mValue;
+        const float speed  = (target > st.anim) ? mEnableAnimSpeed.mValue : mDisableAnimSpeed.mValue;
 
-        mod->mArrayListAnim = MathUtils::lerp(mod->mArrayListAnim, target, clamp01(delta * speed));
-        if (std::abs(mod->mArrayListAnim - target) < 0.002f) mod->mArrayListAnim = target;
-        mod->mArrayListAnim = clamp01(mod->mArrayListAnim);
+        st.anim = MathUtils::lerp(st.anim, target, clamp01(delta * speed));
+        if (std::abs(st.anim - target) < 0.002f) st.anim = target;
+        st.anim = clamp01(st.anim);
 
-        mod->mArrayListBurst = std::max(0.f, mod->mArrayListBurst - delta * 2.6f);
+        st.burst = std::max(0.f, st.burst - delta * 2.6f);
     }
 
     // ── Collect entries ─────────────────────────────────────────────────────
@@ -230,13 +245,15 @@ void Arraylist::onRenderEvent(RenderEvent& event)
         if (!mod) continue;
         if (!mod->mVisibleInArrayList.mValue) continue;
         if (mVisibility.mValue == ModuleVisibility::Bound && mod->mKey == 0) continue;
-        if (mod->mArrayListAnim < 0.004f) continue;
+
+        const ALState& st = stateOf(mod.get());
+        if (st.anim < 0.004f) continue;
 
         ALItem item;
         item.mod      = mod.get();
         item.name     = mod->getName();
         item.suffix   = mRenderMode.mValue ? mod->getSettingDisplayText() : std::string();
-        item.rawAnim  = mod->mArrayListAnim;
+        item.rawAnim  = st.anim;
         item.nameW    = font->CalcTextSizeA(fontSize, FLT_MAX, 0.f, item.name.c_str()).x;
         item.suffixW  = item.suffix.empty() ? 0.f : font->CalcTextSizeA(suffixSize, FLT_MAX, 0.f, item.suffix.c_str()).x;
         item.contentW = std::min(item.nameW + (item.suffix.empty() ? 0.f : suffixGap + item.suffixW), maxContentW);
@@ -290,17 +307,21 @@ void Arraylist::onRenderEvent(RenderEvent& event)
 
     for (auto& item : items)
     {
+        ALState& st = stateOf(item.mod);
+
         // Direction of the animation (a module that is being disabled plays the outro)
-        item.falling = item.rawAnim < item.mod->mArrayListPrevAnim - 0.0005f;
-        item.mod->mArrayListPrevAnim = item.rawAnim;
+        item.falling = item.rawAnim < st.prevAnim - 0.0005f;
+        st.prevAnim  = item.rawAnim;
 
         item.alpha = clamp01(EasingUtil::easeOutQuad(item.rawAnim));
-        item.burst = clamp01(item.mod->mArrayListBurst);
+        item.burst = clamp01(st.burst);
 
+        item.y = st.y;
         item.targetY = cursorY;
         if (item.y < -9000.f) item.y = item.targetY;
         item.y = MathUtils::lerp(item.y, item.targetY, clamp01(delta * 15.f));
         if (std::abs(item.y - item.targetY) < 0.15f) item.y = item.targetY;
+        st.y = item.y;
 
         // Collapsing/expanding height keeps the list below perfectly synced
         cursorY += step * smoothStep(item.rawAnim);
@@ -406,12 +427,13 @@ void Arraylist::onRenderEvent(RenderEvent& event)
             hoverTarget = 1.f;
         }
 
-        item.mod->mArrayListHover = MathUtils::lerp(item.mod->mArrayListHover, hoverTarget, clamp01(delta * 14.f));
-        item.hover = clamp01(item.mod->mArrayListHover);
+        ALState& st = stateOf(item.mod);
+        st.hover = MathUtils::lerp(st.hover, hoverTarget, clamp01(delta * 14.f));
+        item.hover = clamp01(st.hover);
 
         if (mClickToggle.mValue && hoverTarget > 0.f && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
-            item.mod->mArrayListBurst = 1.f;
+            st.burst = 1.f;
             item.mod->toggle();
         }
 
