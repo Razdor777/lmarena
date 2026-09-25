@@ -245,7 +245,7 @@ void Disabler::onPacketOutEvent(PacketOutEvent& event)
                 spdlog::info("Removed sprinting and sneaking flags");
 
                 // Stop the player from sprinting
-                player->getMoveInputComponent()->setmIsSprinting(false);
+                player->getMoveInputComponent()->setSprinting(false);
             }
             //ChatUtils::displayClientMessage("Move: " + to_string(pkt->mMove.x) + " | " + to_string(pkt->mMove.y));
             return;

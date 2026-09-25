@@ -26,10 +26,10 @@ void AutoSneak::onDisable()
     if (!player) return;
 
     if (auto moveInput = player->getMoveInputComponent())
-        moveInput->mIsSneakDown = false;
+        moveInput->setSneakDown(false);
 
     if (auto rawInput = player->getRawMoveInputComponent())
-        rawInput->mIsSneakDown = false;
+        rawInput->setSneakDown(false);
 
     try { player->setStatusFlag(ActorFlags::Sneaking, false); } catch (...) {}
 }
@@ -41,10 +41,10 @@ void AutoSneak::forceSneak()
 
     // Клиентская сторона (визуал у себя)
     if (auto moveInput = player->getMoveInputComponent())
-        moveInput->mIsSneakDown = true;
+        moveInput->setSneakDown(true);
 
     if (auto rawInput = player->getRawMoveInputComponent())
-        rawInput->mIsSneakDown = true;
+        rawInput->setSneakDown(true);
 
     try { player->setStatusFlag(ActorFlags::Sneaking, true); } catch (...) {}
 }

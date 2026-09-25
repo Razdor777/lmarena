@@ -17,7 +17,7 @@ void Spider::onBaseTickEvent(BaseTickEvent& event) {
     if (!player) return;
     if (mOnGroundOnly.mValue && !player->isOnGround()) return;
 
-    if (mMode.mValue == Mode::Clip && player->isCollidingHorizontal() && player->getMoveInputComponent()->mForward) {
+    if (mMode.mValue == Mode::Clip && player->isCollidingHorizontal() && player->getMoveInputComponent()->isForward()) {
         const auto state = player->getStateVectorComponent();
         const auto aabbShape = player->getAABBShapeComponent();
 
@@ -34,7 +34,7 @@ void Spider::onBaseTickEvent(BaseTickEvent& event) {
         auto state = player->getStateVectorComponent();
         auto playerPos = *player->getPos();
 
-        if (!player->isCollidingHorizontal() || !player->getMoveInputComponent()->mForward) {
+        if (!player->isCollidingHorizontal() || !player->getMoveInputComponent()->isForward()) {
             mPosY = 0.f;
             if (!player->isCollidingHorizontal() && mWasCollided) {
                 mWasCollided = false;

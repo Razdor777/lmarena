@@ -26,7 +26,7 @@ void Sprint::onBaseTickEvent(BaseTickEvent& event)
     if (!player) return;
     auto moveInput = player->getMoveInputComponent();
     if (!moveInput) return;
-    moveInput->mIsSprinting = true;
+    moveInput->setSprinting(true);
 }
 
 void Sprint::onPacketOutEvent(PacketOutEvent& event)

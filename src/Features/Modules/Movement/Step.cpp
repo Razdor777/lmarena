@@ -30,10 +30,10 @@ void Step::onBaseTickEvent(BaseTickEvent& event)
     auto player = event.mActor;
     if (!player) return;
 
-    bool isPressed = player->getMoveInputComponent()->mForward || player->getMoveInputComponent()->mBackward || player->getMoveInputComponent()->mLeft || player->getMoveInputComponent()->mRight;
+    bool isPressed = player->getMoveInputComponent()->isForward() || player->getMoveInputComponent()->isBackward() || player->getMoveInputComponent()->isLeft() || player->getMoveInputComponent()->isRight();
 
     auto handleFlareonV2Step = [this, &player]() {
-        if (player->isCollidingHorizontal() && player->getMoveInputComponent()->mForward) {
+        if (player->isCollidingHorizontal() && player->getMoveInputComponent()->isForward()) {
             player->getStateVectorComponent()->mVelocity.y = 0.0f;
 
             {

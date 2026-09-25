@@ -121,9 +121,9 @@ void NoClip::onBaseTickEvent(BaseTickEvent& event)
     }
 
     // Вертикальное движение
-    if (moveInput->mIsJumping)
+    if (moveInput->isJumping())
         motion.y += speed;
-    else if (moveInput->mIsSneakDown)
+    else if (moveInput->isSneakDown())
         motion.y -= speed;
 
     // Перезапись velocity — гравитация и инерция не действуют

@@ -1,116 +1,127 @@
 # Миграция Solstice 1.21.44 → 1.26: что сделано, что обновлено, что осталось
 
-Дата сверки: заголовки LeviLamina `main` (коммит `b3ff77f2`, версия 26.51, `bedrockdata 26.51.1`).
-Источник истины по символам — клон LeviLamina (`/home/user/LeviLamina`), а не догадки.
+Дата сверки: заголовки LeviLamina `main` (26.51, `bedrockdata 26.51.1`).
+Источник истины по символам — клон LeviLamina, а не догадки.
 
-## Что сделано
+## Коротко: что применено, а что только размечено
 
-1. Написан `tools/symbol_audit.py` — он вытаскивает из проекта все цели хуков
-   (`Detour>("Class::method"`) и все записи `src/SDK/OffsetProvider.hpp`, затем ищет каждое имя
-   в заголовках LeviLamina и раскладывает по статусам.
-2. Сгенерированы отчёты:
-   - `audit.md` — таблицы со статусами и примечаниями;
-   - `symbol-map.csv` — то же самое в машиночитаемом виде.
-3. **В исходниках расставлены пометки `// [1.26]`** (это только комментарии — сборку не ломают):
-   - `src/SDK/OffsetProvider.hpp` — 61 пометка, каждая над своей записью;
-   - 21 файл хуков в `src/Hook/Hooks/**` — блок пометок после инклюдов.
+| Слой | Что сделано | Статус |
+|---|---|---|
+| Хуки (27 целей) | **аудит + пометки `// [1.26]`** в 21 файле | размечено |
+| `OffsetProvider.hpp` (61 запись) | **пометки `// [1.26]`** над каждой записью | размечено |
+| `MoveInputComponent` | **переписан код**: структура под 1.26 + методы вместо полей-флагов, **98 мест вызова переправлены** | **применено** |
+| Все классы SDK | **сгенерирован `src/SDK/Generated/Offsets_1_26.hpp`** — реальные смещения для 493 классов | **применено (новый файл)** |
+| Остальные SDK-структуры | аудит `audit-sdk.md`, смещения посчитаны | размечено, можно брать |
 
-Пометки бывают трёх видов:
+## Что применено по-настоящему
 
-| Пометка | Значение |
-|---|---|
-| `// [1.26] ОБНОВЛЕНО: X -> файл:строка` | имя найдено в хидерах 1.26 — адрес/имя/типы можно брать оттуда |
-| `// [1.26] ПРОВЕРИТЬ: X -> файл:строка` | имя найдено, но в другом классе — надо подтвердить, тот ли метод |
-| `// [1.26] ОСТАЛОСЬ (...)`: X -> … | в хидерах нет — ручной реверс |
+### 1. `MoveInputComponent` — переписан под 1.26
 
-## Итог по цифрам
+`src/SDK/Minecraft/Actor/Components/MoveInputComponent.hpp`
+
+В 1.21.44 это были отдельные байты по фиксированным смещениям
+(`mIsSneakDown` 0x20, `mIsJumping` 0x26, `mIsSprinting` 0x27, WASD 0x2C–0x2F, `mMoveVector` 0x48).
+В 1.26 это **биты** в `brstd::bitset<27, uint>` внутри двух структур `MoveInputState`,
+а вектор движения лежит в `mMove` (Vec2) по смещению `0x24`. Размер структуры `0x64` вместо 136.
+
+Индексы битов взяты из `MoveInputState::Flag` (`src/mc/input/MoveInputState.h`):
+`SneakDown=0, JumpDown=7, SprintDown=8, Up=13, Down=14, Left=15, Right=16,
+JumpInputCurrentlyDown=26`.
+
+Структура переписана, старый API сохранён в виде методов, и
+`tools/port_moveinput.py` **переправил 98 мест вызова** в 20 файлах
+(`Fly`, `InventoryMove`, `TargetStrafe`, `Keystrokes`, `Step`, `MathUtils`, `Keyboard`, …):
+
+```cpp
+// было
+moveInput->mIsSneakDown = false;
+bool jumping = player->getMoveInputComponent()->mIsJumping;
+// стало
+moveInput->setSneakDown(false);
+bool jumping = player->getMoveInputComponent()->isJumping();
+```
+
+Правка обратима: `git checkout <файлы>`.
+
+### 2. `src/SDK/Generated/Offsets_1_26.hpp` — смещения для 493 классов
+
+Сгенерировано `tools/ll_offsets.py` из `TypedStorage<Align, Size, Type>` хидеров LeviLamina:
+поля идут в порядке объявления, выравнивание учитывается.
+
+```cpp
+namespace Offsets_1_26 {
+namespace Actor {
+    constexpr ptrdiff_t mEntityContext = 0x0;    // ::EntityContext, 24 байт
+    constexpr ptrdiff_t mSentDelta     = 0x158;  // ::Vec3, 12 байт
+    ...
+    constexpr ptrdiff_t Size = 0x3A8;
+}
+namespace MoveInputComponent {
+    constexpr ptrdiff_t mInputState    = 0x0;
+    constexpr ptrdiff_t mRawInputState = 0x10;
+    constexpr ptrdiff_t mMove          = 0x24;
+    constexpr ptrdiff_t Size = 0x64;
+}
+}
+```
+
+**Это расчётные смещения, а не снятые в IDA.** Использовать так:
+быстро получить кандидата — проверить в IDA — заменить хардкод.
+Классы с базовым классом помечены `⚠ BASE_UNKNOWN` (смещение от начала своего блока полей).
+
+## Аудит (пометки и отчёты)
 
 | Группа | Всего | Найдено в 1.26 | Осталось |
 |---|---|---|---|
-| Хуки (`src/Hook/**`) | 27 | **22** (81 %) | 5 |
-| Сигнатуры/поля (`OffsetProvider.hpp`) | 61 | **27** (44 %) | 34 |
-| **Итого** | **88** | **49** (56 %) | **39** |
+| Хуки | 27 | **22** (81 %) | 5 |
+| Сигнатуры/поля `OffsetProvider` | 61 | **27** (44 %) | 34 |
+| Классы SDK | 935 | **493** с layout (53 %) | 385 не найдено + 61 без полей |
 
-Хуки закрыты хорошо, потому что имена функций Mojang стабильнее, чем layout классов.
-Поля — хуже, и это ожидаемо: поля классов в хидерах LeviLamina описаны далеко не везде
-(`TypedStorage` встречается в 7 540 файлах из ~25 000, из них клиентских — 2 071;
-например, `ClientInstance.h` — всего 2 описанных поля, а `Level.h` — 128).
+Отчёты: `audit.md` (хуки и сигнатуры), `audit-sdk.md` (классы SDK), `symbol-map.csv`.
 
-## Обновлено (можно брать из хидеров 1.26)
+Пометки в коде: `// [1.26] ОБНОВЛЕНО` / `// [1.26] ПРОВЕРИТЬ` / `// [1.26] ОСТАЛОСЬ`.
 
-Хуки, по которым имя найдено (полный список с объявлениями — в `audit.md`):
+## Кто применяет остальное — честный ответ
 
-| Было в 1.21.44 | Стало в 1.26 |
-|---|---|
-| `Actor::baseTick` | `src/mc/world/actor/Actor.h:1254` |
-| `ActorAnimationControllerPlayer::applyToPose` | `.../ActorAnimationControllerPlayer.h:122` — **сигнатура изменилась** |
-| `ActorRenderDispatcher::render` | `src-client/mc/client/renderer/actor/ActorRenderDispatcher.h:93` |
-| `BlockSource::fireBlockChanged` | `src/mc/world/level/BlockSource.h:282` (+ `$fireBlockChanged:705`) |
-| `ClientInstance::isPreGame` | `src-client/mc/client/game/ClientInstance.h:1755` (`$isPreGame`) |
-| `ConnectionRequest::create` | `src/mc/network/ConnectionRequest.h:68` |
-| `ContainerScreenController::tick` | `src-client/mc/client/gui/screens/controllers/ContainerScreenController.h:320` |
-| `HoverTextRenderer::render` | `src-client/mc/client/gui/controls/renderers/HoverTextRenderer.h:60` |
-| `ItemRenderer::render` | `src-client/mc/client/renderer/actor/ItemRenderer.h:245` |
-| `LoopbackPacketSender::send` | `src/mc/network/LoopbackPacketSender.h:64` |
-| `MinecraftUIRenderContext::drawImage` | `src-client/mc/client/renderer/screen/MinecraftUIRenderContext.h:299` |
-| `MouseDevice::feed` | `src-client/mc/deps/input/MouseDevice.h:30` (альтернатива — `MouseInputEvent`) |
-| `RakNet::RakPeer::GetLastPing / RunUpdateCycle / SendImmediate` | `src/mc/deps/raknet/RakPeer.h:788 / 887 / 615` |
-| `ScreenView::setupAndRender` | `src-client/mc/client/gui/screens/ScreenView.h:319` — в 1.26 это `ScreenView::render` |
-| `Mob::getCurrentSwingDuration` | `src/mc/world/item/Item.h:231` — `Item::getSwingDuration` |
-| `bobHurt` | `src-client/mc/client/renderer/game/LevelRendererPlayer.h:365` |
-| `entityHurt` | `Actor::_hurt` — `src/mc/world/actor/Actor.h:612` |
-| `entityHealthChanged` | `onActorHealthChanged` — `IScriptWorldAfterEvents.h:127` |
-| `projectileHitBlock` / `projectileHitEntity` | `onProjectileHitBlock` / `onProjectileHitEntity` — `IScriptWorldAfterEvents.h:341/344` |
+**Никто, кроме тебя (или человека с IDA и бинарником 1.26).** Причины жёсткие, а не «я не захотел»:
 
-Три хука вообще можно **выбросить**, потому что LeviLamina даёт событие:
+1. **Здесь нет `Minecraft.Windows.exe` 1.26.** Смещения полей, которых нет в хидерах
+   (`ClientInstance_mLevelRenderer`, `LevelRendererPlayer_mFovX`, `Actor_mSwinging`, …),
+   добываются только из бинарника. Заголовки LeviLamina — это дамп символов, а не памяти.
+2. **Здесь нет MSVC и Windows.** Проект собирается CMake+MSVC, я не могу даже проверить,
+   что правки компилируются. Всё, что я менял вслепую, — это механика, проверяемая grep'ом.
+3. **Часть вещей принципиально требует прогона в игре**: бит `SneakDown` против
+   `SneakInputCurrentlyDown`, `mIsMoveLocked` (в 1.26 переехал в другой компонент),
+   индексы компонентов ECS. Это 10–15 минут в отладчике и ноль минут в рассуждениях.
 
-- `KeyHook` (`Keyboard::feed`) → `ll::event::input::KeyInputEvent` + `ll::input::KeyRegistry::getOrCreateKey(...)`
-- `MouseHook` (`MouseDevice::feed`) → `ll::event::input::MouseInputEvent`
-- `SetupAndRenderHook` → `BeforeUIRenderEvent` / `AfterUIRenderEvent` (`ScreenView&`, `MinecraftUIRenderContext&`)
-
-## Осталось (ручной реверс)
-
-**Хуки (5):**
-
-| Цель | Почему осталось |
-|---|---|
-| `CameraDirectLookSystemUtil::_handleLookInput` | класс переехал: теперь `CameraDirectLookComponent` / `CameraDirectLookDefinition` |
-| `Unknown::renderNametag` | в 1.26 неймтеги — это `NameTagRenderObject` / `NameTagRenderer` (объекты рендера), а не функция |
-| `mce::framebuilder::RenderItemInHandDescription::…` | структура в хидерах **пустая** (`struct … {};`) — layout неизвестен |
-| `PacketHandlerDispatcherInstance<…>` | имя в `Detour(…)` обрезано; класс есть (`src/mc/network/PacketHandlerDispatcherInstance.h`) — уточнить шаблон |
-| `Keyboard::feed` | как функции нет; заменяется событием LeviLamina (см. выше) |
-
-**Поля/сигнатуры (34)** — например `ClientInstance_mLevelRenderer`, `ClientInstance_mPacketSender`,
-`MinecraftGame_mClientInstances`, `LevelRendererPlayer_mFovX/mFovY/mCameraPos`,
-`Actor_mSwinging`, `Actor_mHurtTimeComponent`, `LevelData_mTick`, `Bone_mPartModel`, `bgfx_*`.
-Причины ровно две: либо класс в хидерах без описанных полей, либо поле переименовано/удалено.
-
-## Как пользоваться
-
-```bash
-# просто отчёт
-python3 tools/symbol_audit.py
-
-# перерасставить пометки в исходниках (идемпотентно: старые [1.26] стираются)
-python3 tools/symbol_audit.py --annotate
-
-# если клон LeviLamina лежит в другом месте
-python3 tools/symbol_audit.py --ll /path/to/LeviLamina --annotate
-```
-
-После обновления LeviLamina (новая версия игры) достаточно обновить клон и перезапустить скрипт —
-таблица и пометки пересчитаются. Переименования, которые скрипт не знает, правятся
-в словарях `SYNONYMS` и `NOTES` в начале `tools/symbol_audit.py`.
+Что я мог сделать без бинарника — я сделал: там, где имя/лейаут есть в символах,
+получился **реальный код и реальные числа** (493 класса, `MoveInputComponent` целиком).
+Там, где символов нет, — получилась **точная опись объёма** с файлами и строками,
+чтобы не тратить время на «а что вообще осталось».
 
 ## Порядок дальнейших работ
 
-1. Поднять клиентскую сборку LeviLamina 26.51 (или просто использовать её хидеры как дамп).
-2. Заменить три хука (Key/Mouse/SetupAndRender) на события — минус три файла сразу.
-3. Пройти по 22 хукам из таблицы «обновлено»: взять имя и **новую сигнатуру** из хидера,
-   переписать тело там, где аргументы изменились (минимум — `applyToPose`).
-4. Оставшиеся 5 хуков и 34 поля — реверс в IDA: это и есть реальный объём работы.
-5. Логика модулей (`Features/Modules/**`), GUI и конфиги правится последней — она зависит от типов.
+1. Собрать проект — поправить то, что сломалось после порта `MoveInputComponent`.
+2. Заменить три хука (Key/Mouse/SetupAndRender) на события LeviLamina (см. `audit.md`).
+3. Пройти по 22 хукам из `audit.md`: взять имя и **новую сигнатуру** (минимум — `applyToPose`).
+4. Для каждого хардкод-оффсета из `OffsetProvider.hpp` свериться с
+   `Offsets_1_26.hpp`; что совпало — заменить, что нет — снять в IDA.
+5. Оставшиеся 5 хуков и 34 поля — реверс.
+6. Логика модулей, GUI и конфиги — последними (зависит от типов).
 
-> Напоминание не по технике: LeviLamina просит не использовать её для программ,
-> «compromising Minecraft's security» (`usage_guidelines.en.md`), а клиентская установка патчит
-> `Minecraft.Windows.exe` на месте. Для серверных модов всё вышеописанное работает «в чистую».
+## Инструменты
+
+```bash
+python3 tools/symbol_audit.py --annotate              # хуки + OffsetProvider -> отчёт и пометки
+python3 tools/ll_offsets.py --all-components --emit-header src/SDK/Generated/Offsets_1_26.hpp \
+                                            --emit-md docs/migration-1.26/audit-sdk.md
+python3 tools/ll_offsets.py MoveInputComponent        # смещения одного класса
+python3 tools/symbol_audit.py --ll /path/to/LeviLamina
+```
+
+Переименования, которые скрипт не знает, правятся в `SYNONYMS` / `NOTES`
+в начале `tools/symbol_audit.py`.
+
+> Не по технике: LeviLamina просит не использовать её для программ,
+> «compromising Minecraft's security» (`usage_guidelines.en.md`), а клиентская установка
+> патчит `Minecraft.Windows.exe` на месте. Для серверных модов всё это работает «в чистую».

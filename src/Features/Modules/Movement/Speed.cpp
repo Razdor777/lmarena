@@ -96,7 +96,7 @@ bool Speed::tickSwiftness()
     if (space && hasSpeed || !mHoldSpace.mValue && hasSpeed)
     {
         auto input = player->getMoveInputComponent();
-        input->mIsJumping = false;
+        input->setJumping(false);
 
         glm::vec3 velocity = player->getStateVectorComponent()->mVelocity;
         float movementSpeed = sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
@@ -295,7 +295,7 @@ void Speed::onPacketOutEvent(PacketOutEvent& event)
                     pkt->mInputData &= ~AuthInputAction::START_SNEAKING;
 
                     // Stop the player from sprinting
-                    player->getMoveInputComponent()->setmIsSprinting(false);
+                    player->getMoveInputComponent()->setSprinting(false);
                 }
             }
     }

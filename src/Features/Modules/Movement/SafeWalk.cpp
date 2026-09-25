@@ -28,5 +28,5 @@ void SafeWalk::onBaseTickEvent(BaseTickEvent& event)
 {
     auto player = event.mActor;
     patchSafeWalk(mEnabled);
-    patchSafeWalkSneak(!player->getMoveInputComponent()->mIsSneakDown && mEnabled);
+    patchSafeWalkSneak(!player->getMoveInputComponent()->isSneakDown() && mEnabled);
 }

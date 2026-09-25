@@ -62,7 +62,7 @@ void ReverseStep::onBaseTickEvent(BaseTickEvent& event) {
     if(mVoidCheck.mValue && isVoid()) return;
     if(mDontUseIfSpeed.mValue && speed->mEnabled) return;
     if(mDontUseIfLongJump.mValue && longJump->mEnabled) return;
-    if(Keyboard::isUsingMoveKeys(true) && player->getMoveInputComponent()->mIsJumping || !player->wasOnGround() || mJumped)return;
+    if(Keyboard::isUsingMoveKeys(true) && player->getMoveInputComponent()->isJumping() || !player->wasOnGround() || mJumped)return;
 
 
     if (!player->isOnGround())

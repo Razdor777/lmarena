@@ -48,11 +48,11 @@ void Keystrokes::onRenderEvent(RenderEvent& event)
     auto ci = ClientInstance::get();
     auto moveCo = player->getMoveInputComponent();
 
-    bool forward = moveCo->mForward;
-    bool back = moveCo->mBackward;
-    bool left = moveCo->mLeft;
-    bool right = moveCo->mRight;
-    bool jump = moveCo->mIsJumping;
+    bool forward = moveCo->isForward();
+    bool back = moveCo->isBackward();
+    bool left = moveCo->isLeft();
+    bool right = moveCo->isRight();
+    bool jump = moveCo->isJumping();
 
     float delta = ImGui::GetIO().DeltaTime;
 

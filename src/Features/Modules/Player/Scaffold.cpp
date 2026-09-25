@@ -89,7 +89,7 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
     auto currentY = player->getPos()->y - 2.62f;
     if (!mLockY.mValue) mStartY = currentY;
     if (player->getPos()->y - 2.62f < mStartY) mStartY = player->getPos()->y - 2.62f;
-    if (moveInput->mIsJumping && !Keyboard::isUsingMoveKeys()) mStartY = currentY;
+    if (moveInput->isJumping() && !Keyboard::isUsingMoveKeys()) mStartY = currentY;
     float yaw = actorRot->mYaw + MathUtils::getRotationKeyOffset() + 90;
 
     glm::vec3 velocity = stateVec->mVelocity;

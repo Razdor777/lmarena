@@ -55,13 +55,13 @@ float MathUtils::getRotationKeyOffset(bool raw, bool allowStrafe)
     auto moveInput = player->getMoveInputComponent();
     if (raw) moveInput = reinterpret_cast<MoveInputComponent*>(player->getRawMoveInputComponent());
 
-    bool isMoving = moveInput->mForward || moveInput->mBackward || moveInput->mLeft || moveInput->mRight;
+    bool isMoving = moveInput->isForward() || moveInput->isBackward() || moveInput->isLeft() || moveInput->isRight();
     if (!isMoving) return 0;
 
-    bool w = moveInput->mForward;
-    bool s = moveInput->mBackward;
-    bool a = moveInput->mLeft;
-    bool d = moveInput->mRight;
+    bool w = moveInput->isForward();
+    bool s = moveInput->isBackward();
+    bool a = moveInput->isLeft();
+    bool d = moveInput->isRight();
 
     float yawOffset = 0;
     if (w && a && allowStrafe)

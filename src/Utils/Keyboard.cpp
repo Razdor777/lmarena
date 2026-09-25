@@ -24,7 +24,7 @@ bool Keyboard::isUsingMoveKeys(bool includeSpaceShift)
     auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
 
     auto moveInput = player->getMoveInputComponent();
-    bool isMoving = moveInput->mForward || moveInput->mBackward || moveInput->mLeft || moveInput->mRight;
+    bool isMoving = moveInput->isForward() || moveInput->isBackward() || moveInput->isLeft() || moveInput->isRight();
     if (includeSpaceShift)
         return isMoving || Keyboard::mPressedKeys[keyboard["key.jump"]] || Keyboard::mPressedKeys[keyboard["key.sneak"]];
 
@@ -37,7 +37,7 @@ bool Keyboard::isStrafing()
     if (!player) return false;
 
     auto moveInput = player->getMoveInputComponent();
-    return moveInput->mLeft || moveInput->mRight || moveInput->mBackward;
+    return moveInput->isLeft() || moveInput->isRight() || moveInput->isBackward();
 }
 
 // returns the char representation of the key

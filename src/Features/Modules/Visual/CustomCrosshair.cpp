@@ -205,7 +205,7 @@ void CustomCrosshair::onRenderEvent(RenderEvent& event)
 
         if (!player->isOnGround()) airTarget = 1.f;
 
-        if (mSneakShrink.mValue && moveInput && moveInput->mIsSneakDown) sneakTarget = 0.6f;
+        if (mSneakShrink.mValue && moveInput && moveInput->isSneakDown()) sneakTarget = 0.6f;
     }
 
     mMoveAnim = animFrame(mMoveAnim, moveTarget, 12.f, dt);

@@ -59,7 +59,7 @@ void TargetStrafe::onBaseTickEvent(BaseTickEvent& event)
         return;
     }
 
-    if (mSpeedOnly.mValue && mJumpOnly.mValue) moveInputComponent->mIsJumping = false;
+    if (mSpeedOnly.mValue && mJumpOnly.mValue) moveInputComponent->setJumping(false);
 
     mCurrentTarget = Aura::sTarget;
     glm::vec3 targetPos = *mCurrentTarget->getPos();
@@ -71,8 +71,8 @@ void TargetStrafe::onBaseTickEvent(BaseTickEvent& event)
         mMoveRight = !mMoveRight;
     }
     else {
-        if (moveInputComponent->mLeft) mMoveRight = false;
-        else if (moveInputComponent->mRight) mMoveRight = true;
+        if (moveInputComponent->isLeft()) mMoveRight = false;
+        else if (moveInputComponent->isRight()) mMoveRight = true;
     }
 
     handleKeyInput(mForward, !mMoveRight, mBackward, mMoveRight);
@@ -125,8 +125,8 @@ void TargetStrafe::handleKeyInput(bool pressingW, bool pressingA, bool pressingS
 
     auto moveInputComponent = player->getMoveInputComponent();
 
-    moveInputComponent->mForward = pressingW;
-    moveInputComponent->mLeft = pressingA;
-    moveInputComponent->mBackward = pressingS;
-    moveInputComponent->mRight = pressingD;
+    moveInputComponent->setForward(pressingW);
+    moveInputComponent->setLeft(pressingA);
+    moveInputComponent->setBackward(pressingS);
+    moveInputComponent->setRight(pressingD);
 }

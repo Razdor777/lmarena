@@ -38,7 +38,7 @@ void InventoryMove::onDisable()
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &InventoryMove::onPacketOutEvent>(this);
     patchFunc(false);
     auto player = ClientInstance::get()->getLocalPlayer();
-    if (player) player->getMoveInputComponent()->mIsMoveLocked = false;
+    if (player) player->getMoveInputComponent()->setMoveLocked(false);
 }
 
 
@@ -71,34 +71,34 @@ void InventoryMove::onBaseTickEvent(BaseTickEvent& event)
 
     if (isInChatScreen || !pressed)
     {
-        input->mForward = false;
-        input->mBackward = false;
-        input->mLeft = false;
-        input->mRight = false;
-        input->mIsJumping = false;
-        input->mIsJumping2 = false;
-        input->mMoveVector = glm::vec2(0.f, 0.f);
-        input->mIsSneakDown = false;
+        input->setForward(false);
+        input->setBackward(false);
+        input->setLeft(false);
+        input->setRight(false);
+        input->setJumping(false);
+        input->setJumpingCurrentlyDown(false);
+        input->setMoveVector(glm::vec2(0.f, 0.f));
+        input->setSneakDown(false);
         return;
     }
 
-    if (screenName != "hud_screen") input->mIsMoveLocked = true;
-    else input->mIsMoveLocked = false;
+    if (screenName != "hud_screen") input->setMoveLocked(true);
+    else input->setMoveLocked(false);
 
-    input->mForward = w;
-    input->mBackward = s;
-    input->mLeft = a;
-    input->mRight = d;
+    input->setForward(w);
+    input->setBackward(s);
+    input->setLeft(a);
+    input->setRight(d);
     if (screenName != "hud_screen") // I hate this game
     {
-        input->mIsJumping = space;
-        input->mIsJumping2 = space;
+        input->setJumping(space);
+        input->setJumpingCurrentlyDown(space);
     }
     if(mHasOpenContainer)
     {
-        input->mIsSneakDown = mDisallowShift.mValue ? false : shift;
+        input->setSneakDown(mDisallowShift.mValue ? false : shift);
     }
-    input->mMoveVector = MathUtils::getMovement();
+    input->setMoveVector(MathUtils::getMovement());
 }
 
 void InventoryMove::onRenderEvent(RenderEvent& event)
@@ -131,34 +131,34 @@ void InventoryMove::onRenderEvent(RenderEvent& event)
 
     if (isInChatScreen || !pressed)
     {
-        input->mForward = false;
-        input->mBackward = false;
-        input->mLeft = false;
-        input->mRight = false;
-        input->mIsJumping = false;
-        input->mIsJumping2 = false;
-        input->mMoveVector = glm::vec2(0.f, 0.f);
-        input->mIsSneakDown = false;
+        input->setForward(false);
+        input->setBackward(false);
+        input->setLeft(false);
+        input->setRight(false);
+        input->setJumping(false);
+        input->setJumpingCurrentlyDown(false);
+        input->setMoveVector(glm::vec2(0.f, 0.f));
+        input->setSneakDown(false);
         return;
     }
 
-    if (screenName != "hud_screen") input->mIsMoveLocked = true;
-    else input->mIsMoveLocked = false;
+    if (screenName != "hud_screen") input->setMoveLocked(true);
+    else input->setMoveLocked(false);
 
-    input->mForward = w;
-    input->mBackward = s;
-    input->mLeft = a;
-    input->mRight = d;
+    input->setForward(w);
+    input->setBackward(s);
+    input->setLeft(a);
+    input->setRight(d);
     if (screenName != "hud_screen") // I hate this game
     {
-        input->mIsJumping = space;
-        input->mIsJumping2 = space;
+        input->setJumping(space);
+        input->setJumpingCurrentlyDown(space);
     }
     if(mHasOpenContainer)
     {
-        input->mIsSneakDown = mDisallowShift.mValue ? false : shift;
+        input->setSneakDown(mDisallowShift.mValue ? false : shift);
     }
-    input->mMoveVector = MathUtils::getMovement();
+    input->setMoveVector(MathUtils::getMovement());
 }
 
 void InventoryMove::onPacketInEvent(PacketInEvent& event)

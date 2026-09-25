@@ -71,8 +71,8 @@ void Fly::onBaseTickEvent(BaseTickEvent& event)
             motion.x = calc.x;
             motion.z = calc.y;
 
-            bool isJumping = player->getMoveInputComponent()->mIsJumping;
-            bool isSneaking = player->getMoveInputComponent()->mIsSneakDown;
+            bool isJumping = player->getMoveInputComponent()->isJumping();
+            bool isSneaking = player->getMoveInputComponent()->isSneakDown();
 
             if (isJumping)
                 motion.y += mSpeed.mValue / 10;
@@ -93,8 +93,8 @@ void Fly::onBaseTickEvent(BaseTickEvent& event)
             motion.x = calc.x;
             motion.z = calc.y;
 
-            bool isJumping = player->getMoveInputComponent()->mIsJumping;
-            bool isSneaking = player->getMoveInputComponent()->mIsSneakDown;
+            bool isJumping = player->getMoveInputComponent()->isJumping();
+            bool isSneaking = player->getMoveInputComponent()->isSneakDown();
 
             if (isJumping)
                 motion.y += speed;

@@ -172,11 +172,11 @@ void DebugFly::onBaseTickEvent(class BaseTickEvent &event)
     player->getStateVectorComponent()->mVelocity.x = motion.x;
     player->getStateVectorComponent()->mVelocity.z = motion.z;
 
-    bool isPressed = player->getMoveInputComponent()->mForward || player->getMoveInputComponent()->mBackward || player->getMoveInputComponent()->mLeft || player->getMoveInputComponent()->mRight;
+    bool isPressed = player->getMoveInputComponent()->isForward() || player->getMoveInputComponent()->isBackward() || player->getMoveInputComponent()->isLeft() || player->getMoveInputComponent()->isRight();
 
     if (isPressed)
     {
         //player->setSprinting(true);
-        player->getMoveInputComponent()->mIsSprinting = true;
+        player->getMoveInputComponent()->setSprinting(true);
     }
 }

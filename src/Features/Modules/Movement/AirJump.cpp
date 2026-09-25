@@ -28,7 +28,7 @@ void AirJump::onBaseTickEvent(BaseTickEvent& event)
     auto stateVector = player->getStateVectorComponent();
     if (!moveInput || !stateVector) return;
 
-    bool spacePressed = moveInput->mIsJumping;
+    bool spacePressed = moveInput->isJumping();
 
     // На земле — обычное поведение, просто обновляем флаг
     if (player->isOnGround()) {

@@ -96,8 +96,8 @@ void Phase::onBaseTickEvent(BaseTickEvent& event)
 
         auto moveInput = player->getMoveInputComponent();
         auto stateVector = player->getStateVectorComponent();
-        bool isJumping = moveInput->mIsJumping;
-        bool isSneaking = moveInput->mIsSneakDown;
+        bool isJumping = moveInput->isJumping();
+        bool isSneaking = moveInput->isSneakDown();
         float value = 0;
 
         glm::vec3 belowBlockPos = *player->getPos();
@@ -116,7 +116,7 @@ void Phase::onBaseTickEvent(BaseTickEvent& event)
             aabb->mMin.y += value;
             aabb->mMax.y += value;
             stateVector->mVelocity = { 0, 0, 0 };
-            moveInput->mIsSneakDown = false;
+            moveInput->setSneakDown(false);
         }
     }
     else if (mMode.mValue == Mode::Clip) {
