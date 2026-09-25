@@ -21,3 +21,12 @@ cmake-build-*/
 # Python
 __pycache__/
 *.pyc
+
+# Отладочные данные (большие файлы, не коммитим)
+*.pdb
+*.idb
+*.i64
+*.til
+*.map
+ida_export.json
+pdb_dump*.json
