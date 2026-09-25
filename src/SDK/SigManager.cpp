@@ -8,6 +8,8 @@
 #include <Solstice.hpp>
 #include <Utils/Logger.hpp>
 #include <Utils/MemUtils.hpp>
+#include <SDK/SymDB.hpp>
+#include <SDK/Generated/SigNames_1_26.hpp>
 #include <chrono>
 #include <omp.h>
 #include <libhat.hpp>
@@ -22,6 +24,18 @@ hat::scan_result SigManager::scanSig(hat::signature_view sig, const std::string&
     auto result = hat::find_pattern(sig, ".text", minecraft);
 
     if (!result.has_result()) {
+        // [1.26] байты от 1.21.44 в новой сборке не находятся — пробуем symdb.
+        // Каталог адресов (bedrock-runtime-data) ищет по имени символа, а не по байтам.
+        const char* sym = SigNames::symbolOf(name);
+        if (sym && *sym) {
+            uintptr_t addr = SymDB::instance().find(sym);
+            if (addr) {
+                // symdb даёт начало функции, поэтому offset старой сигнатуры не нужен
+                mSigs[name] = addr;
+                mSigsFromSymDB++;
+                return {};
+            }
+        }
         mSigs[name] = 0;
         return {};
     }
@@ -35,12 +49,25 @@ hat::scan_result SigManager::scanSig(hat::signature_view sig, const std::string&
 void SigManager::initialize()
 {
     int64_t start = NOW;
+
+    // [1.26] грузим каталог адресов: рядом с exe должна лежать папка bedrock_runtime_data
+    size_t symLoaded = SymDB::instance().loadNextToModule();
+    if (symLoaded) {
+        Solstice::console->info("[symdb] загружено символов: {}", symLoaded);
+        SymDB::instance().inspect("symdb_inspect.txt");
+    } else {
+        Solstice::console->warn("[symdb] каталог bedrock_runtime_data не найден — "
+                                "работаем только по байтовым сигнатурам");
+    }
+
     #pragma omp parallel for
     for (int i = 0; i < mSigInitializers.size(); i++) {
         mSigInitializers[i]();
     }
     int64_t end = NOW;
     int64_t diff = end - start;
+
+    if (mSigsFromSymDB) Solstice::console->info("[signatures] найдено по имени в symdb: {}", mSigsFromSymDB);
 
     for (const auto& sig : mSigs) {
         if (sig.second != 0) Solstice::console->info("[signatures] found {} @ {}", sig.first, MemUtils::getMbMemoryString(sig.second));

@@ -1,4 +1,6 @@
 #pragma once
+
+#include <atomic>
 //
 // Created by vastrakai on 6/24/2024.
 //
@@ -40,6 +42,7 @@ class SigManager {
 
   static inline std::vector<std::function<void()>> mSigInitializers;
   static inline int mSigScanCount;
+  static inline std::atomic<int> mSigsFromSymDB;  // [1.26] сколько адресов взято из symdb, а не из байтов
 
 public:
   static inline bool mIsInitialized = false;
