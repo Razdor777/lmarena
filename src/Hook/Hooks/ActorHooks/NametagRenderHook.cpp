@@ -6,7 +6,7 @@
 #include <Features/Events/NametagRenderEvent.hpp>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ОСТАЛОСЬ (класс не найден): Unknown::renderNametag -> в хидерах 1.26 не найдено — в 1.26 неймтеги — это NameTagRenderObject / NameTagRenderer (объекты рендера), не отдельная функция
+// [1.26] РЕВЕРС (в 1.26 нет): Unknown::renderNametag -> NameTagRenderObject / NameTagRenderer  (src-client/mc/deps/minecraft_renderer/objects/NameTagRenderObject.h, src-client/mc/client/gui/controls/renderers/NameTagRenderer.h) — в 1.26 неймтеги — объекты рендера, отдельной функции нет
 
 std::unique_ptr<Detour> NametagRenderHook::mRenderDetour;
 

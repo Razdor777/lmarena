@@ -9,7 +9,7 @@
 #include "D3DHook.hpp"
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ОБНОВЛЕНО: ActorRenderDispatcher::render -> src-client/mc/client/renderer/actor/ActorRenderDispatcher.h:93
+// [1.26] ОБНОВЛЕНО ($-транк): ActorRenderDispatcher::render -> src-client/mc/client/renderer/actor/ActorRenderDispatcher.h:93
 
 std::unique_ptr<Detour> ActorRenderDispatcherHook::mDetour;
 

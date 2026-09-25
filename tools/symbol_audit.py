@@ -57,6 +57,158 @@ class Entry:
     note: str = ""
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# РУЧНЫЕ ВЕРДИКТЫ (проверено глазами по хидерам LeviLamina 26.51).
+# Формат: цель -> (статус, куда делось, пояснение)
+#   RENAMED    — переименовано, новый символ найден и подтверждён
+#   MOVED      — переехало в другой класс/компонент, найдено
+#   NO_LAYOUT  — класс есть, но поля не описаны -> оффсет только из IDA
+#   GONE       — в 1.26 нет (удалено/переименовано неизвестно куда) -> реверс
+# ─────────────────────────────────────────────────────────────────────────────
+MANUAL = {
+    # ── хуки ──
+    "Mob::getCurrentSwingDuration": (
+        "RENAMED", "Mob::getModifiedSwingDuration  (src/mc/world/actor/Mob.h:338)",
+        "в 1.26 это int getModifiedSwingDuration(); Item::getSwingDuration (Item.h:231) — "
+        "длительность взмаха предмета, НЕ моба: для хука бери Mob::getModifiedSwingDuration"),
+    "bobHurt": (
+        "MOVED", "LevelRendererPlayer::bobHurt(Matrix&, float)  "
+        "(src-client/mc/client/renderer/game/LevelRendererPlayer.h:365)",
+        "метод переехал из анонимного класса в LevelRendererPlayer"),
+    "entityHurt": (
+        "RENAMED", "Actor::_hurt(ActorDamageSource const&, float, HurtParameters const&)  "
+        "(src/mc/world/actor/Actor.h:612, транк $_hurt:1478)",
+        "сигнатура изменилась: появился третий аргумент HurtParameters"),
+    "entityHealthChanged": (
+        "RENAMED", "onActorHealthChanged  (src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:127)",
+        "это scripting-событие; для нативного хука ищи Actor::_hurt / heal"),
+    "projectileHitBlock": (
+        "RENAMED", "onProjectileHitBlock  (IScriptWorldAfterEvents.h:341) + ProjectileHitEvent",
+        "scripting-событие; нативный вариант — хук ProjectileComponent / Actor::_onHit"),
+    "projectileHitEntity": (
+        "RENAMED", "onProjectileHitEntity  (IScriptWorldAfterEvents.h:344) + ProjectileHitEvent",
+        "см. projectileHitBlock"),
+    "Keyboard::feed": (
+        "MOVED", "ll::event::input::KeyInputEvent + ll::input::KeyRegistry  "
+        "(src-client/ll/api/event/input/)",
+        "в 1.26 вместо хука клавиатуры лучше взять готовое событие LeviLamina"),
+    "CameraDirectLookSystemUtil::_handleLookInput": (
+        "GONE", "CameraDirectLookComponent / CameraDirectLookDefinition  "
+        "(src-client/mc/deps/minecraft_camera/components/, src/mc/deps/shared_types/v1_21_100/camera/)",
+        "класс переехал на компонентную систему камеры — реверс"),
+    "Unknown::renderNametag": (
+        "GONE", "NameTagRenderObject / NameTagRenderer  "
+        "(src-client/mc/deps/minecraft_renderer/objects/NameTagRenderObject.h, "
+        "src-client/mc/client/gui/controls/renderers/NameTagRenderer.h)",
+        "в 1.26 неймтеги — объекты рендера, отдельной функции нет"),
+    "PacketHandlerDispatcherInstance<": (
+        "MOVED", "src/mc/network/PacketHandlerDispatcherInstance.h",
+        " имя в Detour() обрезано, уточни шаблонные параметры"),
+
+    # ── ClientInstance ──
+    "ClientInstance_getBlockSource": (
+        "RENAMED", "ClientInstance::getRegion()  "
+        "(src-client/mc/client/game/ClientInstance.h:475, транк $getRegion:1470)",
+        "getBlockSource переименован в getRegion"),
+    "ClientInstance_mLevelRenderer": (
+        "MOVED", "ClientInstance::getLevelRenderer()  (ClientInstance.h:796, $getLevelRenderer:1787)",
+        "поля класса не описаны (в 1.26 у ClientInstance всего 2 описанных поля) — "
+        "бери через геттер, а не по оффсету"),
+    "ClientInstance_mPacketSender": (
+        "MOVED", "ClientInstance::getPacketSender()  (ClientInstance.h:994)", "см. mLevelRenderer"),
+    "ClientInstance_mGuiData": (
+        "MOVED", "ClientInstance::getGuiData()  (ClientInstance.h:857/859)", "см. mLevelRenderer"),
+    "ClientInstance_getInputHandler": (
+        "RENAMED", "ClientInstance::getInput() -> ClientInputHandler*  (ClientInstance.h:1040); "
+        "getMinecraftInput() (968)", "getInputHandler -> getInput"),
+    "ClientInstance_mMinecraftSim": (
+        "NO_LAYOUT", "src-client/mc/client/game/ClientInstance.h",
+        "в хидере описаны только mUITexture/mUICursorTexture — оффсет только из IDA"),
+
+    # ── MinecraftGame ──
+    "MinecraftGame_playUi": ("NO_LAYOUT", "src-client/mc/client/game/MinecraftGame.h",
+        "у MinecraftGame в 1.26 не описано НИ ОДНОГО поля, метода playUi нет — реверс"),
+    "MinecraftGame_mClientInstances": ("NO_LAYOUT", "src-client/mc/client/game/MinecraftGame.h",
+        "полей не описано; геттеры primaryClientInstance ищи в MinecraftGame.h — реверс"),
+    "MinecraftGame_mProfanityContext": ("NO_LAYOUT", "src-client/mc/client/game/MinecraftGame.h",
+        "полей не описано — реверс"),
+    "MinecraftGame_mMouseGrabbed": ("NO_LAYOUT", "src-client/mc/client/game/MinecraftGame.h",
+        "полей не описано; мышь — ClientInstance::grabMouse()/isMouseGrabbed()"),
+
+    # ── рендер ──
+    "LevelRenderer_mRendererPlayer": (
+        "RENAMED", "LevelRenderer::mLevelRendererPlayer  (shared_ptr<LevelRendererPlayer>, "
+        "src-client/mc/client/renderer/game/LevelRenderer.h:125)",
+        "mRendererPlayer -> mLevelRendererPlayer, тип shared_ptr"),
+    "LevelRendererPlayer_mFovX": (
+        "RENAMED", "LevelRendererPlayer::mFov  (float, "
+        "src-client/mc/client/renderer/game/LevelRendererPlayer.h:131)",
+        "в 1.26 один float mFov (есть ещё mOFov — предыдущее значение); "
+        "вертикальный FOV считается из aspect ratio"),
+    "LevelRendererPlayer_mFovY": (
+        "RENAMED", "LevelRendererPlayer::mOFov  (float, LevelRendererPlayer.h:132)",
+        "в 1.26 отдельного «FovY» нет: mFov + mOFov (предыдущее)"),
+    "LevelRendererPlayer_mCameraPos": (
+        "MOVED", "LevelRendererCamera::mCameraPos  (Vec3, "
+        "src-client/mc/client/renderer/game/LevelRendererCamera.h:263)",
+        "позиция камеры переехала в LevelRendererCamera"),
+
+    # ── мир / актор ──
+    "LevelData_mTick": (
+        "RENAMED", "LevelData::mCurrentTick  (Tick, src/mc/world/level/storage/LevelData.h:77)",
+        "mTick -> mCurrentTick (тип Tick, 8 байт)"),
+    "GameSession_mEventCallback": (
+        "RENAMED", "GameSession::getNetEventCallback() / mLegacyClientNetworkHandler  "
+        "(src/mc/world/GameSession.h:30, 60)", "mEventCallback -> getNetEventCallback()"),
+    "Actor_mGameMode": (
+        "MOVED", "ECS ActorGameTypeComponent  (src/mc/entity/components/ActorGameTypeComponent.h)",
+        "gamemode ушёл в ECS-компонент, бери через getEntityContext()"),
+    "Actor_mHurtTimeComponent": (
+        "MOVED", "ECS MobHurtTimeComponent : IntComponent  (src/mc/entity/components/MobHurtTimeComponent.h)",
+        "hurt time ушёл в ECS-компонент (mValue)"),
+    "Actor_mSwinging": (
+        "MOVED", "actor data flags (ActorDataFlagComponent / getStatusFlag(ActorFlags::Swinging))",
+        "флаги актора в 1.26 — биты в ECS-компоненте, не поле Actor"),
+    "Actor_mDestroying": (
+        "MOVED", "actor data flags (ActorDataFlagComponent)",
+        "см. Actor_mSwinging"),
+    "Actor_mSupplies": (
+        "MOVED", "ECS ActorEquipmentComponent  (src/mc/entity/components/ActorEquipmentComponent.h)",
+        "mHand/mArmor — unique_ptr<SimpleContainer>"),
+    "Actor_mContainerManagerModel": (
+        "MOVED", "PlayerInventory::mHudContainerManager  (weak_ptr<HudContainerManagerModel>, "
+        "src/mc/world/actor/player/PlayerInventory.h:26)", "контейнер-менеджер живёт в PlayerInventory"),
+    "Actor_mSerializedSkin": (
+        "GONE", "SerializedSkin в 1.26 не найден", "ищи PlayerSkinComponent / SerializedSkinComponent — реверс"),
+    "BlockSource_mBuildHeight": (
+        "NO_LAYOUT", "src/mc/world/level/BlockSource.h",
+        "поля нет; есть getHeight()/getHeightmapPos(); высота мира — DimensionHeightRange.h"),
+    "PlayerInventory_mContainer": (
+        "RENAMED", "PlayerInventory::mInventory  (unique_ptr<Inventory>, "
+        "src/mc/world/actor/player/PlayerInventory.h:24)", "mContainer -> mInventory"),
+    "ContainerManagerModel_getSlot": (
+        "RENAMED", "ContainerManagerModel::getFullContainerSlot(int, FullContainerName const&)  "
+        "(src/mc/world/containers/managers/models/ContainerManagerModel.h:107, $getFullContainerSlot:182)",
+        "getSlot -> getFullContainerSlot, добавился аргумент FullContainerName"),
+
+    # ── прочее ──
+    "BlockLegacy_mBlockId": ("GONE", "класса BlockLegacy в 1.26 нет", "переименован/вынесен — реверс"),
+    "BlockLegacy_mayPlaceOn": ("GONE", "класса BlockLegacy в 1.26 нет", "см. BlockLegacy_mBlockId"),
+    "BlockLegacy_getCollisionShape": ("GONE", "класса BlockLegacy в 1.26 нет", "см. BlockLegacy_mBlockId"),
+    "bgfx_d3d12_RendererContextD3D12_m_commandQueue": (
+        "NO_LAYOUT", "src-client/mc/external/bgfx/bgfx.h", "bgfx — внешняя библиотека, layout не в хидерах БДС"),
+    "bgfx_context_m_renderCtx": ("NO_LAYOUT", "src-client/mc/external/bgfx/bgfx.h", "см. выше"),
+    "ClientInputMappingFactory_mKeyboardMouseSettings": (
+        "NO_LAYOUT", "src-client/mc/client/input/ClientInputMappingFactory.h", "полей не описано — реверс"),
+    "MinecraftSim_mGameSim": ("GONE", "MinecraftSim в 1.26 нет", "кастомное имя из Flarial — реверс"),
+    "MinecraftSim_mRenderSim": ("GONE", "MinecraftSim в 1.26 нет", "см. выше"),
+    "MinecraftSim_mGameSession": ("GONE", "MinecraftSim в 1.26 нет", "см. выше"),
+    "MainView_bedrockPlatform": ("GONE", "MainView в 1.26 нет", "кастомное имя — реверс"),
+    "BedrockPlatformUWP_mcGame": ("GONE", "BedrockPlatformUWP в 1.26 нет", "кастомное имя — реверс"),
+    "UIProfanityContext_mEnabled": ("GONE", "UIProfanityContext в 1.26 нет", "кастомное имя — реверс"),
+    "Bone_mPartModel": ("GONE", "Bone — собственная структура проекта", "твой реверс, как и раньше"),
+}
+
 # Цели, для которых глобальный поиск даёт ложные срабатывания (разобрано вручную)
 SKIP_GLOBAL = {
     "Keyboard::feed",   # глобальный поиск находит Actor::feed(int) — это не то
@@ -66,9 +218,13 @@ STATUS_ORDER = {
     "FOUND": 0,
     "FOUND_THUNK": 1,
     "FOUND_ELSEWHERE": 2,
+    "RENAMED": 2,
+    "MOVED": 2,
     "EMPTY_CLASS": 3,
-    "NOT_IN_CLASS": 4,
-    "CLASS_MISSING": 5,
+    "NOT_IN_CLASS": 6,
+    "CLASS_MISSING": 7,
+    "NO_LAYOUT": 8,
+    "GONE": 9,
 }
 
 # Переименования Mojang между 1.21.44 и 1.26 (проверено по хидерам вручную)
@@ -192,15 +348,28 @@ def _declares(hfile: Path, cls: str) -> bool:
 
 
 def pick_class_file(index: dict[str, list[Path]], cls: str) -> Path | None:
-    """Файл, где класс реально объявлен; при равных — предпочитаем src-client."""
-    cands = index.get(cls, [])
+    """Файл, где класса описано больше всего.
+
+    У одного имени часто два хидера: настоящий и короткая клиентская заглушка
+    (например BlockSource.h — 776 строк против 75). Раньше побеждала заглушка,
+    и метод «не находился в своём классе» — это ломало весь аудит.
+    """
+    cands = [p for p in index.get(cls, []) if _declares(p, cls)] or index.get(cls, [])
     if not cands:
         return None
+
+    def richness(p: Path) -> int:
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return 0
+        return len(text.splitlines()) + 20 * len(re.findall(r"::ll::TypedStorage<", text))
+
     def score(p: Path) -> int:
         s = p.as_posix()
         return 0 if "/src-client/" in s else (1 if "/src/" in s else 2)
-    declared = [p for p in cands if _declares(p, cls)] or cands
-    return sorted(declared, key=lambda p: (score(p), len(p.as_posix())))[0]
+
+    return sorted(cands, key=lambda p: (-richness(p), score(p)))[0]
 
 
 def global_search(ll: Path, names: list[str]) -> tuple[str, str, str] | None:
@@ -293,6 +462,10 @@ def render_md(entries: list[Entry], ll: Path, header_index_n: int) -> str:
         "- `FOUND` — метод/поле с таким именем есть в заголовке 1.26 (адрес резолвит symdb)",
         "- `FOUND_THUNK` — найден `$`-транк: виртуальную функцию хукают через `&Class::$method`",
         "- `FOUND_ELSEWHERE` — в «своём» классе имени нет, но оно найдено в другом классе (переехало)",
+        "- `RENAMED` — переименовано в 1.26, новый символ найден и подтверждён вручную",
+        "- `MOVED` — переехало в другой класс/компонент (или заменяется событием), найдено вручную",
+        "- `NO_LAYOUT` — класс есть, но поля не описаны: оффсет только из IDA",
+        "- `GONE` — в 1.26 нет (удалено или переименовано неизвестно куда): реверс",
         "- `EMPTY_CLASS` — класс/структура в хидерах пустая (`struct X {};`) — layout неизвестен, только реверс",
         "- `NOT_IN_CLASS` — класс есть, но такого члена нет (переименовано/удалено/переехало)",
         "- `CLASS_MISSING` — класса с таким именем в хидерах 1.26 нет вообще",
@@ -329,6 +502,30 @@ def write_csv(entries: list[Entry], path: Path) -> None:
 # ─────────────────────── пометки в исходниках ───────────────────────
 
 
+def status_tag(e: "Entry") -> str:
+    """Человеческая пометка для комментария в исходнике."""
+    return {
+        "FOUND": "ОБНОВЛЕНО",
+        "FOUND_THUNK": "ОБНОВЛЕНО ($-транк)",
+        "FOUND_ELSEWHERE": "ПРОВЕРИТЬ (найдено в другом классе)",
+        "RENAMED": "ПЕРЕИМЕНОВАНО В 1.26",
+        "MOVED": "ПЕРЕЕХАЛО В 1.26",
+        "NO_LAYOUT": "РЕВЕРС (поля класса не описаны в 1.26)",
+        "GONE": "РЕВЕРС (в 1.26 нет)",
+        "EMPTY_CLASS": "РЕВЕРС (структура в хидерах пустая)",
+        "NOT_IN_CLASS": "РЕВЕРС (нет в классе 1.26)",
+        "CLASS_MISSING": "РЕВЕРС (класс не найден в 1.26)",
+    }.get(e.status, e.status)
+
+
+def verdict_text(e: "Entry") -> str:
+    """Строчка пометки: куда делось и что делать."""
+    where = f"{e.ll_file}:{e.ll_line}".rstrip(":") if e.ll_file else "не найдено"
+    text = f"{status_tag(e)}: {e.raw} -> {where}"
+    if e.note:
+        text += f" — {e.note}"
+    return text
+
 MARK = "// [1.26]"
 
 
@@ -343,14 +540,7 @@ def annotate_sigs(root: Path, entries: list[Entry]) -> int:
             continue
         e = by_line.get(i)
         if e:
-            if e.status in ("FOUND", "FOUND_THUNK"):
-                tag = "ОБНОВЛЕНО"
-            elif e.status == "NOT_IN_CLASS":
-                tag = "ОСТАЛОСЬ (нет в классе 1.26)"
-            else:
-                tag = "ОСТАЛОСЬ (класс не найден)"
-            where = f"{e.ll_file}:{e.ll_line}" if e.ll_file else "не найдено"
-            out.append(f"{MARK} {tag}: {e.cls}::{e.member} -> {where}")
+            out.append(f"{MARK} {verdict_text(e)}")
             n += 1
         out.append(line)
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
@@ -374,20 +564,7 @@ def annotate_hooks(root: Path, entries: list[Entry]) -> int:
         last_inc = max((i for i, l in enumerate(lines) if l.strip().startswith("#include")), default=-1)
         block = ["", "// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):"]
         for e in items:
-            if e.status in ("FOUND", "FOUND_THUNK"):
-                tag = "ОБНОВЛЕНО"
-            elif e.status in ("FOUND_ELSEWHERE",):
-                tag = "ПРОВЕРИТЬ"
-            elif e.status == "NOT_IN_CLASS":
-                tag = "ОСТАЛОСЬ (нет в классе 1.26)"
-            else:
-                tag = "ОСТАЛОСЬ (класс не найден)"
-            if e.status in ("FOUND", "FOUND_THUNK", "FOUND_ELSEWHERE"):
-                where = f"{e.ll_file}:{e.ll_line}" if e.ll_file else "не найдено"
-            else:
-                where = "в хидерах 1.26 не найдено"
-            note = f" — {e.note}" if e.note else ""
-            block.append(f"// [1.26] {tag}: {e.raw} -> {where}{note}")
+            block.append(f"{MARK} {verdict_text(e)}")
         lines[last_inc + 1:last_inc + 1] = block
         text = "\n".join(lines)
         # убираем лишние пустые строки, появившиеся после вставки
@@ -418,6 +595,13 @@ def main() -> int:
 
     for e in entries:
         e.note = NOTES.get(e.raw, e.note)
+        verdict = MANUAL.get(e.raw)
+        if verdict:
+            e.status, where, note = verdict
+            e.ll_file, e.ll_line = where, ""
+            e.decl = ""
+            e.note = note
+            continue
         hfile = pick_class_file(index, e.cls)
         names = [e.member] + SYNONYMS.get(e.member, [])
         if hfile is not None:

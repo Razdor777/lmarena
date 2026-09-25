@@ -13,7 +13,7 @@
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
 // [1.26] ОБНОВЛЕНО: MinecraftUIRenderContext::drawImage -> src-client/mc/client/renderer/screen/MinecraftUIRenderContext.h:299
-// [1.26] ОБНОВЛЕНО: ScreenView::setupAndRender -> src-client/mc/client/gui/screens/ScreenView.h:319 — в 1.26 это ScreenView::render; LeviLamina уже хукает его и даёт Before/AfterUIRenderEvent (src-client/ll/api/event/render) | переименовано: render
+// [1.26] ОБНОВЛЕНО ($-транк): ScreenView::setupAndRender -> src-client/mc/client/gui/screens/ScreenView.h:319 — в 1.26 это ScreenView::render; LeviLamina уже хукает его и даёт Before/AfterUIRenderEvent (src-client/ll/api/event/render) | переименовано: render
 
 std::unique_ptr<Detour> SetupAndRenderHook::mSetupAndRenderDetour;
 std::unique_ptr<Detour> SetupAndRenderHook::mDrawImageDetour;

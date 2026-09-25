@@ -4,13 +4,17 @@
 - Заголовки LeviLamina: `/home/user/LeviLamina`
 - Проиндексировано классов в хидерах: **20521**
 - Проверено целей: **88** (хуков: 27, сигнатур/полей: 61)
-- Найдено по имени в 1.26: **49** (56%) — из них точно в том же классе: **34** (транков `$`: 6), в другом классе (на проверку): **15**
+- Найдено по имени в 1.26: **38** (43%) — из них точно в том же классе: **38** (транков `$`: 6), в другом классе (на проверку): **0**
 
 Статусы:
 
 - `FOUND` — метод/поле с таким именем есть в заголовке 1.26 (адрес резолвит symdb)
 - `FOUND_THUNK` — найден `$`-транк: виртуальную функцию хукают через `&Class::$method`
 - `FOUND_ELSEWHERE` — в «своём» классе имени нет, но оно найдено в другом классе (переехало)
+- `RENAMED` — переименовано в 1.26, новый символ найден и подтверждён вручную
+- `MOVED` — переехало в другой класс/компонент (или заменяется событием), найдено вручную
+- `NO_LAYOUT` — класс есть, но поля не описаны: оффсет только из IDA
+- `GONE` — в 1.26 нет (удалено или переименовано неизвестно куда): реверс
 - `EMPTY_CLASS` — класс/структура в хидерах пустая (`struct X {};`) — layout неизвестен, только реверс
 - `NOT_IN_CLASS` — класс есть, но такого члена нет (переименовано/удалено/переехало)
 - `CLASS_MISSING` — класса с таким именем в хидерах 1.26 нет вообще
@@ -21,6 +25,7 @@
 |---|---|---|---|---|
 | `Actor::baseTick` | FOUND | `src/mc/world/actor/Actor.h:1254` | `MCAPI void $baseTick();` | готовый символ |
 | `ActorAnimationControllerPlayer::applyToPose` | FOUND | `src/mc/world/actor/animation/ActorAnimationControllerPlayer.h:122` | `MCAPI void $applyToPose(` | символ есть, но сигнатура изменилась: (ApplyAnimationContext const&, RenderParams&, unordered_map<SkeletalHierarchyIndex, vector<BoneOrientation>>&, float) — тело хука переписывать |
+| `BlockSource::fireBlockChanged` | FOUND | `src/mc/world/level/BlockSource.h:705` | `MCAPI void $fireBlockChanged(` |  |
 | `ClientInstance::isPreGame` | FOUND | `src-client/mc/client/game/ClientInstance.h:1755` | `MCAPI bool $isPreGame() const;` | готовый символ + транк $isPreGame |
 | `ContainerScreenController::tick` | FOUND | `src-client/mc/client/gui/screens/controllers/ContainerScreenController.h:320` | `MCAPI ::ui::DirtyFlag $tick();` | готовый символ |
 | `HoverTextRenderer::render` | FOUND | `src-client/mc/client/gui/controls/renderers/HoverTextRenderer.h:60` | `MCAPI void $render(::MinecraftUIRenderContext& renderContext, ::IClientInstance& client…` |  |
@@ -34,18 +39,17 @@
 | `MouseDevice::feed` | FOUND_THUNK | `src-client/mc/deps/input/MouseDevice.h:30` | `feed(char actionButtonId, schar buttonData, short x, short y, short dx, short dy, bool …` | альтернатива без хука: ll::event::input::MouseInputEvent |
 | `RakNet::RakPeer::SendImmediate` | FOUND_THUNK | `src/mc/deps/raknet/RakPeer.h:615` | `MCAPI bool SendImmediate(` | в RakPeer.h есть Send + транк $Send; SendImmediate ищите рядом |
 | `ScreenView::setupAndRender` | FOUND_THUNK | `src-client/mc/client/gui/screens/ScreenView.h:319` | `MCAPI void render(::UIRenderContext& uiRenderContext);` | в 1.26 это ScreenView::render; LeviLamina уже хукает его и даёт Before/AfterUIRenderEvent (src-client/ll/api/event/render) \| переименовано: render |
-| `bobHurt` | FOUND_ELSEWHERE | `src-client/mc/client/renderer/game/LevelRendererPlayer.h:365` | `MCAPI void bobHurt(::Matrix& mv, float a);` | найдено как LevelRendererPlayer::bobHurt(Matrix&, float) — класс сменился \| найдено в другом классе — проверь, тот ли это метод |
-| `entityHealthChanged` | FOUND_ELSEWHERE | `src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:127` | `virtual void onActorHealthChanged(` | в 1.26: onActorHealthChanged (IScriptWorldAfterEvents.h:127) \| найдено в другом классе — проверь, тот ли это метод |
-| `entityHurt` | FOUND_ELSEWHERE | `src/mc/world/actor/Actor.h:612` | `_hurt(::ActorDamageSource const& source, float damage, ::HurtParameters const& hurtPara…` | найдено в другом классе — проверь, тот ли это метод |
-| `projectileHitBlock` | FOUND_ELSEWHERE | `src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:341` | `onProjectileHitBlock(::std::shared_ptr<::ScriptModuleMinecraft::ScriptProjectileHitInte…` | в 1.26 есть scripting-событие onProjectileHitBlock + ProjectileHitEvent \| найдено в другом классе — проверь, тот ли это метод |
-| `projectileHitEntity` | FOUND_ELSEWHERE | `src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:344` | `onProjectileHitEntity(::std::shared_ptr<::ScriptModuleMinecraft::ScriptProjectileHitInt…` | в 1.26 есть scripting-событие onProjectileHitEntity + ProjectileHitEvent \| найдено в другом классе — проверь, тот ли это метод |
-| `BlockSource::fireBlockChanged` | FOUND_ELSEWHERE | `src/mc/world/level/BlockSource.h:282` | `virtual void fireBlockChanged(` | найдено в другом классе — проверь, тот ли это метод |
-| `Mob::getCurrentSwingDuration` | FOUND_ELSEWHERE | `src/mc/world/item/Item.h:231` | `virtual uint getSwingDuration() const;` | в 1.26: uint Item::getSwingDuration() (Item.h:231) \| найдено в другом классе — проверь, тот ли это метод |
+| `PacketHandlerDispatcherInstance<` | MOVED | `src/mc/network/PacketHandlerDispatcherInstance.h:` | `—` |  имя в Detour() обрезано, уточни шаблонные параметры |
+| `bobHurt` | MOVED | `LevelRendererPlayer::bobHurt(Matrix&, float)  (src-client/mc/client/renderer/game/LevelRendererPlayer.h:365):` | `—` | метод переехал из анонимного класса в LevelRendererPlayer |
+| `entityHealthChanged` | RENAMED | `onActorHealthChanged  (src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:127):` | `—` | это scripting-событие; для нативного хука ищи Actor::_hurt / heal |
+| `entityHurt` | RENAMED | `Actor::_hurt(ActorDamageSource const&, float, HurtParameters const&)  (src/mc/world/actor/Actor.h:612, транк $_hurt:1478):` | `—` | сигнатура изменилась: появился третий аргумент HurtParameters |
+| `projectileHitBlock` | RENAMED | `onProjectileHitBlock  (IScriptWorldAfterEvents.h:341) + ProjectileHitEvent:` | `—` | scripting-событие; нативный вариант — хук ProjectileComponent / Actor::_onHit |
+| `projectileHitEntity` | RENAMED | `onProjectileHitEntity  (IScriptWorldAfterEvents.h:344) + ProjectileHitEvent:` | `—` | см. projectileHitBlock |
+| `Keyboard::feed` | MOVED | `ll::event::input::KeyInputEvent + ll::input::KeyRegistry  (src-client/ll/api/event/input/):` | `—` | в 1.26 вместо хука клавиатуры лучше взять готовое событие LeviLamina |
+| `Mob::getCurrentSwingDuration` | RENAMED | `Mob::getModifiedSwingDuration  (src/mc/world/actor/Mob.h:338):` | `—` | в 1.26 это int getModifiedSwingDuration(); Item::getSwingDuration (Item.h:231) — длительность взмаха предмета, НЕ моба: для хука бери Mob::getModifiedSwingDuration |
 | `mce::framebuilder::RenderItemInHandDescription::RenderItemInHandDescription` | EMPTY_CLASS | `src/mc/deps/minecraft_renderer/framebuilder/RenderItemInHandDescription.h:7` | `struct RenderItemInHandDescription {};` | структура в хидерах пустая (layout неизвестен) — только ручной реверс |
-| `Keyboard::feed` | NOT_IN_CLASS | — | `—` | в 1.26 хук клавиатуры не нужен: ll::event::input::KeyInputEvent + ll::input::KeyRegistry::getOrCreateKey (src-client/ll/api/event/input) |
-| `PacketHandlerDispatcherInstance<` | CLASS_MISSING | — | `—` | класс есть: src/mc/network/PacketHandlerDispatcherInstance.h (шаблон, имя в Detour обрезано) |
-| `CameraDirectLookSystemUtil::_handleLookInput` | CLASS_MISSING | — | `—` | класс переехал: теперь CameraDirectLookComponent / CameraDirectLookDefinition |
-| `Unknown::renderNametag` | CLASS_MISSING | — | `—` | в 1.26 неймтеги — это NameTagRenderObject / NameTagRenderer (объекты рендера), не отдельная функция |
+| `CameraDirectLookSystemUtil::_handleLookInput` | GONE | `CameraDirectLookComponent / CameraDirectLookDefinition  (src-client/mc/deps/minecraft_camera/components/, src/mc/deps/shared_types/v1_21_100/camera/):` | `—` | класс переехал на компонентную систему камеры — реверс |
+| `Unknown::renderNametag` | GONE | `NameTagRenderObject / NameTagRenderer  (src-client/mc/deps/minecraft_renderer/objects/NameTagRenderObject.h, src-client/mc/client/gui/controls/renderers/NameTagRenderer.h):` | `—` | в 1.26 неймтеги — объекты рендера, отдельной функции нет |
 
 ## Сигнатуры и поля (OffsetProvider.hpp)
 
@@ -54,6 +58,9 @@
 | `Actor_baseTick` | FOUND | `src/mc/world/actor/Actor.h:1254` | `MCAPI void $baseTick();` |  |
 | `Actor_mLevel` | FOUND | `src/mc/world/actor/Actor.h:176` | `[[nodiscard]] Level& getLevel() const { return *reinterpret_cast<Level*>(mLevel); }` |  |
 | `Actor_swing` | FOUND | `src/mc/world/actor/Actor.h:1426` | `MCFOLD bool $swing(::ActorSwingSource swingSource, ::HandSlot handSlot);` |  |
+| `BlockSource_clip` | FOUND | `src/mc/world/level/BlockSource.h:686` | `MCAPI ::HitResult $clip(` |  |
+| `BlockSource_getChunk` | FOUND | `src/mc/world/level/BlockSource.h:581` | `MCAPI ::LevelChunk* $getChunk(int x, int z) const;` |  |
+| `BlockSource_setBlock` | FOUND | `src/mc/world/level/BlockSource.h:730` | `MCAPI bool $setBlock(` |  |
 | `ClientInputHandler_mMappingFactory` | FOUND | `src-client/mc/client/input/ClientInputHandler.h:39` | `::ll::TypedStorage<8, 8, ::std::unique_ptr<::ClientInputMappingFactory>> mMappingFactory;` | закомментировано в проекте |
 | `ClientInstance_getLocalPlayer` | FOUND | `src-client/mc/client/game/ClientInstance.h:1472` | `MCAPI ::LocalPlayer* $getLocalPlayer() const;` |  |
 | `ClientInstance_getMouseGrabbed` | FOUND | `src-client/mc/client/game/ClientInstance.h:1707` | `MCAPI bool $getMouseGrabbed() const;` |  |
@@ -70,48 +77,45 @@
 | `Level_getPlayerMovementSettings` | FOUND | `src/mc/world/level/Level.h:2340` | `MCAPI ::PlayerMovementSettings const& $getPlayerMovementSettings() const;` |  |
 | `LevelChunk_mSubChunks` | FOUND | `src/mc/world/level/chunk/LevelChunk.h:188` | `::ll::TypedStorage<8, 24, ::std::vector<::SubChunk>>               mSubChunks;` |  |
 | `Container_getItem` | FOUND_THUNK | `src/mc/world/Container.h:62` | `[[nodiscard]] ItemStack const& operator[](int index) const { return this->getItem(index…` |  |
-| `BlockLegacy_getCollisionShape` | FOUND_ELSEWHERE | `src/mc/world/level/block/AirBlock.h:54` | `virtual ::AABB getCollisionShape(` | найдено в другом классе — проверь, тот ли это метод |
-| `BlockLegacy_mayPlaceOn` | FOUND_ELSEWHERE | `src/mc/world/level/block/AzaleaBlock.h:47` | `virtual bool mayPlaceOn(::BlockSource& region, ::BlockPos const& pos) const /*override*/;` | найдено в другом классе — проверь, тот ли это метод |
-| `BlockSource_clip` | FOUND_ELSEWHERE | `src/mc/util/ClipUtils.h:16` | `MCNAPI ::HitResult clip(::BlockPos const& pos, ::Vec3 const& A, ::Vec3 const& B, ::AABB…` | найдено в другом классе — проверь, тот ли это метод |
-| `BlockSource_getChunk` | FOUND_ELSEWHERE | `src/mc/world/level/BlockSource.h:156` | `virtual ::LevelChunk* getChunk(int x, int z) const /*override*/;` | найдено в другом классе — проверь, тот ли это метод |
-| `BlockSource_setBlock` | FOUND_ELSEWHERE | `src/mc/editor/EditorStructureBlockSource.h:63` | `virtual bool setBlock(` | найдено в другом классе — проверь, тот ли это метод |
-| `ClientInstance_getBlockSource` | FOUND_ELSEWHERE | `src/mc/gametest/MinecraftGameTestHelper.h:264` | `virtual ::std::optional<::gametest::GameTestError> getBlockSource(::BlockSource*& block…` | найдено в другом классе — проверь, тот ли это метод |
-| `ContainerManagerModel_getSlot` | FOUND_ELSEWHERE | `src/mc/scripting/modules/minecraft/ScriptContainer.h:74` | `getSlot(` | найдено в другом классе — проверь, тот ли это метод |
-| `PlayerInventory_mContainer` | FOUND_ELSEWHERE | `src/mc/world/ContainerIterator.h:16` | `[[nodiscard]] constexpr ContainerIterator(T* container, int position) : mContainer(cont…` | найдено в другом классе — проверь, тот ли это метод |
-| `Actor_mContainerManagerModel` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `Actor_mDestroying` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `Actor_mGameMode` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `Actor_mHurtTimeComponent` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `Actor_mSerializedSkin` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `Actor_mSupplies` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `Actor_mSwinging` | NOT_IN_CLASS | `src/mc/world/actor/Actor.h:` | `—` |  |
-| `BlockSource_mBuildHeight` | NOT_IN_CLASS | `src-client/mc/client/renderer/block/tessellation_pipeline/world_view/BlockSource.h:` | `—` |  |
-| `ClientInputMappingFactory_mKeyboardMouseSettings` | NOT_IN_CLASS | `src-client/mc/client/input/ClientInputMappingFactory.h:` | `—` |  |
-| `ClientInstance_getInputHandler` | NOT_IN_CLASS | `src-client/mc/client/game/ClientInstance.h:` | `—` |  |
-| `ClientInstance_mGuiData` | NOT_IN_CLASS | `src-client/mc/client/game/ClientInstance.h:` | `—` | закомментировано в проекте |
-| `ClientInstance_mLevelRenderer` | NOT_IN_CLASS | `src-client/mc/client/game/ClientInstance.h:` | `—` |  |
-| `ClientInstance_mMinecraftSim` | NOT_IN_CLASS | `src-client/mc/client/game/ClientInstance.h:` | `—` |  |
-| `ClientInstance_mPacketSender` | NOT_IN_CLASS | `src-client/mc/client/game/ClientInstance.h:` | `—` |  |
-| `GameSession_mEventCallback` | NOT_IN_CLASS | `src/mc/world/GameSession.h:` | `—` |  |
-| `LevelData_mTick` | NOT_IN_CLASS | `src/mc/world/level/storage/LevelData.h:` | `—` |  |
-| `LevelRenderer_mRendererPlayer` | NOT_IN_CLASS | `src-client/mc/client/renderer/game/LevelRenderer.h:` | `—` |  |
-| `LevelRendererPlayer_mCameraPos` | NOT_IN_CLASS | `src-client/mc/client/renderer/game/LevelRendererPlayer.h:` | `—` |  |
-| `LevelRendererPlayer_mFovX` | NOT_IN_CLASS | `src-client/mc/client/renderer/game/LevelRendererPlayer.h:` | `—` |  |
-| `LevelRendererPlayer_mFovY` | NOT_IN_CLASS | `src-client/mc/client/renderer/game/LevelRendererPlayer.h:` | `—` |  |
-| `MinecraftGame_mClientInstances` | NOT_IN_CLASS | `src-client/mc/client/game/MinecraftGame.h:` | `—` |  |
-| `MinecraftGame_mMouseGrabbed` | NOT_IN_CLASS | `src-client/mc/client/game/MinecraftGame.h:` | `—` |  |
-| `MinecraftGame_mProfanityContext` | NOT_IN_CLASS | `src-client/mc/client/game/MinecraftGame.h:` | `—` |  |
-| `MinecraftGame_playUi` | NOT_IN_CLASS | `src-client/mc/client/game/MinecraftGame.h:` | `—` |  |
-| `bgfx_context_m_renderCtx` | NOT_IN_CLASS | `src-client/mc/external/bgfx/bgfx.h:` | `—` |  |
-| `bgfx_d3d12_RendererContextD3D12_m_commandQueue` | NOT_IN_CLASS | `src-client/mc/external/bgfx/bgfx.h:` | `—` |  |
-| `BedrockPlatformUWP_mcGame` | CLASS_MISSING | — | `—` |  |
-| `BlockLegacy_mBlockId` | CLASS_MISSING | — | `—` |  |
-| `Bone_mPartModel` | CLASS_MISSING | — | `—` |  |
-| `MainView_bedrockPlatform` | CLASS_MISSING | — | `—` |  |
-| `MinecraftSim_mGameSession` | CLASS_MISSING | — | `—` |  |
-| `MinecraftSim_mGameSim` | CLASS_MISSING | — | `—` |  |
-| `MinecraftSim_mRenderSim` | CLASS_MISSING | — | `—` |  |
-| `UIProfanityContext_mEnabled` | CLASS_MISSING | — | `—` |  |
+| `Actor_mContainerManagerModel` | MOVED | `PlayerInventory::mHudContainerManager  (weak_ptr<HudContainerManagerModel>, src/mc/world/actor/player/PlayerInventory.h:26):` | `—` | контейнер-менеджер живёт в PlayerInventory |
+| `Actor_mDestroying` | MOVED | `actor data flags (ActorDataFlagComponent):` | `—` | см. Actor_mSwinging |
+| `Actor_mGameMode` | MOVED | `ECS ActorGameTypeComponent  (src/mc/entity/components/ActorGameTypeComponent.h):` | `—` | gamemode ушёл в ECS-компонент, бери через getEntityContext() |
+| `Actor_mHurtTimeComponent` | MOVED | `ECS MobHurtTimeComponent : IntComponent  (src/mc/entity/components/MobHurtTimeComponent.h):` | `—` | hurt time ушёл в ECS-компонент (mValue) |
+| `Actor_mSupplies` | MOVED | `ECS ActorEquipmentComponent  (src/mc/entity/components/ActorEquipmentComponent.h):` | `—` | mHand/mArmor — unique_ptr<SimpleContainer> |
+| `Actor_mSwinging` | MOVED | `actor data flags (ActorDataFlagComponent / getStatusFlag(ActorFlags::Swinging)):` | `—` | флаги актора в 1.26 — биты в ECS-компоненте, не поле Actor |
+| `ClientInstance_getBlockSource` | RENAMED | `ClientInstance::getRegion()  (src-client/mc/client/game/ClientInstance.h:475, транк $getRegion:1470):` | `—` | getBlockSource переименован в getRegion |
+| `ClientInstance_getInputHandler` | RENAMED | `ClientInstance::getInput() -> ClientInputHandler*  (ClientInstance.h:1040); getMinecraftInput() (968):` | `—` | getInputHandler -> getInput |
+| `ClientInstance_mGuiData` | MOVED | `ClientInstance::getGuiData()  (ClientInstance.h:857/859):` | `—` | см. mLevelRenderer |
+| `ClientInstance_mLevelRenderer` | MOVED | `ClientInstance::getLevelRenderer()  (ClientInstance.h:796, $getLevelRenderer:1787):` | `—` | поля класса не описаны (в 1.26 у ClientInstance всего 2 описанных поля) — бери через геттер, а не по оффсету |
+| `ClientInstance_mPacketSender` | MOVED | `ClientInstance::getPacketSender()  (ClientInstance.h:994):` | `—` | см. mLevelRenderer |
+| `ContainerManagerModel_getSlot` | RENAMED | `ContainerManagerModel::getFullContainerSlot(int, FullContainerName const&)  (src/mc/world/containers/managers/models/ContainerManagerModel.h:107, $getFullContainerSlot:182):` | `—` | getSlot -> getFullContainerSlot, добавился аргумент FullContainerName |
+| `GameSession_mEventCallback` | RENAMED | `GameSession::getNetEventCallback() / mLegacyClientNetworkHandler  (src/mc/world/GameSession.h:30, 60):` | `—` | mEventCallback -> getNetEventCallback() |
+| `LevelData_mTick` | RENAMED | `LevelData::mCurrentTick  (Tick, src/mc/world/level/storage/LevelData.h:77):` | `—` | mTick -> mCurrentTick (тип Tick, 8 байт) |
+| `LevelRenderer_mRendererPlayer` | RENAMED | `LevelRenderer::mLevelRendererPlayer  (shared_ptr<LevelRendererPlayer>, src-client/mc/client/renderer/game/LevelRenderer.h:125):` | `—` | mRendererPlayer -> mLevelRendererPlayer, тип shared_ptr |
+| `LevelRendererPlayer_mCameraPos` | MOVED | `LevelRendererCamera::mCameraPos  (Vec3, src-client/mc/client/renderer/game/LevelRendererCamera.h:263):` | `—` | позиция камеры переехала в LevelRendererCamera |
+| `LevelRendererPlayer_mFovX` | RENAMED | `LevelRendererPlayer::mFov  (float, src-client/mc/client/renderer/game/LevelRendererPlayer.h:131):` | `—` | в 1.26 один float mFov (есть ещё mOFov — предыдущее значение); вертикальный FOV считается из aspect ratio |
+| `LevelRendererPlayer_mFovY` | RENAMED | `LevelRendererPlayer::mOFov  (float, LevelRendererPlayer.h:132):` | `—` | в 1.26 отдельного «FovY» нет: mFov + mOFov (предыдущее) |
+| `PlayerInventory_mContainer` | RENAMED | `PlayerInventory::mInventory  (unique_ptr<Inventory>, src/mc/world/actor/player/PlayerInventory.h:24):` | `—` | mContainer -> mInventory |
+| `BlockSource_mBuildHeight` | NO_LAYOUT | `src/mc/world/level/BlockSource.h:` | `—` | поля нет; есть getHeight()/getHeightmapPos(); высота мира — DimensionHeightRange.h |
+| `ClientInputMappingFactory_mKeyboardMouseSettings` | NO_LAYOUT | `src-client/mc/client/input/ClientInputMappingFactory.h:` | `—` | полей не описано — реверс |
+| `ClientInstance_mMinecraftSim` | NO_LAYOUT | `src-client/mc/client/game/ClientInstance.h:` | `—` | в хидере описаны только mUITexture/mUICursorTexture — оффсет только из IDA |
+| `MinecraftGame_mClientInstances` | NO_LAYOUT | `src-client/mc/client/game/MinecraftGame.h:` | `—` | полей не описано; геттеры primaryClientInstance ищи в MinecraftGame.h — реверс |
+| `MinecraftGame_mMouseGrabbed` | NO_LAYOUT | `src-client/mc/client/game/MinecraftGame.h:` | `—` | полей не описано; мышь — ClientInstance::grabMouse()/isMouseGrabbed() |
+| `MinecraftGame_mProfanityContext` | NO_LAYOUT | `src-client/mc/client/game/MinecraftGame.h:` | `—` | полей не описано — реверс |
+| `MinecraftGame_playUi` | NO_LAYOUT | `src-client/mc/client/game/MinecraftGame.h:` | `—` | у MinecraftGame в 1.26 не описано НИ ОДНОГО поля, метода playUi нет — реверс |
+| `bgfx_context_m_renderCtx` | NO_LAYOUT | `src-client/mc/external/bgfx/bgfx.h:` | `—` | см. выше |
+| `bgfx_d3d12_RendererContextD3D12_m_commandQueue` | NO_LAYOUT | `src-client/mc/external/bgfx/bgfx.h:` | `—` | bgfx — внешняя библиотека, layout не в хидерах БДС |
+| `Actor_mSerializedSkin` | GONE | `SerializedSkin в 1.26 не найден:` | `—` | ищи PlayerSkinComponent / SerializedSkinComponent — реверс |
+| `BedrockPlatformUWP_mcGame` | GONE | `BedrockPlatformUWP в 1.26 нет:` | `—` | кастомное имя — реверс |
+| `BlockLegacy_getCollisionShape` | GONE | `класса BlockLegacy в 1.26 нет:` | `—` | см. BlockLegacy_mBlockId |
+| `BlockLegacy_mBlockId` | GONE | `класса BlockLegacy в 1.26 нет:` | `—` | переименован/вынесен — реверс |
+| `BlockLegacy_mayPlaceOn` | GONE | `класса BlockLegacy в 1.26 нет:` | `—` | см. BlockLegacy_mBlockId |
+| `Bone_mPartModel` | GONE | `Bone — собственная структура проекта:` | `—` | твой реверс, как и раньше |
+| `MainView_bedrockPlatform` | GONE | `MainView в 1.26 нет:` | `—` | кастомное имя — реверс |
+| `MinecraftSim_mGameSession` | GONE | `MinecraftSim в 1.26 нет:` | `—` | см. выше |
+| `MinecraftSim_mGameSim` | GONE | `MinecraftSim в 1.26 нет:` | `—` | кастомное имя из Flarial — реверс |
+| `MinecraftSim_mRenderSim` | GONE | `MinecraftSim в 1.26 нет:` | `—` | см. выше |
+| `UIProfanityContext_mEnabled` | GONE | `UIProfanityContext в 1.26 нет:` | `—` | кастомное имя — реверс |
 
 ## Что это значит
 

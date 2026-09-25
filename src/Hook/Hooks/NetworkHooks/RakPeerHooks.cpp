@@ -17,7 +17,7 @@
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
 // [1.26] ОБНОВЛЕНО: RakNet::RakPeer::GetLastPing -> src/mc/deps/raknet/RakPeer.h:788 — RakNet в хидерах ещё есть (src/mc/deps/raknet/RakPeer.h), но появился src/mc/external/webrtc — транспорт менялся, проверять вживую
 // [1.26] ОБНОВЛЕНО: RakNet::RakPeer::RunUpdateCycle -> src/mc/deps/raknet/RakPeer.h:887 — см. RakNet::RakPeer::GetLastPing
-// [1.26] ОБНОВЛЕНО: RakNet::RakPeer::SendImmediate -> src/mc/deps/raknet/RakPeer.h:615 — в RakPeer.h есть Send + транк $Send; SendImmediate ищите рядом
+// [1.26] ОБНОВЛЕНО ($-транк): RakNet::RakPeer::SendImmediate -> src/mc/deps/raknet/RakPeer.h:615 — в RakPeer.h есть Send + транк $Send; SendImmediate ищите рядом
 
 std::unique_ptr<Detour> RakPeerHooks::RunUpdateCycleDetour;
 std::unique_ptr<Detour> RakPeerHooks::GetLastPingDetour;

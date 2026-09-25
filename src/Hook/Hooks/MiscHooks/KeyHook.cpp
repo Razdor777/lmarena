@@ -10,7 +10,7 @@
 #include <SDK/Minecraft/ClientInstance.hpp>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ОСТАЛОСЬ (нет в классе 1.26): Keyboard::feed -> в хидерах 1.26 не найдено — в 1.26 хук клавиатуры не нужен: ll::event::input::KeyInputEvent + ll::input::KeyRegistry::getOrCreateKey (src-client/ll/api/event/input)
+// [1.26] ПЕРЕЕХАЛО В 1.26: Keyboard::feed -> ll::event::input::KeyInputEvent + ll::input::KeyRegistry  (src-client/ll/api/event/input/) — в 1.26 вместо хука клавиатуры лучше взять готовое событие LeviLamina
 
 std::unique_ptr<Detour> KeyHook::mDetour = nullptr;
 

@@ -5,8 +5,8 @@
 #include <Windows.h>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ПРОВЕРИТЬ: projectileHitEntity -> src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:344 — в 1.26 есть scripting-событие onProjectileHitEntity + ProjectileHitEvent | найдено в другом классе — проверь, тот ли это метод
-// [1.26] ПРОВЕРИТЬ: projectileHitBlock -> src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:341 — в 1.26 есть scripting-событие onProjectileHitBlock + ProjectileHitEvent | найдено в другом классе — проверь, тот ли это метод
+// [1.26] ПЕРЕИМЕНОВАНО В 1.26: projectileHitEntity -> onProjectileHitEntity  (IScriptWorldAfterEvents.h:344) + ProjectileHitEvent — см. projectileHitBlock
+// [1.26] ПЕРЕИМЕНОВАНО В 1.26: projectileHitBlock -> onProjectileHitBlock  (IScriptWorldAfterEvents.h:341) + ProjectileHitEvent — scripting-событие; нативный вариант — хук ProjectileComponent / Actor::_onHit
 
 std::unique_ptr<Detour> ProjectileHooks::mDetourProjectileHitEntity;
 std::unique_ptr<Detour> ProjectileHooks::mDetourProjectileHitBlock;

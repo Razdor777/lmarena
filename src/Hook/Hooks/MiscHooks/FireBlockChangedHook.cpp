@@ -6,7 +6,7 @@
 #include <Features/Events/BlockChangedEvent.hpp>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ПРОВЕРИТЬ: BlockSource::fireBlockChanged -> src/mc/world/level/BlockSource.h:282 — найдено в другом классе — проверь, тот ли это метод
+// [1.26] ОБНОВЛЕНО: BlockSource::fireBlockChanged -> src/mc/world/level/BlockSource.h:705
 
 std::unique_ptr<Detour> FireBlockChangedHook::mDetour = nullptr;
 

@@ -14,7 +14,7 @@
 #include <omp.h>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ОСТАЛОСЬ (класс не найден): PacketHandlerDispatcherInstance< -> в хидерах 1.26 не найдено — класс есть: src/mc/network/PacketHandlerDispatcherInstance.h (шаблон, имя в Detour обрезано)
+// [1.26] ПЕРЕЕХАЛО В 1.26: PacketHandlerDispatcherInstance< -> src/mc/network/PacketHandlerDispatcherInstance.h —  имя в Detour() обрезано, уточни шаблонные параметры
 
 std::unordered_map<PacketID, std::unique_ptr<Detour>> PacketReceiveHook::mDetours;
 

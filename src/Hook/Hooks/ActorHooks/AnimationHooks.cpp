@@ -11,8 +11,8 @@
 #include <SDK/Minecraft/ClientInstance.hpp>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ПРОВЕРИТЬ: Mob::getCurrentSwingDuration -> src/mc/world/item/Item.h:231 — в 1.26: uint Item::getSwingDuration() (Item.h:231) | найдено в другом классе — проверь, тот ли это метод
-// [1.26] ПРОВЕРИТЬ: bobHurt -> src-client/mc/client/renderer/game/LevelRendererPlayer.h:365 — найдено как LevelRendererPlayer::bobHurt(Matrix&, float) — класс сменился | найдено в другом классе — проверь, тот ли это метод
+// [1.26] ПЕРЕИМЕНОВАНО В 1.26: Mob::getCurrentSwingDuration -> Mob::getModifiedSwingDuration  (src/mc/world/actor/Mob.h:338) — в 1.26 это int getModifiedSwingDuration(); Item::getSwingDuration (Item.h:231) — длительность взмаха предмета, НЕ моба: для хука бери Mob::getModifiedSwingDuration
+// [1.26] ПЕРЕЕХАЛО В 1.26: bobHurt -> LevelRendererPlayer::bobHurt(Matrix&, float)  (src-client/mc/client/renderer/game/LevelRendererPlayer.h:365) — метод переехал из анонимного класса в LevelRendererPlayer
 
 std::unique_ptr<Detour> AnimationHooks::mSwingDetour;
 std::unique_ptr<Detour> AnimationHooks::mBobHurtDetour;

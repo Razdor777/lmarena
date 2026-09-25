@@ -10,7 +10,7 @@
 #include <SDK/Minecraft/Options.hpp>
 
 // [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
-// [1.26] ОСТАЛОСЬ (класс не найден): CameraDirectLookSystemUtil::_handleLookInput -> в хидерах 1.26 не найдено — класс переехал: теперь CameraDirectLookComponent / CameraDirectLookDefinition
+// [1.26] РЕВЕРС (в 1.26 нет): CameraDirectLookSystemUtil::_handleLookInput -> CameraDirectLookComponent / CameraDirectLookDefinition  (src-client/mc/deps/minecraft_camera/components/, src/mc/deps/shared_types/v1_21_100/camera/) — класс переехал на компонентную систему камеры — реверс
 
 std::unique_ptr<Detour> LookInputHook::mDetour;
 

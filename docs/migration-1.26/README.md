@@ -1,126 +1,131 @@
 # Миграция Solstice 1.21.44 → 1.26: что сделано, что обновлено, что осталось
 
 Дата сверки: заголовки LeviLamina `main` (26.51, `bedrockdata 26.51.1`).
-Источник истины по символам — клон LeviLamina, а не догадки.
 
-## Коротко: что применено, а что только размечено
+## Коротко: что применено, а что размечено
 
 | Слой | Что сделано | Статус |
 |---|---|---|
-| Хуки (27 целей) | **аудит + пометки `// [1.26]`** в 21 файле | размечено |
-| `OffsetProvider.hpp` (61 запись) | **пометки `// [1.26]`** над каждой записью | размечено |
-| `MoveInputComponent` | **переписан код**: структура под 1.26 + методы вместо полей-флагов, **98 мест вызова переправлены** | **применено** |
-| Все классы SDK | **сгенерирован `src/SDK/Generated/Offsets_1_26.hpp`** — реальные смещения для 493 классов | **применено (новый файл)** |
-| Остальные SDK-структуры | аудит `audit-sdk.md`, смещения посчитаны | размечено, можно брать |
+| Хуки (27) + `OffsetProvider` (61) | **аудит с вердиктами по каждой цели**, пометки `// [1.26]` | размечено + разобрано |
+| `MoveInputComponent` | **переписан под 1.26**, 98 мест вызова переправлены | **применено** |
+| Все классы SDK | **`src/SDK/Generated/Offsets_1_26.hpp`** — смещения для 493 классов | **применено** |
 
-## Что применено по-настоящему
+## Итог по хукам и сигнатурам (88 целей)
+
+| Вердикт | Сколько | Что значит |
+|---|---|---|
+| `FOUND` / `FOUND_THUNK` | **38** | имя есть в 1.26, адрес даст symdb |
+| `RENAMED` | **14** | переименовано, новый символ найден и подтверждён |
+| `MOVED` | **13** | переехало в другой класс/компонент или заменяется событием |
+| `NO_LAYOUT` | **9** | класс есть, но поля не описаны → оффсет только из IDA |
+| `GONE` | **13** | в 1.26 нет (удалено либо твои/чужие кастомные имена) → реверс |
+| `EMPTY_CLASS` | **1** | структура в хидерах пустая |
+
+**Разобрано и закрыто: 65 из 88 (74 %).** Осталось 23, и это не «я не посмотрел»,
+а то, чего физически нет в симвлах (`MinecraftSim`, `Bone`, `UIProfanityContext`, поля `MinecraftGame`…).
+
+## Как проверять — три уровня
+
+### Уровень 1. По заголовкам (делаю я, бинарник не нужен)
+
+Открыть хидер класса в `LeviLamina/src-client/mc/**` и посмотреть, есть ли член.
+Так найдены и подтверждены, например:
+
+| Было (1.21.44) | Стало в 1.26 (проверено по хидеру) |
+|---|---|
+| `ClientInstance::getBlockSource` | `ClientInstance::getRegion()` (`ClientInstance.h:475`, `$getRegion:1470`) |
+| `ClientInstance::mLevelRenderer` | `getLevelRenderer()` (`:796`, `$getLevelRenderer:1787`) |
+| `ClientInstance::mPacketSender` / `mGuiData` | `getPacketSender()` (`:994`) / `getGuiData()` (`:857`) |
+| `ClientInstance::getInputHandler` | `getInput()` → `ClientInputHandler*` (`:1040`) |
+| `Mob::getCurrentSwingDuration` | `Mob::getModifiedSwingDuration()` (`Mob.h:338`) — **не** `Item::getSwingDuration` |
+| `LevelRenderer::mRendererPlayer` | `mLevelRendererPlayer` (`shared_ptr`, `LevelRenderer.h:125`) |
+| `LevelRendererPlayer::mFovX/mFovY` | `mFov` + `mOFov` (`:131-132`) — один float, вертикальный FOV считается |
+| `LevelRendererPlayer::mCameraPos` | `LevelRendererCamera::mCameraPos` (`LevelRendererCamera.h:263`) |
+| `LevelData::mTick` | `mCurrentTick` (тип `Tick`, `LevelData.h:77`) |
+| `GameSession::mEventCallback` | `getNetEventCallback()` / `mLegacyClientNetworkHandler` (`GameSession.h:30`) |
+| `PlayerInventory::mContainer` | `mInventory` (`unique_ptr<Inventory>`, `PlayerInventory.h:24`) |
+| `ContainerManagerModel::getSlot` | `getFullContainerSlot(int, FullContainerName const&)` (`:107`) |
+| `BlockSource::fireBlockChanged` | есть, виртуалка + `$fireBlockChanged` (`BlockSource.h:282/705`) |
+| `Actor::_hurt` | `_hurt(ActorDamageSource const&, float, HurtParameters const&)` (`Actor.h:612`) |
+| `bobHurt` | `LevelRendererPlayer::bobHurt(Matrix&, float)` (`:365`) |
+| `Actor::mGameMode` / `mHurtTimeComponent` / `mSupplies` | ECS-компоненты `ActorGameTypeComponent` / `MobHurtTimeComponent` / `ActorEquipmentComponent` |
+
+### Уровень 2. По бинарнику (только ты)
+
+Нужно, когда символа нет вообще: `ClientInstance_mMinecraftSim`,
+все поля `MinecraftGame` (в хидере не описано **ни одного** поля),
+`LevelRendererPlayer_mFovY` как отдельная величина, `BlockSource_mBuildHeight`,
+`bgfx_*`, `BlockLegacy_*` (класса в 1.26 нет),
+и твои кастомные `Bone` / `MinecraftSim` / `UIProfanityContext`.
+
+Метод тот же, что у тебя сейчас, но теперь объём известен: 23 цели вместо 88.
+Сигнатуру снимать не надо — LeviLamina даст адрес по имени, если имя есть;
+снимать надо только то, что в хидер не попало.
+
+### Уровень 3. В рантайме (только ты)
+
+Подтвердить то, что в символах выглядит однозначно, но проверяется только игрой:
+- `SneakDown` (бит 0) против `SneakInputCurrentlyDown` (бит 21) — что именно ты хочешь перехватывать;
+- `MoveInputComponent::mIsMoveLocked` — в 1.26 переехал, заглушка в коде помечена `// TODO`;
+- хеши ECS-компонентов в `ComponentHashes.hpp` (там прямо написано «Last updated: 1.21.44»);
+- соответствует ли `mFov` (один float) тому, что ты раньше называл `mFovX`.
+
+## Что применено как код
 
 ### 1. `MoveInputComponent` — переписан под 1.26
 
 `src/SDK/Minecraft/Actor/Components/MoveInputComponent.hpp`
 
-В 1.21.44 это были отдельные байты по фиксированным смещениям
-(`mIsSneakDown` 0x20, `mIsJumping` 0x26, `mIsSprinting` 0x27, WASD 0x2C–0x2F, `mMoveVector` 0x48).
-В 1.26 это **биты** в `brstd::bitset<27, uint>` внутри двух структур `MoveInputState`,
-а вектор движения лежит в `mMove` (Vec2) по смещению `0x24`. Размер структуры `0x64` вместо 136.
+В 1.21.44: отдельные байты (`mIsSneakDown` 0x20, `mIsJumping` 0x26, `mIsSprinting` 0x27,
+WASD 0x2C–0x2F, `mMoveVector` 0x48), размер 136.
+В 1.26: **биты** в `bitset<27,uint>` внутри двух `MoveInputState`, `mMove` (Vec2) по `0x24`, размер `0x64`.
 
-Индексы битов взяты из `MoveInputState::Flag` (`src/mc/input/MoveInputState.h`):
-`SneakDown=0, JumpDown=7, SprintDown=8, Up=13, Down=14, Left=15, Right=16,
-JumpInputCurrentlyDown=26`.
+Индексы битов — из `MoveInputState::Flag` (`src/mc/input/MoveInputState.h`):
+`SneakDown=0, JumpDown=7, SprintDown=8, Up=13, Down=14, Left=15, Right=16, JumpInputCurrentlyDown=26`.
 
-Структура переписана, старый API сохранён в виде методов, и
-`tools/port_moveinput.py` **переправил 98 мест вызова** в 20 файлах
-(`Fly`, `InventoryMove`, `TargetStrafe`, `Keystrokes`, `Step`, `MathUtils`, `Keyboard`, …):
+`tools/port_moveinput.py` переправил **98 мест вызова в 20 файлах**:
 
 ```cpp
-// было
-moveInput->mIsSneakDown = false;
-bool jumping = player->getMoveInputComponent()->mIsJumping;
-// стало
-moveInput->setSneakDown(false);
-bool jumping = player->getMoveInputComponent()->isJumping();
+// было                                  стало
+moveInput->mIsSneakDown = false;   →    moveInput->setSneakDown(false);
+moveInput->mIsJumping              →    moveInput->isJumping()
+input->mMoveVector = glm::vec2(0)  →    input->setMoveVector(glm::vec2(0.f))
 ```
-
-Правка обратима: `git checkout <файлы>`.
 
 ### 2. `src/SDK/Generated/Offsets_1_26.hpp` — смещения для 493 классов
 
-Сгенерировано `tools/ll_offsets.py` из `TypedStorage<Align, Size, Type>` хидеров LeviLamina:
-поля идут в порядке объявления, выравнивание учитывается.
+Сгенерировано `tools/ll_offsets.py` из `TypedStorage<Align, Size, Type>`:
 
 ```cpp
-namespace Offsets_1_26 {
-namespace Actor {
-    constexpr ptrdiff_t mEntityContext = 0x0;    // ::EntityContext, 24 байт
-    constexpr ptrdiff_t mSentDelta     = 0x158;  // ::Vec3, 12 байт
-    ...
-    constexpr ptrdiff_t Size = 0x3A8;
-}
-namespace MoveInputComponent {
-    constexpr ptrdiff_t mInputState    = 0x0;
-    constexpr ptrdiff_t mRawInputState = 0x10;
-    constexpr ptrdiff_t mMove          = 0x24;
-    constexpr ptrdiff_t Size = 0x64;
-}
-}
+namespace Offsets_1_26::Actor { mEntityContext = 0x0; mSentDelta = 0x158; ... Size = 0x3A8; }
+namespace Offsets_1_26::MoveInputComponent { mInputState = 0x0; mRawInputState = 0x10; mMove = 0x24; Size = 0x64; }
 ```
 
-**Это расчётные смещения, а не снятые в IDA.** Использовать так:
-быстро получить кандидата — проверить в IDA — заменить хардкод.
-Классы с базовым классом помечены `⚠ BASE_UNKNOWN` (смещение от начала своего блока полей).
-
-## Аудит (пометки и отчёты)
-
-| Группа | Всего | Найдено в 1.26 | Осталось |
-|---|---|---|---|
-| Хуки | 27 | **22** (81 %) | 5 |
-| Сигнатуры/поля `OffsetProvider` | 61 | **27** (44 %) | 34 |
-| Классы SDK | 935 | **493** с layout (53 %) | 385 не найдено + 61 без полей |
-
-Отчёты: `audit.md` (хуки и сигнатуры), `audit-sdk.md` (классы SDK), `symbol-map.csv`.
-
-Пометки в коде: `// [1.26] ОБНОВЛЕНО` / `// [1.26] ПРОВЕРИТЬ` / `// [1.26] ОСТАЛОСЬ`.
-
-## Кто применяет остальное — честный ответ
-
-**Никто, кроме тебя (или человека с IDA и бинарником 1.26).** Причины жёсткие, а не «я не захотел»:
-
-1. **Здесь нет `Minecraft.Windows.exe` 1.26.** Смещения полей, которых нет в хидерах
-   (`ClientInstance_mLevelRenderer`, `LevelRendererPlayer_mFovX`, `Actor_mSwinging`, …),
-   добываются только из бинарника. Заголовки LeviLamina — это дамп символов, а не памяти.
-2. **Здесь нет MSVC и Windows.** Проект собирается CMake+MSVC, я не могу даже проверить,
-   что правки компилируются. Всё, что я менял вслепую, — это механика, проверяемая grep'ом.
-3. **Часть вещей принципиально требует прогона в игре**: бит `SneakDown` против
-   `SneakInputCurrentlyDown`, `mIsMoveLocked` (в 1.26 переехал в другой компонент),
-   индексы компонентов ECS. Это 10–15 минут в отладчике и ноль минут в рассуждениях.
-
-Что я мог сделать без бинарника — я сделал: там, где имя/лейаут есть в символах,
-получился **реальный код и реальные числа** (493 класса, `MoveInputComponent` целиком).
-Там, где символов нет, — получилась **точная опись объёма** с файлами и строками,
-чтобы не тратить время на «а что вообще осталось».
-
-## Порядок дальнейших работ
-
-1. Собрать проект — поправить то, что сломалось после порта `MoveInputComponent`.
-2. Заменить три хука (Key/Mouse/SetupAndRender) на события LeviLamina (см. `audit.md`).
-3. Пройти по 22 хукам из `audit.md`: взять имя и **новую сигнатуру** (минимум — `applyToPose`).
-4. Для каждого хардкод-оффсета из `OffsetProvider.hpp` свериться с
-   `Offsets_1_26.hpp`; что совпало — заменить, что нет — снять в IDA.
-5. Оставшиеся 5 хуков и 34 поля — реверс.
-6. Логика модулей, GUI и конфиги — последними (зависит от типов).
+Смещения **расчётные** (поля по порядку + выравнивание), а не снятые в IDA.
+Рабочий процесс: взять кандидата → проверить в IDA → заменить хардкод.
+`⚠ BASE_UNKNOWN` = есть базовый класс, смещение от начала своего блока полей.
 
 ## Инструменты
 
 ```bash
-python3 tools/symbol_audit.py --annotate              # хуки + OffsetProvider -> отчёт и пометки
+python3 tools/symbol_audit.py --annotate      # хуки + OffsetProvider -> audit.md, csv, пометки
 python3 tools/ll_offsets.py --all-components --emit-header src/SDK/Generated/Offsets_1_26.hpp \
-                                            --emit-md docs/migration-1.26/audit-sdk.md
-python3 tools/ll_offsets.py MoveInputComponent        # смещения одного класса
+                                             --emit-md docs/migration-1.26/audit-sdk.md
+python3 tools/ll_offsets.py MoveInputComponent
+python3 tools/port_moveinput.py --dry-run
 python3 tools/symbol_audit.py --ll /path/to/LeviLamina
 ```
 
-Переименования, которые скрипт не знает, правятся в `SYNONYMS` / `NOTES`
-в начале `tools/symbol_audit.py`.
+Ручные вердикты лежат в словаре `MANUAL` в `tools/symbol_audit.py` — туда же добавляй
+новые находки, чтобы пометки в коде перегенерировались с ними.
+
+## Порядок работ
+
+1. Собрать проект и поправить, что сломал порт `MoveInputComponent` (20 файлов).
+2. Заменить три хука на события LeviLamina: `Keyboard::feed`, `MouseDevice::feed`, `ScreenView::setupAndRender`.
+3. Пройти 38 `FOUND` + 27 `RENAMED/MOVED` по таблице в `audit.md` — это механика.
+4. Оставшиеся 23 — IDA, объём теперь известен точечно.
+5. Модули, GUI и конфиги — последними.
 
 > Не по технике: LeviLamina просит не использовать её для программ,
 > «compromising Minecraft's security» (`usage_guidelines.en.md`), а клиентская установка
