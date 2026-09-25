@@ -13,6 +13,9 @@
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: Actor::baseTick -> src/mc/world/actor/Actor.h:1254 — готовый символ
+
 std::unique_ptr<Detour> BaseTickHook::mDetour = nullptr;
 
 void BaseTickHook::onBaseTick(Actor* actor)

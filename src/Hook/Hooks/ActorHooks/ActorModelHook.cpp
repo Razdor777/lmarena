@@ -10,6 +10,9 @@
 #include <Features/Events/BoneRenderEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: ActorAnimationControllerPlayer::applyToPose -> src/mc/world/actor/animation/ActorAnimationControllerPlayer.h:122 — символ есть, но сигнатура изменилась: (ApplyAnimationContext const&, RenderParams&, unordered_map<SkeletalHierarchyIndex, vector<BoneOrientation>>&, float) — тело хука переписывать
+
 std::unique_ptr<Detour> ActorModelHook::mDetour;
 
 void ActorModelHook::onActorModel(uintptr_t a1, uintptr_t a2, uintptr_t a3, float a4, int a5)

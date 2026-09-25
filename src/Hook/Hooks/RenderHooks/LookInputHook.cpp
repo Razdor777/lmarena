@@ -9,6 +9,9 @@
 #include <Features/Events/LookInputEvent.hpp>
 #include <SDK/Minecraft/Options.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОСТАЛОСЬ (класс не найден): CameraDirectLookSystemUtil::_handleLookInput -> в хидерах 1.26 не найдено — класс переехал: теперь CameraDirectLookComponent / CameraDirectLookDefinition
+
 std::unique_ptr<Detour> LookInputHook::mDetour;
 
 void LookInputHook::_handleLookInput(EntityContext* entityContext, CameraComponent& cameraComponent, CameraDirectLookComponent& cameraDirectLookComponent, glm::vec2 const& vec2) {

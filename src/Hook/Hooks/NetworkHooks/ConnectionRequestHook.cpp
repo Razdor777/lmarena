@@ -5,6 +5,9 @@
 #include "ConnectionRequestHook.hpp"
 #include <Features/Events/ConnectionRequestEvent.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: ConnectionRequest::create -> src/mc/network/ConnectionRequest.h:68
+
 std::unique_ptr<Detour> ConnectionRequestHook::mDetour;
 
 void* ConnectionRequestHook::createRequestDetourFunc(ConnectionRequest* result, PrivateKeyManager* privKeyManager,

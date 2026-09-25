@@ -7,6 +7,9 @@
 #include <SDK/Minecraft/Rendering/BaseActorRenderContext.hpp>
 #include <Features/Events/ItemRendererEvent.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: ItemRenderer::render -> src-client/mc/client/renderer/actor/ItemRenderer.h:245
+
 std::unique_ptr<Detour> ItemRendererHook::mDetour;
 
 void ItemRendererHook::render(ItemRenderer *_this, BaseActorRenderContext *renderContext, ActorRenderData *actorRenderData) {

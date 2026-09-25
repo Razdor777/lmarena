@@ -5,6 +5,9 @@
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: ContainerScreenController::tick -> src-client/mc/client/gui/screens/controllers/ContainerScreenController.h:320 — готовый символ
+
 std::unique_ptr<Detour> ContainerScreenControllerHook::mDetour;
 
 uint32_t ContainerScreenControllerHook::onContainerTick(class ContainerScreenController *csc)

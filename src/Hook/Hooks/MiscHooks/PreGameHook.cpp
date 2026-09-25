@@ -5,6 +5,9 @@
 #include "PreGameHook.hpp"
 #include <Features/Events/PreGameCheckEvent.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: ClientInstance::isPreGame -> src-client/mc/client/game/ClientInstance.h:1755 — готовый символ + транк $isPreGame
+
 std::unique_ptr<Detour> PreGameHook::mDetour = nullptr;
 
 bool PreGameHook::onPreGame(void* _this)

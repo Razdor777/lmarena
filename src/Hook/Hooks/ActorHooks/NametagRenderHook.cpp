@@ -5,6 +5,9 @@
 #include "NametagRenderHook.hpp"
 #include <Features/Events/NametagRenderEvent.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОСТАЛОСЬ (класс не найден): Unknown::renderNametag -> в хидерах 1.26 не найдено — в 1.26 неймтеги — это NameTagRenderObject / NameTagRenderer (объекты рендера), не отдельная функция
+
 std::unique_ptr<Detour> NametagRenderHook::mRenderDetour;
 
 void* NametagRenderHook::render(void* a1, void* a2, void* a3, void* a4, Actor* actor, void* a6, glm::vec3* pos, bool unknown,

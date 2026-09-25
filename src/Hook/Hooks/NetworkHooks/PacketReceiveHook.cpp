@@ -13,6 +13,9 @@
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <omp.h>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОСТАЛОСЬ (класс не найден): PacketHandlerDispatcherInstance< -> в хидерах 1.26 не найдено — класс есть: src/mc/network/PacketHandlerDispatcherInstance.h (шаблон, имя в Detour обрезано)
+
 std::unordered_map<PacketID, std::unique_ptr<Detour>> PacketReceiveHook::mDetours;
 
 void* PacketReceiveHook::onPacketSend(void* _this, void* networkIdentifier, void* netEventCallback, std::shared_ptr<Packet> packet)

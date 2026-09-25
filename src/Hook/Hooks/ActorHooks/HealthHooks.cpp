@@ -4,6 +4,9 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <Windows.h>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ПРОВЕРИТЬ: entityHurt -> src/mc/world/actor/Actor.h:612 — найдено в другом классе — проверь, тот ли это метод
+// [1.26] ПРОВЕРИТЬ: entityHealthChanged -> src/mc/scripting/modules/minecraft/events/IScriptWorldAfterEvents.h:127 — в 1.26: onActorHealthChanged (IScriptWorldAfterEvents.h:127) | найдено в другом классе — проверь, тот ли это метод
 
 std::unique_ptr<Detour> HealthHooks::mDetourEntityHurt;
 std::unique_ptr<Detour> HealthHooks::mDetourEntityHealthChanged;

@@ -7,6 +7,9 @@
 
 #include "Features/Events/MouseEvent.hpp"
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: MouseDevice::feed -> src-client/mc/deps/input/MouseDevice.h:30 — альтернатива без хука: ll::event::input::MouseInputEvent
+
 struct ImGuiWindow;
 std::unique_ptr<Detour> MouseHook::mDetour = nullptr;
 

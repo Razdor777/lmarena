@@ -13,6 +13,9 @@
 #include "Features/Events/ChatEvent.hpp"
 #include "Features/Events/PacketOutEvent.hpp"
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: LoopbackPacketSender::send -> src/mc/network/LoopbackPacketSender.h:64 — готовый символ (send/sendTo/sendToServer)
+
 class ChatEvent;
 std::unique_ptr<Detour> PacketSendHook::mDetour = nullptr;
 

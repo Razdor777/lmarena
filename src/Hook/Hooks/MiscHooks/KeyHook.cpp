@@ -9,6 +9,9 @@
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОСТАЛОСЬ (нет в классе 1.26): Keyboard::feed -> в хидерах 1.26 не найдено — в 1.26 хук клавиатуры не нужен: ll::event::input::KeyInputEvent + ll::input::KeyRegistry::getOrCreateKey (src-client/ll/api/event/input)
+
 std::unique_ptr<Detour> KeyHook::mDetour = nullptr;
 
 ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)

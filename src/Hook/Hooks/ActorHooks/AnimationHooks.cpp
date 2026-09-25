@@ -10,6 +10,10 @@
 
 #include <SDK/Minecraft/ClientInstance.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ПРОВЕРИТЬ: Mob::getCurrentSwingDuration -> src/mc/world/item/Item.h:231 — в 1.26: uint Item::getSwingDuration() (Item.h:231) | найдено в другом классе — проверь, тот ли это метод
+// [1.26] ПРОВЕРИТЬ: bobHurt -> src-client/mc/client/renderer/game/LevelRendererPlayer.h:365 — найдено как LevelRendererPlayer::bobHurt(Matrix&, float) — класс сменился | найдено в другом классе — проверь, тот ли это метод
+
 std::unique_ptr<Detour> AnimationHooks::mSwingDetour;
 std::unique_ptr<Detour> AnimationHooks::mBobHurtDetour;
 

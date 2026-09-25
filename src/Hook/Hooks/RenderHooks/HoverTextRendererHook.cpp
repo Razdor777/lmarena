@@ -6,6 +6,9 @@
 
 #include <SDK/Minecraft/mce.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОБНОВЛЕНО: HoverTextRenderer::render -> src-client/mc/client/gui/controls/renderers/HoverTextRenderer.h:60
+
 std::unique_ptr<Detour> HoverTextRendererHook::mHoverTextRendererRenderDetour;
 
 void HoverTextRendererHook::onHoverTextRendererRender(HoverTextRenderer* _this, void* mRenderContext, ClientInstance* mClient, glm::vec4* mRenderAABB, int mPass)

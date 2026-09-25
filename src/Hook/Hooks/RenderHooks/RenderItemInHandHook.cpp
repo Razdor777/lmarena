@@ -5,6 +5,9 @@
 #include "RenderItemInHandHook.hpp"
 #include <Features/Events/RenderItemInHandDescriptionEvent.hpp>
 
+// [1.26] — сверка с заголовками LeviLamina 26.51 (см. docs/migration-1.26/audit.md):
+// [1.26] ОСТАЛОСЬ (класс не найден): mce::framebuilder::RenderItemInHandDescription::RenderItemInHandDescription -> в хидерах 1.26 не найдено — структура в хидерах пустая (layout неизвестен) — только ручной реверс
+
 std::unique_ptr<Detour> RenderItemInHandHook::mDetour;
 
 void* RenderItemInHandHook::RenderItemInHandDescriptionCtor(RenderItemInHandDescription* _this, void* renderObject, void* itemFlags,
