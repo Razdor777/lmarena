@@ -30,38 +30,69 @@ void PlaceHighlights::onRenderEvent(RenderEvent& event)
     auto drawList = ImGui::GetBackgroundDrawList();
     ImColor themedColor = ColorUtils::getThemedColor(0);
 
-    std::vector<glm::ivec3> removeQueued;
+    const uint64_t now = NOW;
+    const float duration = mDuration.mValue;
+    const float maxOpacity = mMaxOpacity.mValue;
 
-    for (auto& it : mPlaceMap)
+    // Прямой итератор: раньше позиции копировались во временный вектор ВРЕМЕНЕМ
+    // и `mPlaceMap.erase(it)` стирал несуществующие ключи — записи не удалялись
+    // никогда, и карта росла бесконечно.
+    for (auto it = mPlaceMap.begin(); it != mPlaceMap.end();)
     {
-        glm::ivec3 blockPos = it.first;
-        uint64_t PlacedTime = it.second;
-        float alpha = mMaxOpacity.mValue - ((float)(NOW - PlacedTime) / mDuration.mValue);
-        int alphaInt = (int)(alpha * 200);
-
-        if (alphaInt < 0) {
-            removeQueued.emplace_back(PlacedTime);
+        const float age = static_cast<float>(now - it->second);
+        if (age >= duration)
+        {
+            it = mPlaceMap.erase(it);
             continue;
         }
 
-        auto boxSize = glm::vec3(1, 1, 1);
-        auto boxAABB = AABB(blockPos, boxSize);
-        ImColor cColor = themedColor;
-        if (mColorMode.mValue == ColorMode::Custom) cColor = mBoxColor.getAsImColor();
-        cColor.Value.w = alpha;
+        const float t = age / duration;            // 0..1
+        const float fade = (1.f - t) * (1.f - t);  // мягкий хвост, а не «выключение»
+        // всплеск появления: первые 140 мс бокс чуть крупнее и ярче
+        const float pop = age < 140.f ? 1.f - age / 140.f : 0.f;
+
+        const glm::vec3 center((float)it->first.x + 0.5f,
+                               (float)it->first.y + 0.5f,
+                               (float)it->first.z + 0.5f);
+        const float halfSize = 0.5f * (1.f + 0.08f * pop);
+
+        AABB boxAABB;
+        boxAABB.mMin = center + glm::vec3(halfSize);
+        boxAABB.mMax = center - glm::vec3(halfSize);
 
         std::vector<ImVec2> imPoints = MathUtils::getImBoxPoints(boxAABB);
+        if (imPoints.size() < 3) { ++it; continue; }
 
-        if (mFilled.mValue) drawList->AddConvexPolyFilled(imPoints.data(), imPoints.size(), cColor);
-        drawList->AddPolyline(imPoints.data(), imPoints.size(), cColor, 0, 2.0f);
-    }
+        ImColor cColor = themedColor;
+        if (mColorMode.mValue == ColorMode::Custom) cColor = mBoxColor.getAsImColor();
 
-    if (!removeQueued.empty())
-    {
-        for (auto& it : removeQueued)
+        // вспышка удара при установке — подмешиваем белый
+        if (pop > 0.f)
         {
-            mPlaceMap.erase(it);
+            cColor.Value.x += (1.f - cColor.Value.x) * pop * 0.7f;
+            cColor.Value.y += (1.f - cColor.Value.y) * pop * 0.7f;
+            cColor.Value.z += (1.f - cColor.Value.z) * pop * 0.7f;
         }
+
+        if (mFilled.mValue)
+        {
+            ImColor fill = cColor;
+            fill.Value.w = maxOpacity * fade;
+            drawList->AddConvexPolyFilled(imPoints.data(), (int)imPoints.size(), fill);
+        }
+
+        // свечение: широкая мягкая обводка ПОД контуром
+        ImColor glow = cColor;
+        glow.Value.w = 0.35f * fade;
+        drawList->AddPolyline(imPoints.data(), (int)imPoints.size(), glow, true, 5.0f);
+
+        // контур ярче заливки — бокс не «мылится» при затухании
+        ImColor line = cColor;
+        const float lineAlpha = maxOpacity * fade * 1.6f;
+        line.Value.w = (lineAlpha + pop * 0.3f > 1.f) ? 1.f : lineAlpha + pop * 0.3f;
+        drawList->AddPolyline(imPoints.data(), (int)imPoints.size(), line, true, 2.0f);
+
+        ++it;
     }
 }
 

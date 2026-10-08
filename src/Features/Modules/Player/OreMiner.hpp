@@ -1,6 +1,7 @@
 #pragma once
 #include <Features/Modules/Module.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
+#include <Features/Events/BlockChangedEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
@@ -8,25 +9,29 @@
 #include <SDK/Minecraft/World/Chunk/SubChunkBlockStorage.hpp>
 
 class Block;
+class BlockLegacy;
+class BlockSource;
 
 class OreMiner : public ModuleBase<OreMiner>
 {
 public:
+    NumberSetting mRange        = NumberSetting("Range", "Max distance to mine blocks", 12.f, 2.f, 32.f, 1.f);
     NumberSetting mDestroySpeed = NumberSetting("Destroy Speed", "Break threshold", 1.f, 0.01f, 1.f, 0.01f);
     NumberSetting mStepDistance = NumberSetting("Step Distance", "TP step", 8.f, 1.f, 12.f, 0.5f);
-    BoolSetting mVeinMiner = BoolSetting("Vein Miner", "Break all connected blocks of same type", false);
-    NumberSetting mMineDelay = NumberSetting("Mine Delay", "Delay between blocks (ms)", 50.f, 0.f, 500.f, 10.f);
-    NumberSetting mBlocksPerTick = NumberSetting("Blocks/Tick", "Max blocks per tick", 1.f, 1.f, 5.f, 1.f);
-    NumberSetting mServerTimeout = NumberSetting("Server Timeout", "How long to wait for server confirmation (ms)", 1500.f, 500.f, 5000.f, 100.f);
-    BoolSetting mSwing = BoolSetting("Swing", "Swing animation", false);
-    BoolSetting mHotbarOnly = BoolSetting("Hotbar Only", "Hotbar tools only", false);
-    BoolSetting mRenderBlock = BoolSetting("Render Block", "Highlight mining block", true);
-    BoolSetting mDrawPath = BoolSetting("Draw Path", "Draw TP path", true);
-    BoolSetting mRenderTargets = BoolSetting("Render Targets", "Highlight found blocks", false);
-    BoolSetting mShowBlockList = BoolSetting("Show Block List", "Show target block names", true);
-    NumberSetting mFOV = NumberSetting("FOV", "Mining field of view", 360.f, 30.f, 360.f, 10.f);
-    BoolSetting mToolSaver = BoolSetting("Tool Saver", "Switch to another tool when durability is low, or pause mining when none is left", true);
+    BoolSetting   mVeinMiner    = BoolSetting("Vein Miner", "Break all connected blocks of same type", false);
+    NumberSetting mMineDelay    = NumberSetting("Mine Delay", "Delay between blocks (ms)", 50.f, 0.f, 500.f, 10.f);
+    NumberSetting mBlocksPerTick= NumberSetting("Blocks/Tick", "Max blocks per tick", 1.f, 1.f, 5.f, 1.f);
+    NumberSetting mServerTimeout= NumberSetting("Server Timeout", "How long to wait for server confirmation (ms)", 1500.f, 500.f, 5000.f, 100.f);
+    BoolSetting   mSwing        = BoolSetting("Swing", "Swing animation", false);
+    BoolSetting   mHotbarOnly   = BoolSetting("Hotbar Only", "Hotbar tools only", false);
+    BoolSetting   mRenderBlock  = BoolSetting("Render Block", "Highlight mining block", true);
+    BoolSetting   mDrawPath     = BoolSetting("Draw Path", "Draw TP path", true);
+    BoolSetting   mRenderTargets= BoolSetting("Render Targets", "Highlight found blocks", false);
+    BoolSetting   mShowBlockList= BoolSetting("Show Block List", "Show target block names", true);
+    NumberSetting mFOV          = NumberSetting("FOV", "Mining field of view", 360.f, 30.f, 360.f, 10.f);
+    BoolSetting   mToolSaver    = BoolSetting("Tool Saver", "Switch to another tool when durability is low, or pause mining when none is left", true);
     NumberSetting mMinToolDurability = NumberSetting("Min Tool Durability %", "Stop using a tool below this durability%", 8.f, 1.f, 50.f, 1.f);
+    BoolSetting   mDebug        = BoolSetting("Debug", "Print scanner stats to chat", false);
 
     BoolSetting mCoal = BoolSetting("Coal", "Coal ore", false);
     BoolSetting mIron = BoolSetting("Iron", "Iron ore", false);
@@ -39,7 +44,10 @@ public:
     BoolSetting mAncientDebris = BoolSetting("Ancient Debris", "Netherite", false);
     BoolSetting mQuartz = BoolSetting("Quartz", "Nether quartz", false);
     BoolSetting mLeaves = BoolSetting("Leaves", "All leaf types", false);
-    BoolSetting mWood = BoolSetting("Wood", "All log types", false);
+    BoolSetting mWood = BoolSetting("Wood", "Logs", false);
+    EnumSetting mWoodType = EnumSetting("Wood Type", "Which logs to mine", 0,
+        "All", "Oak", "Birch", "Spruce", "Jungle", "Acacia", "Dark Oak",
+        "Mangrove", "Cherry", "Crimson", "Warped", "Pale Oak");
     BoolSetting mSandstone = BoolSetting("Sandstone", "Sandstone", false);
     BoolSetting mSnow = BoolSetting("Snow", "Snow", false);
     BoolSetting mSpawner = BoolSetting("Spawner", "Mob spawner", false);
@@ -47,16 +55,17 @@ public:
     OreMiner() : ModuleBase("OreMiner", "Mine any block at any distance", ModuleCategory::Player, 0, false)
     {
         addSettings(
-            &mDestroySpeed, &mStepDistance, &mServerTimeout, &mSwing, &mHotbarOnly,
+            &mRange, &mDestroySpeed, &mStepDistance, &mServerTimeout, &mSwing, &mHotbarOnly,
             &mVeinMiner, &mMineDelay, &mBlocksPerTick,
             &mRenderBlock, &mDrawPath, &mRenderTargets, &mShowBlockList, &mFOV,
-            &mToolSaver, &mMinToolDurability,
+            &mToolSaver, &mMinToolDurability, &mDebug,
             &mCoal, &mIron, &mGold, &mDiamond, &mEmerald, &mLapis,
             &mRedstone, &mCopper, &mAncientDebris, &mQuartz,
-            &mLeaves, &mWood, &mSandstone, &mSnow, &mSpawner
+            &mLeaves, &mWood, &mWoodType, &mSandstone, &mSnow, &mSpawner
         );
 
         VISIBILITY_CONDITION(mMinToolDurability, mToolSaver.mValue);
+        VISIBILITY_CONDITION(mWoodType, mWood.mValue);
 
         mNames = {{Lowercase,"oreminer"},{LowercaseSpaced,"ore miner"},{Normal,"OreMiner"},{NormalSpaced,"Ore Miner"}};
     }
@@ -77,33 +86,27 @@ public:
     static inline const std::vector<std::string> sSnowN = {"snow","snow_layer"};
     static inline const std::vector<std::string> sSpawnerN = {"mob_spawner","spawner"};
 
-    // Protected blocks (private claims etc)
     std::unordered_set<BlockPos> mProtectedPositions;
-
-    // Custom blocks
     std::vector<std::string> mCustomBlockNames;
 
-    static constexpr float SCAN_RADIUS = 28.f;
-    // Spiral only covers chunks actually usable by findBestTarget
-    // (28 blocks ≈ 2 chunks — scanning 7 chunks out just wasted minutes)
-    static constexpr float CHUNK_RADIUS = 4.f;
-    static constexpr float UPDATE_FREQ = 1.8f;
-    static constexpr int CHUNKS_PER_TICK = 3;
-    // Subchunks of the player's OWN chunk scanned per batch (priority),
-    // so ores right next to you are picked up within ~1 second
-    static constexpr int OWN_SUBS_PER_TICK = 2;
+    // ================= Scanner =================
+    static constexpr uint64_t SCAN_INTERVAL_MS   = 90;   // как часто крутить сканер
+    static constexpr int      NEAR_RADIUS        = 6;    // прямой куб вокруг игрока (всегда, гарантированно)
+    static constexpr int      SUBCHUNKS_PER_SCAN = 6;    // сабчанков дальнего скана за один проход
+    static constexpr int      CLEANUP_PER_TICK   = 200;  // записей mFoundBlocks проверяем за тик
 
-    struct ScanState {
-        ChunkPos center;
-        ChunkPos current;
-        int subChunkIdx = 0;
-        int dirIdx = 0;
-        int steps = 1;
-        int stepCount = 0;
-    } mScan;
-    int mOwnSubIdx = 0; // round-robin subchunk index for the player's own chunk
+    ChunkPos                 mScanCenter;
+    std::vector<glm::ivec2>  mChunkOrder;      // смещения чанков, отсортированные по дистанции
+    size_t                   mChunkCursor = 0;
+    int                      mSubCursor   = -1;
+    size_t                   mCleanCursor = 0;
+    uint64_t                 mLastScanTime = 0;
+    uint64_t                 mLastDebugTime = 0;
 
-    struct FoundBlock { glm::ivec3 position; std::string name; };
+    std::unordered_map<BlockLegacy*, bool> mTargetCache;   // BlockLegacy* -> является ли целью
+    uint64_t mTargetSig = 0;                                // сигнатура настроек целей
+
+    struct FoundBlock { glm::ivec3 position; BlockLegacy* legacy; };
     std::unordered_map<BlockPos, FoundBlock> mFoundBlocks;
     bool mKeyWasDown = false;
 
@@ -116,11 +119,10 @@ public:
     int mPreviousSlot = -1;
     int mToolSlot = -1;
 
-    // Waiting state for far block server confirmation
     bool mWaitingForBreak = false;
     uint64_t mWaitStartTime = 0;
     int mWaitRetries = 0;
-    std::string mPendingVeinBlockName; // saved before break for VeinMiner BFS
+    std::string mPendingVeinBlockName;
 
     glm::vec3 mRots = {0,0,0};
     std::vector<glm::vec3> mPacketPositions;
@@ -131,26 +133,30 @@ public:
     void onDisable() override;
 
     bool isTargetBlock(const std::string& name);
+    bool isTargetLegacy(BlockLegacy* legacy);
     bool matchNames(const std::string& name, const std::vector<std::string>& list);
     void toggleCustomBlock(const std::string& name);
     bool isCustomBlock(const std::string& name);
     bool hasAnyTarget();
+    uint64_t computeTargetSig();
 
     void resetScanner();
-    void moveToNextChunk();
-    bool scanSubChunk(ChunkPos chunk, int subIdx);
+    int  chunkRadius() const;
+    void rebuildChunkOrder(const ChunkPos& center);
+    void scanNear(BlockSource* source, Actor* player);
+    void scanFarStep(BlockSource* source, Actor* player);
+    bool scanSubChunk(const ChunkPos& chunk, int subIdx, int& outFound);
+    void cleanupFound(BlockSource* source, Actor* player);
+    void addFound(const glm::ivec3& pos, BlockLegacy* legacy);
 
     std::shared_ptr<class MovePlayerPacket> createPacketForPos(glm::vec3 pos);
     void straightLineTP(glm::vec3 from, glm::vec3 to, bool save);
-    // Returns false when no suitable tool exists (Tool Saver) — no packets sent
     bool mineBlockAtPos(const glm::ivec3& pos, Actor* player);
-    // Best tool slot with enough durability, or -1 → mining must pause
-    int getMiningToolSlot(Block* block);
+    int  getMiningToolSlot(Block* block);
     void notifyToolStop();
     glm::ivec3 findBestTarget(Actor* player);
     bool isInPlayerFOV(Actor* player, const glm::vec3& blockCenter);
 
-    // VeinMiner: BFS to find all connected blocks of same type
     std::vector<glm::ivec3> getConnectedVein(const glm::ivec3& start, int maxBlocks = 64);
     std::deque<glm::ivec3> mVeinQueue;
     uint64_t mLastMineTime = 0;
@@ -160,6 +166,7 @@ public:
     void onPacketOutEvent(class PacketOutEvent& event);
     void onPacketInEvent(class PacketInEvent& event);
     void onRenderEvent(class RenderEvent& event);
+    void onBlockChangedEvent(class BlockChangedEvent& event);
 
     std::string getSettingDisplay() override {
         if (mIsMiningBlock) return "Mining";

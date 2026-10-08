@@ -40,6 +40,22 @@ void ChatUtils::displayClientMessageRaw(const std::string& msg)
 
 // ─────────────────────────────────────────────────────────────────────────
 
+namespace
+{
+    // Настоящий код цвета/стиля Minecraft: 0-9, a-f, k-o, r. После «§» байт
+    // выбрасывается только если это действительно код, а не первая буква слова.
+    bool chatUtilsIsCodeChar(unsigned char c)
+    {
+        if (c >= '0' && c <= '9') return true;
+
+        const unsigned char lower = (c >= 'A' && c <= 'Z') ? static_cast<unsigned char>(c + 32) : c;
+        if (lower >= 'a' && lower <= 'f') return true;
+
+        return lower == 'k' || lower == 'l' || lower == 'm' ||
+               lower == 'n' || lower == 'o' || lower == 'r';
+    }
+}
+
 std::string ChatUtils::stripColorCodes(const std::string& s)
 {
     std::string out;
@@ -50,12 +66,17 @@ std::string ChatUtils::stripColorCodes(const std::string& s)
 
         if (c == 0xC2 && i + 1 < s.size() && (unsigned char)s[i + 1] == 0xA7)
         {
-            i += 3; // 0xC2, 0xA7, code
+            i += 2; // 0xC2, 0xA7
+            if (i < s.size() && chatUtilsIsCodeChar((unsigned char)s[i])) i += 1; // + сам код
             continue;
         }
-        if (c == 0xA7)
+        // Однобайтовый legacy §. ВАЖНО: 0xA7 — это ещё и хвостовой байт
+        // кириллических символов ('Ч' = D0 A7), поэтому пропускаем байт как код
+        // только если он не является продолжением UTF-8-последовательности.
+        if (c == 0xA7 && (i == 0 || (unsigned char)s[i - 1] < 0xC0))
         {
-            i += 2; // §, code
+            i += 1; // сам §
+            if (i < s.size() && chatUtilsIsCodeChar((unsigned char)s[i])) i += 1; // + код
             continue;
         }
         out += s[i];

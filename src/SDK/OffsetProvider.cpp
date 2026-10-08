@@ -86,4 +86,3 @@ void OffsetProvider::deinitialize()
 
     mIsInitialized = false;
 }
-

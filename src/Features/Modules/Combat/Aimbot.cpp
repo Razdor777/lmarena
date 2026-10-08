@@ -76,7 +76,7 @@ static void calcTargetRotRads(const glm::vec3& eyePos, const glm::vec3& target, 
     float horizontalDist = std::sqrtf(diff.x * diff.x + diff.z * diff.z);
 
     // mRotRads.x = PI - yawMC(rad), где yawMC = atan2(-x, z)
-    // (конвенция CameraDirectLookComponent — та же, что в Freecam/GhostMode:
+    // (конвенция CameraDirectLookComponent:
     //  yawMC = -degrees(mRotRads.x) + 180).
     // Старая формула atan2(z,x)-PI/2 давала ошибку 180° на севере/юге —
     // в комментарии-проверке были только +X/-X, где обе формулы совпадают :)

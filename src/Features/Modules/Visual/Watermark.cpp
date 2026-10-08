@@ -61,12 +61,8 @@ void Watermark::onRenderEvent(RenderEvent &event) {
   if (!daInterface)
     return;
 
-  auto fontSel = daInterface->mFont.as<Interface::FontType>();
-  if (fontSel == Interface::FontType::ProductSans) {
-    FontHelper::pushPrefFont(true, true);
-  } else {
-    FontHelper::pushPrefFont(true);
-  }
+  // Mntsb — единственный шрифт клиента, и он уже жирный.
+  FontHelper::pushPrefFont(true);
 
   static std::string watermarkText = "Juzdex";
   static float size = 45;

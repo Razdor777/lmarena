@@ -100,6 +100,11 @@ nlohmann::json Module::serialize()
             auto* colorSetting = reinterpret_cast<ColorSetting*>(setting);
             j["settings"].push_back(colorSetting->serialize());
         }
+        else if (setting->mType == SettingType::String)
+        {
+            auto* stringSetting = reinterpret_cast<StringSetting*>(setting);
+            j["settings"].push_back(stringSetting->serialize());
+        }
     }
 
     // === АВТОМАТИЧЕСКИ добавляем customData если модуль имеет кастомные данные ===

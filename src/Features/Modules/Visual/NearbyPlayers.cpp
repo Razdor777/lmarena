@@ -56,13 +56,9 @@ static bool hasCyrillic(const std::string &text) {
 
 // Получить шрифт с поддержкой кириллицы
 static ImFont *getCyrillicFont() {
-  // Сначала пробуем текущий шрифт — если он поддерживает кириллицу, ок
-  // Но лучше сразу вернуть заведомо поддерживающий
-  auto it = FontHelper::Fonts.find("open_sans");
-  if (it != FontHelper::Fonts.end() && it->second) return it->second;
-  it = FontHelper::Fonts.find("product_sans");
-  if (it != FontHelper::Fonts.end() && it->second) return it->second;
-  it = FontHelper::Fonts.find("comfortaa");
+  // Mntsb — единственный интерфейсный шрифт, кириллица в него вмержена
+  // при загрузке (FontHelper::load), поэтому берём именно его.
+  auto it = FontHelper::Fonts.find("mntsb");
   if (it != FontHelper::Fonts.end() && it->second) return it->second;
   return ImGui::GetFont(); // последний fallback
 }
@@ -101,6 +97,8 @@ static void DrawMinecraftText(ImDrawList *dl, ImVec2 pos,
   };
 
   for (size_t i = 0; i < text.length();) {
+    // «§» в UTF-8 — это C2 A7, а код цвета идёт третьим байтом. Съедаем код
+    // только если он реально код: иначе страдала бы первая буква следующего слова.
     if ((unsigned char)text[i] == 0xC2 && i + 2 < text.length() &&
         (unsigned char)text[i + 1] == 0xA7) {
       drawChunk();
@@ -108,17 +106,24 @@ static void DrawMinecraftText(ImDrawList *dl, ImVec2 pos,
       if (mcColors.find(colorCode) != mcColors.end()) {
         currentColor = mcColors[colorCode];
         currentColor.Value.w = alpha;
+        i += 3;
+      } else {
+        i += 2;
       }
-      i += 3;
     }
-    else if ((unsigned char)text[i] == 0xA7 && i + 1 < text.length()) {
+    // Одиночный legacy «§». Байт 0xA7 — это ещё и хвост кириллицы
+    // ('Ч' = D0 A7), поэтому такой байт трогать нельзя.
+    else if ((unsigned char)text[i] == 0xA7 && i + 1 < text.length() &&
+             (i == 0 || (unsigned char)text[i - 1] < 0xC0)) {
       drawChunk();
       char colorCode = tolower(text[i + 1]);
       if (mcColors.find(colorCode) != mcColors.end()) {
         currentColor = mcColors[colorCode];
         currentColor.Value.w = alpha;
+        i += 2;
+      } else {
+        i += 1;
       }
-      i += 2;
     } else {
       size_t len = 1;
       unsigned char uc = static_cast<unsigned char>(text[i]);

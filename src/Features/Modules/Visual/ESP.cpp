@@ -43,7 +43,7 @@ ImColor ESP::getEntityColor(Actor* actor, float alpha)
         auto interfaceMod = gFeatureManager->mModuleManager->getModule<Interface>();
         if (interfaceMod)
         {
-            if (interfaceMod->mMode.mValue == Interface::Rainbow)
+            if (interfaceMod->mMode.mValue == Interface::Prism)
             {
                 float speed = interfaceMod->mColorSpeed.mValue;
                 float sat = interfaceMod->mSaturation.mValue;
@@ -52,17 +52,8 @@ ImColor ESP::getEntityColor(Actor* actor, float alpha)
             }
             else
             {
-                auto themeColors = Interface::ColorThemes.find(interfaceMod->mMode.mValue);
-                if (themeColors != Interface::ColorThemes.end() && !themeColors->second.empty())
-                {
-                    col = themeColors->second[1];
-                    col.Value.w = alpha;
-                }
-                else
-                {
-                    col = mColor.getAsImColor();
-                    col.Value.w = alpha;
-                }
+                col = ColorUtils::getStaticAccentColor(static_cast<float>(((uintptr_t)actor % 100) * 50));
+                col.Value.w = alpha;
             }
         }
         else

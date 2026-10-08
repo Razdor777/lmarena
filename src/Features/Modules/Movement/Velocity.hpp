@@ -4,7 +4,6 @@
 class Velocity : public ModuleBase<Velocity> {
 public:
     enum class Mode {
-        Full,
         Percent,
         Redirect,
     };
@@ -17,7 +16,7 @@ public:
     };
 
     EnumSettingT<Mode> mMode = EnumSettingT<Mode>("Mode", "The mode of the velocity.",
-        Mode::Full, "Full", "Percent", "Redirect");
+        Mode::Percent, "Percent", "Redirect");
 
     NumberSetting mHorizontal = NumberSetting("Horizontal",
         "Horizontal velocity multiplier", 0, -2, 2, 0.01);
@@ -66,8 +65,7 @@ public:
 
     std::string getSettingDisplay() override {
         std::string base;
-        if (mMode.mValue == Mode::Full) base = "Full";
-        else if (mMode.mValue == Mode::Redirect) {
+        if (mMode.mValue == Mode::Redirect) {
             switch (mDirection.mValue) {
                 case Direction::Reverse: base = "Reverse"; break;
                 case Direction::Left:    base = "Left"; break;

@@ -3,6 +3,8 @@
 #include <Features/Modules/Module.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
+#include <Features/Events/PacketInEvent.hpp>
+#include <Features/Events/PacketOutEvent.hpp>
 #include <set>
 #include <map>
 #include "Schematic.hpp"
@@ -21,12 +23,12 @@ public:
 
     // === НАСТРОЙКИ ===
     NumberSetting mBuildDelay = NumberSetting("Build Delay", "Delay between blocks (ms)", 150.0f, 0.0f, 300.0f, 10.0f);
-    NumberSetting mBuildRange = NumberSetting("Build Range", "Max range to place blocks", 4.5f, 3.0f, 6.0f, 0.5f);
+    NumberSetting mBuildRange = NumberSetting("Build Range", "Max reach when Packet Place is off", 4.5f, 3.0f, 6.0f, 0.5f);
     NumberSetting mWalkSpeed = NumberSetting("Walk Speed", "Speed when walking to blocks", 4.0f, 1.0f, 10.0f, 0.5f);
     NumberSetting mPreviewLimit = NumberSetting("Preview Limit", "Max blocks to render in preview", 15.0f, 10.0f, 50.0f, 1.0f);
     NumberSetting mPreviewRadius = NumberSetting("Preview Radius", "Max distance to render blocks", 16.0f, 8.0f, 32.0f, 1.0f);
     
-    BoolSetting mAutoWalk = BoolSetting("Auto Walk", "Walk to unreachable blocks", true);
+    BoolSetting mAutoWalk = BoolSetting("Auto Walk", "Walk to unreachable blocks (Packet Place off)", true);
     BoolSetting mAutoClear = BoolSetting("Auto Clear", "Clear area before building", true);
     BoolSetting mShowPreview = BoolSetting("Show Preview", "Show ghost blocks", true);
     BoolSetting mShowProgress = BoolSetting("Show Progress", "Show progress bar", true);
@@ -35,6 +37,10 @@ public:
     BoolSetting mSwing = BoolSetting("Swing", "Swing arm", true);
     BoolSetting mVerifyPlacement = BoolSetting("Verify Placement", "Double-check block placement", true);
     BoolSetting mExcludeGrass = BoolSetting("Exclude Grass", "Exclude grass/plants when copying", true);
+    BoolSetting mAirPlace = BoolSetting("Air Place", "Allow placing blocks in mid-air", true);
+    BoolSetting mPacketPlace = BoolSetting("Packet Place", "RegionFill-style build AND break: TP on top of the block, act via packets, no range limit", true);
+    NumberSetting mStepDistance = NumberSetting("TP Step", "Teleport step size when packet-placing", 8.0f, 1.0f, 12.0f, 0.5f);
+    BoolSetting mSilentAccept = BoolSetting("Silent Accept", "Prevent rubber banding during teleports", true);
 
     SchematicBuilder() : ModuleBase("SchematicBuilder", "Copy and paste structures", ModuleCategory::Player, 0, false) {
         addSettings(
@@ -51,12 +57,18 @@ public:
             &mShowMissingBlocks,
             &mSwing,
             &mVerifyPlacement,
-            &mExcludeGrass
+            &mExcludeGrass,
+            &mAirPlace,
+            &mPacketPlace,
+            &mStepDistance,
+            &mSilentAccept
         );
 
         VISIBILITY_CONDITION(mWalkSpeed, mAutoWalk.mValue);
         VISIBILITY_CONDITION(mPreviewLimit, mShowPreview.mValue);
         VISIBILITY_CONDITION(mPreviewRadius, mShowPreview.mValue);
+        VISIBILITY_CONDITION(mStepDistance, mPacketPlace.mValue);
+        VISIBILITY_CONDITION(mSilentAccept, mPacketPlace.mValue);
 
         mNames = {
             {Lowercase, "schematicbuilder"},
@@ -82,6 +94,7 @@ public:
     std::vector<SchematicBlock> mBuildQueue;
     std::set<int> mCompletedIndices;
     std::set<int> mSkippedIndices;
+    std::map<int, int> mPlaceAttempts;   // queue index -> failed placement attempts
     
     // Clear queue
     std::vector<glm::ivec3> mClearQueue;
@@ -110,6 +123,10 @@ public:
     uint64_t mLastPlacedTime = 0;
     bool mWaitingForVerification = false;
     int mCurrentBuildIdx = -1;
+
+    // Packet placement (RegionFill-style)
+    glm::vec3 mRots = glm::vec3(0);
+    bool mIsTPing = false;
     
     // Check timer
     uint64_t mLastInventoryCheck = 0;
@@ -143,6 +160,7 @@ public:
     void processWalking();
     void processVerification();
     void processWaitingForBlocks();
+    void reportSkipped();
     
     // Preparation
     void prepareClearQueue();
@@ -159,12 +177,19 @@ public:
     int countRemainingBlocksForCurrentStage();
     int countRemainingBlocksTotal();
     bool isGrassOrPlant(const std::string& blockName);
+    std::string getBlockNameRU(const std::string& blockName);
     
     // Inventory
     int findBlockInInventory(const std::string& blockName);
     int findBlockInFullInventory(const std::string& blockName);
     bool tryPlaceBlock(int queueIndex);
     bool tryBreakBlock(glm::ivec3 pos);
+
+    // Packet placement (RegionFill-style)
+    void onPacketOutEvent(PacketOutEvent& event);
+    void onPacketInEvent(PacketInEvent& event);
+    std::shared_ptr<class MovePlayerPacket> createPacketForPos(glm::vec3 pos);
+    void straightLineTP(glm::vec3 from, glm::vec3 to);
     
     // Movement
     void walkTowards(glm::vec3 target);

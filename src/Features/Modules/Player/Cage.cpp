@@ -20,9 +20,11 @@
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/MobEquipmentPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/PlayerActionPacket.hpp>
 #include <Utils/GameUtils/ActorUtils.hpp>
 #include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
+#include <Utils/GameUtils/ItemUtils.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
@@ -166,14 +168,15 @@ Actor* Cage::findTarget()
 // TP
 // ═══════════════════════════════════════════════════════════════
 
-std::shared_ptr<MovePlayerPacket> Cage::makeTPPacket(glm::vec3 pos)
+std::shared_ptr<MovePlayerPacket> Cage::makeTPPacket(glm::vec3 pos, const glm::vec2& rots)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     auto pkt    = MinecraftPackets::createPacket<MovePlayerPacket>();
     pkt->mPos              = pos;
     pkt->mPlayerID         = player->getRuntimeID();
-    pkt->mRot              = {mRots.x, mRots.y};
-    pkt->mYHeadRot         = mRots.z;
+    // Смотрим туда, куда надо для клика: сервер валидирует луч от глаз
+    pkt->mRot              = {rots.x, rots.y};
+    pkt->mYHeadRot         = rots.y;
     pkt->mResetPosition    = PositionMode::Teleport;
     pkt->mOnGround         = true;
     pkt->mRidingID         = -1;
@@ -183,7 +186,7 @@ std::shared_ptr<MovePlayerPacket> Cage::makeTPPacket(glm::vec3 pos)
     return pkt;
 }
 
-void Cage::tpBetween(glm::vec3 from, glm::vec3 to)
+void Cage::tpBetween(glm::vec3 from, glm::vec3 to, const glm::vec2& rots)
 {
     auto sender = ClientInstance::get()->getPacketSender();
     if (!sender) return;
@@ -192,35 +195,106 @@ void Cage::tpBetween(glm::vec3 from, glm::vec3 to)
     float dist = glm::length(to - from);
     glm::vec3 dir = dist > 0.001f ? glm::normalize(to - from) : glm::vec3(0.f);
 
-    for (float d = 0.f; d < dist; d += step)
-        sender->sendToServer(makeTPPacket(from + dir * d).get());
-    sender->sendToServer(makeTPPacket(to).get());
+    for (float d = step; d < dist; d += step)
+        sender->sendToServer(makeTPPacket(from + dir * d, rots).get());
+    sender->sendToServer(makeTPPacket(to, rots).get());
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Place block
+// Placement plan
+//
+// Главная причина, почему потолок и пол «не ставились»: и старый,
+// и текущий код всегда вставал ПРЯМО НАД клеткой. Оттуда луч бьёт
+// в верхнюю грань блока снизу и мимо боковых граней — а сервер
+// сверяет грань, которую мы отправили, с той, в которую реально
+// попал луч, и отбрасывает блок.
+//
+// Теперь позиция фейкового игрока считается ПОД конкретную грань:
+//   face 1  — блок снизу, клик по верхней грани → стоим сверху
+//   face 0  — блок сверху, клик по нижней    → стоим снизу
+//   face 2-5- боковой сосед, клик по боку    → стоим с его стороны
 // ═══════════════════════════════════════════════════════════════
 
-void Cage::placeBlockAt(glm::ivec3 blockPos, Actor* player)
+Cage::PlacePlan Cage::buildPlacePlan(glm::ivec3 cell)
 {
+    PlacePlan plan;
+    glm::vec3 center = glm::vec3(cell) + glm::vec3(0.5f);
+
+    static const std::vector<int> faceOrder = { 1, 2, 3, 4, 5, 0 };
+
+    for (int f : faceOrder)
+    {
+        glm::vec3  offset    = glm::vec3(BlockUtils::blockFaceOffsets[f]);
+        glm::ivec3 neighbour = cell + glm::ivec3(BlockUtils::blockFaceOffsets[f]);
+        if (isAirAt(neighbour)) continue;
+
+        glm::vec3 stand;
+        if (f == 1)
+        {
+            // Стоим НА клетке (ровно как RegionFill) и смотрим вниз —
+            // луч бьёт в верхнюю грань блока под клеткой.
+            stand = { center.x, cell.y + 2.62f, center.z };
+        }
+        else
+        {
+            // Встаём чуть ниже клетки со стороны, ОТКУДА видно её соседа,
+            // и целиком под клеткой — тогда тело не пересекает ставимый
+            // блок, а луч доходит до нужной грани и не попадает в другой.
+            stand   = center - offset * 0.5f;
+            stand.y = cell.y - 0.18f;
+        }
+
+        // Точка на грани кликаемого блока, повёрнутая к нашей клетке
+        glm::vec3 faceCenter = glm::vec3(neighbour) + glm::vec3(0.5f) - offset * 0.5f;
+
+        plan.rots = MathUtils::getRots(stand, faceCenter);
+        // Лёгкий разброс, чтобы взгляд не был идеально механическим
+        plan.rots.x = MathUtils::clamp(plan.rots.x + MathUtils::randomFloat(-1.1f, 1.1f), -90.f, 90.f);
+        plan.rots.y = MathUtils::wrap(plan.rots.y  + MathUtils::randomFloat(-1.1f, 1.1f), -180.f, 180.f);
+
+        plan.valid   = true;
+        plan.face    = f;
+        plan.clicked = neighbour;
+        plan.stand   = stand;
+        break;
+    }
+
+    if (!plan.valid)
+    {
+        // Ни одного соседа — AirPlace (принимают лояльные сервера)
+        plan.valid    = true;
+        plan.airPlace = true;
+        plan.face     = 1;
+        plan.clicked  = cell;
+        plan.stand    = { center.x, cell.y + 2.62f, center.z };
+        plan.rots     = { 89.5f, mRots.y };
+    }
+
+    return plan;
+}
+
+bool Cage::placeAt(glm::ivec3 cell, Actor* player, int slot)
+{
+    if (slot < 0) return false;
+
     auto sender = ClientInstance::get()->getPacketSender();
-    if (!sender) return;
+    if (!sender) return false;
 
-    int side = BlockUtils::getBlockPlaceFace(blockPos);
-    if (side == -1) return;
-
-    int slot = findBlockSlot();
-    if (slot == -1) return;
+    PlacePlan plan = buildPlacePlan(cell);
+    if (!plan.valid) return false;
 
     auto supplies  = player->getSupplies();
     auto container = supplies ? supplies->getContainer() : nullptr;
-    if (!supplies || !container) return;
+    if (!supplies || !container) return false;
 
-    int       oldSlot  = supplies->mSelectedSlot;
-    glm::vec3 myPos    = *player->getPos();
-    glm::vec3 standPos = glm::vec3(blockPos.x + 0.5f, blockPos.y + 2.62f, blockPos.z + 0.5f);
+    auto* stack = container->getItem(slot);
+    if (!stack || !stack->mItem || stack->mCount <= 0) return false;
 
-    tpBetween(myPos, standPos);
+    int       oldSlot = supplies->mSelectedSlot;
+    glm::vec3 myPos   = *player->getPos();
+    glm::vec3 oldRots = mRots;
+
+    tpBetween(myPos, plan.stand, plan.rots);
 
     if (slot != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(slot).get());
@@ -232,12 +306,12 @@ void Cage::placeBlockAt(glm::ivec3 blockPos, Actor* player)
         auto cit = std::make_unique<ItemUseInventoryTransaction>();
         cit->mActionType           = ItemUseInventoryTransaction::ActionType::Place;
         cit->mSlot                 = slot;
-        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(slot));
-        cit->mBlockPos             = blockPos + glm::ivec3(BlockUtils::blockFaceOffsets[side]);
-        cit->mFace                 = side;
+        cit->mItemInHand           = NetworkItemStackDescriptor(*stack);
+        cit->mBlockPos             = plan.clicked;
+        cit->mFace                 = plan.face;
         cit->mTargetBlockRuntimeId = 0;
-        cit->mPlayerPos            = standPos;
-        cit->mClickPos             = BlockUtils::clickPosOffsets[side];
+        cit->mPlayerPos            = plan.stand;
+        cit->mClickPos             = BlockUtils::clickPosOffsets[plan.face];
 
         for (int i = 0; i < 3; i++)
             if (cit->mClickPos[i] == 0.5f)
@@ -250,68 +324,102 @@ void Cage::placeBlockAt(glm::ivec3 blockPos, Actor* player)
     if (slot != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
 
-    tpBetween(standPos, myPos);
+    tpBetween(plan.stand, myPos, oldRots);
+    mRots = oldRots;
+
+    return true;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Place web
-// ═══════════════════════════════════════════════════════════════
+bool Cage::placeBlockAt(glm::ivec3 blockPos, Actor* player)
+{
+    return placeAt(blockPos, player, findBlockSlot());
+}
 
 void Cage::placeWebAt(glm::ivec3 blockPos, Actor* player)
 {
+    placeAt(blockPos, player, findWebSlot());
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Break block (под целью / под полом)
+// ═══════════════════════════════════════════════════════════════
+
+void Cage::breakBlockAt(glm::ivec3 pos, Actor* player)
+{
     auto sender = ClientInstance::get()->getPacketSender();
-    if (!sender) return;
+    auto source = ClientInstance::get()->getBlockSource();
+    if (!sender || !source) return;
 
-    int slot = findWebSlot();
-    if (slot == -1) return;
+    Block* block = source->getBlock(pos);
+    if (!block || !block->mLegacy || block->mLegacy->isAir()) return;
 
-    int side = BlockUtils::getBlockPlaceFace(blockPos);
-    if (side == -1) {
-        glm::ivec3 below = blockPos - glm::ivec3(0, 1, 0);
-        side = BlockUtils::getBlockPlaceFace(below);
-        if (side != -1) blockPos = below;
-        else return;
-    }
+    int face = BlockUtils::getExposedFace(pos);
+    if (face == -1) face = 1;
 
     auto supplies  = player->getSupplies();
     auto container = supplies ? supplies->getContainer() : nullptr;
     if (!supplies || !container) return;
 
-    int       oldSlot  = supplies->mSelectedSlot;
-    glm::vec3 myPos    = *player->getPos();
-    glm::vec3 standPos = glm::vec3(blockPos.x + 0.5f, blockPos.y + 2.62f, blockPos.z + 0.5f);
+    int oldSlot  = supplies->mSelectedSlot;
+    int bestTool = ItemUtils::getBestBreakingTool(block, false);
+    if (bestTool < 0) bestTool = oldSlot;
 
-    tpBetween(myPos, standPos);
+    glm::vec3 stand = glm::vec3(pos) + glm::vec3(0.5f, 2.62f, 0.5f);
+    glm::vec2 rots  = MathUtils::getRots(stand, glm::vec3(pos) + glm::vec3(0.5f));
 
-    if (slot != oldSlot)
-        sender->sendToServer(PacketUtils::createMobEquipmentPacket(slot).get());
+    glm::vec3 myPos   = *player->getPos();
+    glm::vec3 oldRots = mRots;
+
+    tpBetween(myPos, stand, rots);
+
+    if (bestTool != oldSlot)
+        sender->sendToServer(PacketUtils::createMobEquipmentPacket(bestTool).get());
 
     if (mSwing.mValue) player->swing();
 
     {
+        auto pkt = MinecraftPackets::createPacket<PlayerActionPacket>();
+        pkt->mPos       = pos;
+        pkt->mResultPos = pos;
+        pkt->mFace      = face;
+        pkt->mAction    = static_cast<PlayerActionType>(0); // StartDestroyBlock
+        pkt->mRuntimeId = player->getRuntimeID();
+        pkt->mtIsFromServerPlayerMovementSystem = false;
+        sender->sendToServer(pkt.get());
+    }
+    {
+        auto pkt = MinecraftPackets::createPacket<PlayerActionPacket>();
+        pkt->mPos       = pos;
+        pkt->mResultPos = pos;
+        pkt->mFace      = face;
+        pkt->mAction    = PlayerActionType::StopDestroyBlock;
+        pkt->mRuntimeId = player->getRuntimeID();
+        pkt->mtIsFromServerPlayerMovementSystem = false;
+        sender->sendToServer(pkt.get());
+    }
+    {
         auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
         auto cit = std::make_unique<ItemUseInventoryTransaction>();
-        cit->mActionType           = ItemUseInventoryTransaction::ActionType::Place;
-        cit->mSlot                 = slot;
-        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(slot));
-        cit->mBlockPos             = blockPos + glm::ivec3(BlockUtils::blockFaceOffsets[side]);
-        cit->mFace                 = side;
+        cit->mActionType           = ItemUseInventoryTransaction::ActionType::Destroy;
+        cit->mSlot                 = bestTool;
+        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(bestTool));
+        cit->mBlockPos             = pos;
+        cit->mFace                 = face;
         cit->mTargetBlockRuntimeId = 0;
-        cit->mPlayerPos            = standPos;
-        cit->mClickPos             = BlockUtils::clickPosOffsets[side];
-
-        for (int i = 0; i < 3; i++)
-            if (cit->mClickPos[i] == 0.5f)
-                cit->mClickPos[i] = MathUtils::randomFloat(-0.49f, 0.49f);
-
-        txn->mTransaction = std::move(cit);
+        cit->mPlayerPos            = stand;
+        cit->mClickPos             = {0.5f, 1.0f, 0.5f};
+        txn->mTransaction          = std::move(cit);
         sender->sendToServer(txn.get());
     }
 
-    if (slot != oldSlot)
+    if (bestTool != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
 
-    tpBetween(standPos, myPos);
+    // Локально сразу убираем блок — иначе модуль будет бить его повторно
+    BlockUtils::clearBlock(pos);
+
+    tpBetween(stand, myPos, oldRots);
+    mRots = oldRots;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -329,14 +437,12 @@ struct Ivec3Cmp {
 // ═══════════════════════════════════════════════════════════════
 // Build cage queue
 //
-// Логика:
-// 1. Вычисляем "занятые" блоки — где хитбокс цели пересекается
-//    (using 0.3 hitbox margin → up to 4 blocks at feet level)
-// 2. Для блоков: стены = соседние блокы НЕ из занятого множества
-//    (outer ring — даже если цель между 4 блоками, ставим вокруг них)
-// 3. Для паутины: ставим прямо в занятые позиции (web проходит сквозь игрока)
-// 4. Сортировка: сначала блокируем путь отхода (velocity > look dir),
-//    затем стороны, затем спина. Нижние Y первыми (опора для верхних).
+// Полноценная коробка, ставится снизу вверх, чтобы каждая следующая
+// клетка имела соседа, по которому можно кликнуть:
+//   1. стены (feetY, feetY + 1)
+//   2. кольцо над стенами (feetY + 2)
+//   3. центр потолка (feetY + 2) — кликается по боковой грани кольца
+//   4. пол (feetY - 1) — после расчистки блока под целью
 // ═══════════════════════════════════════════════════════════════
 
 void Cage::rebuildQueue()
@@ -345,7 +451,6 @@ void Cage::rebuildQueue()
 
     glm::vec3 tPos = *mTarget->getPos();
 
-    // === Occupied footprint (player hitbox 0.6 wide → 0.3 margin) ===
     int feetY = (int)std::floor(tPos.y - 1.62f);
 
     int minBX = (int)std::floor(tPos.x - 0.3f);
@@ -353,84 +458,79 @@ void Cage::rebuildQueue()
     int minBZ = (int)std::floor(tPos.z - 0.3f);
     int maxBZ = (int)std::floor(tPos.z + 0.3f);
 
-    // Occupied blocks at feet AND body level (feetY and feetY+1)
-    std::set<glm::ivec3, Ivec3Cmp> occupied;
-    for (int bx = minBX; bx <= maxBX; bx++)
-        for (int bz = minBZ; bz <= maxBZ; bz++) {
-            occupied.insert({bx, feetY,     bz});
-            occupied.insert({bx, feetY + 1, bz});
-        }
+    auto inFootprint = [&](int bx, int bz) {
+        return bx >= minBX && bx <= maxBX && bz >= minBZ && bz <= maxBZ;
+    };
 
     bool hasWeb    = (findWebSlot()   != -1);
     bool hasBlocks = (findBlockSlot() != -1);
 
-    std::vector<glm::ivec3> positions;
     std::set<glm::ivec3, Ivec3Cmp> seen;
+    std::vector<std::vector<glm::ivec3>> stages;
 
-    if (hasWeb) {
-        // ═══ Web: place directly at occupied positions ═══
-        // Web can be placed even if player stands there
+    auto push = [&](std::vector<glm::ivec3>& stage, glm::ivec3 p) {
+        if (seen.insert(p).second) stage.push_back(p);
+    };
+
+    if (hasWeb)
+    {
+        // Паутина ставится прямо в клетки цели — она проходит сквозь игрока
+        std::vector<glm::ivec3> web;
         for (int bx = minBX; bx <= maxBX; bx++)
             for (int bz = minBZ; bz <= maxBZ; bz++) {
-                glm::ivec3 p1 = {bx, feetY,     bz};
-                glm::ivec3 p2 = {bx, feetY + 1, bz};
-                if (seen.insert(p1).second) positions.push_back(p1);
-                if (seen.insert(p2).second) positions.push_back(p2);
+                push(web, {bx, feetY,     bz});
+                push(web, {bx, feetY + 1, bz});
             }
-    } else if (hasBlocks) {
-        // ═══ Blocks: outer ring (adjacent to occupied, NOT occupied) ═══
-
-        // Scan expanded area (1 block larger in each XZ direction)
-        for (int bx = minBX - 1; bx <= maxBX + 1; bx++)
-            for (int bz = minBZ - 1; bz <= maxBZ + 1; bz++) {
-                // Skip if this XZ column is occupied at any wall Y level
-                bool isOccXZ = false;
-                for (int y = 0; y < 2; y++) {
-                    if (occupied.count({bx, feetY + y, bz})) {
-                        isOccXZ = true;
-                        break;
-                    }
+        stages.push_back(std::move(web));
+    }
+    else if (hasBlocks)
+    {
+        // 1. Стены: сначала нижний уровень (на нём держатся верхние)
+        std::vector<glm::ivec3> walls;
+        for (int y = 0; y < 2; y++)
+            for (int bx = minBX - 1; bx <= maxBX + 1; bx++)
+                for (int bz = minBZ - 1; bz <= maxBZ + 1; bz++) {
+                    if (inFootprint(bx, bz)) continue;
+                    push(walls, {bx, feetY + y, bz});
                 }
-                if (isOccXZ) continue;
+        stages.push_back(std::move(walls));
 
-                // Wall blocks at feet + head level
-                for (int y = 0; y < 2; y++) {
-                    glm::ivec3 bp = {bx, feetY + y, bz};
-                    if (seen.insert(bp).second)
-                        positions.push_back(bp);
+        if (mPlaceCeiling.mValue)
+        {
+            // 2. Кольцо над стенами — по нему потом закроется центр
+            std::vector<glm::ivec3> ring;
+            for (int bx = minBX - 1; bx <= maxBX + 1; bx++)
+                for (int bz = minBZ - 1; bz <= maxBZ + 1; bz++) {
+                    if (inFootprint(bx, bz)) continue;
+                    push(ring, {bx, feetY + 2, bz});
                 }
-            }
+            stages.push_back(std::move(ring));
 
-        // Ceiling (above occupied area — at feetY + 2)
-        if (mPlaceCeiling.mValue) {
+            // 3. Центр потолка
+            std::vector<glm::ivec3> ceiling;
             for (int bx = minBX; bx <= maxBX; bx++)
-                for (int bz = minBZ; bz <= maxBZ; bz++) {
-                    glm::ivec3 ceil = {bx, feetY + 2, bz};
-                    if (seen.insert(ceil).second)
-                        positions.push_back(ceil);
-                }
+                for (int bz = minBZ; bz <= maxBZ; bz++)
+                    push(ceiling, {bx, feetY + 2, bz});
+            stages.push_back(std::move(ceiling));
         }
 
-        // Floor (below occupied area — at feetY - 1)
-        if (mPlaceFloor.mValue) {
+        if (mPlaceFloor.mValue)
+        {
+            // 4. Пол под целью
+            std::vector<glm::ivec3> floor;
             for (int bx = minBX; bx <= maxBX; bx++)
-                for (int bz = minBZ; bz <= maxBZ; bz++) {
-                    glm::ivec3 floor = {bx, feetY - 1, bz};
-                    if (seen.insert(floor).second)
-                        positions.push_back(floor);
-                }
+                for (int bz = minBZ; bz <= maxBZ; bz++)
+                    push(floor, {bx, feetY - 1, bz});
+            stages.push_back(std::move(floor));
         }
     }
 
-    mCagePositions = positions;
-
-    // === Sort: escape path first, lower Y first for support ===
-
-    glm::vec3 vel = mTargetVel;
-    bool isMoving = glm::length(glm::vec3(vel.x, 0, vel.z)) > 0.01f;
+    // Приоритет: сначала перекрываем путь отхода, потом ближайшие
+    glm::vec3 vel    = mTargetVel;
+    bool      moving = glm::length(glm::vec3(vel.x, 0, vel.z)) > 0.01f;
     glm::vec3 priorityDir(0);
 
-    if (isMoving) {
+    if (moving) {
         priorityDir = glm::normalize(glm::vec3(vel.x, 0, vel.z));
     } else {
         auto rot = mTarget->getActorRotationComponent();
@@ -440,31 +540,35 @@ void Cage::rebuildQueue()
         }
     }
 
-    bool hasPriority = glm::length(priorityDir) > 0.01f;
+    bool      hasPriority = glm::length(priorityDir) > 0.01f;
     glm::vec3 center(tPos.x, 0, tPos.z);
 
-    std::sort(positions.begin(), positions.end(), [&](const glm::ivec3& a, const glm::ivec3& b) {
-        // Lower Y first — lower blocks support upper ones
-        if (a.y != b.y) return a.y < b.y;
+    auto cmp = [&](const glm::ivec3& a, const glm::ivec3& b) {
+        if (a.y != b.y) return a.y < b.y; // нижние первыми — опора для верхних
 
         if (hasPriority) {
             glm::vec3 ac(a.x + 0.5f, 0, a.z + 0.5f);
             glm::vec3 bc(b.x + 0.5f, 0, b.z + 0.5f);
             float da = glm::dot(ac - center, priorityDir);
             float db = glm::dot(bc - center, priorityDir);
-            if (std::abs(da - db) > 0.1f) return da > db; // ahead first
+            if (std::abs(da - db) > 0.1f) return da > db;
         }
 
         return glm::distance(glm::vec3(a), tPos) < glm::distance(glm::vec3(b), tPos);
-    });
+    };
 
-    // Filter: only air blocks
-    std::vector<glm::ivec3> needed;
-    for (auto& p : positions) {
-        if (isAirAt(p)) needed.push_back(p);
+    mCagePositions.clear();
+    mPlaceQueue.clear();
+
+    for (auto& stage : stages)
+    {
+        std::sort(stage.begin(), stage.end(), cmp);
+        for (auto& p : stage)
+        {
+            mCagePositions.push_back(p);
+            if (isAirAt(p)) mPlaceQueue.push_back(p);
+        }
     }
-
-    mPlaceQueue = std::move(needed);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -480,6 +584,7 @@ void Cage::onBaseTickEvent(BaseTickEvent& event)
     if (!mTarget || mTarget->isDead()) {
         mTarget = nullptr;
         mPlaceQueue.clear();
+        mCagePositions.clear();
         return;
     }
 
@@ -490,14 +595,32 @@ void Cage::onBaseTickEvent(BaseTickEvent& event)
     auto rot = player->getActorRotationComponent();
     if (rot) mRots = {rot->mPitch, rot->mYaw, rot->mYaw};
 
+    if (NOW - mLastPlace < static_cast<uint64_t>(mDelay.mValue)) return;
+
+    // ── Пол: сначала сносим блок, на котором стоит цель ──────────────
+    if (mPlaceFloor.mValue && mBreakUnder.mValue)
+    {
+        int feetY = (int)std::floor(curPos.y - 1.62f);
+        glm::ivec3 under = {
+            (int)std::floor(curPos.x),
+            feetY - 1,
+            (int)std::floor(curPos.z)
+        };
+
+        if (!isAirAt(under))
+        {
+            breakBlockAt(under, player);
+            mLastPlace = NOW;
+            return;
+        }
+    }
+
     rebuildQueue();
 
     if (mPlaceQueue.empty()) return;
-    if (NOW - mLastPlace < static_cast<uint64_t>(mDelay.mValue)) return;
 
     bool hasWeb    = (findWebSlot()   != -1);
     bool hasBlocks = (findBlockSlot() != -1);
-
     if (!hasWeb && !hasBlocks) return;
 
     int maxPlace = (int)mBlocksPerTick.mValue;
@@ -509,8 +632,8 @@ void Cage::onBaseTickEvent(BaseTickEvent& event)
 
         if (!isAirAt(pos)) continue;
 
-        if (hasWeb) placeWebAt(pos, player);
-        else        placeBlockAt(pos, player);
+        if (hasWeb) { if (!placeAt(pos, player, findWebSlot()))   continue; }
+        else        { if (!placeAt(pos, player, findBlockSlot())) continue; }
 
         placed++;
     }

@@ -41,6 +41,18 @@ static void trim(std::string& str) {
 // Правильно убирает §X-коды из строки (Minecraft color codes).
 // § в UTF-8 = \xC2\xA7 (2 байта), за которыми следует 1 символ кода цвета.
 // Итого за каждый §X нужно пропустить 3 байта (\xC2 + \xA7 + code).
+// Настоящий код цвета/стиля Minecraft: 0-9, a-f, k-o, r. После «§» байт
+// выбрасывается только если это код — иначе съедалась бы первая буква слова.
+static bool whoisIsCodeChar(unsigned char c) {
+    if (c >= '0' && c <= '9') return true;
+
+    const unsigned char lower = (c >= 'A' && c <= 'Z') ? (unsigned char)(c + 32) : c;
+    if (lower >= 'a' && lower <= 'f') return true;
+
+    return lower == 'k' || lower == 'l' || lower == 'm' ||
+           lower == 'n' || lower == 'o' || lower == 'r';
+}
+
 static std::string stripColors(const std::string& s) {
     std::string out;
     out.reserve(s.size());
@@ -49,13 +61,15 @@ static std::string stripColors(const std::string& s) {
 
         // UTF-8 § = 0xC2 0xA7
         if (c == 0xC2 && i + 1 < s.size() && (unsigned char)s[i + 1] == 0xA7) {
-            // Пропускаем: \xC2, \xA7, и код цвета (следующий байт)
-            i += 3;
+            i += 2; // \xC2, \xA7
+            if (i < s.size() && whoisIsCodeChar((unsigned char)s[i])) i += 1; // + код цвета
             continue;
         }
-        // Legacy/Latin-1 § = 0xA7 напрямую
-        if (c == 0xA7) {
-            i += 2; // пропускаем § и код цвета
+        // Legacy/Latin-1 § = 0xA7 напрямую. Важно: 0xA7 — это ещё и хвостовой
+        // байт кириллицы ('Ч' = D0 A7), и трогать его в таком случае нельзя.
+        if (c == 0xA7 && (i == 0 || (unsigned char)s[i - 1] < 0xC0)) {
+            i += 1;
+            if (i < s.size() && whoisIsCodeChar((unsigned char)s[i])) i += 1; // + код цвета
             continue;
         }
         out += s[i];

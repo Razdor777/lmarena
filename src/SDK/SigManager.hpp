@@ -428,7 +428,13 @@ public:
   // DEFINE_SIG(GeneralSettingsScreenController_ctor, "48 89 5C 24 18 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 30 FB FF FF 48 81 EC D0 05 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 C0 04 00 00 45", SigType::Sig, 0);
   // DEFINE_SIG(SettingsScreenOnExit, "40 57 48 83 EC 40 48 8B 79", SigType::Sig, 0);
   // DEFINE_SIG(SettingsScreenOnExit_Patch, "74 ? 48 8b 8f ? ? ? ? e8 ? ? ? ? 33 c0", SigType::Sig, 0);
-  // DEFINE_SIG(ContainerScreenController_onContainerSlotHovered, "48 89 ? ? ? 57 41 ? 41 ? 48 83 EC ? 45 8B ? 48 8B ? 48 8B ? 44 39", SigType::Sig, 0);
+  // ContainerScreenController::_handleSlotHovered(const std::string& collectionName, int slot)
+  // Verified against 1.21.44: one hit, and the prologue decodes to
+  //   mov r15d, r8d / mov rbx, rdx / mov rdi, rcx / cmp [rcx+0F48h], r8d
+  // i.e. rdx = &collectionName (std::string), r8d = slot. Called through the
+  // vtable (14 entries point at it), never directly. This is the only source of
+  // "which slot is the cursor over", so JavaInventory depends on it.
+  DEFINE_SIG(ContainerScreenController_onContainerSlotHovered, "48 89 ? ? ? 57 41 ? 41 ? 48 83 EC ? 45 8B ? 48 8B ? 48 8B ? 44 39", SigType::Sig, 0);
   // DEFINE_SIG(MinecraftGame_onResumeWaitReloadActors, "48 89 5C 24 10 48 89 74 24 18 55 57 41 54 41 56 41 57 48 8D 6C 24 C9 48 81 EC D0 00 00 00 4C 8B F9 48", SigType::Sig, 0);
 
   // --- BoneTransform (for custom animations) ---

@@ -89,7 +89,7 @@ bool AntiBot::isBot(Actor* actor)
         auto playerList = getPlayerNames();
         std::string nickName = actor->getNameTag();
 
-        if (std::find(playerList.begin(), playerList.end(), nickName) != playerList.end()) {
+        if (std::find(playerList.begin(), playerList.end(), nickName) == playerList.end()) {
             return true;
         }
     }
@@ -105,18 +105,25 @@ bool AntiBot::hasArmor(Actor* actor)
     if (!player) return false;
     if (!actor->isPlayer()) return false;
 
-    ItemStack* helmetItem = actor->getArmorContainer()->getItem(0);
-    ItemStack* chestplateItem = actor->getArmorContainer()->getItem(1);
-    ItemStack* legginsItem = actor->getArmorContainer()->getItem(2);
-    ItemStack* bootsItem = actor->getArmorContainer()->getItem(3);
+    // Both the container and the individual stacks can be missing — this runs
+    // for every actor in the entity list, so a single unguarded dereference here
+    // takes down the whole tick for ESP / Aura / everything that lists actors.
+    auto* container = actor->getArmorContainer();
+    if (!container) return false;
+
+    auto hasItem = [&](int slot)
+    {
+        auto* stack = container->getItem(slot);
+        return stack && stack->mItem;
+    };
 
     if (mArmorMode.mValue == ArmorMode::Full)
     {
-        return helmetItem->mItem && chestplateItem->mItem && legginsItem->mItem && bootsItem->mItem;
+        return hasItem(0) && hasItem(1) && hasItem(2) && hasItem(3);
     }
     else if (mArmorMode.mValue == ArmorMode::OneElement)
     {
-        return helmetItem->mItem || chestplateItem->mItem || legginsItem->mItem || bootsItem->mItem;
+        return hasItem(0) || hasItem(1) || hasItem(2) || hasItem(3);
     }
 
     return false;

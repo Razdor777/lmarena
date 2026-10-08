@@ -25,7 +25,9 @@
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/StringUtils.hpp>
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // One HudElement per widget
@@ -40,6 +42,8 @@ static char sIdBPS[]   = "InfoBPS";
 static char sIdArrow[] = "InfoArrows";
 static char sIdPearl[] = "InfoPearls";
 static char sIdKicks[] = "InfoKicks";
+static char sIdHealth[] = "InfoHealth";
+static char sIdSession[] = "InfoSession";
 
 struct InfoWidget : public HudElement {
     InfoWidget(char* id, float defX, float defY)
@@ -48,6 +52,15 @@ struct InfoWidget : public HudElement {
         mAnchor  = Anchor::BottomLeft;
         mPos     = {defX, defY};
     }
+
+    // ---- animation state (per widget, so nothing leaks between pills) ----
+    float animValue  = NAN;   // eased display value (numbers stop twitching)
+    float lastValue  = NAN;   // last committed value, for the change flash
+    float flash      = 0.f;   // 1 -> 0 highlight right after a change
+    float widthAnim  = -1.f;  // animated chip width (-1 = snap on first draw)
+    float hist[48]{};         // sparkline samples, oldest .. newest
+    int   histCount  = 0;
+    float sampleTimer = 0.f;
 };
 
 static InfoWidget* gWPing  = nullptr;
@@ -58,6 +71,8 @@ static InfoWidget* gWBPS   = nullptr;
 static InfoWidget* gWArrow = nullptr;
 static InfoWidget* gWPearl = nullptr;
 static InfoWidget* gWKicks = nullptr;
+static InfoWidget* gWHealth = nullptr;
+static InfoWidget* gWSession = nullptr;
 
 static void registerWidget(InfoWidget*& ptr, char* id, float dx, float dy) {
     if (!ptr) {
@@ -74,7 +89,8 @@ static void registerWidget(InfoWidget*& ptr, char* id, float dx, float dy) {
 // ─────────────────────────────────────────────────────────────────────────────
 static float drawChip(ImDrawList* dl, ImFont* font, float fs,
     float x, float y, const char* label, const char* value, ImColor accent,
-    float opacity, float rounding, bool blur, bool showDot, bool showDivider)
+    float opacity, float rounding, bool blur, bool showDot, bool showDivider,
+    InfoWidget* widget, bool sparkline, float dt)
 {
     // Clamp rounding so pills keep a sane shape
     float padH  = 9.f;
@@ -98,28 +114,56 @@ static float drawChip(ImDrawList* dl, ImFont* font, float fs,
     float labelSpace = labelUpper.empty() ? 0.f : (labelW + gap * 0.75f);
     if (labelUpper.empty()) divSpace = 0.f;
 
+    // Sparkline slot: a small graph on the right of the chip.
+    const bool  hasSpark = sparkline && widget && widget->histCount > 1;
+    const float sparkW   = hasSpark ? fs * 2.6f : 0.f;
+
     float w = padH * 2.f + dotSpace + labelSpace + divSpace + valueW;
+    if (hasSpark) w += gap + sparkW;
+
     float h = valueFs + padV * 2.f;
+
+    // Animated width: the pill grows/shrinks into its new size instead of
+    // teleporting when a value gets longer. The background is never allowed to
+    // be narrower than the content, or the text would spill out of it.
+    float drawW = w;
+    if (widget) {
+        if (widget->widthAnim < 0.f) widget->widthAnim = w;
+        widget->widthAnim += (w - widget->widthAnim) * std::clamp(dt * 12.f, 0.f, 1.f);
+        drawW = std::max(widget->widthAnim, w);
+    }
 
     float round = std::min(rounding, h * 0.5f);
 
     // Soft shadow
-    dl->AddShadowRect({x, y}, {x + w, y + h},
+    dl->AddShadowRect({x, y}, {x + drawW, y + h},
         ImColor(0.f, 0.f, 0.f, 0.35f * opacity), 10.f, {0.f, 1.5f}, 0, round);
 
     // Glass blur
     if (blur)
-        ImRenderUtils::addBlur(ImVec4(x, y, x + w, y + h), 3.f, round);
+        ImRenderUtils::addBlur(ImVec4(x, y, x + drawW, y + h), 3.f, round);
 
     // Gradient body (top slightly lighter than bottom)
     ImColor topCol(22, 23, 31, (int)(225 * opacity));
     ImColor botCol(11, 11, 17, (int)(225 * opacity));
-    dl->AddRectFilledMultiColor({x, y}, {x + w, y + h},
+    dl->AddRectFilledMultiColor({x, y}, {x + drawW, y + h},
         topCol, topCol, botCol, botCol, round, ImDrawFlags_RoundCornersAll);
 
     // Hairline border
-    dl->AddRect({x, y}, {x + w, y + h},
+    dl->AddRect({x, y}, {x + drawW, y + h},
         ImColor(255, 255, 255, (int)(16 * opacity)), round, 0, 1.f);
+
+    // Change highlight: a short accent wash + border right after the value
+    // moved, so a fresh arrow/pearl/kick is impossible to miss.
+    if (widget) {
+        widget->flash = std::max(0.f, widget->flash - dt * 2.6f);
+        if (widget->flash > 0.001f) {
+            ImColor wash = accent; wash.Value.w = 0.26f * widget->flash * opacity;
+            ImColor edge = accent; edge.Value.w = 0.85f * widget->flash * opacity;
+            dl->AddRectFilled({x, y}, {x + drawW, y + h}, wash, round);
+            dl->AddRect({x, y}, {x + drawW, y + h}, edge, round, 0, 1.f);
+        }
+    }
 
     float cx = x + padH;
     float textY = y + padV;
@@ -160,7 +204,48 @@ static float drawChip(ImDrawList* dl, ImFont* font, float fs,
     valueCol.Value.w *= opacity;
     dl->AddText(font, valueFs, {cx, textY}, valueCol, value);
 
-    return w;
+    // ── sparkline ─────────────────────────────────────────────────────────
+    // Oldest sample on the left, newest on the right, brighter toward the
+    // head — a tiny history strip that costs almost nothing.
+    if (hasSpark) {
+        const float sx0 = cx + valueW + gap;
+        const float sx1 = sx0 + sparkW;
+        const float sy0 = y + padV + 1.f;
+        const float sy1 = y + h - padV - 1.f;
+
+        const int n = widget->histCount;
+        const int base = 48 - n;
+
+        float mn = widget->hist[base], mx = widget->hist[base];
+        for (int i = base + 1; i < 48; ++i) {
+            mn = std::min(mn, widget->hist[i]);
+            mx = std::max(mx, widget->hist[i]);
+        }
+        if (mx - mn < 1.f) { mn -= 1.f; mx += 1.f; }
+
+        ImColor lineCol = accent;
+
+        for (int i = 0; i < n - 1; ++i) {
+            const float t0 = (float)i / (float)(n - 1);
+            const float t1 = (float)(i + 1) / (float)(n - 1);
+            const float v0 = (widget->hist[base + i]     - mn) / (mx - mn);
+            const float v1 = (widget->hist[base + i + 1] - mn) / (mx - mn);
+
+            lineCol.Value.w = opacity * (0.25f + 0.6f * t1);
+
+            dl->AddLine({
+                sx0 + (sx1 - sx0) * t0, sy1 - (sy1 - sy0) * v0
+            }, {
+                sx0 + (sx1 - sx0) * t1, sy1 - (sy1 - sy0) * v1
+            }, lineCol, 1.2f);
+        }
+
+        // Faint floor line for the graph to sit on.
+        ImColor baseCol(255, 255, 255, (int)(22 * opacity));
+        dl->AddLine({sx0, sy1}, {sx1, sy1}, baseCol, 1.f);
+    }
+
+    return drawW;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,6 +271,10 @@ void LevelInfo::onEnable()
     registerWidget(gWArrow, sIdArrow, 470.f, -32.f);
     registerWidget(gWPearl, sIdPearl, 540.f, -32.f);
     registerWidget(gWKicks, sIdKicks, 610.f, -32.f);
+    registerWidget(gWHealth, sIdHealth, 700.f, -32.f);
+    registerWidget(gWSession, sIdSession, 790.f, -32.f);
+
+    mSessionStart = NOW;
 }
 
 void LevelInfo::onDisable()
@@ -199,6 +288,7 @@ void LevelInfo::onDisable()
     auto hide = [](InfoWidget* w){ if (w) w->mVisible = false; };
     hide(gWPing); hide(gWName); hide(gWXYZ); hide(gWFPS);
     hide(gWBPS);  hide(gWArrow); hide(gWPearl); hide(gWKicks);
+    hide(gWHealth); hide(gWSession);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -325,23 +415,54 @@ void LevelInfo::onRenderEvent(RenderEvent& event)
     FontHelper::pushPrefFont(false);
     ImFont* font = ImGui::GetFont();
 
-    auto draw = [&](InfoWidget* w, const char* label, const char* value, ImColor accent) {
+    const float dt = std::clamp(ImGui::GetIO().DeltaTime, 0.0005f, 0.1f);
+
+    // Numbers ease toward their real value instead of snapping, so a jittery
+    // ping/fps readout stops twitching and counters roll up like an odometer.
+    auto animTo = [&](InfoWidget* w, float target, float speed) -> float {
+        if (!std::isfinite(w->animValue)) w->animValue = target;
+        w->animValue += (target - w->animValue) * std::clamp(dt * speed, 0.f, 1.f);
+        return w->animValue;
+    };
+
+    // Flash the pill when a counter actually changed.
+    auto markChange = [&](InfoWidget* w, float v) {
+        if (!mHighlight.mValue) return;
+        if (std::isfinite(w->lastValue) && std::fabs(v - w->lastValue) >= 0.5f) w->flash = 1.f;
+        w->lastValue = v;
+    };
+
+    // Feed the sparkline; sampled at 4 Hz so the strip shows seconds, not noise.
+    auto sparkSample = [&](InfoWidget* w, float v) {
+        if (!mSparkline.mValue) return;
+        w->sampleTimer += dt;
+        if (w->sampleTimer < 0.25f) return;
+        w->sampleTimer = 0.f;
+        for (int i = 0; i < 47; ++i) w->hist[i] = w->hist[i + 1];
+        w->hist[47] = v;
+        if (w->histCount < 48) w->histCount++;
+    };
+
+    auto draw = [&](InfoWidget* w, const char* label, const char* value, ImColor accent, bool spark = false) {
         ImVec2 pos = w->getPos();
         float width = drawChip(dl, font, fs, pos.x, pos.y, label, value,
-                               accent, opacity, round, blur, dots, divs);
+                               accent, opacity, round, blur, dots, divs,
+                               w, spark, dt);
         w->mSize = {width, fs + 8.f};
     };
 
     // ── Ping pill ─────────────────────────────────────────────────────────
     if (mShowPing.mValue && gWPing && gWPing->mVisible) {
-        int ping = (int)mPing;
+        const float pingRaw = (float)mPing;
+        sparkSample(gWPing, pingRaw);
+        const int ping = (int)std::lround(animTo(gWPing, pingRaw, 7.f));
         ImColor pc(110, 255, 170, 255);
         if (mColorPing.mValue) {
             if      (ping > 150) pc = ImColor(255, 105, 105, 255);
             else if (ping >  80) pc = ImColor(255, 200, 95,  255);
         }
         char buf[32]; snprintf(buf, sizeof(buf), "%d ms", ping);
-        draw(gWPing, "ping", buf, pc);
+        draw(gWPing, "ping", buf, pc, true);
     }
 
     // ── Name pill ─────────────────────────────────────────────────────────
@@ -373,12 +494,14 @@ void LevelInfo::onRenderEvent(RenderEvent& event)
 
     // ── FPS pill ──────────────────────────────────────────────────────────
     if (mShowFPS.mValue && gWFPS && gWFPS->mVisible) {
-        int fps = (int)ImGui::GetIO().Framerate;
+        const float fpsRaw = ImGui::GetIO().Framerate;
+        sparkSample(gWFPS, fpsRaw);
+        const int fps = (int)std::lround(animTo(gWFPS, fpsRaw, 7.f));
         ImColor fc(130, 240, 190, 255);
         if      (fps < 30) fc = ImColor(255, 105, 105, 255);
         else if (fps < 60) fc = ImColor(255, 200, 95,  255);
         char buf[24]; snprintf(buf, sizeof(buf), "%d", fps);
-        draw(gWFPS, "fps", buf, fc);
+        draw(gWFPS, "fps", buf, fc, true);
     }
 
     // ── BPS pill ──────────────────────────────────────────────────────────
@@ -389,20 +512,58 @@ void LevelInfo::onRenderEvent(RenderEvent& event)
 
     // ── Arrows pill ───────────────────────────────────────────────────────
     if (mShowArrows.mValue && gWArrow && gWArrow->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%d", mArrows);
+        markChange(gWArrow, (float)mArrows);
+        const int shown = (int)std::lround(animTo(gWArrow, (float)mArrows, 10.f));
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", shown);
         draw(gWArrow, "arrows", buf, ImColor(225, 210, 160, 255));
     }
 
     // ── Pearls pill ───────────────────────────────────────────────────────
     if (mShowEnderPearls.mValue && gWPearl && gWPearl->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%d", mPearls);
+        markChange(gWPearl, (float)mPearls);
+        const int shown = (int)std::lround(animTo(gWPearl, (float)mPearls, 10.f));
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", shown);
         draw(gWPearl, "pearls", buf, ImColor(140, 175, 255, 255));
     }
 
     // ── Kicks pill ────────────────────────────────────────────────────────
     if (mShowKicksAmount.mValue && gWKicks && gWKicks->mVisible) {
-        char buf[24]; snprintf(buf, sizeof(buf), "%d", mKicksAmount);
+        markChange(gWKicks, (float)mKicksAmount);
+        const int shown = (int)std::lround(animTo(gWKicks, (float)mKicksAmount, 10.f));
+        char buf[24]; snprintf(buf, sizeof(buf), "%d", shown);
         draw(gWKicks, "kicks", buf, ImColor(255, 110, 110, 255));
+    }
+
+    // Health pill: colour ramps green -> red with the actual HP ratio.
+    if (mShowHealth.mValue && gWHealth && gWHealth->mVisible) {
+        float hp = 0.f, hpMax = 20.f;
+
+        try {
+            hp = player->getHealth();
+            const float mx = player->getMaxHealth();
+            if (mx > 0.f) hpMax = mx;
+        } catch (...) {}
+
+        const float ratio = hpMax > 0.f ? std::clamp(hp / hpMax, 0.f, 1.f) : 1.f;
+
+        sparkSample(gWHealth, hp);
+        markChange(gWHealth, std::floor(hp * 2.f) * 0.5f);
+
+        const float shown = animTo(gWHealth, hp, 8.f);
+        char buf[32]; snprintf(buf, sizeof(buf), "%.1f", shown);
+        draw(gWHealth, "hp", buf, ImColor::HSV(0.33f * ratio, 0.72f, 1.f), true);
+    }
+
+    // Session pill: mm:ss since the module was enabled.
+    if (mShowSession.mValue && gWSession && gWSession->mVisible) {
+        int64_t secs = (NOW - mSessionStart) / 1000;
+        if (secs < 0)      secs = 0;
+        if (secs > 359999) secs = 359999;   // keep the pill from growing forever
+
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%02d:%02d",
+                 (int)((secs / 60) % 60) + (int)(secs / 3600) * 60, (int)(secs % 60));
+        draw(gWSession, "session", buf, ImColor(190, 165, 255, 255));
     }
 
     ImGui::PopFont();

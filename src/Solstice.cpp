@@ -15,6 +15,8 @@
 #include <SDK/OffsetProvider.hpp>
 
 #include <SDK/SigManager.hpp>
+
+#include <Utils/GameUtils/ChatUtils.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/MinecraftGame.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
@@ -22,7 +24,6 @@
 #include <Features/Auth/Authorization.hpp>
 
 #include "spdlog/sinks/stdout_color_sinks-inl.h"
-#include "spdlog/sinks/basic_file_sink.h"
 #include <winrt/base.h>
 #include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
@@ -74,7 +75,7 @@ void Solstice::init(HMODULE hModule)
 
     // Create a file logger sink
     std::string logFile = FileUtils::getSolsticeDir() + xorstr_("solstice.log");
-
+ 
     // Don't use the file sink if the log file doesn't exist
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
@@ -170,25 +171,31 @@ void Solstice::init(HMODULE hModule)
     if (failedSigs > 0)
     {
         console->critical("Failed to find {} signatures/offsets!", failedSigs);
-#ifdef __DEBUG__
-        console->critical("Solstice should not be used in this state.");
-        console->info("Type 'DEBUG' to continue, or press ENTER to exit.");
-        std::string input;
-        std::getline(std::cin, input);
-        if (input != "DEBUG")
-        {
-            SigManager::deinitialize();
-            OffsetProvider::deinitialize();
-            Logger::deinitialize();
 
-            setTitle("");
-            FreeLibraryAndExitThread(hModule, 0);
+#ifdef __DEBUG__
+        {
+            console->critical("Solstice should not be used in this state.");
+            console->info("Type 'DEBUG' to continue, or press ENTER to exit.");
+            std::string input;
+            std::getline(std::cin, input);
+            if (input != "DEBUG")
+            {
+                SigManager::deinitialize();
+                OffsetProvider::deinitialize();
+                Logger::deinitialize();
+
+                setTitle("");
+                FreeLibraryAndExitThread(hModule, 0);
+            }
         }
 #else
-        ExceptionHandler::makeCrashLog("Failed to find signatures/offsets!", 0xFF01);
-        int* p = nullptr;
-        *p = 0;
-        exit(0);
+        else
+        {
+            ExceptionHandler::makeCrashLog("Failed to find signatures/offsets!", 0xFF01);
+            int* p = nullptr;
+            *p = 0;
+            exit(0);
+        }
 #endif
     }
 
@@ -299,6 +306,7 @@ void Solstice::shutdownThread()
     }
 
     mRequestEject = true;
+    mUnloading.store(true);
 
     setTitle("");
 
@@ -306,15 +314,27 @@ void Solstice::shutdownThread()
 
     HookManager::shutdown();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // The hooks are gone, but the render thread may still be inside the frame it
+    // started before that. Give it a few frames to get out before anything is
+    // freed.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     gFeatureManager->shutdown();
 
     // Shutdown
     console->warn("Shutting down...");
 
-    ClientInstance::get()->getMinecraftGame()->playUi("beacon.deactivate", 1, 1.0f);
-    ClientInstance::get()->getGuiData()->displayClientMessage("§asolstice§7 » §cEjected!");
+    // Both of these used to be raw dereferences inside the eject path — pulling
+    // the module while the game was between worlds (GuiData gone) crashed right
+    // here, before anything was even unloaded.
+    if (auto* ci = ClientInstance::get())
+    {
+        if (auto* game = ci->getMinecraftGame())
+            game->playUi("beacon.deactivate", 1, 1.0f);
+
+        if (auto* guiData = ci->getGuiData())
+            guiData->displayClientMessage("§asolstice§7 » §cEjected!");
+    }
 
     mInitialized = false;
     SigManager::deinitialize();
@@ -324,5 +344,35 @@ void Solstice::shutdownThread()
     Sleep(1000); // Give the user time to read the message
 
     Logger::deinitialize();
-    FreeLibrary(mModule); // i don't understand this
+
+    // ---- unload ---------------------------------------------------------
+    //
+    // This used to be a plain `FreeLibrary(mModule)` right here, and that is the
+    // uninject crash: the DLL gets unmapped while *this* thread is still
+    // executing code inside it, so the very next instruction (the function
+    // epilogue, the std::thread teardown, the CRT) jumps into freed memory.
+    //
+    // A dedicated thread owns the unload instead. It waits until this thread is
+    // definitely gone, then calls FreeLibraryAndExitThread, which frees the
+    // module and terminates the thread inside kernel32 without ever returning
+    // into unmapped code. This thread ends with ExitThread for the same reason.
+    HANDLE unloader = CreateThread(nullptr, 0, &Solstice::unloadThreadProc, mModule, 0, nullptr);
+    if (unloader)
+    {
+        CloseHandle(unloader);
+        ExitThread(0);
+    }
+
+    // Thread creation failed: unload from here, but still never return.
+    FreeLibraryAndExitThread(mModule, 0);
+}
+
+DWORD WINAPI Solstice::unloadThreadProc(LPVOID module)
+{
+    // Give the ejecting thread time to actually terminate (it calls ExitThread,
+    // so nothing of ours is left running by then).
+    Sleep(250);
+
+    FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
+    return 0;
 }

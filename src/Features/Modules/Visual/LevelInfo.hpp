@@ -18,6 +18,8 @@ public:
     BoolSetting mShowArrows    = BoolSetting("Show Arrows", "Show arrow count",                  false);
     BoolSetting mShowEnderPearls = BoolSetting("Show Pearls","Show ender pearl count",           false);
     BoolSetting mShowKicksAmount = BoolSetting("Kicks Counter","Show times kicked",              false);
+    BoolSetting mShowHealth    = BoolSetting("Show Health", "Show your health",                  false);
+    BoolSetting mShowSession   = BoolSetting("Show Session","Show how long you have been online", false);
     BoolSetting mShowSpells    = BoolSetting("Show Spells", "Show spells from inventory",        false);
     BoolSetting mShowHealthSpells    = BoolSetting("Health Spells","Show health spells",         false);
     BoolSetting mShowSpeedSpells     = BoolSetting("Speed Spells", "Show speed spells",          false);
@@ -32,14 +34,18 @@ public:
     BoolSetting   mDividers  = BoolSetting  ("Dividers", "Show dividers between items", true);
     BoolSetting   mIcons     = BoolSetting  ("Icons",    "Show icon prefix",      true);
     BoolSetting   mColorPing = BoolSetting  ("Color Ping","Color ping red when high", true);
+    BoolSetting   mSparkline = BoolSetting  ("Sparkline","Mini history graph on the FPS and Ping pills", true);
+    BoolSetting   mHighlight = BoolSetting  ("Highlight","Flash a pill when its value changes", true);
 
     LevelInfo() : ModuleBase("LevelInfo", "Premium horizontal info bar.", ModuleCategory::Visual, 0, false) {
         addSettings(
             &mShowFPS, &mShowPing, &mShowName, &mShowXYZ,
             &mShowBPS, &mShowArrows, &mShowEnderPearls, &mShowKicksAmount,
+            &mShowHealth, &mShowSession,
             &mShowSpells, &mShowHealthSpells, &mShowSpeedSpells, &mShowFireTrailSpells,
             &mScale, &mOpacity, &mRounding, &mFontSize,
-            &mGlass, &mDividers, &mIcons, &mColorPing
+            &mGlass, &mDividers, &mIcons, &mColorPing,
+            &mSparkline, &mHighlight
         );
 
         VISIBILITY_CONDITION(mShowHealthSpells,    mShowSpells.mValue);
@@ -60,6 +66,7 @@ public:
     int   mSpeedSpells  = 0, mSeconds = 0;
     int   mFireTrailSpells = 0, mBlocks = 0;
     int   mKicksAmount = 0;
+    int64_t mSessionStart = 0;
     float mBps = 0.f, mAveragedBps = 0.f;
     std::map<uint64_t, float> mBpsHistory;
     __int64 mPing = 0, mEventDelay = 0;

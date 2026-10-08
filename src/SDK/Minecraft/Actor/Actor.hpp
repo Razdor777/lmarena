@@ -44,13 +44,17 @@ public:
     CLASS_FIELD(EntityContext, mContext, 0x8);
     CLASS_FIELD(std::string, mEntityIdentifier, OffsetProvider::Actor_mEntityIdentifier);
 
+    // The flag component is not guaranteed to exist (dead actor, world change,
+    // disconnect) — it is null-checked here because these helpers are called from
+    // module disable paths, where the player is often already gone.
     bool getStatusFlag(ActorFlags flag) {
         auto data = getActorDataFlagComponent();
-        return data->getStatusFlag(flag);
+        return data ? data->getStatusFlag(flag) : false;
     }
 
     void setStatusFlag(ActorFlags flag, bool value) {
         auto data = getActorDataFlagComponent();
+        if (!data) return;
         data->setStatusFlag(flag, value);
     }
 

@@ -65,6 +65,8 @@ std::string MemUtils::getModulePath(HMODULE handle)
 
 void MemUtils::writeBytes(uintptr_t ptr, const std::vector<unsigned char>& bytes, size_t size)
 {
+    if (ptr == 0 || bytes.empty() || size == 0) return;
+
     DWORD oldProtect;
     VirtualProtect(reinterpret_cast<void*>(ptr), size, PAGE_EXECUTE_READWRITE, &oldProtect);
     memcpy(reinterpret_cast<void*>(ptr), bytes.data(), size);
@@ -73,6 +75,8 @@ void MemUtils::writeBytes(uintptr_t ptr, const std::vector<unsigned char>& bytes
 
 void MemUtils::writeBytes(uintptr_t ptr, const void* bytes, size_t size)
 {
+    if (ptr == 0 || bytes == nullptr || size == 0) return;
+
     DWORD oldProtect;
     VirtualProtect(reinterpret_cast<void*>(ptr), size, PAGE_EXECUTE_READWRITE, &oldProtect);
     memcpy(reinterpret_cast<void*>(ptr), bytes, size);

@@ -8,20 +8,20 @@
 #include <Features/Events/KeyEvent.hpp>
 #include <Features/GUI/ModernDropdown.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
+#include <Utils/MiscUtils/MathUtils.hpp>
 
 static ModernGui modernGui = ModernGui();
 
-
 void ClickGui::onEnable()
 {
-    // getMouseGrabbed() инвертирован (!getMinecraftGame()->getMouseGrabbed())
-    // поэтому инвертируем обратно чтобы получить реальное состояние
     mWasGrabbed = !ClientInstance::get()->getMouseGrabbed();
     mGuiOpen = true;
     ClientInstance::get()->releaseMouse();
 
     gFeatureManager->mDispatcher->listen<MouseEvent, &ClickGui::onMouseEvent>(this);
     gFeatureManager->mDispatcher->listen<KeyEvent, &ClickGui::onKeyEvent, nes::event_priority::FIRST>(this);
+
+    modernGui.onOpen();
 }
 
 void ClickGui::onDisable()
@@ -29,12 +29,11 @@ void ClickGui::onDisable()
     gFeatureManager->mDispatcher->deafen<MouseEvent, &ClickGui::onMouseEvent>(this);
     gFeatureManager->mDispatcher->deafen<KeyEvent, &ClickGui::onKeyEvent>(this);
 
-    // 3. GUI закрыт — СНАЧАЛА снимаю флаг, ПОТОМ возвращаю состояние
     mGuiOpen = false;
+    modernGui.onClose();
 
     if (mWasGrabbed)
-        ClientInstance::get()->grabMouse();   // была захвачена → снова захвачена (невидима)
-    // else: была видима → ничего не делаю, курсор и так видимый
+        ClientInstance::get()->grabMouse();
 }
 
 void ClickGui::onWindowResizeEvent(WindowResizeEvent& event)
@@ -49,80 +48,19 @@ void ClickGui::onMouseEvent(MouseEvent& event)
 
 void ClickGui::onKeyEvent(KeyEvent& event)
 {
-    if (event.mKey == VK_ESCAPE) {
-        if (!modernGui.isBinding && event.mPressed) this->toggle();
+    if (modernGui.onKey(event.mKey, event.mPressed)) {
         event.mCancelled = true;
         return;
     }
 
-    if (modernGui.isBinding) {
+    if (event.mKey == VK_ESCAPE && event.mPressed) {
+        this->toggle();
         event.mCancelled = true;
         return;
     }
 
-    if (modernGui.mSearching && event.mPressed)
-    {
-        int key = event.mKey;
-        bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-
-        // Layout-independent typing: the game's key codes follow the ACTIVE
-        // keyboard layout, so with a non-English (e.g. Russian) layout the
-        // physical letter keys report non-ASCII codes and the search appears
-        // "sometimes working, sometimes not". Translate the physical key to
-        // its US-layout equivalent so typing always works.
-        {
-            static HKL usLayout = LoadKeyboardLayoutA("00000409", KLF_NOTELLSHELL);
-            if (usLayout) {
-                UINT sc = MapVirtualKeyExA((UINT)key, MAPVK_VK_TO_VSC, GetKeyboardLayout(0));
-                if (sc) {
-                    UINT usVk = MapVirtualKeyExA(sc, MAPVK_VSC_TO_VK, usLayout) & 0xFF;
-                    if ((usVk >= 'A' && usVk <= 'Z') || (usVk >= '0' && usVk <= '9'))
-                        key = (int)usVk;
-                }
-            }
-        }
-
-        if (key == VK_BACK)
-        {
-            int len = (int)strlen(modernGui.mSearchBuffer);
-            if (len > 0)
-                modernGui.mSearchBuffer[len - 1] = '\0';
-        }
-        else
-        {
-            char c = 0;
-            if (key >= 'A' && key <= 'Z')
-                c = shift ? (char)key : (char)(key + 32);
-            else if (key >= '0' && key <= '9')
-                c = (char)key;
-            else if (key == VK_SPACE)
-                c = ' ';
-            else if (key == VK_OEM_MINUS)
-                c = shift ? '_' : '-';
-            else if (key == VK_OEM_PLUS)
-                c = shift ? '+' : '=';
-
-            if (c != 0)
-            {
-                int len = (int)strlen(modernGui.mSearchBuffer);
-                if (len < (int)sizeof(modernGui.mSearchBuffer) - 1)
-                {
-                    modernGui.mSearchBuffer[len] = c;
-                    modernGui.mSearchBuffer[len + 1] = '\0';
-                }
-            }
-        }
-
-        event.mCancelled = true;
-        return;
-    }
-
-    if (event.mKey == VK_SHIFT && event.mPressed) {
-        mIsPressingShift = true;
-        event.mCancelled = true;
-    } else {
-        mIsPressingShift = false;
-    }
+    if (event.mKey == VK_SHIFT)
+        mIsPressingShift = event.mPressed;
 }
 
 float ClickGui::getEaseAnim(EasingUtil ease, int mode)
@@ -130,19 +68,18 @@ float ClickGui::getEaseAnim(EasingUtil ease, int mode)
     switch (mode) {
     case 0: return ease.easeOutExpo();
     case 1: return mEnabled ? ease.easeOutElastic() : ease.easeOutBack();
+    case 2: return 0.90f + 0.10f * ease.easeOutCubic();
+    case 3: return mEnabled ? ease.easeOutElastic() : ease.easeInBack();
     default: return ease.easeOutExpo();
     }
 }
 
 void ClickGui::onRenderEvent(RenderEvent& event)
 {
-    // Пока GUI открыт — держу курсор видимым (игра пытается вернуть каждый тик)
-    // После закрытия (mGuiOpen=false) — НЕ трогаю мышку вообще
     if (mGuiOpen)
         ClientInstance::get()->releaseMouse();
 
     static float animation = 0;
-    static int scrollDirection = 0;
     static EasingUtil inEase = EasingUtil();
 
     float delta = ImGui::GetIO().DeltaTime;
@@ -152,24 +89,20 @@ void ClickGui::onRenderEvent(RenderEvent& event)
         : inEase.decrementPercentage(delta * 2 * mEaseSpeed.mValue / 10);
 
     float inScale = getEaseAnim(inEase, mAnimation.as<int>());
-    if (inEase.isPercentageMax()) inScale = 0.996;
+    if (inEase.isPercentageMax()) inScale = 1.f;
     if (mAnimation.mValue == ClickGuiAnimation::Zoom)
-        inScale = MathUtils::clamp(inScale, 0.0f, 0.996);
+        inScale = MathUtils::clamp(inScale, 0.0f, 1.f);
 
     animation = MathUtils::lerp(0, 1, inEase.easeOutExpo());
 
     if (animation < 0.0001f) return;
 
-    if (ImGui::GetIO().MouseWheel > 0)
-        scrollDirection = -1;
-    else if (ImGui::GetIO().MouseWheel < 0)
-        scrollDirection = 1;
-    else
-        scrollDirection = 0;
-
     if (mStyle.mValue == ClickGuiStyle::Modern)
     {
-        modernGui.render(animation, inScale, scrollDirection,
-            mBlurStrength.mValue, mMidclickRounding.mValue, mIsPressingShift);
+        modernGui.render(animation, inScale,
+            mBlurStrength.mValue, mMidclickRounding.mValue,
+            mUiScale.mValue, mAmbientOrbs.mValue, mShowHints.mValue,
+            mEffectIntensity.mValue, mPanelGlow.mValue,
+            mCursorGlow.mValue, mParallax.mValue, mBackdropGrid.mValue);
     }
 }

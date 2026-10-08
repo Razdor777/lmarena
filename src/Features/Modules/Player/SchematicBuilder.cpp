@@ -12,12 +12,385 @@
 #include <SDK/Minecraft/World/BlockLegacy.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
+#include <SDK/Minecraft/Inventory/NetworkItemStackDescriptor.hpp>
+#include <SDK/Minecraft/Inventory/ItemStack.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
+#include <SDK/Minecraft/Network/MinecraftPackets.hpp>
+#include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/PlayerActionPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/MobEquipmentPacket.hpp>
+#include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/GameUtils/ItemUtils.hpp>
+#include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <algorithm>
+
+// =========================================================
+// РУССКИЕ НАЗВАНИЯ БЛОКОВ (для списка недостающих)
+// =========================================================
+namespace
+{
+    const std::map<std::string, std::string> kBlockNamesRU = {
+        // Камень и обрабатываемый камень
+        {"stone", "Камень"},
+        {"cobblestone", "Булыжник"},
+        {"smooth_stone", "Гладкий камень"},
+        {"stone_bricks", "Каменный кирпич"},
+        {"mossy_stone_bricks", "Мшистый каменный кирпич"},
+        {"cracked_stone_bricks", "Потрескавшийся каменный кирпич"},
+        {"chiseled_stone_bricks", "Резной каменный кирпич"},
+        {"granite", "Гранит"},
+        {"polished_granite", "Полированный гранит"},
+        {"diorite", "Диорит"},
+        {"polished_diorite", "Полированный диорит"},
+        {"andesite", "Андезит"},
+        {"polished_andesite", "Полированный андезит"},
+        {"deepslate", "Глубинный сланец"},
+        {"cobbled_deepslate", "Булыжник глубинного сланца"},
+        {"polished_deepslate", "Полированный глубинный сланец"},
+        {"deepslate_bricks", "Кирпичи из глубинного сланца"},
+        {"deepslate_tiles", "Плитка из глубинного сланца"},
+        {"tuff", "Туф"},
+        {"bedrock", "Бедрок"},
+        {"obsidian", "Обсидиан"},
+        {"crying_obsidian", "Плачущий обсидиан"},
+
+        // Земля и природа
+        {"grass_block", "Земля с травой"},
+        {"dirt", "Земля"},
+        {"coarse_dirt", "Тощая земля"},
+        {"podzol", "Подзол"},
+        {"mycelium", "Мицелий"},
+        {"sand", "Песок"},
+        {"red_sand", "Красный песок"},
+        {"sandstone", "Песчаник"},
+        {"gravel", "Гравий"},
+        {"clay", "Глина"},
+        {"soul_sand", "Песок душ"},
+        {"soul_soil", "Почва душ"},
+        {"moss_block", "Блок мха"},
+        {"mud", "Грязь"},
+        {"packed_mud", "Утрамбованная грязь"},
+        {"snow", "Снег"},
+        {"snow_layer", "Снежный слой"},
+        {"ice", "Лёд"},
+        {"packed_ice", "Плотный лёд"},
+        {"blue_ice", "Синий лёд"},
+
+        // Дерево
+        {"oak_log", "Дубовое бревно"},
+        {"oak_planks", "Дубовые доски"},
+        {"oak_leaves", "Дубовая листва"},
+        {"spruce_log", "Еловое бревно"},
+        {"spruce_planks", "Еловые доски"},
+        {"spruce_leaves", "Еловая листва"},
+        {"birch_log", "Берёзовое бревно"},
+        {"birch_planks", "Берёзовые доски"},
+        {"birch_leaves", "Берёзовая листва"},
+        {"jungle_log", "Бревно тропического дерева"},
+        {"jungle_planks", "Доски тропического дерева"},
+        {"jungle_leaves", "Листва тропического дерева"},
+        {"acacia_log", "Бревно акации"},
+        {"acacia_planks", "Доски акации"},
+        {"acacia_leaves", "Листва акации"},
+        {"dark_oak_log", "Бревно тёмного дуба"},
+        {"dark_oak_planks", "Доски тёмного дуба"},
+        {"dark_oak_leaves", "Листва тёмного дуба"},
+        {"mangrove_log", "Мангровое бревно"},
+        {"mangrove_planks", "Мангровые доски"},
+        {"cherry_log", "Вишнёвое бревно"},
+        {"cherry_planks", "Вишнёвые доски"},
+        {"bamboo_block", "Блок бамбука"},
+        {"bamboo_planks", "Бамбуковые доски"},
+        {"crimson_stem", "Багровый стебель"},
+        {"crimson_planks", "Багровые доски"},
+        {"warped_stem", "Искажённый стебель"},
+        {"warped_planks", "Искажённые доски"},
+
+        // Строительные блоки
+        {"bricks", "Кирпичи"},
+        {"brick_block", "Кирпичный блок"},
+        {"nether_bricks", "Адские кирпичи"},
+        {"red_nether_bricks", "Красные адские кирпичи"},
+        {"end_stone", "Камень Края"},
+        {"end_stone_bricks", "Каменные кирпичи Края"},
+        {"purpur_block", "Пурпурный блок"},
+        {"quartz_block", "Кварцевый блок"},
+        {"smooth_quartz", "Гладкий кварц"},
+        {"quartz_bricks", "Кварцевые кирпичи"},
+        {"prismarine", "Призмарин"},
+        {"prismarine_bricks", "Призмариновые кирпичи"},
+        {"dark_prismarine", "Тёмный призмарин"},
+        {"sea_lantern", "Морской фонарь"},
+        {"glass", "Стекло"},
+        {"tinted_glass", "Тонированное стекло"},
+        {"glowstone", "Светокамень"},
+        {"sea_pickle", "Огурец морской"},
+        {"sponge", "Губка"},
+        {"wet_sponge", "Мокрая губка"},
+        {"hay_block", "Сноп сена"},
+        {"bone_block", "Костяной блок"},
+        {"honeycomb_block", "Медовые соты"},
+        {"slime", "Слизь"},
+        {"slime_block", "Блок слизи"},
+        {"honey_block", "Медовый блок"},
+        {"magma", "Магмовый блок"},
+        {"magma_block", "Магмовый блок"},
+        {"netherrack", "Адский камень"},
+        {"nether_wart_block", "Блок адского нароста"},
+        {"warped_wart_block", "Блок искажённого нароста"},
+        {"shroomlight", "Светогриб"},
+        {"ancient_debris", "Древние обломки"},
+        {"basalt", "Базальт"},
+        {"polished_basalt", "Полированный базальт"},
+        {"blackstone", "Чёрный камень"},
+        {"polished_blackstone", "Полированный чёрный камень"},
+        {"polished_blackstone_bricks", "Кирпичи из чёрного камня"},
+        {"gilded_blackstone", "Позолоченный чёрный камень"},
+
+        // Руды и металлы
+        {"coal_ore", "Угольная руда"},
+        {"deepslate_coal_ore", "Угольная руда глубинного сланца"},
+        {"iron_ore", "Железная руда"},
+        {"deepslate_iron_ore", "Железная руда глубинного сланца"},
+        {"copper_ore", "Медная руда"},
+        {"deepslate_copper_ore", "Медная руда глубинного сланца"},
+        {"gold_ore", "Золотая руда"},
+        {"deepslate_gold_ore", "Золотая руда глубинного сланца"},
+        {"nether_gold_ore", "Адская золотая руда"},
+        {"redstone_ore", "Красная руда"},
+        {"deepslate_redstone_ore", "Красная руда глубинного сланца"},
+        {"lapis_ore", "Лазуритовая руда"},
+        {"deepslate_lapis_ore", "Лазуритовая руда глубинного сланца"},
+        {"diamond_ore", "Алмазная руда"},
+        {"deepslate_diamond_ore", "Алмазная руда глубинного сланца"},
+        {"emerald_ore", "Изумрудная руда"},
+        {"deepslate_emerald_ore", "Изумрудная руда глубинного сланца"},
+        {"coal_block", "Блок угля"},
+        {"iron_block", "Железный блок"},
+        {"copper_block", "Медный блок"},
+        {"gold_block", "Золотой блок"},
+        {"redstone_block", "Блок красной пыли"},
+        {"lapis_block", "Блок лазурита"},
+        {"diamond_block", "Алмазный блок"},
+        {"emerald_block", "Изумрудный блок"},
+        {"netherite_block", "Незеритовый блок"},
+        {"raw_iron_block", "Блок сырого железа"},
+        {"raw_copper_block", "Блок сырой меди"},
+        {"raw_gold_block", "Блок сырого золота"},
+
+        // Бетон и терракота (все 16 цветов)
+        {"white_concrete", "Белый бетон"},
+        {"orange_concrete", "Оранжевый бетон"},
+        {"magenta_concrete", "Пурпурный бетон"},
+        {"light_blue_concrete", "Голубой бетон"},
+        {"yellow_concrete", "Жёлтый бетон"},
+        {"lime_concrete", "Лаймовый бетон"},
+        {"pink_concrete", "Розовый бетон"},
+        {"gray_concrete", "Серый бетон"},
+        {"light_gray_concrete", "Светло-серый бетон"},
+        {"cyan_concrete", "Бирюзовый бетон"},
+        {"purple_concrete", "Фиолетовый бетон"},
+        {"blue_concrete", "Синий бетон"},
+        {"brown_concrete", "Коричневый бетон"},
+        {"green_concrete", "Зелёный бетон"},
+        {"red_concrete", "Красный бетон"},
+        {"black_concrete", "Чёрный бетон"},
+        {"white_concrete_powder", "Белый цемент"},
+        {"orange_concrete_powder", "Оранжевый цемент"},
+        {"magenta_concrete_powder", "Пурпурный цемент"},
+        {"light_blue_concrete_powder", "Голубой цемент"},
+        {"yellow_concrete_powder", "Жёлтый цемент"},
+        {"lime_concrete_powder", "Лаймовый цемент"},
+        {"pink_concrete_powder", "Розовый цемент"},
+        {"gray_concrete_powder", "Серый цемент"},
+        {"light_gray_concrete_powder", "Светло-серый цемент"},
+        {"cyan_concrete_powder", "Бирюзовый цемент"},
+        {"purple_concrete_powder", "Фиолетовый цемент"},
+        {"blue_concrete_powder", "Синий цемент"},
+        {"brown_concrete_powder", "Коричневый цемент"},
+        {"green_concrete_powder", "Зелёный цемент"},
+        {"red_concrete_powder", "Красный цемент"},
+        {"black_concrete_powder", "Чёрный цемент"},
+        {"white_terracotta", "Белая терракота"},
+        {"orange_terracotta", "Оранжевая терракота"},
+        {"magenta_terracotta", "Пурпурная терракота"},
+        {"light_blue_terracotta", "Голубая терракота"},
+        {"yellow_terracotta", "Жёлтая терракота"},
+        {"lime_terracotta", "Лаймовая терракота"},
+        {"pink_terracotta", "Розовая терракота"},
+        {"gray_terracotta", "Серая терракота"},
+        {"light_gray_terracotta", "Светло-серая терракота"},
+        {"cyan_terracotta", "Бирюзовая терракота"},
+        {"purple_terracotta", "Фиолетовая терракота"},
+        {"blue_terracotta", "Синяя терракота"},
+        {"brown_terracotta", "Коричневая терракота"},
+        {"green_terracotta", "Зелёная терракота"},
+        {"red_terracotta", "Красная терракота"},
+        {"black_terracotta", "Чёрная терракота"},
+        {"terracotta", "Терракота"},
+        {"white_glazed_terracotta", "Белая глазурованная терракота"},
+        {"orange_glazed_terracotta", "Оранжевая глазурованная терракота"},
+        {"magenta_glazed_terracotta", "Пурпурная глазурованная терракота"},
+        {"light_blue_glazed_terracotta", "Голубая глазурованная терракота"},
+        {"yellow_glazed_terracotta", "Жёлтая глазурованная терракота"},
+        {"lime_glazed_terracotta", "Лаймовая глазурованная терракота"},
+        {"pink_glazed_terracotta", "Розовая глазурованная терракота"},
+        {"gray_glazed_terracotta", "Серая глазурованная терракота"},
+        {"light_gray_glazed_terracotta", "Светло-серая глазурованная терракота"},
+        {"cyan_glazed_terracotta", "Бирюзовая глазурованная терракота"},
+        {"purple_glazed_terracotta", "Фиолетовая глазурованная терракота"},
+        {"blue_glazed_terracotta", "Синяя глазурованная терракота"},
+        {"brown_glazed_terracotta", "Коричневая глазурованная терракота"},
+        {"green_glazed_terracotta", "Зелёная глазурованная терракота"},
+        {"red_glazed_terracotta", "Красная глазурованная терракота"},
+        {"black_glazed_terracotta", "Чёрная глазурованная терракота"},
+        {"white_wool", "Белая шерсть"},
+        {"orange_wool", "Оранжевая шерсть"},
+        {"magenta_wool", "Пурпурная шерсть"},
+        {"light_blue_wool", "Голубая шерсть"},
+        {"yellow_wool", "Жёлтая шерсть"},
+        {"lime_wool", "Лаймовая шерсть"},
+        {"pink_wool", "Розовая шерсть"},
+        {"gray_wool", "Серая шерсть"},
+        {"light_gray_wool", "Светло-серая шерсть"},
+        {"cyan_wool", "Бирюзовая шерсть"},
+        {"purple_wool", "Фиолетовая шерсть"},
+        {"blue_wool", "Синяя шерсть"},
+        {"brown_wool", "Коричневая шерсть"},
+        {"green_wool", "Зелёная шерсть"},
+        {"red_wool", "Красная шерсть"},
+        {"black_wool", "Чёрная шерсть"},
+
+        // Свет и функциональные
+        {"torch", "Факел"},
+        {"redstone_torch", "Красный факел"},
+        {"lantern", "Фонарь"},
+        {"soul_lantern", "Фонарь душ"},
+        {"glow_lichen", "Светящийся лишайник"},
+        {"crafting_table", "Верстак"},
+        {"furnace", "Печь"},
+        {"blast_furnace", "Плавильная печь"},
+        {"anvil", "Наковальня"},
+        {"chest", "Сундук"},
+        {"trapped_chest", "Сундук-ловушка"},
+        {"ender_chest", "Эндер-сундук"},
+        {"barrel", "Бочка"},
+        {"bookshelf", "Книжная полка"},
+        {"lectern", "Кафедра"},
+        {"enchanting_table", "Стол зачарований"},
+        {"beacon", "Маяк"},
+        {"shulker_box", "Шалкеровый ящик"},
+        {"ender_eye", "Око Края"},
+        {"end_portal_frame", "Рамка портала Края"},
+        {"respawn_anchor", "Якорь возрождения"},
+        {"lodestone", "Магнит"},
+        {"bell", "Колокол"},
+
+        // Функциональные / интерьер
+        {"door", "Дверь"},
+        {"oak_door", "Дубовая дверь"},
+        {"spruce_door", "Еловая дверь"},
+        {"birch_door", "Берёзовая дверь"},
+        {"iron_door", "Железная дверь"},
+        {"fence", "Забор"},
+        {"oak_fence", "Дубовый забор"},
+        {"oak_fence_gate", "Дубовая калитка"},
+        {"oak_stairs", "Дубовые ступеньки"},
+        {"oak_slab", "Дубовая плита"},
+        {"stone_brick_slab", "Плита из каменного кирпича"},
+        {"stone_brick_stairs", "Ступеньки из каменного кирпича"},
+        {"cobblestone_slab", "Булыжная плита"},
+        {"cobblestone_stairs", "Булыжные ступеньки"},
+        {"glass_pane", "Стеклянная панель"},
+        {"iron_bars", "Железная решётка"},
+        {"ladder", "Лестница"},
+        {"scaffolding", "Строительные леса"},
+        {"sign", "Табличка"},
+        {"item_frame", "Рамка"},
+        {"flower_pot", "Цветочный горшок"},
+        {"campfire", "Костёр"},
+        {"soul_campfire", "Костёр душ"},
+        {"cauldron", "Котёл"},
+        {"hopper", "Загрузочная воронка"},
+        {"dispenser", "Раздатчик"},
+        {"dropper", "Выбрасыватель"},
+        {"piston", "Поршень"},
+        {"sticky_piston", "Липкий поршень"},
+        {"observer", "Наблюдатель"},
+        {"repeater", "Повторитель"},
+        {"comparator", "Компаратор"},
+        {"redstone_lamp", "Красная лампа"},
+        {"target", "Мишень"},
+        {"rail", "Рельсы"},
+        {"powered_rail", "Электрические рельсы"},
+        {"detector_rail", "Рельсы с датчиком"},
+        {"tnt", "Динамит"},
+        {"cake", "Торт"},
+        {"bed", "Кровать"},
+        {"red_bed", "Красная кровать"},
+        {"blue_bed", "Синяя кровать"},
+        {"white_bed", "Белая кровать"},
+    };
+
+    std::string stripNamespace(const std::string& name)
+    {
+        std::string n = name;
+        if (n.starts_with("minecraft:")) n = n.substr(10);
+        return n;
+    }
+}
+
+// =========================================================
+// РУССКОЕ ИМЯ БЛОКА (с фолбэком на транслит имени)
+// =========================================================
+std::string SchematicBuilder::getBlockNameRU(const std::string& blockName)
+{
+    std::string name = stripNamespace(blockName);
+
+    // Убираем ванильные суффиксы состояний (гранаты/двери/брёвна и т.п.)
+    static const std::vector<std::string> stateSuffixes = {
+        "_upper", "_lower", "_top", "_bottom", "_left", "_right",
+        "_front", "_back", "_north", "_south", "_east", "_west",
+        "_end", "_head", "_foot"
+    };
+    for (const auto& suf : stateSuffixes) {
+        size_t pos = name.find(suf);
+        if (pos != std::string::npos) name = name.substr(0, pos);
+    }
+
+    auto it = kBlockNamesRU.find(name);
+    if (it != kBlockNamesRU.end()) return it->second;
+
+    // Фолбэк: слово-за-словом перевод (обрабатывает "oak_stairs" и т.д.), затем сырое имя
+    std::string translated;
+    std::string word;
+    bool allWordsMatched = !name.empty();
+    for (size_t i = 0; i <= name.size(); i++) {
+        if (i == name.size() || name[i] == '_') {
+            if (!word.empty()) {
+                auto w = kBlockNamesRU.find(word);
+                if (w != kBlockNamesRU.end()) {
+                    if (!translated.empty()) translated += " ";
+                    translated += w->second;
+                } else {
+                    allWordsMatched = false;
+                    break;
+                }
+                word.clear();
+            }
+        } else {
+            word += name[i];
+        }
+    }
+    if (allWordsMatched && !translated.empty()) return translated;
+
+    // Ничего не нашли — вернём как есть, чтобы игрок всё равно видел идентификатор
+    return stripNamespace(blockName);
+}
 
 void SchematicBuilder::onEnable()
 {
@@ -31,17 +404,28 @@ void SchematicBuilder::onEnable()
         return;
     }
     
-    ChatUtils::displayClientMessage("§aSchematicBuilder enabled!");
-    ChatUtils::displayClientMessage("§7Commands: .spos1, .spos2, .scopy, .spaste, .sbuild, .scancel");
+    ChatUtils::displayClientMessage("§aSchematicBuilder включён!");
+    ChatUtils::displayClientMessage("§7Команды: .spos1, .spos2, .scopy, .spaste, .sbuild, .scancel");
+    
+    // Packet placement (build AND break) lives in these two handlers — keep them
+    // registered even when the toggle is flipped while the module is running.
+    gFeatureManager->mDispatcher->listen<PacketOutEvent, &SchematicBuilder::onPacketOutEvent,
+        nes::event_priority::ABSOLUTE_LAST>(this);
+    gFeatureManager->mDispatcher->listen<PacketInEvent, &SchematicBuilder::onPacketInEvent>(this);
+    if (auto rot = player->getActorRotationComponent())
+        mRots = {rot->mPitch, rot->mYaw, rot->mYaw};
 }
 
 void SchematicBuilder::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<RenderEvent, &SchematicBuilder::onRenderEvent>(this);
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &SchematicBuilder::onBaseTickEvent>(this);
+    gFeatureManager->mDispatcher->deafen<PacketOutEvent, &SchematicBuilder::onPacketOutEvent>(this);
+    gFeatureManager->mDispatcher->deafen<PacketInEvent, &SchematicBuilder::onPacketInEvent>(this);
     
     mState = State::Idle;
     mIsWalking = false;
+    mIsTPing = false;
 }
 
 bool SchematicBuilder::hasValidSelection() 
@@ -193,31 +577,28 @@ bool SchematicBuilder::copySelection()
         }
     }
     
-    ChatUtils::displayClientMessage("§aCopied §f{} §ablocks!", solidBlocks);
-    ChatUtils::displayClientMessage("§7  Air skipped: §f{}", airBlocks);
+    ChatUtils::displayClientMessage("§aСкопировано §f{} §aблоков!", solidBlocks);
+    ChatUtils::displayClientMessage("§7  Воздуха пропущено: §f{}", airBlocks);
     
     if (excludedGrass > 0) {
-        ChatUtils::displayClientMessage("§7  Grass/plants excluded: §f{}", excludedGrass);
+        ChatUtils::displayClientMessage("§7  Травы/растений исключено: §f{}", excludedGrass);
     }
     
-    // Показываем требуемые блоки
-    ChatUtils::displayClientMessage("§7Required blocks:");
+    // Показываем требуемые блоки (на русском)
+    ChatUtils::displayClientMessage("§7Нужные блоки:");
     for (const auto& [name, count] : mClipboard.blockCounts) {
-        std::string displayName = name;
-        if (displayName.starts_with("minecraft:")) {
-            displayName = displayName.substr(10);
-        }
+        std::string displayName = getBlockNameRU(name);
         
         int slot = findBlockInFullInventory(name);
         std::string status;
         if (slot != -1) {
             if (slot < 9) {
-                status = fmt::format("§a✓ hotbar {}", slot + 1);
+                status = fmt::format("§a✓ хотбар {}", slot + 1);
             } else {
-                status = fmt::format("§e✓ inv {}", slot + 1);
+                status = fmt::format("§e✓ инвентарь {}", slot + 1);
             }
         } else {
-            status = "§c✗ missing";
+            status = "§c✗ нет";
         }
         
         ChatUtils::displayClientMessage("§7  {} §f{}: §e{}", status, displayName, count);
@@ -264,15 +645,15 @@ bool SchematicBuilder::preparePaste(glm::ivec3 position)
         }
     }
     
-    ChatUtils::displayClientMessage("§aPaste position: §f{}, {}, {}", position.x, position.y, position.z);
-    ChatUtils::displayClientMessage("§7Total: §f{} §7| §aAvailable: §f{} §7| §cMissing: §f{}", 
+    ChatUtils::displayClientMessage("§aПозиция вставки: §f{}, {}, {}", position.x, position.y, position.z);
+    ChatUtils::displayClientMessage("§7Всего: §f{} §7| §aЕсть: §f{} §7| §cНет: §f{}", 
         mClipboard.blocks.size(), available, missing);
     
     if (conflicts > 0) {
-        ChatUtils::displayClientMessage("§e⚠ {} blocks need clearing", conflicts);
+        ChatUtils::displayClientMessage("§e⚠ {} блоков нужно очистить", conflicts);
     }
     
-    ChatUtils::displayClientMessage("§7Use §f.sbuild §7to start");
+    ChatUtils::displayClientMessage("§7Используй §f.sbuild §7чтобы начать");
     
     return true;
 }
@@ -386,6 +767,7 @@ void SchematicBuilder::startBuilding()
     mBuildQueue.clear();
     mCompletedIndices.clear();
     mSkippedIndices.clear();
+    mPlaceAttempts.clear();
     mClearQueue.clear();
     mClearIndex = 0;
     mBuildQueue = mClipboard.blocks;
@@ -523,6 +905,7 @@ int SchematicBuilder::countRemainingBlocksForCurrentStage()
     int count = 0;
     for (size_t i = 0; i < mBuildQueue.size(); i++) {
         if (mCompletedIndices.count(i)) continue;
+        if (mSkippedIndices.count(static_cast<int>(i))) continue;
         if (isBlockInHotbar(mBuildQueue[i].blockName)) {
             count++;
         }
@@ -532,7 +915,35 @@ int SchematicBuilder::countRemainingBlocksForCurrentStage()
 
 int SchematicBuilder::countRemainingBlocksTotal()
 {
-    return mTotalBlocksToBuild - static_cast<int>(mCompletedIndices.size());
+    // Skipped (server refused them) blocks are not "remaining" either, otherwise
+    // the module would sit in "Waiting for blocks" forever after the last failure.
+    return mTotalBlocksToBuild
+         - static_cast<int>(mCompletedIndices.size())
+         - static_cast<int>(mSkippedIndices.size());
+}
+
+// Tells the player which blocks the server would not accept (e.g. air place is
+// not allowed there), instead of silently teleport-spamming them forever.
+void SchematicBuilder::reportSkipped()
+{
+    if (mSkippedIndices.empty()) return;
+
+    ChatUtils::displayClientMessage("§cСервер не принял §f{} §cблоков:", (int)mSkippedIndices.size());
+
+    int shown = 0;
+    for (int idx : mSkippedIndices)
+    {
+        if (idx < 0 || idx >= static_cast<int>(mBuildQueue.size())) continue;
+        if (shown >= 5) break;
+
+        glm::ivec3 p = mPastePosition + mBuildQueue[idx].relativePos;
+        ChatUtils::displayClientMessage("§7- §f{} §7({}, {}, {})",
+            getBlockNameRU(mBuildQueue[idx].blockName), p.x, p.y, p.z);
+        shown++;
+    }
+
+    if (static_cast<int>(mSkippedIndices.size()) > shown)
+        ChatUtils::displayClientMessage("§7... и ещё §f{}", static_cast<int>(mSkippedIndices.size()) - shown);
 }
 
 void SchematicBuilder::startNextStage()
@@ -556,6 +967,7 @@ void SchematicBuilder::startNextStage()
             mState = State::WaitingForBlocks;
         } else {
             ChatUtils::displayClientMessage("§aBuild complete! §f{} §ablocks placed", mBlocksVerified);
+            reportSkipped();
             mState = State::Idle;
             mHasPastePosition = false;
         }
@@ -578,6 +990,7 @@ void SchematicBuilder::cancelPaste()
     mBuildQueue.clear();
     mCompletedIndices.clear();
     mSkippedIndices.clear();
+    mPlaceAttempts.clear();
     mClearQueue.clear();
     mMissingBlocksCache.clear();
     mHasPastePosition = false;
@@ -643,6 +1056,7 @@ void SchematicBuilder::processWaitingForBlocks()
     int remaining = countRemainingBlocksTotal();
     if (remaining == 0) {
         ChatUtils::displayClientMessage("§aBuild complete! §f{} §ablocks placed", mBlocksVerified);
+        reportSkipped();
         mState = State::Idle;
         mHasPastePosition = false;
     }
@@ -674,7 +1088,9 @@ void SchematicBuilder::processClearing()
     
     glm::ivec3 pos = mClearQueue[mClearIndex];
     
-    if (!isInRange(pos)) {
+    // Like RegionFill, packet breaking teleports to the block, so range and walking
+    // are only relevant for the legacy (in-range) path.
+    if (!mPacketPlace.mValue && !isInRange(pos)) {
         if (mAutoWalk.mValue) {
             mWalkTarget = findWalkPosition(pos);
             mState = State::Walking;
@@ -703,19 +1119,87 @@ void SchematicBuilder::processClearing()
     }
 }
 
+// RegionFill-style destroy: teleport on top of the block (packet TP), swap to the
+// best tool, send start/stop destroy + the inventory transaction, then teleport
+// back. The legacy path (GameMode::destroyBlock) stays for Packet Place = off.
 bool SchematicBuilder::tryBreakBlock(glm::ivec3 pos)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
-    
+
+    auto blockSource = ClientInstance::get()->getBlockSource();
+    if (!blockSource) return false;
+
+    Block* block = blockSource->getBlock(pos);
+    if (!block || !block->toLegacy() || block->toLegacy()->isAir()) return false;
+
     int side = BlockUtils::getExposedFace(pos);
-    if (side == -1) side = 0;
-    
-    if (mSwing.mValue) {
-        player->swing();
+    if (side == -1) side = 1;   // same fallback RegionFill uses
+
+    // ── legacy (in-range) breaking ──
+    if (!mPacketPlace.mValue)
+    {
+        if (mSwing.mValue) player->swing();
+        BlockUtils::destroyBlock(pos, side, false);
+        return true;
     }
-    
-    BlockUtils::destroyBlock(pos, side, false);
+
+    // ── RegionFill-style packet breaking ──
+    auto sender    = ClientInstance::get()->getPacketSender();
+    auto supplies  = player->getSupplies();
+    auto container = supplies ? supplies->getContainer() : nullptr;
+    if (!sender || !supplies || !container) return false;
+
+    const int oldSlot  = supplies->mSelectedSlot;
+    const int bestTool = ItemUtils::getBestBreakingTool(block, false);
+
+    const glm::vec3 playerPos = *player->getPos();
+    const glm::vec3 standPos  = glm::vec3(pos.x + 0.5f, pos.y + 2.62f, pos.z + 0.5f);
+
+    mIsTPing = true;
+    straightLineTP(playerPos, standPos);
+
+    if (bestTool != oldSlot)
+        sender->sendToServer(PacketUtils::createMobEquipmentPacket(bestTool).get());
+
+    if (mSwing.mValue) player->swing();
+
+    // start destroy, then stop destroy
+    for (PlayerActionType action : { PlayerActionType::StartDestroyBlock, PlayerActionType::StopDestroyBlock })
+    {
+        auto pkt = MinecraftPackets::createPacket<PlayerActionPacket>();
+        pkt->mPos        = pos;
+        pkt->mResultPos  = pos;
+        pkt->mFace       = side;
+        pkt->mAction     = action;
+        pkt->mRuntimeId  = player->getRuntimeID();
+        pkt->mtIsFromServerPlayerMovementSystem = false;
+        sender->sendToServer(pkt.get());
+    }
+
+    {
+        auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
+        auto cit = std::make_unique<ItemUseInventoryTransaction>();
+        cit->mActionType           = ItemUseInventoryTransaction::ActionType::Destroy;
+        cit->mSlot                 = bestTool;
+        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(bestTool));
+        cit->mBlockPos             = pos;
+        cit->mFace                 = side;
+        cit->mTargetBlockRuntimeId = 0;
+        cit->mPlayerPos            = standPos;
+        cit->mClickPos             = {0.5f, 1.0f, 0.5f};
+        txn->mTransaction          = std::move(cit);
+        sender->sendToServer(txn.get());
+    }
+
+    if (bestTool != oldSlot)
+        sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
+
+    // client-side prediction so the next tick does not try to break it again
+    TRY_CALL([&]() { BlockUtils::clearBlock(pos); });
+
+    straightLineTP(standPos, playerPos);
+    mIsTPing = false;
     return true;
 }
 
@@ -735,6 +1219,22 @@ void SchematicBuilder::processVerification()
         mBlocksVerified++;
         mBlocksBuiltInStage++;
         mCompletedIndices.insert(mCurrentBuildIdx);
+        mPlaceAttempts.erase(mCurrentBuildIdx);
+    }
+    else if (mCurrentBuildIdx >= 0)
+    {
+        // Nothing appeared: the server rejected the placement (air place not
+        // supported there, wrong item, anticheat, ...). Give the block a few
+        // tries, then drop it so we do not teleport-spam it until the heat death
+        // of the universe.
+        int& tries = mPlaceAttempts[mCurrentBuildIdx];
+        if (++tries >= 3)
+        {
+            ChatUtils::displayClientMessage("§cНе удалось поставить §f{} §c({}, {}, {}) §7— пропускаю",
+                getBlockNameRU(mLastPlacedBlockName), mLastPlacedPos.x, mLastPlacedPos.y, mLastPlacedPos.z);
+            mSkippedIndices.insert(mCurrentBuildIdx);
+            mPlaceAttempts.erase(mCurrentBuildIdx);
+        }
     }
     
     mWaitingForVerification = false;
@@ -767,6 +1267,7 @@ void SchematicBuilder::processBuilding()
     int remaining = countRemainingBlocksTotal();
     if (remaining == 0) {
         ChatUtils::displayClientMessage("§aBuild complete! §f{} §ablocks placed", mBlocksVerified);
+        reportSkipped();
         mState = State::Idle;
         mHasPastePosition = false;
         return;
@@ -926,6 +1427,7 @@ bool SchematicBuilder::canBuildAt(int index)
 {
     if (index < 0 || index >= static_cast<int>(mBuildQueue.size())) return false;
     if (mCompletedIndices.count(index)) return false;
+    if (mSkippedIndices.count(index)) return false;
     
     const std::string& blockName = mBuildQueue[index].blockName;
     
@@ -934,8 +1436,10 @@ bool SchematicBuilder::canBuildAt(int index)
     glm::ivec3 worldPos = mPastePosition + mBuildQueue[index].relativePos;
     
     if (!BlockUtils::isAirBlock(worldPos)) return false;
-    if (!isInRange(worldPos)) return false;
-    if (BlockUtils::getBlockPlaceFace(worldPos) == -1) return false;
+    // Packet placement teleports to the block, so it does not need to be in reach
+    // (RegionFill has no range limit either).
+    if (!mPacketPlace.mValue && !isInRange(worldPos)) return false;
+    if (!mAirPlace.mValue && BlockUtils::getBlockPlaceFace(worldPos) == -1) return false;
     if (findBlockInInventory(blockName) == -1) return false;
     
     return true;
@@ -972,6 +1476,7 @@ int SchematicBuilder::findBlockToWalkTo()
 {
     for (size_t i = 0; i < mBuildQueue.size(); i++) {
         if (mCompletedIndices.count(i)) continue;
+        if (mSkippedIndices.count(static_cast<int>(i))) continue;
         
         const std::string& blockName = mBuildQueue[i].blockName;
         if (!isBlockInHotbar(blockName)) continue;
@@ -984,7 +1489,7 @@ int SchematicBuilder::findBlockToWalkTo()
             continue;
         }
         
-        if (BlockUtils::getBlockPlaceFace(worldPos) == -1) continue;
+        if (!mAirPlace.mValue && BlockUtils::getBlockPlaceFace(worldPos) == -1) continue;
         if (findBlockInInventory(blockName) == -1) continue;
         
         return static_cast<int>(i);
@@ -1132,9 +1637,62 @@ bool SchematicBuilder::tryPlaceBlock(int queueIndex)
     if (slot == -1 || slot >= 9) return false;
     
     int side = BlockUtils::getBlockPlaceFace(worldPos);
-    if (side == -1) return false;
+    bool airPlace = false;
+    if (side == -1) {
+        if (!mAirPlace.mValue) return false;
+        airPlace = true;
+        side = 1;
+    }
     
     int oldSlot = supplies->mSelectedSlot;
+
+    // ── RegionFill-style packet placement ──────────────────────────────────
+    if (mPacketPlace.mValue)
+    {
+        auto sender = ClientInstance::get()->getPacketSender();
+        auto container = supplies->getContainer();
+        if (!sender || !container) return false;
+
+        glm::vec3 playerPos = *player->getPos();
+        glm::vec3 standPos  = glm::vec3(worldPos.x + 0.5f, worldPos.y + 2.62f, worldPos.z + 0.5f);
+
+        mIsTPing = true;
+        straightLineTP(playerPos, standPos);
+
+        if (slot != oldSlot)
+            sender->sendToServer(PacketUtils::createMobEquipmentPacket(slot).get());
+
+        if (mSwing.mValue) player->swing();
+
+        {
+            auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
+            auto cit = std::make_unique<ItemUseInventoryTransaction>();
+            cit->mActionType           = ItemUseInventoryTransaction::ActionType::Place;
+            cit->mSlot                 = slot;
+            cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(slot));
+            cit->mBlockPos             = airPlace ? worldPos : worldPos + glm::ivec3(BlockUtils::blockFaceOffsets[side]);
+            cit->mFace                 = side;
+            cit->mTargetBlockRuntimeId = 0;
+            cit->mPlayerPos            = standPos;
+            cit->mClickPos             = BlockUtils::clickPosOffsets[side];
+
+            for (int i = 0; i < 3; i++)
+                if (cit->mClickPos[i] == 0.5f)
+                    cit->mClickPos[i] = MathUtils::randomFloat(-0.49f, 0.49f);
+
+            txn->mTransaction = std::move(cit);
+            sender->sendToServer(txn.get());
+        }
+
+        if (slot != oldSlot)
+            sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
+
+        straightLineTP(standPos, playerPos);
+        mIsTPing = false;
+        return true;
+    }
+
+    // ── Legacy direct placement ────────────────────────────────────────
     supplies->mSelectedSlot = slot;
     
     if (mSwing.mValue) {
@@ -1146,6 +1704,80 @@ bool SchematicBuilder::tryPlaceBlock(int queueIndex)
     supplies->mSelectedSlot = oldSlot;
     
     return true;
+}
+
+// =========================================================
+// PACKET TELEPORT (RegionFill-style)
+// =========================================================
+
+std::shared_ptr<MovePlayerPacket> SchematicBuilder::createPacketForPos(glm::vec3 pos)
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return nullptr;
+
+    auto pkt = MinecraftPackets::createPacket<MovePlayerPacket>();
+    pkt->mPos              = pos;
+    pkt->mPlayerID         = player->getRuntimeID();
+    pkt->mRot              = {mRots.x, mRots.y};
+    pkt->mYHeadRot         = mRots.z;
+    pkt->mResetPosition    = PositionMode::Teleport;
+    pkt->mOnGround         = true;
+    pkt->mRidingID         = -1;
+    pkt->mCause            = TeleportationCause::Unknown;
+    pkt->mSourceEntityType = ActorType::Player;
+    pkt->mTick             = 0;
+    return pkt;
+}
+
+void SchematicBuilder::straightLineTP(glm::vec3 from, glm::vec3 to)
+{
+    auto sender = ClientInstance::get()->getPacketSender();
+    if (!sender) return;
+
+    float step = mStepDistance.mValue;
+    float dist = glm::length(to - from);
+
+    if (dist < 0.01f) {
+        auto pkt = createPacketForPos(to);
+        if (pkt) sender->sendToServer(pkt.get());
+        return;
+    }
+
+    glm::vec3 dir = glm::normalize(to - from);
+    glm::vec3 cur = from;
+
+    while (glm::distance(cur, to) > step) {
+        cur += dir * step;
+        auto pkt = createPacketForPos(cur);
+        if (pkt) sender->sendToServer(pkt.get());
+    }
+    auto pkt = createPacketForPos(to);
+    if (pkt) sender->sendToServer(pkt.get());
+}
+
+void SchematicBuilder::onPacketOutEvent(PacketOutEvent& event)
+{
+    if (event.mPacket->getId() == PacketID::MovePlayer) {
+        auto pkt = event.getPacket<MovePlayerPacket>();
+        mRots = {pkt->mRot.x, pkt->mRot.y, pkt->mYHeadRot};
+    }
+}
+
+void SchematicBuilder::onPacketInEvent(PacketInEvent& event)
+{
+    if (!mPacketPlace.mValue) return;
+    if (!mSilentAccept.mValue) return;
+    if (!mIsTPing) return;
+
+    if (event.mPacket->getId() == PacketID::MovePlayer) {
+        auto player = ClientInstance::get()->getLocalPlayer();
+        if (!player) return;
+        auto pkt = event.getPacket<MovePlayerPacket>();
+        if (pkt->mPlayerID == player->getRuntimeID()) {
+            event.cancel();
+            ClientInstance::get()->getPacketSender()->sendToServer(pkt.get());
+        }
+    }
 }
 
 // ==================== RENDERING ====================
@@ -1366,8 +1998,8 @@ void SchematicBuilder::renderMissingBlocks()
     float lineHeight = 16.0f;
     float padding = 8.0f;
     
-    // Заголовок
-    std::string title = "Missing Blocks";
+    // Заголовок (на русском)
+    std::string title = "Нет блоков";
     
     // Подсчёт высоты
     int maxLines = std::min(static_cast<int>(mMissingBlocksCache.size()), 10);
@@ -1402,7 +2034,7 @@ void SchematicBuilder::renderMissingBlocks()
     for (const auto& [name, count] : mMissingBlocksCache) {
         if (lineCount >= maxLines) {
             // Показываем "и ещё..."
-            std::string moreText = fmt::format("... and {} more", 
+            std::string moreText = fmt::format("... и ещё {}", 
                 static_cast<int>(mMissingBlocksCache.size()) - maxLines);
             drawList->AddText(
                 ImVec2(hudX, currentY),
@@ -1412,10 +2044,10 @@ void SchematicBuilder::renderMissingBlocks()
             break;
         }
         
-        // Форматируем имя блока
-        std::string displayName = name;
-        if (displayName.length() > 20) {
-            displayName = displayName.substr(0, 17) + "...";
+        // Русское имя блока
+        std::string displayName = getBlockNameRU(name);
+        if (displayName.length() > 24) {
+            displayName = displayName.substr(0, 21) + "...";
         }
         
         std::string blockLine = fmt::format("{}: {}", displayName, count);

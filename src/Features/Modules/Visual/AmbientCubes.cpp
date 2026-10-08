@@ -1,56 +1,79 @@
 //
-// AmbientCubes.cpp — Soft floating ambient glow particles
+// AmbientCubes.cpp — ambient particles that live in the world.
 //
-// Behaviour:
-//  - The swarm is anchored to what you actually see (camera origin).
-//  - Teleports (pearls, lagbacks, dimension hops) refill the whole swarm
-//    INSTANTLY around the new spot — no more waiting for particles.
-//  - At any speed (pearls + fireworks), particles that fall outside the
-//    radius are recycled back to you immediately, so the density around
-//    you stays constant.
-//
-// Visuals:
-//  - Soft bokeh-style glow shapes (layered transparency, no harsh outlines)
+// The swarm is filled instantly and kept at full population: particles that
+// expire or that you outrun are reborn around you right away, which is what
+// makes the air feel full instead of thinning out as you move. The population
+// scales with Radius, so widening the field also adds more particles.
 //
 
 #include "AmbientCubes.hpp"
+
+#include <algorithm>
+#include <cmath>
 
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
-#include <Utils/MiscUtils/ImRenderUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
-#include <cmath>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+namespace
+{
+    constexpr float kPi = 3.14159265f;
 
-static inline float rand01() { return (float)rand() / (float)RAND_MAX; }
+    inline float rand01() { return (float)rand() / (float)RAND_MAX; }
 
-void AmbientCubes::onEnable() {
-    cubes.clear();
-    spawnTimer = 0;
-    mLastAnchor = { FLT_MAX, FLT_MAX, FLT_MAX };
-}
-
-void AmbientCubes::onDisable() {
-    cubes.clear();
-}
-
-ImColor AmbientCubes::getColor() {
-    if (mUseThemeColor.mValue) {
-        return ColorUtils::getThemedColor(0.f);
+    inline ImU32 col32(const ImColor& c, float alpha)
+    {
+        return IM_COL32(
+            (int)(MathUtils::clamp(c.Value.x, 0.f, 1.f) * 255.f),
+            (int)(MathUtils::clamp(c.Value.y, 0.f, 1.f) * 255.f),
+            (int)(MathUtils::clamp(c.Value.z, 0.f, 1.f) * 255.f),
+            (int)(MathUtils::clamp(alpha, 0.f, 1.f) * 255.f));
     }
-    return mCustomColor.getAsImColor();
 }
 
-// Anchor = the point you are actually looking from.
-// Camera/render origin first, player eye-pos as fallback.
-glm::vec3 AmbientCubes::getAnchorPos() {
-    auto player = ClientInstance::get()->getLocalPlayer();
+void AmbientCubes::onEnable()
+{
+    cubes.clear();
+}
+
+void AmbientCubes::onDisable()
+{
+    cubes.clear();
+}
+
+// Colour of a particle. colorIndex (0..1) spreads the shades across the theme
+// palette so the swarm shimmers instead of being one flat colour.
+ImColor AmbientCubes::getColor(float index)
+{
+    switch (mColorMode.mValue)
+    {
+    case ColorMode::Custom:
+        return mCustomColor.getAsImColor();
+
+    case ColorMode::ThemeStatic:
+        return ColorUtils::getThemedColor(0.f);
+
+    case ColorMode::Rainbow: {
+        float hue = std::fmod((float)ImGui::GetTime() * 0.08f + index, 1.f);
+        if (hue < 0.f) hue += 1.f;
+        return ImColor::HSV(hue, 0.72f, 1.f);
+    }
+
+    case ColorMode::ThemeFlow:
+    default:
+        return ColorUtils::getThemedColor(index * 620.f);
+    }
+}
+
+glm::vec3 AmbientCubes::getAnchorPos()
+{
+    auto* ci = ClientInstance::get();
+
+    auto* player = ci ? ci->getLocalPlayer() : nullptr;
     glm::vec3 fallback = player
         ? *player->getPos() + glm::vec3(0.f, PLAYER_HEIGHT, 0.f)
         : glm::vec3(0.f);
@@ -61,301 +84,242 @@ glm::vec3 AmbientCubes::getAnchorPos() {
     return o;
 }
 
-// Build one particle around the anchor.
-// popIn = appear at full alpha right away (no fade-in)
-AmbientCube AmbientCubes::makeCube(const glm::vec3& anchor, bool popIn) {
-    AmbientCube cube;
-    float radius = mSpawnRadius.mValue;
-
-    switch (mSpawnArea.mValue) {
-    case SpawnArea::Everywhere:
-        cube.position = anchor + glm::vec3(
-            (rand01() * 2.f - 1.f) * radius,
-            (rand01() * 1.6f - 0.8f) * radius,
-            (rand01() * 2.f - 1.f) * radius);
-        break;
-    case SpawnArea::Above:
-        cube.position = anchor + glm::vec3(
-            (rand01() * 2.f - 1.f) * radius,
-            (0.3f + rand01()) * radius * 0.7f,
-            (rand01() * 2.f - 1.f) * radius);
-        break;
-    case SpawnArea::Front: {
-        float angle = rand01() * 2.f * (float)M_PI;
-        float d = 3.f + rand01() * radius;
-        cube.position = anchor + glm::vec3(
-            cosf(angle) * d,
-            (rand01() * 2.f - 1.f) * radius * 0.5f,
-            sinf(angle) * d);
-        break;
-    }
-    case SpawnArea::Surround: {
-        float angle = rand01() * 2.f * (float)M_PI;
-        cube.position = anchor + glm::vec3(
-            cosf(angle) * radius,
-            (rand01() * 2.f - 1.f) * radius * 0.5f,
-            sinf(angle) * radius);
-        break;
-    }
-    }
-
-    // Never spawn right on the camera — particles popping onto your
-    // face are exactly what made this module annoying
-    glm::vec3 fromAnchor = cube.position - anchor;
-    float d = glm::length(fromAnchor);
-    const float minDist = 2.0f;
-    if (d < minDist) {
-        if (d < 0.001f) fromAnchor = { 1.f, 0.f, 0.f };
-        cube.position = anchor + glm::normalize(fromAnchor) * minDist;
-    }
-
-    // Gentle drift with a slight upward float
-    cube.velocity = glm::vec3(
-        (rand01() - 0.5f) * 0.6f,
-        (rand01() - 0.35f) * 0.25f,
-        (rand01() - 0.5f) * 0.6f);
-
-    cube.rotation = glm::vec3(0.f);
-    cube.rotation.z = rand01() * 2.f * (float)M_PI;
-    cube.rotationSpeed = glm::vec3(
-        0.f, 0.f,
-        (rand01() - 0.5f) * 2.f * mRotationSpeed.mValue);
-
-    float baseSize = mCubeSize.mValue;
-    float variation = mSizeVariation.mValue;
-    cube.size = baseSize + (rand01() - 0.5f) * variation * baseSize;
-    cube.size = std::max(cube.size, 0.05f);
-
-    cube.alpha = mAlpha.mValue;
-    cube.maxLifetime = mLifetime.mValue + (rand01() * 4.f - 2.f);
-    cube.maxLifetime = std::max(cube.maxLifetime, 1.f);
-    cube.lifetime = cube.maxLifetime;
-
-    switch (mStyle.mValue) {
-    case ParticleStyle::Mixed:  cube.style = rand() % 4; break;
-    case ParticleStyle::Orbs:   cube.style = 0; break;
-    case ParticleStyle::Bokeh:  cube.style = 1; break;
-    case ParticleStyle::Dust:   cube.style = 2; break;
-    case ParticleStyle::Petals: cube.style = 3; break;
-    }
-
-    cube.popIn = popIn;
-    cube.swayPhase = rand01() * 2.f * (float)M_PI;
-    return cube;
+// Count is a density: doubling Radius roughly quadruples the volume, so scale
+// the population to keep the air just as thick when the field grows.
+int AmbientCubes::wantedCount() const
+{
+    const float base = 26.f;
+    const float scale = (mRadius.mValue / base) * (mRadius.mValue / base);
+    int want = (int)std::lround(mCount.mValue * scale);
+    return (int)MathUtils::clamp((float)want, 20.f, 900.f);
 }
 
-void AmbientCubes::spawnCube(const glm::vec3& anchorPos, bool popIn) {
-    cubes.push_back(makeCube(anchorPos, popIn));
+// Put one particle back into the air around the anchor. Everything random about
+// a particle is decided here, so recycling costs nothing extra.
+void AmbientCubes::respawn(AmbientCube& c, const glm::vec3& anchor, float maxDist)
+{
+    const float minDist = (std::min)(3.5f, maxDist * 0.35f);
+
+    // Uniform-ish point in an ellipsoid: wider than it is tall so the swarm
+    // hugs the world around you instead of forming a thin shell.
+    const float theta = rand01() * 2.f * kPi;
+    const float z     = rand01() * 2.f - 1.f;
+    const float xy    = std::sqrt((std::max)(0.f, 1.f - z * z));
+
+    glm::vec3 dir{ xy * std::cos(theta), z * 0.62f + 0.22f, xy * std::sin(theta) };
+    const float len = glm::length(dir);
+    dir = (len > 0.0001f) ? dir / len : glm::vec3(0.f, 1.f, 0.f);
+
+    c.position = anchor + dir * (minDist + rand01() * (maxDist - minDist));
+
+    // Slow, genuinely world-space drift (this is why they float "in the world").
+    c.velocity = glm::vec3(
+        (rand01() - 0.5f) * 0.45f,
+        (rand01() - 0.35f) * 0.22f,
+        (rand01() - 0.5f) * 0.45f);
+
+    c.prevPosition = c.position;
+    c.phase        = 0.f;
+    c.colorIndex   = rand01();
+    c.swayPhase    = rand01() * 2.f * kPi;
+
+    // 55% .. 100% of Size — the old "Size Variation" slider, now automatic.
+    c.size = (std::max)(0.05f, mSize.mValue * (1.f - 0.45f * rand01()));
+
+    c.maxLife = 9.f + rand01() * 9.f;
+    c.life    = c.maxLife;
+    c.alpha   = 0.f;      // fades in
 }
 
-// Refill the whole swarm around a new spot at once (enable / teleports).
-// Lifetimes are staggered so the swarm doesn't die all at the same moment.
-void AmbientCubes::reseedAll(const glm::vec3& anchor) {
-    cubes.clear();
-    int count = (int)mCubeCount.mValue;
-    for (int i = 0; i < count; i++) {
-        AmbientCube cube = makeCube(anchor, true);
-        cube.lifetime = cube.maxLifetime * (0.35f + 0.65f * rand01());
-        cubes.push_back(cube);
-    }
-    spawnTimer = 0.f;
-}
+AmbientCube AmbientCubes::makeCube(const glm::vec3& anchor)
+{
+    AmbientCube c;
+    respawn(c, anchor, mRadius.mValue);
 
-void AmbientCubes::updateCube(AmbientCube& cube, float deltaTime, float timeSec) {
-    // Gentle sinusoidal sway on top of the drift
-    glm::vec3 sway = glm::vec3(
-        sinf(timeSec * 0.9f + cube.swayPhase),
-        sinf(timeSec * 0.6f + cube.swayPhase * 1.7f) * 0.4f,
-        cosf(timeSec * 0.8f + cube.swayPhase)) * 0.15f;
-
-    cube.position += (cube.velocity * mSpeed.mValue + sway) * deltaTime;
-
-    if (mRotate.mValue)
-        cube.rotation += cube.rotationSpeed * deltaTime;
-
-    cube.lifetime -= deltaTime;
-
-    float base = mAlpha.mValue;
-    float a = base;
-    if (mFadeInOut.mValue) {
-        float fadeTime = 1.5f;
-        float age = cube.maxLifetime - cube.lifetime;
-        // popIn particles (teleport refill / recycled) skip the fade-in:
-        // the whole point is that they are already there
-        if (!cube.popIn && age < fadeTime)
-            a = base * (age / fadeTime);
-        if (cube.lifetime < fadeTime)
-            a = std::min(a, base * (cube.lifetime / fadeTime));
-    }
-    cube.alpha = a;
-}
-
-// ============================================================
-// SHAPE RENDERING — soft bokeh glow, layered transparency
-// ============================================================
-static inline ImColor withAlpha(ImColor c, float a) {
-    a = MathUtils::clamp(a, 0.f, 1.f);
-    c.Value.w = a;
+    // Stagger the lifetimes and the fade-in so the whole swarm does not breathe
+    // in unison.
+    c.life  = c.maxLife * (0.20f + 0.80f * rand01());
+    c.alpha = rand01() * 0.6f;
     return c;
 }
 
-static inline ImColor mixColors(ImColor a, ImColor b, float t) {
-    return ImColor(
-        a.Value.x + (b.Value.x - a.Value.x) * t,
-        a.Value.y + (b.Value.y - a.Value.y) * t,
-        a.Value.z + (b.Value.z - a.Value.z) * t,
-        a.Value.w + (b.Value.w - a.Value.w) * t);
+void AmbientCubes::updateCube(AmbientCube& c, float dt, float t)
+{
+    c.prevPosition = c.position;
+
+    // Per particle sway — a gentle circulation rather than straight-line motion.
+    const glm::vec3 sway{
+        std::sin(t * 0.70f + c.swayPhase) * 0.10f + std::sin(t * 0.23f + c.swayPhase * 0.7f) * 0.05f,
+        std::sin(t * 0.50f + c.swayPhase * 1.7f) * 0.06f,
+        std::cos(t * 0.60f + c.swayPhase) * 0.10f + std::cos(t * 0.19f + c.swayPhase * 0.4f) * 0.05f
+    };
+
+    // One breeze that slowly turns, so the swarm drifts together.
+    const float windAngle = t * 0.06f + c.swayPhase * 0.15f;
+    const glm::vec3 wind{ std::cos(windAngle), 0.06f, std::sin(windAngle) };
+
+    // Vertical bias: positive Rise lifts the swarm, negative lets it settle.
+    const glm::vec3 rise{ 0.f, mRise.mValue * 0.35f, 0.f };
+
+    c.position += (c.velocity * mSpeed.mValue + sway + wind * (0.35f * mSpeed.mValue) + rise) * dt;
+
+    c.life -= dt;
+
+    // Smooth alpha: fade in on birth, hold, then fade out before recycling.
+    const float p = (c.maxLife > 0.01f) ? MathUtils::clamp(1.f - c.life / c.maxLife, 0.f, 1.f) : 1.f;
+    float target = 1.f;
+    if (p > 0.82f) target = MathUtils::clamp((1.f - p) / 0.18f, 0.f, 1.f);
+
+    c.alpha += (target - c.alpha) * (std::min)(1.f, dt * 4.f);
+    c.phase = p;
 }
 
-static void glowLayer(ImDrawList* dl, ImVec2 c, float r, ImColor col, float a, int segments = 14) {
-    if (r <= 0.05f || a <= 0.003f) return;
-    dl->AddCircleFilled(c, r, withAlpha(col, a), segments);
-}
+// ============================================================
+// DRAW — one of four shapes, tuned by Size / Alpha / Glow / Trails
+// ============================================================
 
-void AmbientCubes::renderShape(const glm::vec2& screenPos, float pixelSize,
-                                const glm::vec3& rotation, float alpha,
-                                ImColor color, int style) {
-    auto dl = ImGui::GetBackgroundDrawList();
-    ImVec2 center(screenPos.x, screenPos.y);
-    ImColor white(255, 255, 255);
-
-    switch (style) {
-    case 0: { // Orb — soft glowing sphere with a bright core
-        float r = pixelSize;
-        if (mGlow.mValue) {
-            glowLayer(dl, center, r * 2.0f, color, alpha * 0.09f, 16);
-            glowLayer(dl, center, r * 1.3f, color, alpha * 0.16f, 16);
-        }
-        glowLayer(dl, center, r * 0.72f, color, alpha * 0.55f, 14);
-        ImColor core = mixColors(color, white, 0.65f);
-        glowLayer(dl, center, r * 0.28f, core, alpha * 0.9f, 10);
-        break;
-    }
-    case 1: { // Bokeh — big dreamy translucent circle, no core
-        float r = pixelSize * 1.7f;
-        glowLayer(dl, center, r * 1.9f, color, alpha * 0.045f, 18);
-        glowLayer(dl, center, r * 1.35f, color, alpha * 0.07f, 18);
-        glowLayer(dl, center, r * 1.0f, color, alpha * 0.10f, 16);
-        // subtle edge sheen so the bokeh reads as a lens disc
-        ImColor sheen = mixColors(color, white, 0.25f);
-        glowLayer(dl, center, r * 0.62f, sheen, alpha * 0.10f, 16);
-        break;
-    }
-    case 2: { // Dust — tiny bright speck with a faint glint cross
-        float r = pixelSize * 0.45f;
-        if (mGlow.mValue)
-            glowLayer(dl, center, r * 2.2f, color, alpha * 0.16f, 10);
-        ImColor core = mixColors(color, white, 0.75f);
-        glowLayer(dl, center, r, core, alpha * 0.95f, 8);
-        // tiny sparkle cross
-        ImColor glint = withAlpha(core, alpha * 0.4f);
-        float g = r * 2.6f;
-        dl->AddLine({center.x - g, center.y}, {center.x + g, center.y}, glint, 1.0f);
-        dl->AddLine({center.x, center.y - g}, {center.x, center.y + g}, glint, 1.0f);
-        break;
-    }
-    case 3: { // Petal — soft rotated ellipse that slowly tumbles
-        float r = pixelSize * 1.1f;
-        float rx = r, ry = r * 0.55f;
-        float ang = rotation.z;
-        float ca = cosf(ang), sa = sinf(ang);
-
-        auto ellipsePoints = [&](float scale, ImVec2 off, ImVec2* out, int n) {
-            for (int i = 0; i < n; i++) {
-                float t = (float)i / (float)n * 2.f * (float)M_PI;
-                float ex = cosf(t) * rx * scale;
-                float ey = sinf(t) * ry * scale;
-                out[i] = ImVec2(center.x + ex * ca - ey * sa + off.x,
-                                center.y + ex * sa + ey * ca + off.y);
-            }
-        };
-
-        constexpr int n = 10;
-        ImVec2 pts[n];
-        ellipsePoints(1.0f, {0.f, 0.f}, pts, n);
-        dl->AddConvexPolyFilled(pts, n, withAlpha(color, alpha * 0.30f));
-
-        ImVec2 inner[n];
-        ImVec2 lightOff(-r * 0.12f * ca, -r * 0.12f * sa);
-        ImColor innerCol = mixColors(color, white, 0.35f);
-        ellipsePoints(0.55f, lightOff, inner, n);
-        dl->AddConvexPolyFilled(inner, n, withAlpha(innerCol, alpha * 0.45f));
-        break;
-    }
-    }
-}
-
-void AmbientCubes::renderCube(const AmbientCube& cube) {
-    auto ci = ClientInstance::get();
+void AmbientCubes::renderCube(const AmbientCube& cube)
+{
+    auto* ci = ClientInstance::get();
     if (!ci) return;
-    if (!ci->getGuiData()) return;
 
-    glm::vec2 screenPos;
-    if (!RenderUtils::transform.mMatrix.OWorldToScreen(RenderUtils::transform.mOrigin, cube.position,
-                                  screenPos, MathUtils::fov,
-                                  ci->getGuiData()->mResolution)) {
-        return;
+    // worldToScreen already bails out safely while GuiData is missing (window
+    // resize, world load), so it is the only guard needed here.
+    ImVec2 screenPos;
+    if (!RenderUtils::worldToScreen(cube.position, screenPos)) return;
+
+    const glm::vec3& camPos = RenderUtils::transform.mOrigin;
+
+    const float dist    = glm::distance(camPos, cube.position);
+    const float maxDist = mRadius.mValue * 1.6f;
+    if (dist > maxDist) return;
+
+    // Perspective sizing: near = bigger, far = smaller (clamped).
+    const float persp = MathUtils::clamp(3.2f / (std::max)(dist, 0.1f), 0.30f, 2.5f);
+
+    // Birth pop: particles grow into their size instead of appearing at full.
+    const float pop = (cube.phase < 0.12f) ? (0.60f + 0.40f * (cube.phase / 0.12f)) : 1.f;
+
+    const float sz = cube.size * 30.f * persp * pop;
+    if (sz < 1.f) return;
+
+    // Fade the edges of the swarm so its boundary is never visible, and let
+    // every particle breathe on its own phase.
+    const float edgeFade = MathUtils::clamp(1.25f - dist / maxDist, 0.f, 1.f);
+    const float twinkle  = mTwinkle.mValue
+        ? (0.80f + 0.20f * std::sin((float)ImGui::GetTime() * 2.1f + cube.swayPhase * 3.1f))
+        : 1.f;
+
+    const float alpha = cube.alpha * edgeFade * mAlpha.mValue * twinkle;
+    if (alpha <= 0.004f) return;
+
+    const ImColor color = getColor(cube.colorIndex);
+    auto* dl = ImGui::GetBackgroundDrawList();
+    const ImU32 body = col32(color, alpha);
+
+    // Motion streak.
+    if (mTrails.mValue && sz > 1.6f)
+    {
+        const float streak = (mShape.mValue == Shape::Spark) ? 3.4f : (0.30f * (0.4f + mSpeed.mValue));
+        const glm::vec3 tail = cube.position - cube.velocity * streak;
+        ImVec2 tailSc;
+        if (RenderUtils::worldToScreen(tail, tailSc))
+        {
+            const float len = glm::distance(glm::vec2(tailSc.x, tailSc.y), glm::vec2(screenPos.x, screenPos.y));
+            if (len > 0.75f && len < 420.f)
+                dl->AddLine(tailSc, screenPos, col32(color, alpha * 0.5f), (std::max)(1.f, sz * 0.45f));
+        }
     }
 
-    // Perspective sizing: near = bigger, far = smaller (clamped)
-    float dist = glm::distance(RenderUtils::transform.mOrigin, cube.position);
-    float persp = MathUtils::clamp(3.2f / std::max(dist, 0.1f), 0.30f, 2.5f);
-    float pixelSize = cube.size * 26.f * persp;
-    if (pixelSize < 0.6f) return; // too small to matter
+    switch (mShape.mValue)
+    {
+    case Shape::Square: {
+        if (mGlow.mValue)
+            dl->AddCircleFilled(screenPos, sz * 2.1f, col32(color, alpha * 0.16f), 10);
 
-    // Gentle distance fade so the swarm dissolves instead of popping
-    float maxDist = mSpawnRadius.mValue * 1.75f;
-    float distFade = MathUtils::clamp(1.3f - dist / maxDist, 0.25f, 1.f);
+        const float half = sz * 0.5f;
+        dl->AddRectFilled({ screenPos.x - half, screenPos.y - half },
+                          { screenPos.x + half, screenPos.y + half },
+                          body,
+                          (std::max)(0.f, half * 0.35f));
+        break;
+    }
 
-    ImColor color = getColor();
-    renderShape(screenPos, pixelSize, cube.rotation, cube.alpha * distFade, color, cube.style);
+    case Shape::Spark: {
+        dl->AddCircleFilled(screenPos, sz * 0.85f, body, 12);
+        dl->AddCircleFilled(screenPos, sz * 2.2f, col32(color, alpha * 0.18f), 10);
+        break;
+    }
+
+    case Shape::Snow: {
+        if (mGlow.mValue)
+            dl->AddCircleFilled(screenPos, sz * 1.8f, col32(color, alpha * 0.16f), 10);
+        dl->AddCircleFilled(screenPos, sz * 0.75f, body, 12);
+
+        const float arm = sz * 1.35f;
+        dl->AddLine({ screenPos.x - arm, screenPos.y }, { screenPos.x + arm, screenPos.y }, col32(color, alpha * 0.7f), 1.f);
+        dl->AddLine({ screenPos.x, screenPos.y - arm }, { screenPos.x, screenPos.y + arm }, col32(color, alpha * 0.7f), 1.f);
+        break;
+    }
+
+    case Shape::Orb:
+    default: {
+        if (mGlow.mValue)
+            dl->AddCircleFilled(screenPos, sz * 2.4f, col32(color, alpha * 0.14f), 12);
+        dl->AddCircleFilled(screenPos, sz * 1.15f, col32(color, alpha * 0.45f), 14);
+        dl->AddCircleFilled(screenPos, sz * 0.65f, body, 14);
+        break;
+    }
+    }
 }
 
-void AmbientCubes::onRenderEvent(RenderEvent& event) {
+void AmbientCubes::onRenderEvent(RenderEvent& event)
+{
     if (!mEnabled) return;
 
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
+    auto* ci = ClientInstance::get();
+    if (!ci) return;
 
-    float deltaTime = ImGui::GetIO().DeltaTime;
-    float timeSec = (float)ImGui::GetTime();
+    auto* player = ci->getLocalPlayer();
+    if (!player || !ci->getGuiData()) return;
 
-    glm::vec3 anchor = getAnchorPos();
+    const float dt = std::clamp(ImGui::GetIO().DeltaTime, 0.0005f, 0.1f);
+    const float t  = (float)ImGui::GetTime();
 
-    // Teleport / big jump (pearl, lagback, freecam drag): refill the whole
-    // swarm around the new spot INSTANTLY instead of waiting for spawns
-    if (mLastAnchor.x == FLT_MAX ||
-        glm::distance(anchor, mLastAnchor) > mSpawnRadius.mValue * 0.75f) {
-        reseedAll(anchor);
-    }
-    mLastAnchor = anchor;
+    const glm::vec3 anchor = getAnchorPos();
+    const float radius = mRadius.mValue;
+    const int   want   = wantedCount();
 
-    // Gentle trickle spawn for natural replenishment
-    float spawnRate = (float)mCubeCount.mValue / mLifetime.mValue;
-    spawnTimer += deltaTime;
-    while (spawnTimer > 1.f / spawnRate && cubes.size() < (size_t)mCubeCount.mValue) {
-        spawnCube(anchor);
-        spawnTimer -= 1.f / spawnRate;
-    }
+    // ── population ─────────────────────────────────────────────────────────
+    // Fill instantly (a chunk per frame, so a 600 particle field does not
+    // stall the frame), then keep it there.
+    int spawnBudget = 200;
+    while ((int)cubes.size() < want && spawnBudget-- > 0)
+        cubes.push_back(makeCube(anchor));
+    while ((int)cubes.size() > want && !cubes.empty())
+        cubes.pop_back();
 
-    float recycleDist = mSpawnRadius.mValue * 1.75f;
+    // ── update / recycle ───────────────────────────────────────────────────
+    const float killDist = radius * 1.35f;
 
-    for (auto it = cubes.begin(); it != cubes.end();) {
-        updateCube(*it, deltaTime, timeSec);
+    for (auto& c : cubes)
+    {
+        updateCube(c, dt, t);
 
-        if (it->lifetime <= 0) {
-            it = cubes.erase(it);
-            continue;
+        // Expired, or you ran/flew past it: recycle it into the air around you
+        // instead of letting it fade away, so the population never thins out.
+        if (c.life <= 0.f || !std::isfinite(c.position.x) ||
+            glm::distance(c.position, anchor) > killDist)
+        {
+            respawn(c, anchor, radius);
         }
-
-        // Particle got left behind (fast flight, pearls): recycle it back
-        // around the anchor right now at full alpha — the swarm keeps up
-        // with you no matter the speed
-        if (glm::distance(it->position, anchor) > recycleDist) {
-            *it = makeCube(anchor, true);
-        }
-
-        renderCube(*it);
-        ++it;
     }
+
+    // Depth sort: the far ones are drawn first so the near ones land on top.
+    std::sort(cubes.begin(), cubes.end(), [&](const AmbientCube& a, const AmbientCube& b) {
+        return glm::distance(a.position, anchor) > glm::distance(b.position, anchor);
+    });
+
+    for (const auto& cube : cubes)
+        renderCube(cube);
 }

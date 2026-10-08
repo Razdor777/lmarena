@@ -252,3 +252,41 @@ public:
         mValue[3] = ((val >> 24) & 0xFF) / 255.0f;
     }
 };
+
+class StringSetting : public Setting
+{
+public:
+    std::string mValue;
+    char mBuffer[128] = {};
+    bool mIsPassword = false;
+
+    StringSetting(std::string name, std::string description, std::string value, bool isPassword = false)
+        : Setting(std::move(name), std::move(description), SettingType::String),
+          mValue(std::move(value)), mIsPassword(isPassword)
+    {
+        syncBuffer();
+    }
+
+    void setValue(const std::string& value) {
+        mValue = value;
+        syncBuffer();
+    }
+
+    // Sync mBuffer from mValue (call after mValue changes externally)
+    void syncBuffer() {
+        memset(mBuffer, 0, sizeof(mBuffer));
+        strncpy_s(mBuffer, mValue.c_str(), sizeof(mBuffer) - 1);
+    }
+
+    // Sync mValue from mBuffer (call after ImGui edits mBuffer)
+    void syncValue() {
+        mValue = mBuffer;
+    }
+
+    nlohmann::json serialize() override
+    {
+        nlohmann::json j = Setting::serialize();
+        j["stringValue"] = mValue;
+        return j;
+    }
+};

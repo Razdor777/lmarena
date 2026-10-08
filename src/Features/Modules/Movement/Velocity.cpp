@@ -44,10 +44,6 @@ void Velocity::onPacketInEvent(PacketInEvent& event)
 
     switch (mMode.mValue)
     {
-    case Mode::Full:
-        event.setCancelled(true);
-        break;
-
     case Mode::Percent:
     {
         glm::vec3 motion = packet->mMotion;

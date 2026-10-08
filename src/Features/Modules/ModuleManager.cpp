@@ -10,46 +10,39 @@
 #include "Combat/Aimbot.hpp"
 #include "Combat/ArrowTP.hpp"
 #include "Combat/Aura.hpp"
-#include "Combat/AutoClicker.hpp"
-#include "Combat/Criticals.hpp"
-#include "Combat/GhostMode.hpp"
-#include "Combat/HitBoxes.hpp"
 #include "Combat/InfiniteAura.hpp"
 #include "Combat/InfiniteChestAura.hpp"
 #include "Combat/PearlStopper.hpp"
+#include "Combat/HitBoxes.hpp"
+#include "Combat/AutoClicker.hpp"
+#include "Combat/Criticals.hpp"
 #include "Combat/Reach.hpp"
+#include "Combat/LastTP.hpp"
 #include "Combat/TriggerBot.hpp"
 
 #include "Misc/AntiBot.hpp"
 #include "Misc/AntiCheatDetector.hpp"
 #include "Misc/Anticheat.hpp"
 #include "Misc/ArmorSlotUnlock.hpp"
-#include "Misc/AutoDodge.hpp"
 #include "Misc/AutoLoot.hpp"
 #include "Misc/AutoMessage.hpp"
 #include "Misc/DeviceSpoof.hpp"
 #include "Misc/Disabler.hpp"
 #include "Misc/FakeChat.hpp"
 #include "Misc/Friends.hpp"
-#include "Misc/ItemDupe.hpp"
-#include "Misc/ItemUseDelayFix.hpp"
+#include "Misc/JavaInventory.hpp"
 #include "Misc/JavaInventoryHotkeys.hpp"
 #include "Misc/KickSounds.hpp"
-#include "Misc/Killsults.hpp"
 #include "Misc/NetSkip.hpp"
 #include "Misc/NoFilter.hpp"
 #include "Misc/NoPacket.hpp"
 #include "Misc/NoPause.hpp"
 #include "Misc/PacketLogger.hpp"
-#include "Misc/PlayerLogger.hpp"
 #include "Misc/WhoisCollector.hpp"
-#include "Misc/SkinBlinker.hpp"
-#include "Misc/SkinChanger.hpp"
-#include "Misc/SkinSpoofer.hpp"
+#include "Misc/JavaInventory.hpp"
 #include "Misc/SkinStealer.hpp"
+#include "Misc/AdminPanel.hpp"
 #include "Misc/Spammer.hpp"
-#include "Misc/SpectatorDetector.hpp"
-#include "Misc/StaffAlert.hpp"
 #include "Misc/TestModule.hpp"
 #include "Misc/ToggleSounds.hpp"
 
@@ -68,7 +61,6 @@
 #include "Movement/NoSlowDown.hpp"
 #include "Movement/ReverseStep.hpp"
 #include "Movement/SafeWalk.hpp"
-#include "Movement/ServerSneak.hpp"
 #include "Movement/Speed.hpp"
 #include "Movement/Spider.hpp"
 #include "Movement/Sprint.hpp"
@@ -78,9 +70,9 @@
 
 #include "Player/AntiVoid.hpp"
 #include "Player/AutoArmor.hpp"
+#include "Player/AutoKick.hpp"
 #include "Player/AutoTool.hpp"
 #include "Player/Cage.hpp"
-#include "Player/ChainTP.hpp"
 #include "Player/ChestAura.hpp"
 #include "Player/ChestStealer.hpp"
 #include "Player/ClickTp.hpp"
@@ -96,7 +88,6 @@
 #include "Player/OreMiner.hpp"
 #include "Player/OreMinerV2.hpp"
 #include "Player/PlayerTracker.hpp"
-#include "Player/Regen.hpp"
 #include "Player/RegionFill.hpp"
 #include "Player/Scaffold.hpp"
 #include "Player/Schematic.hpp"
@@ -114,53 +105,47 @@
 #include "Visual/ArmorHUD.hpp"
 #include "Visual/Arraylist.hpp"
 #include "Visual/BlockESP.hpp"
-#include "Visual/ChinaHat.hpp"
 #include "Visual/ClickGui.hpp"
+#include "Visual/CustomChat.hpp"
 #include "Visual/PlayerPositionOffset.hpp"
-#include "Visual/CustomFog.hpp"
 #include "Visual/DamageLog.hpp"
 #include "Visual/DestroyProgress.hpp"
 #include "Visual/ESP.hpp"
 #include "Visual/EnemyIndicator.hpp"
 #include "Visual/EntityRadar.hpp"
-#include "Visual/FakePlayer.hpp"
 #include "Visual/Freelook.hpp"
 #include "Visual/FullBright.hpp"
-#include "Visual/Glint.hpp"
-#include "Visual/Goofy.hpp"
 #include "Visual/HealthBar.hpp"
 #include "Visual/HealthDisplay.hpp"
 #include "Visual/HudEditor.hpp"
 #include "Visual/Interface.hpp"
 #include "Visual/ItemESP.hpp"
 #include "Visual/ItemPhysics.hpp"
+#include "Visual/JumpCircles.hpp"
 #include "Visual/Kagune.hpp"
 #include "Visual/LevelInfo.hpp"
 #include "Visual/PlayerHUD.hpp"
 #include "Visual/InventoryHUD.hpp"
 #include "Visual/MotionBlur.hpp"
-#include "Visual/NameProtect.hpp"
 #include "Visual/Nametags.hpp"
 #include "Visual/NearbyPlayers.hpp"
 #include "Visual/NoCameraClip.hpp"
-#include "Visual/NoDebuff.hpp"
 #include "Visual/CustomCrosshair.hpp"
+#include "Visual/Glint.hpp"
 #include "Visual/NoHurtcam.hpp"
 #include "Visual/NoRender.hpp"
 #include "Visual/Notifications.hpp"
 #include "Visual/OpponentReach.hpp"
-#include "Visual/PathTracer.hpp"
 #include "Visual/PotionHUD.hpp"
 #include "Visual/ProjectileTracer.hpp"
 #include "Visual/ReachCounter.hpp"
 #include "Visual/RobloxCamera.hpp"
+#include "Visual/SkyPack.hpp"
 #include "Visual/HitColor.hpp"
-#include "Visual/SessionInfo.hpp"
+#include "Visual/HitParticles.hpp"
 #include "Visual/TargetHUD.hpp"
-#include "Visual/TeamHealthBars.hpp"
 #include "Visual/Tracers.hpp"
 #include "Visual/UpdateForm.hpp"
-#include "Visual/VSync.hpp"
 #include "Visual/ViewModel.hpp"
 #include "Visual/Watermark.hpp"
 #include "Visual/Zoom.hpp"
@@ -177,10 +162,10 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<Criticals>());
   mModules.emplace_back(std::make_shared<InfiniteAura>());
   mModules.emplace_back(std::make_shared<InfiniteChestAura>());
+  mModules.emplace_back(std::make_shared<LastTP>());
   mModules.emplace_back(std::make_shared<Aimbot>());
   mModules.emplace_back(std::make_shared<ArrowTP>());
   mModules.emplace_back(std::make_shared<PearlStopper>());
-  mModules.emplace_back(std::make_shared<GhostMode>());
   mModules.emplace_back(std::make_shared<HitBoxes>());
 
   // Movement
@@ -196,7 +181,6 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<Step>());
   mModules.emplace_back(std::make_shared<LongJump>());
   mModules.emplace_back(std::make_shared<Spider>());
-  mModules.emplace_back(std::make_shared<ServerSneak>());
   mModules.emplace_back(std::make_shared<AutoSneak>());
   mModules.emplace_back(std::make_shared<AirJump>());
   mModules.emplace_back(std::make_shared<TargetStrafe>());
@@ -210,13 +194,13 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ChestStealer>());
   mModules.emplace_back(std::make_shared<InvManager>());
   mModules.emplace_back(std::make_shared<PlayerTracker>());
-  mModules.emplace_back(std::make_shared<Regen>());
   mModules.emplace_back(std::make_shared<SchematicBuilder>());
   mModules.emplace_back(std::make_shared<NoClip>());
   mModules.emplace_back(std::make_shared<ContainerActions>());
   mModules.emplace_back(std::make_shared<RegionFill>());
   mModules.emplace_back(std::make_shared<OreMinerV2>());
   mModules.emplace_back(std::make_shared<AutoArmor>());
+  mModules.emplace_back(std::make_shared<AutoKick>());
   mModules.emplace_back(std::make_shared<Scaffold>());
   mModules.emplace_back(std::make_shared<Nuker>());
   mModules.emplace_back(std::make_shared<OreMiner>());
@@ -232,7 +216,6 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<NoRotate>());
   mModules.emplace_back(std::make_shared<FastEat>());
   mModules.emplace_back(std::make_shared<SpawnerAura>());
-  mModules.emplace_back(std::make_shared<ChainTP>());
   mModules.emplace_back(std::make_shared<AutoLoot>());
   mModules.emplace_back(std::make_shared<Cage>());
 
@@ -241,40 +224,37 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<PacketLogger>());
   mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
   mModules.emplace_back(std::make_shared<DeviceSpoof>());
-  mModules.emplace_back(std::make_shared<ItemUseDelayFix>());
+  mModules.emplace_back(std::make_shared<AdminPanel>());
   mModules.emplace_back(std::make_shared<KickSounds>());
   mModules.emplace_back(std::make_shared<AntiBot>());
+  mModules.emplace_back(std::make_shared<JavaInventory>());
   mModules.emplace_back(std::make_shared<AntiCheatDetector>());
   mModules.emplace_back(std::make_shared<FakeChat>());
   mModules.emplace_back(std::make_shared<Friends>());
   mModules.emplace_back(std::make_shared<NoPacket>());
   mModules.emplace_back(std::make_shared<NoFilter>());
   mModules.emplace_back(std::make_shared<AutoMessage>());
-  mModules.emplace_back(std::make_shared<Killsults>());
   mModules.emplace_back(std::make_shared<NetSkip>());
   mModules.emplace_back(std::make_shared<Disabler>());
-  mModules.emplace_back(std::make_shared<StaffAlert>());
   mModules.emplace_back(std::make_shared<JavaInventoryHotkeys>());
+  mModules.emplace_back(std::make_shared<JavaInventory>());
   mModules.emplace_back(std::make_shared<Spammer>());
   mModules.emplace_back(std::make_shared<SkinStealer>());
-  mModules.emplace_back(std::make_shared<AutoDodge>());
   mModules.emplace_back(std::make_shared<TestModule>());
-  mModules.emplace_back(std::make_shared<SkinChanger>());
-  mModules.emplace_back(std::make_shared<SpectatorDetector>());
-  mModules.emplace_back(std::make_shared<PlayerLogger>());
   mModules.emplace_back(std::make_shared<WhoisCollector>());
-  mModules.emplace_back(std::make_shared<ItemDupe>());
-  mModules.emplace_back(std::make_shared<SkinSpoofer>());
 
   // Visual
   mModules.emplace_back(std::make_shared<Watermark>());
   mModules.emplace_back(std::make_shared<ClickGui>());
   mModules.emplace_back(std::make_shared<Interface>());
+  mModules.emplace_back(std::make_shared<HitParticles>());
   mModules.emplace_back(std::make_shared<Arraylist>());
   mModules.emplace_back(std::make_shared<LevelInfo>());
+  mModules.emplace_back(std::make_shared<Glint>());
   mModules.emplace_back(std::make_shared<PlayerHUD>());
   mModules.emplace_back(std::make_shared<InventoryHUD>());
   mModules.emplace_back(std::make_shared<Notifications>());
+  mModules.emplace_back(std::make_shared<CustomChat>());
   mModules.emplace_back(std::make_shared<HitColor>());
   mModules.emplace_back(std::make_shared<DestroyProgress>());
   mModules.emplace_back(std::make_shared<ESP>());
@@ -292,26 +272,19 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<NoHurtcam>());
   mModules.emplace_back(std::make_shared<FullBright>());
   mModules.emplace_back(std::make_shared<ViewModel>());
-  mModules.emplace_back(std::make_shared<SessionInfo>());
   mModules.emplace_back(std::make_shared<ReachCounter>());
   mModules.emplace_back(std::make_shared<OpponentReach>());
-  mModules.emplace_back(std::make_shared<VSync>());
   mModules.emplace_back(std::make_shared<Tracers>());
-  mModules.emplace_back(std::make_shared<ChinaHat>());
-  mModules.emplace_back(std::make_shared<NameProtect>());
   mModules.emplace_back(std::make_shared<Zoom>());
-  mModules.emplace_back(std::make_shared<Glint>());
-  mModules.emplace_back(std::make_shared<NoDebuff>());
   mModules.emplace_back(std::make_shared<Freelook>());
   mModules.emplace_back(std::make_shared<NoRender>());
   mModules.emplace_back(std::make_shared<Kagune>());
   mModules.emplace_back(std::make_shared<Ambience>());
+  mModules.emplace_back(std::make_shared<SkyPack>());
   mModules.emplace_back(std::make_shared<AmbientCubes>());
+  mModules.emplace_back(std::make_shared<JumpCircles>());
   mModules.emplace_back(std::make_shared<EntityRadar>());
   mModules.emplace_back(std::make_shared<AfterImage>());
-  mModules.emplace_back(std::make_shared<PathTracer>());
-  mModules.emplace_back(std::make_shared<FakePlayer>());
-  mModules.emplace_back(std::make_shared<CustomFog>());
   mModules.emplace_back(std::make_shared<PotionHUD>());
   mModules.emplace_back(std::make_shared<NearbyPlayers>());
   mModules.emplace_back(std::make_shared<EnemyIndicator>());
@@ -319,17 +292,14 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ProjectileTracer>());
   mModules.emplace_back(std::make_shared<DamageLog>());
   mModules.emplace_back(std::make_shared<HealthBar>());
-  mModules.emplace_back(std::make_shared<TeamHealthBars>());
   mModules.emplace_back(std::make_shared<HealthDisplay>());
 
 #ifdef __PRIVATE_BUILD__
-  mModules.emplace_back(std::make_shared<SkinBlinker>());
   mModules.emplace_back(std::make_shared<Anticheat>());
 #endif
 
 #ifdef __DEBUG__
   mModules.emplace_back(std::make_shared<AutoPath>());
-  mModules.emplace_back(std::make_shared<Goofy>());
 #endif
 
   // Determine if we should add UpdateForm
@@ -582,6 +552,11 @@ void ModuleManager::deserialize(const nlohmann::json &j, bool showMessages) {
                 auto *colorSetting = static_cast<ColorSetting *>(set);
                 for (int i = 0; i < 4; i++) {
                   colorSetting->mValue[i] = settingValue["colorValue"][i];
+                }
+              } else if (set->mType == SettingType::String) {
+                auto *stringSetting = static_cast<StringSetting *>(set);
+                if (settingValue.contains("stringValue") && settingValue["stringValue"].is_string()) {
+                  stringSetting->setValue(settingValue["stringValue"].get<std::string>());
                 }
               }
 

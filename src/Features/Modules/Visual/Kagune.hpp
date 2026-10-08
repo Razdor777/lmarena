@@ -2,11 +2,13 @@
 
 #include <vector>
 #include <array>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <Features/Modules/Module.hpp>
 #include <Features/Modules/Setting.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
+#include <Features/Events/LookInputEvent.hpp>
 
 class Kagune : public ModuleBase<Kagune>
 {
@@ -14,53 +16,64 @@ public:
     // ── Атака ─────────────────────────────────────────────────────────────
     enum class AttackMode { Alternate, Sting, Slap };
     EnumSettingT<AttackMode> mAttackMode = EnumSettingT<AttackMode>(
-        "Attack Mode", "Attack animation type", AttackMode::Alternate,
+        "Attack Mode", "Slap = шлепок по дуге, Sting = укол", AttackMode::Alternate,
         "Alternate", "Sting", "Slap");
 
-    // ── Частицы ───────────────────────────────────────────────────────────
+    // ── Кровь ─────────────────────────────────────────────────────────────
     enum class ParticleColor { DarkRed, BrightRed, Gradient };
     EnumSettingT<ParticleColor> mParticleColor = EnumSettingT<ParticleColor>(
-        "Blood Color", "Hemolymph particle color", ParticleColor::Gradient,
+        "Blood Color", "Blood particle color", ParticleColor::Gradient,
         "Dark Red", "Bright Red", "Gradient");
 
-    // ── Основные параметры ────────────────────────────────────────────────
-    NumberSetting mLength    = NumberSetting("Length",     "Max tentacle length", 2.50f, 1.0f,  8.0f,  0.1f);
-    NumberSetting mThickness = NumberSetting("Thickness",  "Tentacle thickness",  8.00f, 2.0f,  20.0f, 0.5f);
-    NumberSetting mCount     = NumberSetting("Count",      "Number of tentacles", 4.00f, 1.0f,  8.0f,  1.0f);
-    NumberSetting mSegments  = NumberSetting("Segments",   "Spine segments",      16.0f, 4.0f,  20.0f, 1.0f);
-    NumberSetting mRingRes   = NumberSetting("Ring Res",   "Tube sides",          7.00f, 3.0f,  10.0f, 1.0f);
-    NumberSetting mAnimTime  = NumberSetting("Anim Time",  "Attack duration",     0.50f, 0.1f,  2.0f,  0.05f);
-    NumberSetting mHideDelay = NumberSetting("Hide Delay", "Auto-hide (sec)",    20.00f, 10.0f, 60.0f, 1.0f);
+    // ── Палитра ───────────────────────────────────────────────────────────
+    enum class Palette { Crimson, Blood, Ember, Custom };
+    EnumSettingT<Palette> mPalette = EnumSettingT<Palette>(
+        "Palette", "Color preset", Palette::Crimson,
+        "Crimson", "Blood", "Ember", "Custom");
+
+    // ── Параметры ─────────────────────────────────────────────────────────
+    NumberSetting mLength    = NumberSetting("Length",       "Max tentacle length",         2.50f, 1.0f, 8.0f,  0.1f);
+    NumberSetting mThickness = NumberSetting("Thickness",    "Tentacle size",               8.00f, 2.0f, 20.0f, 0.5f);
+    NumberSetting mCount     = NumberSetting("Count",        "Number of tentacles",         4.00f, 1.0f, 8.0f,  1.0f);
+    NumberSetting mSegments  = NumberSetting("Blocks",       "Blocks per tentacle",         12.0f, 6.0f, 24.0f, 1.0f);
+    NumberSetting mAnimTime  = NumberSetting("Anim Time",    "Attack duration (sec)",       0.60f, 0.2f, 2.0f,  0.05f);
+    NumberSetting mHideDelay = NumberSetting("Hide Delay",   "Auto-hide after (sec)",       12.0f, 3.0f, 60.0f, 1.0f);
+    NumberSetting mSway      = NumberSetting("Sway",         "Idle motion amount",          1.00f, 0.0f, 2.0f,  0.1f);
+    NumberSetting mShake     = NumberSetting("Camera Shake", "Shake on strike, degrees",   1.0f,  0.0f, 3.0f,  0.1f);
+    NumberSetting mPulse     = NumberSetting("Pulse",        "Pulsing glow strength",       1.00f, 0.0f, 2.0f,  0.1f);
+    NumberSetting mWidth     = NumberSetting("Blade Width",  "Block width multiplier",      1.00f, 0.4f, 2.0f,  0.1f);
 
     // ── Визуал ────────────────────────────────────────────────────────────
-    BoolSetting mSpikes  = BoolSetting("Spikes",   "Bone crystal spikes",  true);
-    BoolSetting mGlow    = BoolSetting("Glow",     "Blood particles",      true);
-    BoolSetting mShowFPV = BoolSetting("FPV Show", "Show in first person", true);
+    BoolSetting mOutline = BoolSetting("Outline",  "Ink outline",                          true);
+    BoolSetting mGlow    = BoolSetting("Glow",     "Blood particles",                      true);
+    BoolSetting mShowFPV = BoolSetting("FPV Show", "Show in first person",                 true);
+    BoolSetting mDetail  = BoolSetting("Detail",   "Glow bands + strike trail",            true);
 
-    // ── Цвета ─────────────────────────────────────────────────────────────
-    ColorSetting mColOuter = ColorSetting("Flesh Color", "Outer flesh", 0.45f, 0.02f, 0.03f, 1.0f);
-    ColorSetting mColCore  = ColorSetting("Core Color",  "Inner core",  1.00f, 0.15f, 0.15f, 1.0f);
-    ColorSetting mColSpike = ColorSetting("Spike Color", "Bone spikes", 0.85f, 0.78f, 0.72f, 1.0f);
+    // ── Цвета (Palette = Custom) ──────────────────────────────────────────
+    ColorSetting mColBlade = ColorSetting("Blade Color", "Flesh color",          0.52f, 0.03f, 0.06f, 1.0f);
+    ColorSetting mColGlow  = ColorSetting("Glow Color",  "Glowing rings color",  1.00f, 0.22f, 0.12f, 1.0f);
+    ColorSetting mColShade = ColorSetting("Shade Color", "Shadow / step color",  0.12f, 0.00f, 0.02f, 1.0f);
 
-    // ── Константы позиций ─────────────────────────────────────────────────
-    static constexpr float kOffsetY   = -1.70f;
-    static constexpr float kOffsetZ   =  0.10f;
-    static constexpr float kSpreadX   =  0.20f;
-    static constexpr float kUpperY    =  0.30f;
-    static constexpr float kLowerY    = -0.05f;
-    static constexpr float kHeightFac =  0.57f;
+    // ── Новые настройки (в конце, чтобы не сдвигать старые) ───────────────
+    BoolSetting   mSpikes   = BoolSetting("Spikes",        "Small spikes on the back of blocks", true);
+    BoolSetting   mLegs     = BoolSetting("Spider Legs",   "Lower tentacles walk on the ground", true);
+    BoolSetting   mExitAnim = BoolSetting("Exit Anim",     "Tentacles retract when module is disabled", true);
+    NumberSetting mFpvSize  = NumberSetting("FPV Size",    "Tentacle size in first person", 0.65f, 0.3f, 1.2f, 0.05f);
+    NumberSetting mYOffset  = NumberSetting("Height Offset", "Root height tweak (3rd person)", 0.0f, -1.0f, 1.0f, 0.05f);
 
+    // ── Константы ─────────────────────────────────────────────────────────
+    static constexpr int   kMax     = 8;
+    static constexpr int   kNodes   = 14;     // узлов физики на щупальце
+    static constexpr float kRootFrac = 0.53f; // высота корня от роста игрока
+    static constexpr float kOffsetZ = 0.18f;  // корень на задней поверхности тела
+
+    // ── Видимость ─────────────────────────────────────────────────────────
     uint64_t mEnableTime = 0;
-
-    // ── Spawn/despawn ──────────────────────────────────────────────────────
-    enum class SpawnState { Hidden, Spawning, Visible, Despawning };
-    SpawnState mSpawnState      = SpawnState::Hidden;
-    uint64_t   mSpawnStart      = 0;
-    uint64_t   mLastHit         = 0;
-    float      mDespawnProgress = 0.f;
-
-    bool      mPendingHit    = false;
-    glm::vec3 mPendingTarget = {};
+    uint64_t mLastHit    = 0;
+    bool     mWantShown  = false;
+    float    mVis        = 0.f;
+    bool     mListening  = false;
+    bool     mClosing    = false;
 
     // ── Частицы ───────────────────────────────────────────────────────────
     struct Particle {
@@ -73,62 +86,103 @@ public:
     };
     std::vector<Particle> mParticles;
 
-    // ── Очередь ударов ────────────────────────────────────────────────────
+    // ── Удары ─────────────────────────────────────────────────────────────
     struct HitRecord {
         uint64_t  hitTime = 0;
         glm::vec3 target  = {};
-        uint8_t   animId  = 0;
+        glm::vec3 jit     = {};
+        float     dur     = 0.6f;
         bool      isSlap  = false;
-        float     stretch = 1.f;
+        uint8_t   var     = 0;
     };
 
-    // ── Состояние щупальца ────────────────────────────────────────────────
+    struct TrailPt { glm::vec3 p{}; float t = -100.f; };
+
     struct TentacleState {
-        std::vector<HitRecord> hitQueue;
-        HitRecord currentHit   = {};
-        bool      hasActiveHit = false;
+        std::array<glm::vec3, kNodes> pos{};
+        std::array<glm::vec3, kNodes> vel{};
+        bool inited = false;
 
-        glm::vec3 target     = {};
-        uint8_t   animId     = 0;
-        float     stretch    = 1.f;
-        bool      isSlap     = false;
+        HitRecord cur{};
+        bool      hasActive  = false;
+        bool      impactDone = false;
         uint32_t  hitCount   = 0;
-        glm::vec3 restTip    = {};
-        bool      restInited = false;
-        float     stabAngleH = 0.f;
-        float     stabAngleV = 0.f;
-
         uint64_t  hardenTime = 0;
-        uint64_t  hitTime    = 0;
-    };
 
-    static constexpr int kMax = 8;
+        // нога
+        glm::vec3 foot{};
+        glm::vec3 stepFrom{};
+        bool      footInit = false;
+        bool      stepping = false;
+        float     stepT    = 0.f;
+
+        std::array<TrailPt, 24> trail{};
+        int trailHead = 0;
+        void pushTrail(const glm::vec3& p, float t)
+        {
+            TrailPt tp; tp.p = p; tp.t = t;
+            trail[trailHead] = tp;
+            trailHead = (trailHead + 1) % 24;
+        }
+    };
     std::array<TentacleState, kMax> mTentacles{};
 
-    int      mStriker     = 0;
-    int      mLastStriker = -1;
-    uint32_t mHits        = 0;
+    // ── Планировщик ударов ────────────────────────────────────────────────
+    struct PendingHit {
+        bool      valid  = false;
+        glm::vec3 target = {};
+        uint64_t  time   = 0;
+    };
+    PendingHit mPending;
+    uint64_t   mNextAttackAt   = 0;
+    uint64_t   mLastPacketHit  = 0;
+    float      mHitIntervalEma = 0.8f;
+    int        mStriker        = 0;
+    uint32_t   mHits           = 0;
 
-    // ── Прыжок ────────────────────────────────────────────────────────────
-    float    mJumpVel     = 0.f;
-    bool     mWasOnGround = true;
-    float    mJumpPush    = 0.f;
-    uint64_t mJumpStart   = 0;
+    // ── Движение игрока ───────────────────────────────────────────────────
+    bool      mWasOnGround     = true;
+    bool      mJumped          = false;
+    uint64_t  mAirStart        = 0;
+    float     mAir             = 0.f;      // 0 на земле .. 1 в воздухе
+    float     mPrevSpeed       = 0.f;
+    float     mBrake           = 0.f;
+    glm::vec3 mMoveDir         = {0.f, 0.f, 1.f};
+    float     mSmoothedBodyYaw = -999.f;
+    float     mSmY             = 0.f;
+    bool      mSmYInit         = false;
+    float     mGroundY         = 0.f;
+    bool      mGroundInit      = false;
+    int       mPosMode         = 0;        // 0 неизвестно, 1 getPos()=глаза, 2 getPos()=ноги
 
-    // ── Сглаженный body yaw (вычисляем сами) ──────────────────────────────
-    // -999.f = не инициализирован
-    float mSmoothedBodyYaw = -999.f;
+    // ── RNG ───────────────────────────────────────────────────────────────
+    uint32_t mRng = 0x1234567u;
+    float rndU() { mRng = mRng * 1664525u + 1013904223u; return float(mRng >> 8) / 16777216.f; }
+    float rndS() { return rndU() * 2.f - 1.f; }
+
+    // ── Тряска камеры ─────────────────────────────────────────────────────
+    uint64_t  mShakeStart   = 0;
+    float     mShakeAmp     = 0.f;
+    glm::vec2 mShakeDir     = {1.f, 1.f};
+    glm::vec2 mShakeApplied = {0.f, 0.f};
 
     Kagune() : ModuleBase("Kagune", "Tokyo Ghoul kagune cosmetic", ModuleCategory::Visual, 0, false)
     {
         addSettings(
-            &mAttackMode,
-            &mParticleColor,
-            &mLength, &mThickness, &mCount, &mSegments, &mRingRes, &mAnimTime,
-            &mHideDelay,
-            &mSpikes, &mGlow, &mShowFPV,
-            &mColOuter, &mColCore, &mColSpike
+            &mAttackMode, &mParticleColor,
+            &mLength, &mThickness, &mCount, &mSegments, &mAnimTime,
+            &mHideDelay, &mSway,
+            &mOutline, &mGlow, &mShowFPV,
+            &mColBlade, &mColGlow, &mColShade,
+            &mShake,
+            &mPulse, &mWidth,
+            &mPalette, &mDetail,
+            &mSpikes, &mLegs, &mExitAnim, &mFpvSize, &mYOffset
         );
+
+        VISIBILITY_CONDITION(mColBlade, mPalette.mValue == Palette::Custom);
+        VISIBILITY_CONDITION(mColGlow,  mPalette.mValue == Palette::Custom);
+        VISIBILITY_CONDITION(mColShade, mPalette.mValue == Palette::Custom);
 
         mNames = {
             {Lowercase,       "kagune"},
@@ -140,6 +194,9 @@ public:
 
     void onEnable()  override;
     void onDisable() override;
+    void unlisten();
     void onRenderEvent(RenderEvent& event);
     void onPacketOutEvent(PacketOutEvent& event);
+    void onLookInputEvent(LookInputEvent& event);
+    void triggerShake(float power);
 };

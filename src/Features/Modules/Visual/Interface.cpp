@@ -8,10 +8,10 @@
 #include <Features/Events/ModuleStateChangeEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
-#include <Features/Events/DrawImageEvent.hpp>
 #include <Features/Events/PreGameCheckEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
 
+#include <Features/Modules/Visual/ClickGui.hpp>
 #include <Features/Modules/Visual/Interface.hpp>
 #include <Hook/Hooks/RenderHooks/ActorRenderDispatcherHook.hpp>
 #include <Hook/Hooks/RenderHooks/HoverTextRendererHook.hpp>
@@ -88,17 +88,11 @@ float pLerpedBodyYaw;
 
 bool usingPaip = false;
 
-// Returns the FontHelper key string for the currently selected FontType
-static std::string fontTypeToKey(Interface::FontType t) {
-    switch (t) {
-        case Interface::FontType::ProductSans: return "product_sans";
-        case Interface::FontType::Mojangles:   return "mojangles";
-        case Interface::FontType::Comfortaa:   return "comfortaa";
-        case Interface::FontType::OpenSans:    return "open_sans";
-        case Interface::FontType::SFPro:       return "sf_pro_display";
-        case Interface::FontType::Sarabun:     return "sarabun_light";
-        default:                               return "roboto";
-    }
+// Returns the FontHelper key string for the currently selected FontType.
+// Mntsb is the only text font the client ships with, so this is a fixed key.
+static std::string fontTypeToKey(Interface::FontType)
+{
+    return "mntsb";
 }
 
 void Interface::onEnable()
@@ -217,6 +211,14 @@ void Interface::onPregameCheckEvent(PreGameCheckEvent& event)
 
 void Interface::onRenderEvent(RenderEvent& event)
 {
+    // Apply font changes immediately; Interface is always enabled, so relying
+    // on onEnable alone made the selector appear broken until a restart.
+    static int lastFont = -1;
+    if (lastFont != mFont.as<int>()) {
+        lastFont = mFont.as<int>();
+        FontHelper::setCurrentFont(fontTypeToKey(mFont.mValue));
+    }
+
     auto player = ClientInstance::get()->getLocalPlayer();
     static bool lastPlayerState = false;
 

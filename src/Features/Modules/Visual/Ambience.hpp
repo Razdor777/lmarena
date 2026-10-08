@@ -65,6 +65,12 @@ public:
     ColorSetting mMoonColor = ColorSetting("Moon Color", "Color of the moon", 0.8f, 0.85f, 1.0f, 1.0f);
     BoolSetting mAnimateSun = BoolSetting("Animate Sun", "Pulse animation for sun", false);
 
+    // === DEBUG ===
+    // Хуки неба/солнца/облаков могут молчать по трём разным причинам (детур не
+    // встал, функция не вызывается в этом билде, или структура/оффсеты другие).
+    // Счётчики вызовов и разовый дамп структуры позволяют различить их по логу.
+    BoolSetting mDebug = BoolSetting("Debug Log", "Log whether the render hooks fire and dump the struct once (offset hunting)", false);
+
     Ambience() : ModuleBase("Ambience", "Customize world visuals: sky, fog, clouds, sun/moon",
                             ModuleCategory::Visual, 0, false) {
         mNames = {
@@ -101,7 +107,9 @@ public:
             &mModifySunMoon,
             &mSunColor,
             &mMoonColor,
-            &mAnimateSun
+            &mAnimateSun,
+            // Debug
+            &mDebug
         );
 
         // Set visibility conditions
@@ -151,6 +159,7 @@ public:
     bool shouldModifyClouds() const { return mEnabled && mModifyClouds.mValue; }
     bool shouldDisableClouds() const { return mEnabled && mModifyClouds.mValue && mDisableClouds.mValue; }
     bool shouldModifySunMoon() const { return mEnabled && mModifySunMoon.mValue; }
+    bool isDebugLog() const { return mEnabled && mDebug.mValue; }
 
     float* getSkyColor() { return mCurrentSkyColor; }
     float* getEndSkyColor() { return mEndSkyColor.mValue; }

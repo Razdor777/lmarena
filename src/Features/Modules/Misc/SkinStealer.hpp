@@ -9,7 +9,9 @@ public:
     BoolSetting mApplySkin = BoolSetting("Apply Skin", "Automatically applies the stolen skin", false);
 
     SkinStealer() : ModuleBase("SkinStealer", "Steal skins from other players", ModuleCategory::Misc, 0, false) {
+#ifdef __PRIVATE_BUILD__
         addSettings(&mApplySkin);
+#endif
 
         mNames = {
             {Lowercase, "skinstealer"},

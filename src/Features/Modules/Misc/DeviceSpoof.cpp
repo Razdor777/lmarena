@@ -13,6 +13,8 @@
 #include <Utils/Buffer.hpp>
 #include "EditionFaker.hpp"
 
+#include <spdlog/spdlog.h>
+
 static uintptr_t deviceModelAddr;
 
 void DeviceSpoof::onInit()
@@ -20,7 +22,15 @@ void DeviceSpoof::onInit()
     deviceModelAddr = SigManager::ConnectionRequest_create_DeviceModel;
 }
 
-void DeviceSpoof::inject() {
+bool DeviceSpoof::inject() {
+    // If the signature did not resolve, patching would write into address 0.
+    // Bail out (and report) instead of crashing the game.
+    if (deviceModelAddr == 0)
+    {
+        spdlog::error("[DeviceSpoof] signature not found, cannot inject");
+        return false;
+    }
+
     MemUtils::ReadBytes((void *) deviceModelAddr, originalData, sizeof(originalData));
 
     MemUtils::NopBytes(deviceModelAddr, 7);
@@ -37,12 +47,18 @@ void DeviceSpoof::inject() {
 
     MemUtils::writeBytes(deviceModelAddr, "\xE9", 1);
     MemUtils::writeBytes(deviceModelAddr + 1, &newRelRip4, sizeof(int32_t));
+
+    mInjected = true;
+    return true;
 }
 
 void DeviceSpoof::eject()
 {
+    if (!mInjected || deviceModelAddr == 0) return;
+
+    mInjected = false;
     MemUtils::writeBytes(deviceModelAddr, originalData, sizeof(originalData));
-    FreeBuffer(patchPtr);;
+    FreeBuffer(patchPtr);
 }
 
 void DeviceSpoof::spoofMboard() {
@@ -61,7 +77,13 @@ void DeviceSpoof::spoofMboard() {
 
 void DeviceSpoof::onEnable()
 {
-    inject();
+    if (!inject()) return;
+
+    // inject() allocated patchPtr, so the model pointer can be filled in now.
+    // This guarantees the very first connection request after injection is
+    // already spoofed, instead of only the ones that follow a manual toggle.
+    spoofMboard();
+
     gFeatureManager->mDispatcher->listen<ConnectionRequestEvent, &DeviceSpoof::onConnectionRequestEvent>(this);
 }
 

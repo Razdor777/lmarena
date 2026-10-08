@@ -218,7 +218,10 @@ void BlockUtils::placeBlock(glm::vec3 pos, int side)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     glm::ivec3 blockPos = pos;
-    if (side == -1) side = getBlockPlaceFace(blockPos);
+    if (side == -1) {
+        side = getBlockPlaceFace(blockPos);
+        if (side == -1) side = 1; // AirPlace fallback: fake face 1
+    }
 
     glm::vec3 vec = blockPos;
 
@@ -371,7 +374,7 @@ bool BlockUtils::isMiningPosition(glm::ivec3 blockPos) {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
 
-    // Без Regen и OreMiner просто проверяем текущий прогресс
+    // Без OreMiner просто проверяем текущий прогресс
     if (0 < player->getGameMode()->mBreakProgress && player->getLevel()->getHitResult()->mBlockPos == blockPos) 
         return true;
 

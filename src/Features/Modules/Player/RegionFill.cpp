@@ -25,7 +25,94 @@
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
+#include <Utils/StringUtils.hpp>
 #include <algorithm>
+
+// =========================================================
+// ДЕТЕКЦИЯ "ЭТИМ ПРЕДМЕТОМ МОЖНО ПОСТАВИТЬ БЛОК"
+// У костра, кровати, торта, дверей, табличек и т.п. ItemStack::mBlock == nullptr
+// (это не BlockItem), поэтому нужна проверка по имени.
+// =========================================================
+namespace
+{
+    const std::vector<std::string> kBlockPlacingItems = {
+        "campfire", "soul_campfire",
+        "bed", "cake", "door", "sign", "hanging_sign",
+        "kelp", "sugar_cane", "reeds", "nether_wart", "flower_pot",
+        "hopper", "brewing_stand", "cauldron", "repeater", "comparator",
+        "frame", "glow_frame", "skull", "chain", "banner", "bamboo",
+        "candle", "lantern", "soul_lantern", "scaffolding",
+        "lily_pad", "waterlily", "redstone", "string", "seagrass", "nether_sprouts",
+    };
+
+    std::string normalizeName(std::string n)
+    {
+        n = StringUtils::toLower(n);
+        if (n.rfind("item.", 0) == 0) n = n.substr(5);
+        else if (n.rfind("tile.", 0) == 0) n = n.substr(5);
+        if (n.size() > 5 && n.compare(n.size() - 5, 5, ".name") == 0) n = n.substr(0, n.size() - 5);
+        size_t c = n.find(':');
+        if (c != std::string::npos) n = n.substr(c + 1);
+        return n;
+    }
+
+    std::string getStackName(ItemStack* stack)
+    {
+        if (!stack || !stack->mItem) return "";
+        Item* item = stack->getItem();
+        if (!item) return "";
+
+        std::string name;
+        TRY_CALL([&]() { name = item->mName; });
+
+        if (stack->mBlock)
+        {
+            BlockLegacy* bl = stack->mBlock->toLegacy();
+            if (bl)
+            {
+                std::string bn;
+                TRY_CALL([&]() { bn = bl->mName; });
+                if (!bn.empty()) name = bn;
+            }
+        }
+        return normalizeName(name);
+    }
+
+    bool nameIsPlaceable(const std::string& n)
+    {
+        if (n.empty()) return false;
+        for (const auto& p : kBlockPlacingItems)
+        {
+            if (n == p) return true;
+            std::string suffix = "_" + p;
+            if (n.size() > suffix.size() &&
+                n.compare(n.size() - suffix.size(), suffix.size(), suffix) == 0)
+                return true;
+        }
+        return false;
+    }
+
+    bool isBlockPlacingItem(ItemStack* stack)
+    {
+        if (!stack || !stack->mItem || stack->mCount <= 0) return false;
+        Item* item = stack->getItem();
+        if (!item) return false;
+
+        // 1) Обычный блок
+        if (stack->mBlock)
+        {
+            BlockLegacy* bl = stack->mBlock->toLegacy();
+            if (bl && !bl->isAir()) return true;
+        }
+
+        // 2) Инструменты / броня / всё с прочностью — точно не блоки
+        if (item->getItemType() != SItemType::None) return false;
+        if (stack->hasDurability()) return false;
+
+        // 3) Известный предмет, ставящий блок (костёр и т.д.)
+        return nameIsPlaceable(getStackName(stack));
+    }
+}
 
 // =========================================================
 // ENABLE / DISABLE
@@ -46,6 +133,13 @@ void RegionFill::onEnable()
         return;
     }
 
+    if (auto supplies = player->getSupplies())
+        mHeldSlot = supplies->mSelectedSlot;
+    else
+        mHeldSlot = -1;
+
+    if (mDebug.mValue) dumpHotbar();
+
     if (!hasValidSelection()) {
         ChatUtils::displayClientMessage("§cSet pos1 and pos2 first! (.spos1 / .spos2)");
         setEnabled(false);
@@ -61,7 +155,7 @@ void RegionFill::onEnable()
     mFillIndex     = 0;
     mIsTPing       = false;
     mStartTime     = NOW;
-    mMixedSlotCursor = 0;
+    mLastNoBlocksWarn = 0;
 
     {
         std::lock_guard<std::mutex> lk(mMutex);
@@ -78,10 +172,13 @@ void RegionFill::onEnable()
             "§eRegionFill: §f{}x{}x{} §e(§f{} §evolume)", sz.x, sz.y, sz.z, volume);
         ChatUtils::displayClientMessage(
             "§eClearing §f{} §eblocks, then filling §f{}", mTotalToClear, mTotalToFill);
+        if (findAnyPlaceableSlot() == -1)
+            ChatUtils::displayClientMessage("§7(no placeable blocks in hotbar yet — add some before clearing finishes)");
         mState = State::Clearing;
     } else {
         if (findAnyPlaceableSlot() == -1) {
-            ChatUtils::displayClientMessage("§cNo blocks in hotbar!");
+            ChatUtils::displayClientMessage("§cNo placeable blocks in hotbar!");
+            ChatUtils::displayClientMessage("§7Tip: enable §fUse Held Slot §7or §fDebug §7to see what the module detects.");
             setEnabled(false);
             return;
         }
@@ -138,8 +235,6 @@ glm::ivec3 RegionFill::getSelectionMax()
 
 // =========================================================
 // BUILD QUEUES
-// Правило: всё не-воздух в регионе → mClearQueue (если mClearFirst)
-//          всё воздух в регионе    → mFillQueue
 // =========================================================
 
 void RegionFill::buildQueues()
@@ -153,8 +248,7 @@ void RegionFill::buildQueues()
     glm::ivec3 mn = getSelectionMin();
     glm::ivec3 mx = getSelectionMax();
 
-    // Обходим регион сверху вниз для очистки, снизу вверх для заполнения
-    for (int y = mx.y; y >= mn.y; y--)   // ← сверху вниз
+    for (int y = mx.y; y >= mn.y; y--)
     for (int x = mn.x; x <= mx.x; x++)
     for (int z = mn.z; z <= mx.z; z++)
     {
@@ -162,26 +256,12 @@ void RegionFill::buildQueues()
         Block* block = source->getBlock(x, y, z);
 
         bool isAir = true;
-        if (block && block->mLegacy) {
-            int id = block->mLegacy->getBlockId();
-            // Воздух = 0, жидкости 8-11 тоже считаем как "мешающее"
-            isAir = (id == 0);
-        }
+        if (block && block->mLegacy) isAir = block->mLegacy->isAir();
 
-        if (!isAir) {
-            // Не воздух — нужно сломать (если ClearFirst включён)
-            if (mClearFirst.mValue)
-                mClearQueue.push_back(pos);
-            // После очистки это место надо заполнить
-            mFillQueue.push_back(pos);
-        } else {
-            // Воздух — только заполнить
-            mFillQueue.push_back(pos);
-        }
+        if (!isAir && mClearFirst.mValue) mClearQueue.push_back(pos);
+        mFillQueue.push_back(pos);
     }
 
-    // mClearQueue уже в порядке сверху вниз (y убывает в внешнем цикле)
-    // mFillQueue нужен снизу вверх — реверсируем
     std::reverse(mFillQueue.begin(), mFillQueue.end());
 
     mTotalToClear = static_cast<int>(mClearQueue.size());
@@ -191,27 +271,37 @@ void RegionFill::buildQueues()
 }
 
 // =========================================================
-// FIND ANY PLACEABLE BLOCK IN HOTBAR
+// HOTBAR
 // =========================================================
 
-// Надёжно определяет, можно ли поставить предмет как блок.
-// Обычные блоки распознаются по ItemStack::mBlock, но у некоторых блоков
-// (например, campfire/костёр) mBlock может быть не заполнен — для них
-// используем Item::isBlockItem() из vtable игры.
 bool RegionFill::isPlaceableBlock(ItemStack* stack)
 {
-    if (!stack || !stack->mItem || stack->mCount <= 0) return false;
-    Item* item = stack->getItem();
-    if (!item) return false;
+    return isBlockPlacingItem(stack);
+}
 
-    // Основной путь: mBlock заполнен и это не воздух
-    if (stack->mBlock) {
-        BlockLegacy* bl = stack->mBlock->toLegacy();
-        if (bl && !bl->isAir()) return true;
+void RegionFill::dumpHotbar()
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+    auto supplies = player->getSupplies();
+    if (!supplies) return;
+    auto container = supplies->getContainer();
+    if (!container) return;
+
+    ChatUtils::displayClientMessage("§e--- RegionFill hotbar dump (selected = {}) ---", supplies->mSelectedSlot);
+    for (int i = 0; i < 9; i++)
+    {
+        ItemStack* s = container->getItem(i);
+        if (!s || !s->mItem) {
+            ChatUtils::displayClientMessage("§7[{}] empty", i);
+            continue;
+        }
+        ChatUtils::displayClientMessage("§7[{}] §f{} §7x{} mBlock={} id={} -> {}",
+            i, getStackName(s), (int)s->mCount,
+            s->mBlock ? "§ayes§7" : "§cnull§7",
+            (int)s->getItem()->mItemId,
+            isBlockPlacingItem(s) ? "§aPLACEABLE" : "§cno");
     }
-
-    // Запасной путь: предмет зарегистрирован в игре как блок-предмет
-    return item->isBlockItem();
 }
 
 int RegionFill::findAnyPlaceableSlot()
@@ -223,18 +313,24 @@ int RegionFill::findAnyPlaceableSlot()
     auto container = supplies->getContainer();
     if (!container) return -1;
 
-    for (int i = 0; i < 9; i++) {
-        if (isPlaceableBlock(container->getItem(i))) return i;
+    // Режим "Use Held Slot": доверяем игроку — ставим тем, что было в руке
+    if (mUseHeldSlot.mValue)
+    {
+        if (mHeldSlot < 0 || mHeldSlot > 8) return -1;
+        ItemStack* s = container->getItem(mHeldSlot);
+        if (s && s->mItem && s->mCount > 0) return mHeldSlot;
+        return -1;
     }
+
+    for (int i = 0; i < 9; i++)
+        if (isPlaceableBlock(container->getItem(i))) return i;
     return -1;
 }
 
-// =========================================================
-// MIXED SLOT — cycles through all available block types
-// =========================================================
-
 int RegionFill::findMixedSlot()
 {
+    if (mUseHeldSlot.mValue) return findAnyPlaceableSlot();
+
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return findAnyPlaceableSlot();
     auto supplies = player->getSupplies();
@@ -242,46 +338,30 @@ int RegionFill::findMixedSlot()
     auto container = supplies->getContainer();
     if (!container) return findAnyPlaceableSlot();
 
-    // Collect all hotbar slots that have placeable blocks
     std::vector<int> slots;
-    std::vector<std::string> seenNames; // for Diverse Only dedup
+    std::vector<std::string> seenNames;
 
     for (int i = 0; i < 9; i++) {
         ItemStack* stack = container->getItem(i);
         if (!isPlaceableBlock(stack)) continue;
 
         if (mDiverseOnly.mValue) {
-            // Only include this slot if its block name hasn't been seen yet.
-            // mBlock может быть null (напр. campfire) — тогда берём имя предмета.
-            std::string blockName;
-            if (stack->mBlock) {
-                BlockLegacy* bl = stack->mBlock->toLegacy();
-                if (bl) blockName = bl->getmName();
-            }
-            if (blockName.empty()) {
-                Item* item = stack->getItem();
-                if (item) blockName = item->getmName();
-            }
-
+            std::string blockName = getStackName(stack);
             bool duplicate = false;
             for (const auto& n : seenNames)
                 if (n == blockName) { duplicate = true; break; }
             if (duplicate) continue;
             seenNames.push_back(blockName);
         }
-
         slots.push_back(i);
     }
 
     if (slots.empty()) return -1;
-
-    // True random pick — fixes striped pattern
-    int chosen = slots[rand() % (int)slots.size()];
-    return chosen;
+    return slots[rand() % (int)slots.size()];
 }
 
 // =========================================================
-// TP (InfiniteAura pattern)
+// TP
 // =========================================================
 
 std::shared_ptr<MovePlayerPacket> RegionFill::createPacketForPos(glm::vec3 pos)
@@ -335,7 +415,6 @@ void RegionFill::straightLineTP(glm::vec3 from, glm::vec3 to, bool saveForRender
 
 // =========================================================
 // BREAK BLOCK
-// Используем тот же подход что Nuker: destroyBlock(transac=true) + clearBlock
 // =========================================================
 
 void RegionFill::breakBlockAtPos(glm::ivec3 pos, Actor* player)
@@ -347,10 +426,8 @@ void RegionFill::breakBlockAtPos(glm::ivec3 pos, Actor* player)
     Block* block = source->getBlock(pos);
     if (!block || !block->mLegacy || block->mLegacy->isAir()) return;
 
-    // Получаем face — для ломания берём любой exposed face,
-    // если блок полностью окружён — используем face 1 (снизу, т.к. ломаем сверху вниз)
     int face = BlockUtils::getExposedFace(pos);
-    if (face == -1) face = 1; // снизу — безопасный дефолт при ломании сверху
+    if (face == -1) face = 1;
 
     auto supplies  = player->getSupplies();
     auto container = supplies ? supplies->getContainer() : nullptr;
@@ -360,32 +437,26 @@ void RegionFill::breakBlockAtPos(glm::ivec3 pos, Actor* player)
     int bestTool = ItemUtils::getBestBreakingTool(block, false);
 
     glm::vec3 playerPos = *player->getPos();
-    // Встаём прямо над блоком
     glm::vec3 standPos  = glm::vec3(pos.x + 0.5f, pos.y + 2.62f, pos.z + 0.5f);
 
-    // TP к блоку
     mIsTPing = true;
     straightLineTP(playerPos, standPos, true);
 
-    // Смена инструмента
     if (bestTool != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(bestTool).get());
 
     if (mSwing.mValue) player->swing();
 
-    // === PlayerAction: StartDestroyBlock ===
     {
         auto pkt = MinecraftPackets::createPacket<PlayerActionPacket>();
         pkt->mPos        = pos;
         pkt->mResultPos  = pos;
         pkt->mFace       = face;
-        pkt->mAction     = static_cast<PlayerActionType>(0); // StartDestroyBlock
+        pkt->mAction     = static_cast<PlayerActionType>(0);
         pkt->mRuntimeId  = player->getRuntimeID();
         pkt->mtIsFromServerPlayerMovementSystem = false;
         sender->sendToServer(pkt.get());
     }
-
-    // === PlayerAction: StopDestroyBlock ===
     {
         auto pkt = MinecraftPackets::createPacket<PlayerActionPacket>();
         pkt->mPos        = pos;
@@ -396,31 +467,26 @@ void RegionFill::breakBlockAtPos(glm::ivec3 pos, Actor* player)
         pkt->mtIsFromServerPlayerMovementSystem = false;
         sender->sendToServer(pkt.get());
     }
-
-    // === InventoryTransaction: Destroy ===
     {
         auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
         auto cit = std::make_unique<ItemUseInventoryTransaction>();
-        cit->mActionType          = ItemUseInventoryTransaction::ActionType::Destroy;
-        cit->mSlot                = bestTool;
-        cit->mItemInHand          = NetworkItemStackDescriptor(*container->getItem(bestTool));
-        cit->mBlockPos            = pos;
-        cit->mFace                = face;
+        cit->mActionType           = ItemUseInventoryTransaction::ActionType::Destroy;
+        cit->mSlot                 = bestTool;
+        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(bestTool));
+        cit->mBlockPos             = pos;
+        cit->mFace                 = face;
         cit->mTargetBlockRuntimeId = 0;
-        cit->mPlayerPos           = standPos;
-        cit->mClickPos            = {0.5f, 1.0f, 0.5f};
-        txn->mTransaction         = std::move(cit);
+        cit->mPlayerPos            = standPos;
+        cit->mClickPos             = {0.5f, 1.0f, 0.5f};
+        txn->mTransaction          = std::move(cit);
         sender->sendToServer(txn.get());
     }
 
-    // Возврат инструмента
     if (bestTool != oldSlot)
         sender->sendToServer(PacketUtils::createMobEquipmentPacket(oldSlot).get());
 
-    // Клиентски убираем блок сразу (как Nuker делает)
     TRY_CALL([&]() { BlockUtils::clearBlock(pos); });
 
-    // TP обратно
     straightLineTP(standPos, playerPos, false);
     mIsTPing = false;
 }
@@ -435,9 +501,13 @@ bool RegionFill::placeAnyBlockAtPos(glm::ivec3 blockPos, Actor* player)
     if (!sender) return false;
 
     int side = BlockUtils::getBlockPlaceFace(blockPos);
-    if (side == -1) return false;
+    bool airPlace = false;
+    if (side == -1) {
+        if (!mAirPlace.mValue) return false;
+        airPlace = true;
+        side = 1;
+    }
 
-    // Choose slot based on mode
     int slot = mMixedBlocks.mValue ? findMixedSlot() : findAnyPlaceableSlot();
     if (slot == -1) return false;
 
@@ -457,24 +527,21 @@ bool RegionFill::placeAnyBlockAtPos(glm::ivec3 blockPos, Actor* player)
 
     if (mSwing.mValue) player->swing();
 
-    // === InventoryTransaction: Place ===
     {
         auto txn = MinecraftPackets::createPacket<InventoryTransactionPacket>();
         auto cit = std::make_unique<ItemUseInventoryTransaction>();
-        cit->mActionType          = ItemUseInventoryTransaction::ActionType::Place;
-        cit->mSlot                = slot;
-        cit->mItemInHand          = NetworkItemStackDescriptor(*container->getItem(slot));
-        cit->mBlockPos            = blockPos + glm::ivec3(BlockUtils::blockFaceOffsets[side]);
-        cit->mFace                = side;
+        cit->mActionType           = ItemUseInventoryTransaction::ActionType::Place;
+        cit->mSlot                 = slot;
+        cit->mItemInHand           = NetworkItemStackDescriptor(*container->getItem(slot));
+        cit->mBlockPos             = airPlace ? blockPos : blockPos + glm::ivec3(BlockUtils::blockFaceOffsets[side]);
+        cit->mFace                 = side;
         cit->mTargetBlockRuntimeId = 0;
-        cit->mPlayerPos           = standPos;
-        cit->mClickPos            = BlockUtils::clickPosOffsets[side];
+        cit->mPlayerPos            = standPos;
+        cit->mClickPos             = BlockUtils::clickPosOffsets[side];
 
-        // Рандомизируем clickPos (античит)
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++)
             if (cit->mClickPos[i] == 0.5f)
                 cit->mClickPos[i] = MathUtils::randomFloat(-0.49f, 0.49f);
-        }
 
         txn->mTransaction = std::move(cit);
         sender->sendToServer(txn.get());
@@ -485,7 +552,6 @@ bool RegionFill::placeAnyBlockAtPos(glm::ivec3 blockPos, Actor* player)
 
     straightLineTP(standPos, playerPos, false);
     mIsTPing = false;
-
     return true;
 }
 
@@ -499,44 +565,37 @@ void RegionFill::onBaseTickEvent(BaseTickEvent& event)
     if (!player) return;
     if (mState == State::Idle) return;
 
-    // Задержка между действиями
     if (NOW - mLastActionTime < static_cast<uint64_t>(mDelay.mValue)) return;
 
     auto source = ClientInstance::get()->getBlockSource();
     if (!source) return;
 
-    // =========================================================
-    // ФАЗА ОЧИСТКИ
-    // =========================================================
+    // ---------------- CLEARING ----------------
     if (mState == State::Clearing)
     {
-        // Пропускаем блоки которые уже стали воздухом
         while (mClearIndex < mClearQueue.size()) {
             glm::ivec3 pos   = mClearQueue[mClearIndex];
             Block*     block = source->getBlock(pos);
 
             bool isAir = (!block || !block->mLegacy || block->mLegacy->isAir());
             if (isAir) {
-                // Уже воздух (сервер подтвердил или clearBlock сработал)
                 mClearIndex++;
                 mBlocksCleared++;
                 continue;
             }
 
-            // Ломаем блок
             breakBlockAtPos(pos, player);
             mBlocksCleared++;
             mClearIndex++;
             mLastActionTime = NOW;
-            return; // 1 блок за тик
+            return;
         }
 
-        // Очистка завершена
-        ChatUtils::displayClientMessage(
-            "§aCleared §f{} §ablocks! Now filling...", mBlocksCleared);
+        ChatUtils::displayClientMessage("§aCleared §f{} §ablocks! Now filling...", mBlocksCleared);
 
         if (findAnyPlaceableSlot() == -1) {
-            ChatUtils::displayClientMessage("§cNo blocks in hotbar! Add blocks to continue.");
+            ChatUtils::displayClientMessage("§cNo placeable blocks in hotbar! Add blocks to continue.");
+            ChatUtils::displayClientMessage("§7Tip: enable §fUse Held Slot §7or §fDebug§7.");
             setEnabled(false);
             return;
         }
@@ -545,51 +604,39 @@ void RegionFill::onBaseTickEvent(BaseTickEvent& event)
         return;
     }
 
-    // =========================================================
-    // ФАЗА ЗАПОЛНЕНИЯ
-    // =========================================================
+    // ---------------- FILLING ----------------
     if (mState == State::Filling)
     {
         if (findAnyPlaceableSlot() == -1) {
-            ChatUtils::displayClientMessage("§cNo blocks in hotbar! Put blocks and wait...");
-            return; // Ждём, не продвигаемся
+            if (NOW - mLastNoBlocksWarn > 3000) {
+                mLastNoBlocksWarn = NOW;
+                ChatUtils::displayClientMessage("§cNo placeable blocks in hotbar! Put blocks and wait...");
+            }
+            return;
         }
 
         while (mFillIndex < mFillQueue.size()) {
             glm::ivec3 pos   = mFillQueue[mFillIndex];
             Block*     block = source->getBlock(pos);
 
-            // Уже заполнено → пропускаем
             bool filled = (block && block->mLegacy && !block->mLegacy->isAir());
-            if (filled) {
-                mFillIndex++;
-                continue;
-            }
+            if (filled) { mFillIndex++; continue; }
 
-            // Нет соседнего блока для опоры → пропускаем пока
-            if (BlockUtils::getBlockPlaceFace(pos) == -1) {
-                mFillIndex++;
-                continue;
-            }
+            if (!mAirPlace.mValue && BlockUtils::getBlockPlaceFace(pos) == -1) { mFillIndex++; continue; }
 
             if (placeAnyBlockAtPos(pos, player)) {
                 mBlocksPlaced++;
                 mFillIndex++;
                 mLastActionTime = NOW;
-                return; // 1 блок за тик
+                return;
             }
-
             mFillIndex++;
         }
 
-        // Проверяем реально ли всё заполнено
         bool allFilled = true;
         for (auto& pos : mFillQueue) {
             Block* block = source->getBlock(pos);
-            if (!block || !block->mLegacy || block->mLegacy->isAir()) {
-                allFilled = false;
-                break;
-            }
+            if (!block || !block->mLegacy || block->mLegacy->isAir()) { allFilled = false; break; }
         }
 
         if (allFilled) {
@@ -600,7 +647,6 @@ void RegionFill::onBaseTickEvent(BaseTickEvent& event)
             mState = State::Idle;
             setEnabled(false);
         } else {
-            // Второй проход — блоки которым нужна опора
             mFillIndex = 0;
         }
     }
@@ -654,9 +700,8 @@ void RegionFill::onRenderEvent(RenderEvent& event)
         float alpha = std::clamp(1.f - float(now - mLastPathTime) / 500.f, 0.f, 1.f);
         if (mPacketPositions.empty()) return;
 
-        auto               drawList = ImGui::GetBackgroundDrawList();
+        auto                drawList = ImGui::GetBackgroundDrawList();
         std::vector<ImVec2> pts;
-
         for (auto& pos : mPacketPositions) {
             ImVec2 sp;
             if (RenderUtils::worldToScreen(pos, sp)) pts.push_back(sp);
@@ -686,7 +731,6 @@ void RegionFill::renderProgress()
     float barX = (ss.x - barW) / 2.f;
     float barY = ss.y - 100.f;
 
-    // Фон
     drawList->AddRectFilled(
         {barX - 2, barY - 2}, {barX + barW + 2, barY + barH + 2},
         ImColor(0.f, 0.f, 0.f, 0.8f), 6.f);
@@ -696,37 +740,27 @@ void RegionFill::renderProgress()
     ImColor     color;
 
     if (mState == State::Clearing) {
-        progress = mTotalToClear > 0
-            ? float(mClearIndex) / float(mTotalToClear) : 1.f;
+        progress = mTotalToClear > 0 ? float(mClearIndex) / float(mTotalToClear) : 1.f;
         text  = fmt::format("Clearing: {}/{}", mClearIndex, mTotalToClear);
         color = ImColor(1.f, 0.3f, 0.3f, 0.9f);
     } else {
-        progress = mTotalToFill > 0
-            ? float(mBlocksPlaced) / float(mTotalToFill) : 1.f;
+        progress = mTotalToFill > 0 ? float(mBlocksPlaced) / float(mTotalToFill) : 1.f;
         text  = fmt::format("Filling: {}/{}", mBlocksPlaced, mTotalToFill);
         color = ImColor(0.2f, 0.8f, 0.2f, 0.9f);
     }
 
-    // Прогресс бар
-    drawList->AddRectFilled(
-        {barX, barY}, {barX + barW * progress, barY + barH}, color, 4.f);
-    drawList->AddRect(
-        {barX, barY}, {barX + barW, barY + barH},
-        ImColor(1.f, 1.f, 1.f, 0.5f), 4.f);
+    drawList->AddRectFilled({barX, barY}, {barX + barW * progress, barY + barH}, color, 4.f);
+    drawList->AddRect({barX, barY}, {barX + barW, barY + barH}, ImColor(1.f, 1.f, 1.f, 0.5f), 4.f);
 
-    // Текст по центру
     ImVec2 ts = ImGui::CalcTextSize(text.c_str());
-    drawList->AddText(
-        {barX + (barW - ts.x) / 2.f, barY + (barH - ts.y) / 2.f},
+    drawList->AddText({barX + (barW - ts.x) / 2.f, barY + (barH - ts.y) / 2.f},
         ImColor(1.f, 1.f, 1.f, 1.f), text.c_str());
 
-    // Время
     if (mStartTime > 0) {
         uint64_t    elapsed = (NOW - mStartTime) / 1000;
         std::string t       = fmt::format("{}s", elapsed);
         ImVec2      tts     = ImGui::CalcTextSize(t.c_str());
-        drawList->AddText(
-            {barX + barW - tts.x, barY - tts.y - 4},
+        drawList->AddText({barX + barW - tts.x, barY - tts.y - 4},
             ImColor(0.7f, 0.7f, 0.7f, 0.8f), t.c_str());
     }
 }

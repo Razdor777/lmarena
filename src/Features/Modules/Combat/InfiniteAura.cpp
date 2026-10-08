@@ -20,6 +20,7 @@
 #include <Utils/GameUtils/ItemUtils.hpp>
 #include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
+#include <Utils/MiscUtils/ImRenderUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/NotifyUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
@@ -688,7 +689,8 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   if (NOW - mLastAttack < delay) return;
 
   if (actors.empty()) {
-    mHasTarget = mGhostVisible = false;
+    // призрак НЕ гасим — он должен дорисовать свой эффект (см. onRenderEvent)
+    mHasTarget = false;
     return;
   }
 
@@ -795,7 +797,6 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   }
 
   mHasTarget = targetFound;
-  if (!targetFound) mGhostVisible = false;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -884,35 +885,110 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
     }
   }
 
-  // GHOST
-  if (mDrawGhost.mValue && mGhostVisible && alphaMultiplier > 0.01f) {
-    glm::vec3 feet = mGhostPos - glm::vec3(0.f, 1.62f, 0.f);
-    AABB gAABB;
-    gAABB.mMin = feet - glm::vec3(0.3f, 0.f, 0.3f);
-    gAABB.mMax = feet + glm::vec3(0.3f, 1.8f, 0.3f);
-    auto pts = MathUtils::getImBoxPoints(gAABB);
+  // ── GHOST: призрак атаки + эффект удара ──
+  // Живёт по своему таймеру (не гаснет вместе с тропой), дышит, бьёт вспышкой
+  // и пускает рябь по земле. Новых настроек нет — всё завязано на Draw Ghost.
+  if (mDrawGhost.mValue && mGhostVisible && mLastAttack != 0) {
+    const float ageMs   = static_cast<float>(NOW - mLastAttack);
+    const float kLife   = 1400.f;  // общий срок жизни эффекта
+    const float kRise   = 90.f;    // всплеск сразу после удара
+    const float kFall   = 700.f;   // затухание хвоста
+    const float kRipple = 620.f;   // рябь по земле
+    const float kFlash  = 150.f;   // вспышка удара
 
-    if (!pts.empty()) {
-      bool isLocked = (mLockedTargetRuntimeID != -1);
-      ImColor fill = isLocked && mHighlightLocked.mValue
-                         ? ImColor(255, 215, 0, (int)(50 * alphaMultiplier))
-                         : ColorUtils::getThemedColor(0);
-      fill.Value.w = 0.2f * alphaMultiplier;
+    if (ageMs <= kLife) {
+      // огибающая: всплеск → держимся → гасим хвост
+      float env = 1.f;
+      if (ageMs < kRise)      env = ageMs / kRise;
+      if (ageMs > kLife - kFall) env = std::max(0.f, (kLife - ageMs) / kFall);
+      // «дыхание» бокса — лёгкая пульсация, чтобы не выглядело статикой
+      const float pulse = 0.82f + 0.18f * std::sin(ageMs * (2.f * PI / 1000.f));
+      const float a = env * pulse;
 
-      ImColor outline = isLocked && mHighlightLocked.mValue
-                            ? ImColor(255, 215, 0, (int)(200 * alphaMultiplier))
-                            : ColorUtils::getThemedColor(0);
-      outline.Value.w = 0.7f * alphaMultiplier;
+      const bool isLocked = (mLockedTargetRuntimeID != -1 && mHighlightLocked.mValue);
+      ImColor base = isLocked ? ImColor(255, 215, 0, 255)
+                              : ColorUtils::getStaticAccentColor(0);
 
-      drawList->AddConvexPolyFilled(pts.data(), (int)pts.size(), fill);
-      drawList->AddPolyline(pts.data(), (int)pts.size(), outline, true, 2.f);
-    }
+      glm::vec3 feet = mGhostPos - glm::vec3(0.f, 1.62f, 0.f);
+      AABB gAABB;
+      gAABB.mMin = feet - glm::vec3(0.3f, 0.f, 0.3f);
+      gAABB.mMax = feet + glm::vec3(0.3f, 1.8f, 0.3f);
+      auto pts = MathUtils::getImBoxPoints(gAABB);
 
-    ImVec2 ps, gs;
-    if (RenderUtils::worldToScreen(*player->getPos(), ps) && RenderUtils::worldToScreen(mGhostPos, gs)) {
-      ImColor lc = ColorUtils::getThemedColor(0);
-      lc.Value.w = 0.4f * alphaMultiplier;
-      drawList->AddLine(ps, gs, lc, 1.5f);
+      if (!pts.empty()) {
+        ImColor glow = base;
+        glow.Value.w = 0.22f * a;
+        ImColor fill = base;
+        fill.Value.w = 0.12f * a;
+        ImColor outline = base;
+        outline.Value.w = 0.9f * a;
+
+        // свечение: широкая мягкая линия под контуром, сверху яркая
+        drawList->AddPolyline(pts.data(), (int)pts.size(), glow, true, 5.f);
+        drawList->AddConvexPolyFilled(pts.data(), (int)pts.size(), fill);
+        drawList->AddPolyline(pts.data(), (int)pts.size(), outline, true, 2.f);
+      }
+
+      // луч «игрок → точка атаки» + яркая точка в конце
+      ImVec2 ps, gs;
+      if (RenderUtils::worldToScreen(*player->getPos(), ps) &&
+          RenderUtils::worldToScreen(mGhostPos, gs)) {
+        ImColor lc = base;
+        lc.Value.w = 0.45f * env;
+        drawList->AddLine(ps, gs, lc, 1.5f);
+
+        ImColor dot = base;
+        dot.Value.w = 0.9f * a;
+        drawList->AddCircleFilled(gs, 3.5f, dot, 16);
+      }
+
+      // рябь по земле — расходится от точки удара (как в JumpCircles)
+      if (ageMs < kRipple) {
+        const float p = ageMs / kRipple;
+        const float radius = 0.35f + 1.9f * p;
+        const int kSeg = 24;
+        std::vector<ImVec2> ring;
+        ring.reserve(kSeg);
+        for (int i = 0; i < kSeg; i++) {
+          const float ang = static_cast<float>(i) / static_cast<float>(kSeg) * 2.f * PI;
+          const glm::vec3 wp(mGhostPos.x + std::cos(ang) * radius, feet.y,
+                             mGhostPos.z + std::sin(ang) * radius);
+          ImVec2 sp;
+          if (RenderUtils::worldToScreen(wp, sp)) ring.push_back(sp);
+        }
+        if (ring.size() >= 3) {
+          ImColor rc = base;
+          rc.Value.w = (1.f - p) * 0.85f;
+          drawList->AddPolyline(ring.data(), (int)ring.size(), rc, true, 2.f);
+        }
+      }
+
+      // вспышка удара — белый крест в точке атаки
+      if (ageMs < kFlash) {
+        const float p = ageMs / kFlash;
+        ImVec2 c;
+        if (RenderUtils::worldToScreen(mGhostPos, c)) {
+          const float len = 5.f + 15.f * p;
+          ImColor fc = base;
+          fc.Value.x = fc.Value.y = fc.Value.z = 1.f;
+          fc.Value.w = (1.f - p) * 0.85f;
+          drawList->AddLine(ImVec2(c.x - len, c.y), ImVec2(c.x + len, c.y), fc, 1.5f);
+          drawList->AddLine(ImVec2(c.x, c.y - len), ImVec2(c.x, c.y + len), fc, 1.5f);
+        }
+      }
+
+      // подпись под боксом — дистанция до точки атаки
+      ImVec2 lp;
+      if (RenderUtils::worldToScreen(
+              glm::vec3(mGhostPos.x, feet.y - 0.15f, mGhostPos.z), lp)) {
+        const std::string label = fmt::format(
+            "{:.1f}m", glm::distance(*player->getPos(), mGhostPos));
+        const ImVec2 sz = ImGui::CalcTextSize(label.c_str());
+        ImColor tc = base;
+        tc.Value.w = 0.95f * env;
+        ImRenderUtils::drawShadowText(drawList, label,
+                                      ImVec2(lp.x - sz.x * 0.5f, lp.y), tc, 15.f);
+      }
     }
   }
 

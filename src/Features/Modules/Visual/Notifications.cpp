@@ -1,305 +1,335 @@
 //
-// Notifications — Premium redesign
-// Glassmorphism + geometric icons + shimmer + progress bar + elastic slide
+// Notifications — минималистичные чёрные карточки с цветной полоской-акцентом.
+//
+// Что убрано по сравнению со старой версией (и почему):
+//   • ImRenderUtils::addBlur на каждой карточке — самая дорогая операция кадра;
+//   • двойной AddShadowRect «glow» на каждой карточке;
+//   • shimmer-полоса, летающая рамка, таймер-кольцо, спарклы, эластичные пружины;
+//   • ~20 настроек цвета/плотности/анимаций;
+//   • повторный strip §-кодов и пересчёт ширин текста КАЖДЫЙ кадр;
+//   • ВСЕ пиктограммы (галочки, кресты, «!», «i», глифы шрифтов) — вместо них
+//     у левого края карточки стоит цветная полоска: тип события читается по цвету,
+//     и карточка остаётся чистой даже на 15 px текста.
+//
+// Теперь карточка строится один раз (текст очищен, ширина посчитана), а в кадре
+// остаются только AddRectFilled / AddRect / AddText.
 //
 
 #include "Notifications.hpp"
+
 #include <Features/Events/ConnectionRequestEvent.hpp>
 #include <Features/Events/NotifyEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
-#include <Utils/MiscUtils/ImRenderUtils.hpp>
-#include <Utils/MiscUtils/MathUtils.hpp>
-#include <Utils/MiscUtils/ColorUtils.hpp>
 #include <Utils/FontHelper.hpp>
 
-// Strip Minecraft colour codes
-static std::string stripMCFormatting(const std::string& src)
+#include <algorithm>
+#include <string>
+
+namespace
 {
-    std::string out;
-    out.reserve(src.size());
-    for (size_t i = 0; i < src.size(); )
+    // Метрики фиксированы — никаких настроек масштаба и плотности.
+    constexpr float kPadX      = 10.f;
+    constexpr float kPadY      = 7.f;
+    constexpr float kStripW    = 3.f;    // толщина цветной полоски-акцента
+    constexpr float kStripGap  = 10.f;   // от полоски до текста
+    constexpr float kCardGap   = 4.f;
+    constexpr float kMargin       = 8.f;
+    constexpr float kRounding    = 3.f;
+    constexpr float kInTime      = 0.14f;
+    constexpr float kOutTime     = 0.12f;
+    constexpr float kFontSize    = 15.f;
+    constexpr int   kMaxVisible  = 6;
+    constexpr size_t kMaxStored  = 16;
+
+    // Цвет полоски-акцента. Оттенки пастельные и приглушённые: они не спорят с
+    // чёрной карточкой, но тип события читается сразу. Пиктограмм больше нет —
+    // цвет и подпись справа («enabled» / «disabled») говорят сами за себя.
+    ImU32 accentColor(Notifications::Icon icon, float alpha)
     {
-        unsigned char c = (unsigned char)src[i];
-        if (c == 0xC2 && i + 2 < src.size() && (unsigned char)src[i+1] == 0xA7) { i += 3; continue; }
-        if (c == 0xA7 && i + 1 < src.size()) { i += 2; continue; }
-        out += src[i++];
+        const int a = static_cast<int>(std::clamp(alpha, 0.f, 1.f) * 255.f);
+        switch (icon)
+        {
+            case Notifications::Icon::Success:  return IM_COL32(150, 226, 172, a); // мята — включено
+            case Notifications::Icon::Disabled: return IM_COL32(146, 149, 158, a); // серый — выключено
+            case Notifications::Icon::Warning:  return IM_COL32(240, 200, 120, a); // янтарь — предупреждение
+            case Notifications::Icon::Error:    return IM_COL32(240, 138, 138, a); // коралл — ошибка
+            case Notifications::Icon::Info:
+            default:                            return IM_COL32(198, 214, 246, a); // холодный белый — инфо
+        }
     }
-    return out.empty() ? src : out;
+
+    // Настоящий код цвета/стиля Minecraft: 0-9, a-f, k-o, r. После «§» байт
+    // выбрасывается только если это код — иначе одинокий «§» съедал бы букву.
+    bool notificationsIsCodeChar(unsigned char c)
+    {
+        if (c >= '0' && c <= '9') return true;
+
+        const unsigned char lower = (c >= 'A' && c <= 'Z') ? static_cast<unsigned char>(c + 32) : c;
+        if (lower >= 'a' && lower <= 'f') return true;
+
+        return lower == 'k' || lower == 'l' || lower == 'm' ||
+               lower == 'n' || lower == 'o' || lower == 'r';
+    }
+
+    // Убирает §-коды (включая UTF-8 «Â§»), служебные символы и лишние пробелы.
+    // ВАЖНО: строки кэшируются на момент создания карточки, поэтому серверные
+    // префиксы и разноцветные ники не превращаются в «§» в интерфейсе.
+    std::string cleanText(const std::string& src)
+    {
+        std::string out;
+        out.reserve(src.size());
+
+        for (size_t i = 0; i < src.size(); )
+        {
+            const unsigned char c = static_cast<unsigned char>(src[i]);
+
+            // UTF-8 «§» = C2 A7
+            if (c == 0xC2 && i + 1 < src.size() && static_cast<unsigned char>(src[i + 1]) == 0xA7)
+            {
+                i += 2;
+                // за кодом цвета может идти сам код (0-9a-fk-or)
+                if (i < src.size() && notificationsIsCodeChar(static_cast<unsigned char>(src[i]))) i += 1;
+                continue;
+            }
+
+            // Одиночный 0xA7 (кодировка Latin-1) — то же самое, но только если это
+            // не хвостовой байт UTF-8: 'Ч' = D0 A7, и такой байт трогать нельзя.
+            if (c == 0xA7 && (i == 0 || static_cast<unsigned char>(src[i - 1]) < 0xC0))
+            {
+                i += 1;
+                if (i < src.size() && notificationsIsCodeChar(static_cast<unsigned char>(src[i]))) i += 1;
+                continue;
+            }
+
+            // Управляющие символы, которые часто прилетают с серверов
+            if (c < 0x20 && c != '\t') { i += 1; continue; }
+
+            out += src[i++];
+        }
+
+        // Обрезаем края и схлопываем повторные пробелы
+        std::string trimmed;
+        trimmed.reserve(out.size());
+        bool lastSpace = true;
+        for (char ch : out)
+        {
+            const bool isSpace = (ch == ' ' || ch == '\t');
+            if (isSpace) { if (!lastSpace) trimmed += ' '; }
+            else         { trimmed += ch; }
+            lastSpace = isSpace;
+        }
+        while (!trimmed.empty() && trimmed.back() == ' ') trimmed.pop_back();
+        return trimmed;
+    }
 }
 
 void Notifications::onEnable()
 {
-    gFeatureManager->mDispatcher->listen<NotifyEvent,           &Notifications::onNotifyEvent>(this);
-    gFeatureManager->mDispatcher->listen<ModuleStateChangeEvent,&Notifications::onModuleStateChange>(this);
-    gFeatureManager->mDispatcher->listen<ConnectionRequestEvent,&Notifications::onConnectionRequestEvent>(this);
+    gFeatureManager->mDispatcher->listen<NotifyEvent,            &Notifications::onNotifyEvent>(this);
+    gFeatureManager->mDispatcher->listen<ModuleStateChangeEvent, &Notifications::onModuleStateChange>(this);
+    gFeatureManager->mDispatcher->listen<ConnectionRequestEvent, &Notifications::onConnectionRequestEvent>(this);
 }
 
 void Notifications::onDisable()
 {
-    gFeatureManager->mDispatcher->deafen<NotifyEvent,           &Notifications::onNotifyEvent>(this);
-    gFeatureManager->mDispatcher->deafen<ModuleStateChangeEvent,&Notifications::onModuleStateChange>(this);
-    gFeatureManager->mDispatcher->deafen<ConnectionRequestEvent,&Notifications::onConnectionRequestEvent>(this);
+    gFeatureManager->mDispatcher->deafen<NotifyEvent,            &Notifications::onNotifyEvent>(this);
+    gFeatureManager->mDispatcher->deafen<ModuleStateChangeEvent, &Notifications::onModuleStateChange>(this);
+    gFeatureManager->mDispatcher->deafen<ConnectionRequestEvent, &Notifications::onConnectionRequestEvent>(this);
+
+    mEntries.clear();
 }
 
-ImColor Notifications::getTypeColor(Notification::Type type, float offset)
+void Notifications::push(std::string text, Icon icon, float duration, std::string state)
 {
-    switch (type) {
-        case Notification::Type::Info:    return ColorUtils::getThemedColor(offset);
-        case Notification::Type::Warning: return ImColor(200, 160, 40);
-        case Notification::Type::Error:   return ImColor(190, 50, 50);
-        default: return ImColor(160, 160, 175);
-    }
-}
+    Entry entry;
+    entry.text = cleanText(text);
+    if (entry.text.empty()) return;
 
-// ── Geometric icons — clean, professional ─────────────────────
-static void drawNotifIcon(ImDrawList* dl, ImVec2 center, float r, Notification::Type type, ImColor col, float alpha)
-{
-    col.Value.w = alpha;
-    ImColor white(230, 230, 240, (int)(200 * alpha));
+    entry.state    = std::move(state);
+    entry.icon     = icon;
+    entry.duration = std::clamp(duration, 0.5f, 60.f);
 
-    switch (type) {
-    case Notification::Type::Warning: {
-        // Triangle outline + exclamation
-        float h = r * 2.f;
-        ImVec2 p0(center.x, center.y - h * 0.55f);
-        ImVec2 p1(center.x - h * 0.5f, center.y + h * 0.4f);
-        ImVec2 p2(center.x + h * 0.5f, center.y + h * 0.4f);
-        dl->AddTriangleFilled(p0, p1, p2, col);
-        // Exclamation bar
-        dl->AddRectFilled(ImVec2(center.x - 0.8f, center.y - 4.f),
-                          ImVec2(center.x + 0.8f, center.y + 0.5f), white, 1.f);
-        // Exclamation dot
-        dl->AddCircleFilled(ImVec2(center.x, center.y + 3.5f), 1.f, white, 6);
-        break;
-    }
-    case Notification::Type::Error: {
-        // Circle with X
-        dl->AddCircleFilled(center, r * 1.1f, col, 20);
-        float c = r * 0.55f;
-        dl->AddLine({center.x - c, center.y - c}, {center.x + c, center.y + c}, white, 1.8f);
-        dl->AddLine({center.x + c, center.y - c}, {center.x - c, center.y + c}, white, 1.8f);
-        break;
-    }
-    default: {
-        // Circle with i
-        dl->AddCircleFilled(center, r * 1.1f, col, 20);
-        dl->AddCircleFilled({center.x, center.y - r * 0.35f}, 1.2f, white, 6);
-        dl->AddRectFilled({center.x - 0.8f, center.y - r * 0.05f},
-                          {center.x + 0.8f, center.y + r * 0.6f}, white, 1.f);
-        break;
-    }
-    }
-}
+    mEntries.push_back(std::move(entry));
 
-void Notifications::renderModern(ImDrawList* drawList, ImVec2 displaySize, float delta)
-{
-    float animSpeed = mAnimSpeed.mValue;
-    float baseY = displaySize.y - 16.f;
-    const float padX = 14.f;
-    const float padY = 10.f;
-    const float rounding = 8.f;
-    const float fontSize = 13.5f;
-    const float accentW = 3.f;
-    const float iconAreaW = 26.f;
-
-    int shown = 0;
-    for (auto& n : mNotifications)
-    {
-        if (mLimitNotifications.mValue && shown >= mMaxNotifications.mValue) break;
-
-        n.mTimeShown += delta;
-        n.mIsTimeUp = n.mTimeShown >= n.mDuration;
-
-        float target = n.mIsTimeUp ? 0.f : 1.f;
-        n.mCurrentDuration = MathUtils::lerp(n.mCurrentDuration, target, delta * animSpeed);
-
-        float anim = n.mCurrentDuration;
-        if (anim < 0.002f && n.mIsTimeUp) continue;
-
-        // ── Spawn easing ─────────────────────────────────────
-        float spawnT = MathUtils::clamp(n.mTimeShown / 0.35f, 0.f, 1.f);
-        EasingUtil spawnEase; spawnEase.percentage = spawnT;
-        float spawnScale = spawnEase.easeOutBack();
-
-        // ── Dismiss easing ───────────────────────────────────
-        float dismissT = n.mIsTimeUp ? MathUtils::clamp((n.mTimeShown - n.mDuration) / 0.35f, 0.f, 1.f) : 0.f;
-        EasingUtil dismissEase; dismissEase.percentage = dismissT;
-        float dismissSlide = dismissEase.easeInBack();
-
-        float alpha = anim * spawnScale;
-
-        const std::string stripped = stripMCFormatting(n.mMessage);
-
-        ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, stripped.c_str());
-        float boxW = ts.x + padX * 2.f + iconAreaW + accentW + 4.f;
-        float boxH = ts.y + padY * 2.f;
-
-        // ── Slide from right with elastic ────────────────────
-        float slideTarget = displaySize.x - boxW - 14.f;
-        float slideHidden = displaySize.x + boxW + 30.f;
-
-        EasingUtil slideEase; slideEase.percentage = spawnT;
-        float slideX = MathUtils::lerp(slideHidden, slideTarget, slideEase.easeOutElastic());
-        slideX += dismissSlide * (boxW + 60.f);
-
-        // ── Vertical stacking ────────────────────────────────
-        baseY -= (boxH + 6.f) * anim;
-        float y = baseY;
-
-        ImVec2 min(slideX, y);
-        ImVec2 max(slideX + boxW, y + boxH);
-
-        // ── Hover to dismiss ─────────────────────────────────
-        ImVec2 mp = ImGui::GetIO().MousePos;
-        bool hovered = mp.x >= min.x && mp.x <= max.x && mp.y >= min.y && mp.y <= max.y;
-        if (hovered && ImGui::IsMouseClicked(0)) {
-            n.mIsTimeUp = true;
-            n.mTimeShown = n.mDuration;
-        }
-        n.hoverScale = MathUtils::lerp(n.hoverScale, hovered ? 1.f : 0.f, delta * 18.f);
-
-        // ── Shimmer sweep ────────────────────────────────────
-        n.shimmerOffset = MathUtils::lerp(n.shimmerOffset, n.mIsTimeUp ? 0.f : 1.3f, delta * 0.8f);
-        if (n.mTimeShown < 0.05f) n.shimmerOffset = -0.1f;
-
-        ImColor accent = getTypeColor(n.mType, y * 2.8f);
-        accent.Value.w = alpha;
-
-        // ── Layer 1: outer glow ──────────────────────────────
-        if (alpha > 0.05f) {
-            ImColor glowCol = accent;
-            glowCol.Value.w = alpha * 0.12f;
-            drawList->AddShadowRect(
-                {min.x - 3, min.y - 3}, {max.x + 3, max.y + 3},
-                glowCol, 20.f, {0, 0}, 0, rounding + 2.f);
-        }
-
-        // ── Layer 2: blur (glassmorphism) ────────────────────
-        ImRenderUtils::addBlur(ImVec4(min.x, min.y, max.x, max.y), alpha * 4.f, rounding);
-
-        // ── Layer 3: dark glass background ───────────────────
-        {
-            ImColor bg(14, 14, 22, (int)(220 * alpha));
-            bg.Value.x += 0.015f * n.hoverScale;
-            bg.Value.y += 0.015f * n.hoverScale;
-            bg.Value.z += 0.03f  * n.hoverScale;
-            drawList->AddRectFilled(min, max, bg, rounding);
-        }
-
-        // ── Layer 4: top highlight rim ───────────────────────
-        {
-            ImColor rim(255, 255, 255, (int)(12 * alpha));
-            drawList->AddRectFilled(
-                {min.x + rounding * 0.5f, min.y},
-                {max.x - rounding * 0.5f, min.y + 1.f},
-                rim, 0.5f);
-        }
-
-        // ── Layer 5: drop shadow ─────────────────────────────
-        drawList->AddShadowRect(min, max, ImColor(0, 0, 0, (int)(60 * alpha)),
-            16.f, {0, 4}, 0, rounding);
-
-        // ── Layer 6: shimmer sweep ───────────────────────────
-        if (!n.mIsTimeUp && n.shimmerOffset > 0.f && n.shimmerOffset < 1.2f) {
-            float sx = min.x + (max.x - min.x) * n.shimmerOffset;
-            float shimW = 35.f;
-            float clipL = std::max(min.x, sx - shimW);
-            float clipR = std::min(max.x, sx + shimW * 0.5f);
-            if (clipR > clipL) {
-                ImColor shimmerCol(255, 255, 255, (int)(15 * alpha));
-                drawList->AddRectFilled({clipL, min.y}, {clipR, max.y}, shimmerCol, rounding);
-            }
-        }
-
-        // ── Accent left strip ────────────────────────────────
-        float stripH = boxH - rounding * 0.5f;
-        float stripY = min.y + rounding * 0.25f;
-        drawList->AddRectFilled(
-            {min.x + 1.5f, stripY},
-            {min.x + 1.5f + accentW, stripY + stripH},
-            accent, accentW * 0.4f);
-
-        // ── Accent glow ──────────────────────────────────────
-        {
-            ImColor glowA = accent; glowA.Value.w = alpha * 0.45f;
-            drawList->AddShadowRect(
-                {min.x, stripY}, {min.x + accentW + 2.f, stripY + stripH},
-                glowA, 10.f, {0, 0}, 0, accentW * 0.4f);
-        }
-
-        // ── Geometric icon ───────────────────────────────────
-        ImVec2 iconCenter(min.x + accentW + 3.f + iconAreaW * 0.5f, min.y + boxH * 0.5f);
-        drawNotifIcon(drawList, iconCenter, 5.f, n.mType, accent, alpha);
-
-        // ── Text ─────────────────────────────────────────────
-        float textX = min.x + accentW + 3.f + iconAreaW;
-        float textY = min.y + padY - 0.5f;
-        drawList->AddText(ImGui::GetFont(), fontSize,
-            {textX, textY},
-            ImColor(220, 220, 235, (int)(255 * alpha)),
-            stripped.c_str());
-
-        // ── Progress bar (thin, elegant) ─────────────────────
-        float pct = std::clamp(n.mTimeShown / n.mDuration, 0.f, 1.f);
-        float remaining = 1.f - pct;
-        float progW = (max.x - textX) * remaining;
-        if (progW > 0.5f && !n.mIsTimeUp) {
-            float py = max.y - 1.5f;
-            // Track
-            drawList->AddRectFilled({textX, py - 0.5f}, {max.x, py + 1.f},
-                ImColor(255, 255, 255, (int)(18 * alpha)), 1.f);
-            // Fill
-            ImColor prog = accent; prog.Value.w = 0.6f * alpha;
-            drawList->AddRectFilled({textX, py - 0.5f}, {textX + progW, py + 1.f}, prog, 1.f);
-            // Glow dot at tip
-            ImColor tipGlow = accent; tipGlow.Value.w = alpha * 0.7f;
-            drawList->AddCircleFilled({textX + progW, py + 0.5f}, 2.f, tipGlow, 8);
-        }
-
-        // ── Wave pulse ring on spawn ─────────────────────────
-        if (n.mTimeShown < 0.5f && spawnT < 0.85f) {
-            float waveAlpha = (1.f - spawnT) * alpha * 0.25f;
-            float waveR = spawnT * 25.f;
-            ImColor waveCol = accent; waveCol.Value.w = waveAlpha;
-            drawList->AddCircle(iconCenter, waveR, waveCol, 20, 1.5f);
-        }
-
-        if (!n.mIsTimeUp) shown++;
-    }
+    // Спам событий не должен копить карточки бесконечно.
+    while (mEntries.size() > kMaxStored)
+        mEntries.erase(mEntries.begin());
 }
 
 void Notifications::onRenderEvent(RenderEvent& event)
 {
-    FontHelper::pushPrefFont(false);
-    ImVec2 ds = ImGui::GetIO().DisplaySize;
-    auto drawList = ImGui::GetBackgroundDrawList();
-    float delta = ImGui::GetIO().DeltaTime;
+    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+    if (!drawList) return;
 
-    std::erase_if(mNotifications, [](const Notification& n) {
-        return n.mIsTimeUp && n.mTimeShown > n.mDuration + 3.f;
+    const float delta  = std::clamp(ImGui::GetIO().DeltaTime, 0.0001f, 0.1f);
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+
+    for (auto& entry : mEntries)
+        entry.life += delta;
+
+    std::erase_if(mEntries, [](const Entry& entry)
+    {
+        return entry.life > entry.duration + kOutTime;
     });
 
-    renderModern(drawList, ds, delta);
+    if (mEntries.empty()) return;
+
+    FontHelper::pushPrefFont(false);
+    ImFont* font = ImGui::GetFont();
+    if (!font)
+    {
+        ImGui::PopFont();
+        return;
+    }
+
+    const float lineHeight = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, "Ag").y;
+    const float cardHeight = (std::max)(26.f, lineHeight + kPadY * 2.f);
+    const bool  fromBottom = mPosition.mValue == Position::BottomRight;
+
+    float cursorY = fromBottom ? (screen.y - kMargin - cardHeight) : kMargin;
+    int   drawn   = 0;
+
+    // Новые карточки рисуются первыми — они всегда ближе к углу.
+    for (auto it = mEntries.rbegin(); it != mEntries.rend() && drawn < kMaxVisible; ++it, ++drawn)
+    {
+        Entry& entry = *it;
+
+        // Ширина считается один раз, при первом кадре карточки.
+        if (entry.width <= 0.f)
+        {
+            const float textW  = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.text.c_str()).x;
+            const float stateW = entry.state.empty()
+                ? 0.f
+                : font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.state.c_str()).x + 6.f;
+
+            entry.textW = textW;
+            entry.width = kPadX * 2.f + kStripW + kStripGap + textW + stateW;
+            entry.width = std::clamp(entry.width, 96.f,
+                                     (std::max)(120.f, screen.x - kMargin * 2.f));
+        }
+
+        const float cardY = cursorY;
+        cursorY += fromBottom ? -(cardHeight + kCardGap) : (cardHeight + kCardGap);
+
+        const float inT  = std::clamp(entry.life / kInTime, 0.f, 1.f);
+        const float outT = entry.life > entry.duration
+            ? std::clamp((entry.life - entry.duration) / kOutTime, 0.f, 1.f)
+            : 0.f;
+
+        const float alpha = inT * (1.f - outT);
+        if (alpha <= 0.01f) continue;
+
+        const float easeIn = 1.f - (1.f - inT) * (1.f - inT);
+        const float hidden = entry.width + kMargin;
+
+        const float x = screen.x - kMargin - entry.width
+                      + (1.f - easeIn) * hidden
+                      + outT * hidden;
+        const float y = cardY + (1.f - easeIn) * 4.f;
+
+        const ImVec2 min(x, y);
+        const ImVec2 max(x + entry.width, y + cardHeight);
+
+        // ── сплошная чёрная подложка ──────────────────────────────────────────
+        drawList->AddRectFilled(min, max, IM_COL32(0, 0, 0, static_cast<int>(238 * alpha)), kRounding);
+        drawList->AddRect(min, max, IM_COL32(255, 255, 255, static_cast<int>(24 * alpha)),
+                          kRounding, 0, 1.f);
+
+        // ── цветная полоска-акцент вместо пиктограммы ────────────────────────
+        // Свободно стоящая вертикальная полоска с отступом от краёв — как полоска
+        // справа в Arraylist. Один прямоугольник, ничего не ломается на малых размерах.
+        const float stripX   = min.x + kPadX - 3.f;
+        const float stripTop = y + 4.f;
+        const float stripBot = max.y - 4.f;
+        drawList->AddRectFilled({ stripX, stripTop }, { stripX + kStripW, stripBot },
+                                accentColor(entry.icon, alpha), 1.5f);
+
+        // ── текст ─────────────────────────────────────────────────────────────
+        const float textX = stripX + kStripW + kStripGap;
+        const float textY = y + (cardHeight - lineHeight) * 0.5f;
+
+        drawList->AddText(font, kFontSize, { textX, textY },
+                          IM_COL32(246, 246, 248, static_cast<int>(255 * alpha)),
+                          entry.text.c_str());
+
+        if (!entry.state.empty())
+        {
+            drawList->AddText(font, kFontSize, { textX + entry.textW + 6.f, textY },
+                              IM_COL32(142, 145, 152, static_cast<int>(255 * alpha)),
+                              entry.state.c_str());
+        }
+
+        // ── тонкая линия оставшегося времени ─────────────────────────────────
+        const float remain = std::clamp(1.f - entry.life / (std::max)(entry.duration, 0.001f), 0.f, 1.f);
+        if (remain > 0.01f && outT <= 0.f)
+        {
+            const float barW = (entry.width - 2.f) * remain;
+            drawList->AddRectFilled({ min.x + 1.f, max.y - 1.6f },
+                                    { min.x + 1.f + barW, max.y - 0.6f },
+                                    IM_COL32(255, 255, 255, static_cast<int>(58 * alpha)));
+        }
+    }
+
     ImGui::PopFont();
 }
 
 void Notifications::onModuleStateChange(ModuleStateChangeEvent& event)
 {
     if (event.isCancelled() || !mShowOnToggle.mValue) return;
-    mNotifications.push_back(Notification(
-        event.mModule->getName() + " " + (event.mEnabled ? "enabled" : "disabled"),
-        Notification::Type::Info, 3.0f));
+    if (!event.mModule) return;
+
+    push(event.mModule->getName(),
+         event.mEnabled ? Icon::Success : Icon::Disabled,
+         mDuration.mValue,
+         event.mEnabled ? "enabled" : "disabled");
 }
 
 void Notifications::onConnectionRequestEvent(ConnectionRequestEvent& event)
 {
     if (!mShowOnJoin.mValue) return;
-    mNotifications.push_back(Notification(
-        "Connecting to " + *event.mServerAddress + "...",
-        Notification::Type::Info, 6.0f));
+    if (!event.mServerAddress) return;
+
+    push("Connecting to " + *event.mServerAddress + "...", Icon::Info, mDuration.mValue);
 }
 
 void Notifications::onNotifyEvent(NotifyEvent& event)
 {
-    mNotifications.push_back(event.mNotification);
+    const Notification& notification = event.mNotification;
+
+    Icon icon = Icon::Info;
+    if (notification.mType == Notification::Type::Warning) icon = Icon::Warning;
+    else if (notification.mType == Notification::Type::Error) icon = Icon::Error;
+
+    std::string text  = notification.mMessage;
+    std::string state;
+
+    // Другие части клиента до сих пор формируют сообщения вида "Aura enabled".
+    // Разделяем их, чтобы карточка выглядела как toggle-карточка.
+    if (icon == Icon::Info)
+    {
+        constexpr const char* kEnabled  = " enabled";
+        constexpr const char* kDisabled = " disabled";
+
+        const std::string clean = cleanText(text);
+        const size_t enabledLen  = 8; // strlen(kEnabled)
+        const size_t disabledLen = 9; // strlen(kDisabled)
+
+        if (clean.size() > enabledLen &&
+            clean.compare(clean.size() - enabledLen, enabledLen, kEnabled) == 0)
+        {
+            text  = clean.substr(0, clean.size() - enabledLen);
+            state = "enabled";
+            icon  = Icon::Success;
+        }
+        else if (clean.size() > disabledLen &&
+                 clean.compare(clean.size() - disabledLen, disabledLen, kDisabled) == 0)
+        {
+            text  = clean.substr(0, clean.size() - disabledLen);
+            state = "disabled";
+            icon  = Icon::Disabled;
+        }
+    }
+
+    const float duration = notification.mDuration > 0.f ? notification.mDuration : mDuration.mValue;
+    push(std::move(text), icon, duration, std::move(state));
 }

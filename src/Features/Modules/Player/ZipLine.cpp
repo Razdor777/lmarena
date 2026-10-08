@@ -112,10 +112,16 @@ glm::vec3 ZipLine::getPlacePos(float extend)
 
         // Find da block
         blockSel = getClosestPlacePos(blockSel, mRange.as<float>(), getCollidingBlocks(player));
-        if (blockSel.x == INT_MAX) return { FLT_MAX, FLT_MAX, FLT_MAX };
+        if (blockSel.x == INT_MAX) {
+            if (mAirPlace.mValue) return getRotBasedPos(extend, yPos);
+            return { FLT_MAX, FLT_MAX, FLT_MAX };
+        }
         side = BlockUtils::getBlockPlaceFace(blockSel);
 
-        if (side == -1) return { FLT_MAX, FLT_MAX, FLT_MAX };
+        if (side == -1) {
+            if (mAirPlace.mValue) return blockSel;
+            return { FLT_MAX, FLT_MAX, FLT_MAX };
+        }
     }
 
     if (blockSel.x == INT_MAX) return { FLT_MAX, FLT_MAX, FLT_MAX };
@@ -134,13 +140,17 @@ bool ZipLine::tickPlace() {
         }
     }
 
-    if (!BlockUtils::isValidPlacePos(blockPos) || !BlockUtils::isAirBlock(blockPos)) {
+    if (!mAirPlace.mValue && !BlockUtils::isValidPlacePos(blockPos)) {
+        return false;
+    }
+    if (!BlockUtils::isAirBlock(blockPos)) {
         return false;
     }
 
     int side = BlockUtils::getBlockPlaceFace(blockPos);
     if (side == -1) {
-        return false;
+        if (!mAirPlace.mValue) return false;
+        side = 1;
     }
     int blockSlot = ItemUtils::getPlaceableItemOnBlock(blockPos, mHotbarOnly.mValue, false);
     ClientInstance::get()->getLocalPlayer()->getSupplies()->mSelectedSlot = blockSlot;

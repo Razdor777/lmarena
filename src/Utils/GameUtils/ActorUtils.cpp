@@ -71,6 +71,11 @@ std::vector<struct Actor *> ActorUtils::getActorList(bool playerOnly, bool exclu
                     continue;
                 };
 
+                // Filter entities without a physical hitbox — these are phantom
+                // entities in the process of being created/destroyed. Without this
+                // check Aura would try to attack them and get kicked for hitting air.
+                if (!actor->getAABBShapeComponent()) continue;
+
                 if (excludeBots && antibot->isBot(actor)) continue;
 
                 if (playerOnly && actor->isPlayer() || !playerOnly)

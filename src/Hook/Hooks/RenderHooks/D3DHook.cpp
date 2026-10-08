@@ -239,7 +239,10 @@ bool D3DHook::createTextureFromData(const uint8_t* data, int width, int height, 
 
 HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT flags)
 {
-    if (Solstice::mRequestEject)
+    // Ejecting (or already ejected): never run another line of our code on the
+    // render thread, otherwise the module can be unmapped while this thread is
+    // still inside it.
+    if (Solstice::mRequestEject || Solstice::mUnloading.load())
     {
         return oPresent(swapChain, syncInterval, flags);
     }
@@ -301,12 +304,17 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     {
         spdlog::warn("Forcing fallback to D3D11");
 
+        // Same rule as the resize path: the back buffers are about to be
+        // recreated, so the "already built" flag has to go with them. It used to
+        // be left true, and the very next frame indexed the just-cleared
+        // vectors (mBackBuffer11Tex.at(index)) -> std::out_of_range.
         mBackBuffer11Rtv.clear();
         mBackBuffer11Tex.clear();
         gContext11->Flush();
 
         gDevice11on12->Release();
         gDevice11on12 = nullptr;
+        d3dInitImGui = false;
 
         ID3D12Device* bad_device;
         if (SUCCEEDED(swapChain->GetDevice(IID_PPV_ARGS(&bad_device))))
@@ -387,13 +395,29 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
 
 
     initImGui(gDevice11.get(), gContext11.get());
+
+    // No ImGui this frame (GuiData is not there yet, or the window is mid
+    // resize). Hand the frame straight back to the game instead of touching an
+    // uninitialised context — this is the path that crashed on F11 and on
+    // window resizing.
+    if (!imGuiInitialized)
+        return oPresent(swapChain, syncInterval, flags);
+
     D2D::init(swapChain, gDevice11.get());
 
     static ImVec2 lastWindowSize = ImGui::GetIO().DisplaySize;
-    ImVec2 windowSize = ImVec2(ClientInstance::get()->getGuiData()->mResolution.x, ClientInstance::get()->getGuiData()->mResolution.y);
+
+    auto* ci = ClientInstance::get();
+    auto* guiData = ci ? ci->getGuiData() : nullptr;
+    ImVec2 windowSize = guiData
+        ? ImVec2(guiData->mResolution.x, guiData->mResolution.y)
+        : lastWindowSize;
 
     if (lastWindowSize.x != windowSize.x || lastWindowSize.y != windowSize.y) {
-        auto holder = nes::make_holder<WindowResizeEvent>(windowSize.x, windowSize.y);
+        // This event existed but nothing ever fired it, so ClickGui's resize
+        // handler (which rescales the panel layout) was dead code — the gui kept
+        // its stale layout after F11 until it was reopened.
+        auto holder = nes::make_holder<WindowResizeEvent>((int)windowSize.x, (int)windowSize.y);
         gFeatureManager->mDispatcher->trigger(holder);
     }
 
@@ -437,19 +461,31 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
 HRESULT D3DHook::resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height,
     DXGI_FORMAT newFormat, UINT swapChainFlags)
 {
+    // Ejecting: never touch our state from the render thread again.
+    if (Solstice::mUnloading.load())
+        return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
+
     if (d3dInitImGui)
     {
+        // EVERY reference to the back buffer has to be gone before ResizeBuffers,
+        // otherwise DXGI fails the call and every later GetBuffer() hands back a
+        // buffer that no longer matches the swap chain (visual corruption, then
+        // crashes). The one that was always missed was the render target still
+        // bound on the immediate context.
+        if (gContext11)
+        {
+            ID3D11RenderTargetView* nullTargets[1] = { nullptr };
+            gContext11->OMSetRenderTargets(1, nullTargets, nullptr);
+            gContext11->Flush();
+        }
 
-        // release all the stuff we created
         D2D::shutdown();
         shutdownImGui();
 
         mBackBuffer11Rtv.clear();
         mBackBuffer11Tex.clear();
-        gContext11->Flush();
 
         d3dInitImGui = false;
-
     }
 
     return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
@@ -458,6 +494,14 @@ HRESULT D3DHook::resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UIN
 void D3DHook::initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext)
 {
     if (imGuiInitialized) return;
+
+    // GuiData vanishes for a moment on every swap chain resize and while a world
+    // is loading. Bailing out leaves imGuiInitialized false, and present() then
+    // skips the whole frame instead of dereferencing a null resolution.
+    auto* ci = ClientInstance::get();
+    auto* guiData = ci ? ci->getGuiData() : nullptr;
+    if (!guiData) return;
+
     ImGui::CreateContext();
 
     FontHelper::load();
@@ -475,7 +519,7 @@ void D3DHook::initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext
     ImGui_ImplDX11_Init(device, deviceContext);
 
     ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(ClientInstance::get()->getGuiData()->mResolution.x, ClientInstance::get()->getGuiData()->mResolution.y);
+    io.DisplaySize = ImVec2(guiData->mResolution.x, guiData->mResolution.y);
 
     imGuiInitialized = true;
 }
@@ -485,6 +529,7 @@ void D3DHook::shutdownImGui()
     if (imGuiInitialized) {
         ImGui_ImplDX11_Shutdown();
         ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
 
         imGuiInitialized = false;
     }
@@ -496,14 +541,18 @@ void D3DHook::igNewFrame()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
+    // Keep the previous display size when GuiData is momentarily gone; a stale
+    // size for one frame is harmless, a null dereference is not.
+    auto* ci = ClientInstance::get();
+    auto* guiData = ci ? ci->getGuiData() : nullptr;
+    if (!guiData) return;
+
     ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(ClientInstance::get()->getGuiData()->mResolution.x, ClientInstance::get()->getGuiData()->mResolution.y);
+    io.DisplaySize = ImVec2(guiData->mResolution.x, guiData->mResolution.y);
 
     MathUtils::fov = RenderUtils::transform.mFov;
-    MathUtils::displaySize = ClientInstance::get()->getGuiData()->mResolution;
+    MathUtils::displaySize = guiData->mResolution;
     MathUtils::origin = RenderUtils::transform.mOrigin;
-
-
 }
 
 void D3DHook::igEndFrame()

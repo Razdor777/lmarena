@@ -1,89 +1,84 @@
 #pragma once
 //
-// AmbientCubes - Floating ambient glow particles
-// Soft bokeh-style visuals that keep up with you:
-//  - anchored to your view, instantly refill after teleports (pearls)
-//  - fast flight no longer leaves the swarm behind
+// AmbientCubes — ambient particles that live in the WORLD, not on the camera.
+//
+// How it works now:
+//   * the swarm is filled instantly and the population is kept FULL — a
+//     particle that expires or is left behind is immediately reborn around
+//     you, so the air is constantly dense instead of thinning out as you move,
+//   * every particle is born at a world position and stays there; because the
+//     world is the anchor a teleport, pearl or lagback never wipes the swarm,
+//   * particles drift with a slow breeze that turns over time plus a per
+//     particle sway, and can rise or fall, so nothing moves in a straight line,
+//   * Count is a density, not a hard number: the count is scaled by how large
+//     Radius is, so spreading them "across the world" also adds more of them.
+//
+// The body of a particle is configurable with Shape (orn / rounded square /
+// spark / snowflake), and Size / Alpha / Glow / Trails / Twinkle tune the look.
 //
 
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Modules/Module.hpp>
 #include <deque>
-#include <cfloat>
 #include <glm/glm.hpp>
 
 struct AmbientCube {
     glm::vec3 position;
     glm::vec3 velocity;
-    glm::vec3 rotation;
-    glm::vec3 rotationSpeed;
+    glm::vec3 prevPosition;   // for the motion trail
     float size;
-    float alpha;
-    float lifetime;
-    float maxLifetime;
-    int style;      // 0=orb, 1=bokeh, 2=dust, 3=petal
-    bool popIn;     // skip fade-in, appear instantly (teleports/recycles)
-    float swayPhase; // per-particle phase for the gentle sway
+    float alpha;              // current (smoothed) alpha, 0..1
+    float life;               // seconds left
+    float maxLife;
+    float phase;              // 0..1 life phase (birth pop / fade)
+    float colorIndex;         // own shade inside the theme palette
+    float swayPhase;          // per particle sway/twinkle phase
 };
 
 class AmbientCubes : public ModuleBase<AmbientCubes> {
 public:
-    enum class ParticleStyle {
-        Mixed,
-        Orbs,
-        Bokeh,
-        Dust,
-        Petals
+    enum class ColorMode {
+        ThemeFlow,    // theme colour, every particle on its own shade (перелив)
+        ThemeStatic,  // one theme colour for all of them
+        Custom,       // your own colour
+        Rainbow       // full spectrum over time
     };
 
-    enum class SpawnArea {
-        Everywhere,
-        Above,
-        Front,
-        Surround
+    enum class Shape {
+        Orb,      // soft glowing dot
+        Square,   // rounded square droplet (the hit-particle look)
+        Spark,    // streak of light, like a shooting star
+        Snow      // soft dot with a faint flake cross
     };
 
-    // General
-    NumberSetting mCubeCount = NumberSetting("Count", "Maximum number of particles", 20, 5, 60, 1);
-    NumberSetting mSpawnRadius = NumberSetting("Spawn Radius", "How far particles spawn", 12.f, 5.f, 35.f, 1.f);
-    NumberSetting mSpeed = NumberSetting("Speed", "Movement speed", 1.5f, 0.3f, 5.f, 0.1f);
-    EnumSettingT<SpawnArea> mSpawnArea = EnumSettingT<SpawnArea>(
-        "Spawn Area", "Where particles spawn", SpawnArea::Everywhere,
-        "Everywhere", "Above", "Front", "Surround");
+    NumberSetting mCount  = NumberSetting("Count",  "Particle density (scaled by Radius)", 120, 10, 600, 5);
+    NumberSetting mRadius = NumberSetting("Radius", "How far from you particles live and spawn", 32.f, 8.f, 160.f, 2.f);
+    NumberSetting mSize   = NumberSetting("Size",   "Particle size",                       0.30f, 0.04f, 1.2f, 0.01f);
+    NumberSetting mSpeed  = NumberSetting("Drift Speed", "How fast particles float around", 0.9f, 0.f, 3.f, 0.05f);
+    NumberSetting mRise   = NumberSetting("Rise / Fall", "Slow upward (+) or downward (-) drift", 0.10f, -1.f, 1.f, 0.05f);
 
-    // Visual
-    EnumSettingT<ParticleStyle> mStyle = EnumSettingT<ParticleStyle>(
-        "Style", "Shape of particles", ParticleStyle::Mixed,
-        "Mixed", "Orbs", "Bokeh", "Dust", "Petals");
-    NumberSetting mCubeSize = NumberSetting("Size", "Particle size", 0.25f, 0.05f, 0.8f, 0.05f);
-    NumberSetting mSizeVariation = NumberSetting("Size Variation", "Random size variation", 0.4f, 0.f, 1.f, 0.1f);
-    BoolSetting mGlow = BoolSetting("Glow", "Soft glow effect", true);
+    EnumSettingT<ColorMode> mColorMode = EnumSettingT<ColorMode>(
+        "Color Mode", "Where the particle colour comes from", ColorMode::ThemeFlow,
+        "Theme Flow", "Theme Static", "Custom", "Rainbow");
 
-    // Rotation
-    BoolSetting mRotate = BoolSetting("Rotate", "Enable rotation", true);
-    NumberSetting mRotationSpeed = NumberSetting("Rotation Speed", "Rotation speed", 1.0f, 0.1f, 3.f, 0.1f);
+    EnumSettingT<Shape> mShape = EnumSettingT<Shape>(
+        "Shape", "What a particle looks like", Shape::Orb,
+        "Orb", "Square", "Spark", "Snow");
 
-    // Color
-    BoolSetting mUseThemeColor = BoolSetting("Use Theme Color", "Use current GUI theme color", true);
-    ColorSetting mCustomColor = ColorSetting("Custom Color", "Custom particle color", 0xFFADD8E6);
-    NumberSetting mAlpha = NumberSetting("Alpha", "Transparency", 0.45f, 0.1f, 0.8f, 0.05f);
+    ColorSetting  mCustomColor = ColorSetting("Custom Color", "Your own particle colour", 0xFFADD8E6);
+    NumberSetting mAlpha       = NumberSetting("Alpha", "Particle transparency", 0.65f, 0.05f, 1.f, 0.05f);
+    BoolSetting   mGlow        = BoolSetting("Glow",    "Soft halo around every particle", true);
+    BoolSetting   mTrails      = BoolSetting("Trails",  "Motion streak behind fast particles", true);
+    BoolSetting   mTwinkle     = BoolSetting("Twinkle", "Each particle gently pulses in brightness", true);
 
-    // Lifetime
-    NumberSetting mLifetime = NumberSetting("Lifetime", "How long particles last (seconds)", 10.f, 3.f, 25.f, 0.5f);
-    BoolSetting mFadeInOut = BoolSetting("Fade In/Out", "Smooth fade effect", true);
-
-    AmbientCubes() : ModuleBase("AmbientCubes", "Floating ambient particles around you",
+    AmbientCubes() : ModuleBase("AmbientCubes", "Ambient particles all over the world around you",
                                 ModuleCategory::Visual, 0, false) {
         gFeatureManager->mDispatcher->listen<RenderEvent, &AmbientCubes::onRenderEvent, nes::event_priority::NORMAL>(this);
 
-        addSettings(&mCubeCount, &mSpawnRadius, &mSpeed, &mSpawnArea,
-                    &mStyle, &mCubeSize, &mSizeVariation, &mGlow,
-                    &mRotate, &mRotationSpeed,
-                    &mUseThemeColor, &mCustomColor, &mAlpha,
-                    &mLifetime, &mFadeInOut);
+        addSettings(&mCount, &mRadius, &mSize, &mSpeed, &mRise,
+                    &mColorMode, &mShape, &mCustomColor, &mAlpha, &mGlow, &mTrails, &mTwinkle);
 
-        VISIBILITY_CONDITION(mRotationSpeed, mRotate.mValue);
-        VISIBILITY_CONDITION(mCustomColor, !mUseThemeColor.mValue);
+        VISIBILITY_CONDITION(mCustomColor, mColorMode.mValue == ColorMode::Custom);
 
         mNames = {
             {Lowercase, "ambientcubes"},
@@ -94,24 +89,22 @@ public:
     }
 
     std::deque<AmbientCube> cubes;
-    float spawnTimer = 0;
-    glm::vec3 mLastAnchor = { FLT_MAX, FLT_MAX, FLT_MAX };
 
     void onEnable() override;
     void onDisable() override;
     void onRenderEvent(RenderEvent& event);
 
 private:
-    // Anchor = what you actually see through (camera origin), eye-pos fallback
+    // Anchor = what you actually see through (camera origin), eye-pos fallback.
     glm::vec3 getAnchorPos();
-    // Fill the whole swarm right now (used on enable + after teleports)
-    void reseedAll(const glm::vec3& anchor);
-    AmbientCube makeCube(const glm::vec3& anchorPos, bool popIn);
-    void spawnCube(const glm::vec3& anchorPos, bool popIn = false);
+
+    // Actual particle count for the current settings (density * radius²).
+    int wantedCount() const;
+
+    AmbientCube makeCube(const glm::vec3& anchor);
+    void respawn(AmbientCube& cube, const glm::vec3& anchor, float maxDist);
     void updateCube(AmbientCube& cube, float deltaTime, float timeSec);
+
     void renderCube(const AmbientCube& cube);
-    void renderShape(const glm::vec2& screenPos, float size,
-                     const glm::vec3& rotation, float alpha,
-                     ImColor color, int style);
-    ImColor getColor();
+    ImColor getColor(float index);
 };

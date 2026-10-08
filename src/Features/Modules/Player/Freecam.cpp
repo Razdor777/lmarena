@@ -149,14 +149,23 @@ void Freecam::onDisable()
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Freecam::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->deafen<ActorRenderEvent, &Freecam::onActorRenderEvent>(this);
 
+    // Queued before anything can bail out below: if the player is gone right now
+    // (world change / death / disconnect) the camera state still has to be restored
+    // on the next look input instead of leaving the freecam flags set forever.
+    mResetRot = true;
+
     auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
+
+    // Everything from here on writes into the player's components. While the world
+    // is unloading those are already destroyed, and dereferencing them is what made
+    // Freecam crash when it was turned off.
+    if (!player || !player->isValid()) return;
 
     player->setFlag<RenderCameraComponent>(false);
     player->setFlag<CameraRenderPlayerModelComponent>(false);
     player->setFlag<RedirectCameraInputComponent>(false);
 
-    // NoClip: restore flags and kill velocity
+    // NoClip: restore what onEnable saved, and kill the leftover motion
     player->setStatusFlag(ActorFlags::HasCollision, mHadCollision);
     player->setStatusFlag(ActorFlags::HasGravity, mHadGravity);
 
@@ -166,8 +175,7 @@ void Freecam::onDisable()
 
     if (mMode.mValue == Mode::Normal)
     {
-        auto aabb = player->getAABBShapeComponent();
-        if (aabb)
+        if (auto aabb = player->getAABBShapeComponent())
         {
             aabb->mMin = mAABBMin;
             aabb->mMax = mAABBMax;
@@ -178,13 +186,11 @@ void Freecam::onDisable()
             sv->mPosOld = mSvPosOld;
         }
     }
+
     if (auto walkAnim = player->getWalkAnimationComponent())
         walkAnim->mWalkAnimSpeed = 1.0f;
     if (auto moveInput = player->getMoveInputComponent())
         moveInput->reset(false);
-
-
-    mResetRot = true;
 }
 
 void Freecam::onPacketInEvent(PacketInEvent& event)
@@ -361,7 +367,7 @@ void Freecam::onLookInputEvent(LookInputEvent& event)
         // Restore camera state. The player (or its registry) can be gone by
         // now (world change, death, relog) — bail out instead of crashing.
         auto player = ClientInstance::get()->getLocalPlayer();
-        if (player && player->mContext.mRegistry)
+        if (player && player->isValid() && player->mContext.mRegistry)
         {
             for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
             {

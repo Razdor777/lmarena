@@ -12,9 +12,10 @@ public:
     NumberSetting mExtend = NumberSetting("Extend", "The distance to extend the placement", 3, 0, 10, 1);
     BoolSetting mLockY = BoolSetting("Lock Y", "Whether or not to lock the Y position", false);
     BoolSetting mHotbarOnly = BoolSetting("Hotbar Only", "Only switch to blocks in the hotbar", true);
+    BoolSetting mAirPlace = BoolSetting("Air Place", "Allow placing blocks in mid-air", true);
     ZipLine() : ModuleBase("ZipLine", "Automatically places blocks above you", ModuleCategory::Player, 0, false)
     {
-        addSettings(&mPlaces, &mRange, &mExtend, &mLockY, &mHotbarOnly);
+        addSettings(&mPlaces, &mRange, &mExtend, &mLockY, &mHotbarOnly, &mAirPlace);
 
         mNames = {
               {Lowercase, "zipline"},

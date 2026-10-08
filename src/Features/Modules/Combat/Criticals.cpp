@@ -1,114 +1,120 @@
-//
-// Criticals.cpp
-//
-// Три метода в порядке надёжности:
-//
-// 1. ActorFlags::Critical (0xD) — прямой флаг крита в ECS.
-//    Ставим его каждый тик. Клиент сам включает его в пакеты.
-//    Самый чистый способ — движок сам обрабатывает.
-//
-// 2. FallDistance + velocity.y + OnGround — компонентный метод.
-//    Меняем клиентские компоненты ДО того как движок собирает
-//    PlayerAuthInputPacket. Сервер получает легитимный пакет.
-//
-// 3. PlayerAuthInputPacket патч — дополнительный фикс полей пакета
-//    на случай если движок не подхватил изменения компонентов.
-//
-
 #include "Criticals.hpp"
 
 #include <Features/FeatureManager.hpp>
-#include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
-#include <SDK/Minecraft/Actor/Components/StateVectorComponent.hpp>
-#include <SDK/Minecraft/Actor/Components/FallDistanceComponent.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
-#include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 
-void Criticals::onEnable() {
-    gFeatureManager->mDispatcher->listen<BaseTickEvent,  &Criticals::onBaseTickEvent>(this);
+void Criticals::onEnable()
+{
     gFeatureManager->mDispatcher->listen<PacketOutEvent, &Criticals::onPacketOutEvent,
-        nes::event_priority::ABSOLUTE_LAST>(this);
-    mTickCounter    = 0;
-    mSavedVelocityY = 0.f;
-    mWasOnGround    = true;
+        nes::event_priority::VERY_LAST>(this);
+    mSnap = {};
+    mSending = false;
+    mLastFakeTick = -1;
 }
 
-void Criticals::onDisable() {
-    gFeatureManager->mDispatcher->deafen<BaseTickEvent,  &Criticals::onBaseTickEvent>(this);
+void Criticals::onDisable()
+{
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Criticals::onPacketOutEvent>(this);
-
-    auto* player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
-
-    // Восстанавливаем всё
-    auto* sv = player->getStateVectorComponent();
-    if (sv) sv->mVelocity.y = mSavedVelocityY;
-    player->setFallDistance(0.f);
-    if (mWasOnGround) player->setOnGround(true);
-
-    // Снимаем флаг Critical
-    player->setStatusFlag(ActorFlags::Critical, false);
+    mSnap = {};
 }
 
-void Criticals::onBaseTickEvent(BaseTickEvent& event) {
-    auto* player = event.mActor;
+void Criticals::sendFake(float yOffset, float yDelta, AuthInputAction flags)
+{
+    if (!mSnap.valid) return;
+
+    auto ci = ClientInstance::get();
+    if (!ci) return;
+    auto sender = ci->getPacketSender();
+    if (!sender) return;
+
+    auto pkt = MinecraftPackets::createPacket<PlayerAuthInputPacket>();
+    if (!pkt) return;
+
+    pkt->mRot               = mSnap.rot;
+    pkt->mPos               = mSnap.pos;
+    pkt->mPos.y            += yOffset;            // mPos в auth input уже на высоте глаз
+    pkt->mYHeadRot          = mSnap.headRot;
+    pkt->mPosDelta          = { 0.f, yDelta, 0.f };
+    pkt->mAnalogMoveVector  = { 0.f, 0.f };
+    pkt->mVehicleRotation   = { 0.f, 0.f };
+    pkt->mMove              = { 0.f, 0.f };
+    pkt->mInteractRots      = mSnap.interactRots;
+    pkt->mCameraOrientation = mSnap.cameraOrientation;
+    pkt->mInputData         = flags;
+    pkt->mInputMode         = mSnap.inputMode;
+    pkt->mPlayMode          = mSnap.playMode;
+    pkt->mNewInteractionModel = mSnap.interaction;
+    pkt->mClientTick        = mSnap.tick;          // см. вопрос к другу про тик
+    pkt->mPredictedVehicle  = mSnap.predictedVehicle;
+    pkt->mPlayerBlockActions.mActions.clear();
+
+    mSending = true;
+    sender->sendToServer(pkt.get());
+    mSending = false;
+}
+
+void Criticals::onPacketOutEvent(PacketOutEvent& event)
+{
+    if (mSending || !event.mPacket) return;
+
+    const PacketID id = event.mPacket->getId();
+
+    // 1) запоминаем последний настоящий auth input
+    if (id == PacketID::PlayerAuthInput) {
+        auto* p = event.getPacket<PlayerAuthInputPacket>();
+        mSnap.valid             = true;
+        mSnap.rot               = p->mRot;
+        mSnap.pos               = p->mPos;
+        mSnap.headRot           = p->mYHeadRot;
+        mSnap.interactRots      = p->mInteractRots;
+        mSnap.cameraOrientation = p->mCameraOrientation;
+        mSnap.inputMode         = p->mInputMode;
+        mSnap.playMode          = p->mPlayMode;
+        mSnap.interaction       = p->mNewInteractionModel;
+        mSnap.tick              = p->mClientTick;
+        mSnap.predictedVehicle  = p->mPredictedVehicle;
+        return;
+    }
+
+    // 2) ловим атаку
+    if (id != PacketID::InventoryTransaction) return;
+    if (event.isCancelled()) return;
+    if (!mSnap.valid) return;
+
+    auto* itp = event.getPacket<InventoryTransactionPacket>();
+    if (!itp || !itp->mTransaction) return;
+    if (itp->mTransaction->type != ComplexInventoryTransaction::Type::ItemUseOnEntityTransaction) return;
+
+    auto* tx = reinterpret_cast<ItemUseOnActorInventoryTransaction*>(itp->mTransaction.get());
+    if (tx->mActionType != ItemUseOnActorInventoryTransaction::ActionType::Attack) return;
+
+    auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
+    if (mOnlyOnGround.mValue && !player->isOnGround()) return;
 
-    // Не трогаем в воде / плавании / элитры
-    if (player->getStatusFlag(ActorFlags::Swimming)) return;
-    if (player->getStatusFlag(ActorFlags::Gliding))  return;
-    if (player->getStatusFlag(ActorFlags::Riding))   return;
+    // уже слали фейки в этом тике (мульти-таргет и т.п.)
+    if (mLastFakeTick == mSnap.tick) return;
+    mLastFakeTick = mSnap.tick;
 
-    auto* sv = player->getStateVectorComponent();
-    if (!sv) return;
+    const float h = mHeight.mValue;
 
-    mSavedVelocityY = sv->mVelocity.y;
-    mWasOnGround    = player->isOnGround();
-    mTickCounter++;
-
-    // ── Метод 1: Прямой флаг Critical ─────────────────────────────────────
-    // ActorFlags::Critical = 0xD — движок сам читает этот флаг при атаке
-    player->setStatusFlag(ActorFlags::Critical, true);
-
-    // ── Метод 2: Компонентный — FallDistance + velocity + OnGround ─────────
-    // Чередуем тики: вверх → вниз → вверх → вниз
-    // Сервер получает через PlayerAuthInput: posDelta.y меняет знак каждый тик
-    if (mTickCounter % 2 == 0) {
-        // "Вверх" тик
-        sv->mVelocity.y = mYOffset.mValue;
-        player->setFallDistance(0.f);
-        player->setOnGround(false);
+    if (mMode.mValue == Mode::PocketMine) {
+        // мини-прыжок: вверх на h, затем вниз на h/2 -> !onGround и fallDistance > 0
+        sendFake(h,        +h,         AuthInputAction::NONE);
+        sendFake(h * 0.5f, -h * 0.5f,  AuthInputAction::NONE);
     } else {
-        // "Вниз" тик — крит условие
-        sv->mVelocity.y = -mYOffset.mValue;
-        player->setFallDistance(0.11f); // > 0 → сервер видит падение
-        player->setOnGround(false);
+        // имитация прыжка: вверх с флагами прыжка, потом вниз без них
+        const AuthInputAction up =
+            AuthInputAction::JUMPING | AuthInputAction::JUMP_DOWN |
+            AuthInputAction::WANT_UP | AuthInputAction::START_JUMPING;
+        sendFake(h,        +h,         up);
+        sendFake(h * 0.5f, -h * 0.5f,  AuthInputAction::NONE);
     }
-}
-
-void Criticals::onPacketOutEvent(PacketOutEvent& event) {
-    if (!event.mPacket) return;
-    auto* player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
-
-    // ── Метод 3: Патчим PlayerAuthInputPacket ─────────────────────────────
-    if (event.mPacket->getId() == PacketID::PlayerAuthInput) {
-        auto* pkt = event.getPacket<PlayerAuthInputPacket>();
-        if (!pkt) return;
-
-        // Убираем vertical collision — иначе сервер думает что мы на земле
-        pkt->mInputData &= ~AuthInputAction::VERTICAL_COLLISION;
-
-        if (mTickCounter % 2 == 0) {
-            pkt->mPos.y      += mYOffset.mValue;
-            pkt->mPosDelta.y  = mYOffset.mValue;
-        } else {
-            pkt->mPosDelta.y  = -mYOffset.mValue;
-        }
-    }
+    // оригинальная атака уйдёт сразу после наших пакетов
 }

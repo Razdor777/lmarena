@@ -4,8 +4,10 @@
 
 #include "Level.hpp"
 
+#include <windows.h>
 #include <libhat.hpp>
 #include <SDK/OffsetProvider.hpp>
+#include <SDK/SigManager.hpp>
 #include <SDK/Minecraft/Actor/SyncedPlayerMovementSettings.hpp>
 
 std::unordered_map<mce::UUID, PlayerListEntry>* Level::getPlayerList()
@@ -44,4 +46,12 @@ class BlockPalette* Level::getBlockPalette()
 {
     static auto vIndex = OffsetProvider::Level_getBlockPalette;
     return MemUtils::callVirtualFunc<class BlockPalette*>(vIndex, this);
+}
+
+void Level::addParticle(ParticleType type, const glm::vec3& pos, const glm::vec3& dir, int data)
+{
+    static uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
+    static uintptr_t func = base + 0x32A4800; // Оффсет функции sub_1432A4800
+
+    MemUtils::callFastcall<void>(func, this, static_cast<int>(type), &pos, &dir, data);
 }

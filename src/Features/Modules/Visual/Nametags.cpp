@@ -97,9 +97,9 @@ ImFont* Nametags::getCyrillicFont()
     static ImFont* cached = nullptr;
     if (cached) return cached;
 
+    // Mntsb несёт всю кириллицу (в него вмержен Roboto-fallback при загрузке).
     static const char* cyrFonts[] = {
-        "comfortaa", "open_sans", "product_sans",
-        "sf_pro_display", "comfortaa_bold", "open_sans_bold"
+        "mntsb", "roboto"
     };
     for (auto fn : cyrFonts) {
         auto it = FontHelper::Fonts.find(fn);

@@ -28,7 +28,6 @@
 #include "Commands/HiveStatsCommand.hpp"
 #include "Commands/VclipCommand.hpp"
 #include "Commands/SnipeCommand.hpp"
-#include "Commands/NameProtectCommand.hpp"
 #include "Commands/TeleportCommand.hpp"
 #include "Commands/Pos1Command.hpp"      // ← ДОБАВЛЕНО
 #include "Commands/Pos2Command.hpp"      // ← ДОБАВЛЕНО
@@ -41,7 +40,6 @@
 #include "Commands/SCancelCommand.hpp"
 #include "Features/Events/ChatEvent.hpp"
 #include "spdlog/spdlog.h"
-#include "Commands/SkinCommand.hpp"
 
 void CommandManager::init()
 {
@@ -66,7 +64,6 @@ void CommandManager::init()
     ADD_COMMAND(FlingCommand);
     ADD_COMMAND(VclipCommand);
     ADD_COMMAND(SnipeCommand);
-    ADD_COMMAND(NameProtectCommand);
     ADD_COMMAND(FakeChatCommand);
     ADD_COMMAND(TeleportCommand);
     ADD_COMMAND(Pos1Command);            // ← ДОБАВЛЕНО
@@ -78,7 +75,6 @@ void CommandManager::init()
     ADD_COMMAND(SPasteCommand);
     ADD_COMMAND(SBuildCommand);
     ADD_COMMAND(SCancelCommand);
-    ADD_COMMAND(SkinCommand)
 
 
     // Look for any commands that have duplicate names

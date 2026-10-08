@@ -9,28 +9,42 @@ class Interface : public ModuleBase<Interface>
 {
 public:
     enum ColorTheme {
-        Midnight,
-        Slate,
-        Ruby,
-        Forest,
-        Amethyst,
-        Rainbow
+        Aurora,
+        Abyss,
+        Ember,
+        Blossom,
+        Prism,
+        Spectrum = Prism,
+        Rainbow = Prism
     };
 
+    // Клиент грузит ровно один текстовый шрифт — Mntsb (см. FontHelper::load()).
+    // Остальные шрифты удалены из resources: они дублировали кириллицу, ломали
+    // вёрстку и раздували атлас. Nurik убран отсюда осознанно — это НЕ текстовый
+    // шрифт, а набор иконок, поэтому он больше не выбирается как Font.
     enum class FontType {
-        ProductSans,
-        Mojangles,
-        Comfortaa,
-        OpenSans,
-        SFPro,
-        Sarabun,
+        Mntsb,
     };
 
     EnumSettingT<NamingStyle> mNamingStyle = EnumSettingT<NamingStyle>("Naming", "The style of the module names.", NamingStyle::NormalSpaced, "lowercase", "lower spaced", "Normal", "Spaced");
-    EnumSettingT<ColorTheme> mMode = EnumSettingT<ColorTheme>("Theme", "The mode of the interface.", Midnight, "Midnight", "Rainbow", "Slate", "Obsidian", "Forest", "Ember", "Ocean");
-    EnumSettingT<FontType> mFont = EnumSettingT<FontType>("Font", "The font of the interface.", FontType::ProductSans, "Product Sans", "Mojangles", "Comfortaa", "Open Sans", "SF Pro", "Sarabun");
-    NumberSetting mColorSpeed = NumberSetting("Color Speed", "The speed of the color change.", 3.f, 0.01f, 20.f, 0.01);
-    NumberSetting mSaturation = NumberSetting("Saturation", "The saturation of the interface.", 1.f, 0.f, 1.f, 0.01);
+    EnumSettingT<ColorTheme> mMode = EnumSettingT<ColorTheme>(
+        "Theme", "Color palette used by the whole client.",
+        Aurora, "Aurora", "Abyss", "Ember", "Blossom", "Prism");
+    EnumSettingT<FontType> mFont = EnumSettingT<FontType>("Font", "The font of the interface.", FontType::Mntsb, "Mntsb");
+    BoolSetting mGradientFlow = BoolSetting("Gradient Flow", "Smoothly morphs between colors in the selected palette", true);
+    NumberSetting mColorSpeed = NumberSetting("Flow Speed", "Speed of the palette morphing", 2.4f, 0.1f, 10.f, 0.05f);
+    NumberSetting mFlowDepth = NumberSetting("Flow Depth", "How strongly the moving gradient affects the base color", 0.82f, 0.f, 1.f, 0.02f);
+    NumberSetting mSaturation = NumberSetting("Saturation", "Global saturation of themed accents", 0.92f, 0.f, 1.f, 0.01f);
+
+    // ── Effects (what actually makes it look alive) ────────────────────────
+    BoolSetting mColorWave = BoolSetting("Color Wave", "Waves the hue across elements in sync", true);
+    NumberSetting mWaveSpeed = NumberSetting("Wave Speed", "Speed of the color wave", 1.0f, 0.1f, 5.0f, 0.05f);
+    NumberSetting mWaveSpacing = NumberSetting("Wave Spacing", "How far apart the wave pattern is", 28.f, 5.f, 120.f, 1.f);
+    BoolSetting mPulse = BoolSetting("Pulse", "Breathing brightness pulse on accents", true);
+    NumberSetting mPulseSpeed = NumberSetting("Pulse Speed", "Speed of the brightness pulse", 2.0f, 0.5f, 8.0f, 0.1f);
+    NumberSetting mPulseStrength = NumberSetting("Pulse Strength", "Depth of the brightness pulse", 0.25f, 0.f, 0.8f, 0.05f);
+    BoolSetting mShimmer = BoolSetting("Shimmer", "Occasional bright sparkle sweeping through colors", true);
+    NumberSetting mGlowBoost = NumberSetting("Glow Boost", "Multiplies glow strength of themed elements", 1.f, 0.2f, 2.f, 0.05f);
     BoolSetting mSlotEasing = BoolSetting("Slot Easing", "Eases the selection of slots", true);
     NumberSetting mSlotEasingSpeed = NumberSetting("Easing Speed", "The speed of the slot easing", 20.f, 0.1f, 20.f, 0.01f);
 #ifdef __DEBUG__
@@ -50,8 +64,18 @@ public:
             &mNamingStyle,
             &mMode,
             &mFont,
+            &mGradientFlow,
             &mColorSpeed,
+            &mFlowDepth,
             &mSaturation,
+            &mColorWave,
+            &mWaveSpeed,
+            &mWaveSpacing,
+            &mPulse,
+            &mPulseSpeed,
+            &mPulseStrength,
+            &mShimmer,
+            &mGlowBoost,
             &mSlotEasing,
             &mSlotEasingSpeed
 #ifdef __DEBUG__
@@ -59,8 +83,12 @@ public:
 #endif
         );
 
-        VISIBILITY_CONDITION(mColorSpeed, mMode.mValue == Rainbow);
-        VISIBILITY_CONDITION(mSaturation, mMode.mValue == Rainbow);
+        VISIBILITY_CONDITION(mColorSpeed, mGradientFlow.mValue);
+        VISIBILITY_CONDITION(mFlowDepth, mGradientFlow.mValue);
+        VISIBILITY_CONDITION(mWaveSpeed, mColorWave.mValue);
+        VISIBILITY_CONDITION(mWaveSpacing, mColorWave.mValue);
+        VISIBILITY_CONDITION(mPulseSpeed, mPulse.mValue);
+        VISIBILITY_CONDITION(mPulseStrength, mPulse.mValue);
         VISIBILITY_CONDITION(mSlotEasingSpeed, mSlotEasing.mValue);
 
         mNames = {
@@ -70,15 +98,6 @@ public:
             {NormalSpaced, "Interface"}
         };
     }
-
-    static inline std::unordered_map<int, std::vector<ImColor>> ColorThemes = {
-        {Midnight, {ImColor(45,55,75), ImColor(60,75,100), ImColor(35,45,65), ImColor(55,70,95)}},
-        {Slate,    {ImColor(85,90,100), ImColor(100,105,115), ImColor(70,75,85), ImColor(90,95,105)}},
-        {Ruby,     {ImColor(160,50,60), ImColor(190,70,80), ImColor(130,40,50), ImColor(180,60,70)}},
-        {Forest,   {ImColor(50,110,80), ImColor(65,135,100), ImColor(40,90,65), ImColor(60,125,90)}},
-        {Amethyst, {ImColor(110,80,150), ImColor(130,100,175), ImColor(95,70,130), ImColor(120,90,160)}},
-        {Rainbow,  {}}
-    };
 
     void onEnable() override;
     void onDisable() override;
