@@ -21,12 +21,9 @@ std::string FileUtils::getRoamingStatePath() {
                                 "8wekyb3d8bbwe\\RoamingState\\";
 }
 
-std::string FileUtils::getJuzdexDir() {
-  return getRoamingStatePath() + xorstr_("Juzdex\\");
+std::string FileUtils::getDexkoDir() {
+  return getRoamingStatePath() + xorstr_("Dexko\\");
 }
-
-// Alias for compatibility
-std::string FileUtils::getSolsticeDir() { return getJuzdexDir(); }
 
 bool FileUtils::fileExists(const std::string &path) {
   return std::filesystem::exists(path);
@@ -40,8 +37,8 @@ void FileUtils::createDirectory(const std::string &path) {
 }
 
 void FileUtils::validateDirectories() {
-  createDirectory(getJuzdexDir());
-  createDirectory(getJuzdexDir() + "Configs\\");
+  createDirectory(getDexkoDir());
+  createDirectory(getDexkoDir() + "Configs\\");
   spdlog::info("Directories created successfully.");
 }
 

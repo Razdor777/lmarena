@@ -9,8 +9,7 @@
 class FileUtils {
 public:
   static std::string getRoamingStatePath();
-  static std::string getJuzdexDir();
-  static std::string getSolsticeDir(); // Alias for compatibility
+  static std::string getDexkoDir();
   static bool fileExists(const std::string &path);
   static void createDirectory(const std::string &path);
   static void validateDirectories();

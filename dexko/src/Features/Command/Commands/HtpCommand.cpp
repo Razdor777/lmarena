@@ -62,6 +62,10 @@ void HtpCommand::execute(const std::vector<std::string>& args)
 
     hp->mStyle.setValue(static_cast<HitParticles::Style>(idx));
 
+    // The style only decides the look while colours come from its palette.
+    // With Custom / Theme colour mode a style change would look like nothing happened.
+    hp->mColorMode.setValue(HitParticles::ColorMode::StyleColor);
+
     if (!hp->mEnabled)
         hp->setEnabled(true);
 

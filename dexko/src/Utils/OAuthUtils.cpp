@@ -40,7 +40,7 @@ bool OAuthUtils::hasValidToken()
 
 std::string OAuthUtils::getToken()
 {
-    std::string tokenPath = FileUtils::getSolsticeDir() + xorstr_("uniqueId.txt");
+    std::string tokenPath = FileUtils::getDexkoDir() + xorstr_("uniqueId.txt");
     if (FileUtils::fileExists(tokenPath))
     {
         std::ifstream file(tokenPath);
@@ -79,7 +79,7 @@ std::vector<std::string> OAuthUtils::getCommitsBetweenHash(const std::string& st
 
 std::string OAuthUtils::getLastCommitHash()
 {
-    std::string commitPath = FileUtils::getSolsticeDir() + xorstr_("commitHash.txt");
+    std::string commitPath = FileUtils::getDexkoDir() + xorstr_("commitHash.txt");
     if (FileUtils::fileExists(commitPath))
     {
         std::ifstream file(commitPath);
@@ -93,7 +93,7 @@ std::string OAuthUtils::getLastCommitHash()
 
 void OAuthUtils::saveCommitHash(const std::string& commitHash)
 {
-    std::string commitPath = FileUtils::getSolsticeDir() + xorstr_("commitHash.txt");
+    std::string commitPath = FileUtils::getDexkoDir() + xorstr_("commitHash.txt");
     std::ofstream file(commitPath);
     file << commitHash;
     file.close();

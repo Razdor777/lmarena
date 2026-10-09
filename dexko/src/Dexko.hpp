@@ -8,7 +8,7 @@
 //
 
 
-class Solstice {
+class Dexko {
 public:
     /* Fields */
     static inline HMODULE mModule;

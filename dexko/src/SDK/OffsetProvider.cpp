@@ -4,7 +4,7 @@
 
 #include "OffsetProvider.hpp"
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Utils/MemUtils.hpp>
 #include <libhat.hpp>
 
@@ -39,7 +39,7 @@ void OffsetProvider::initialize()
     {
         if (sig.second != 0)
         {
-            Solstice::console->info("[offsets] found {} @ {}", sig.first, MemUtils::getMbMemoryString(sig.second));
+            Dexko::console->info("[offsets] found {} @ {}", sig.first, MemUtils::getMbMemoryString(sig.second));
         }
     }
 
@@ -47,7 +47,7 @@ void OffsetProvider::initialize()
     {
         if (sig.second == 0)
         {
-            Solstice::console->critical("[offsets] failed to find {}", sig.first);
+            Dexko::console->critical("[offsets] failed to find {}", sig.first);
         }
     }
 
@@ -73,7 +73,7 @@ void OffsetProvider::initialize()
     }
 #endif
 
-    Solstice::console->info("[offsets] initialized in {}ms, {} total sigs scanned", end - start, mSigScanCount);
+    Dexko::console->info("[offsets] initialized in {}ms, {} total sigs scanned", end - start, mSigScanCount);
     mIsInitialized = true;
 }
 

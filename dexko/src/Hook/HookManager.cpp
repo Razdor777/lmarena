@@ -6,7 +6,6 @@
 #include <MinHook.h>
 
 #include "Hooks/ActorHooks/BaseTickHook.hpp"
-#include "Hooks/MiscHooks/KeyHook.hpp"
 #include "Hooks/MiscHooks/PreGameHook.hpp"
 #include "Hooks/NetworkHooks/ConnectionRequestHook.hpp"
 #include "Hooks/NetworkHooks/PacketReceiveHook.hpp"
@@ -33,7 +32,6 @@ void HookManager::init(bool initLp)
     else
     {
         std::vector<std::shared_ptr<Hook>> hooks;
-        ADD_HOOK(KeyHook);
         ADD_HOOK(SetupAndRenderHook);
         ADD_HOOK(D3DHook);
         ADD_HOOK(ConnectionRequestHook);

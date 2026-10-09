@@ -80,6 +80,38 @@ namespace {
         default: return { ImColor(0.55f, 0.95f, 0.25f, 1.f), ImColor(0.85f, 1.00f, 0.35f, 1.f), ImColor(0.20f, 0.55f, 0.12f, 1.f) };
         }
     }
+    // Shape per style, so each style reads differently on screen.
+    // 0 Blood / 2 Critical / 1 Sparks: square droplet · 3 Hearts: heart
+    // 4 Fire / 6 Soul / 7 Toxic: round · 5 Frost: diamond
+    void drawDroplet(ImDrawList* dl, ImVec2 c, float h, ImU32 col, int style)
+    {
+        switch (style) {
+        case 3: { // Hearts
+            const float r = h * 0.85f;
+            dl->AddCircleFilled({ c.x - r, c.y - r * 0.35f }, r, col, 12);
+            dl->AddCircleFilled({ c.x + r, c.y - r * 0.35f }, r, col, 12);
+            dl->AddTriangleFilled({ c.x - r * 1.95f, c.y - r * 0.35f },
+                                  { c.x + r * 1.95f, c.y - r * 0.35f },
+                                  { c.x, c.y + r * 2.0f }, col);
+            return;
+        }
+        case 4: case 6: // Fire, Soul
+            dl->AddCircleFilled(c, h, col, 10);
+            return;
+        case 5: // Frost
+            dl->AddQuadFilled({ c.x, c.y - h * 1.3f }, { c.x + h * 1.3f, c.y },
+                              { c.x, c.y + h * 1.3f }, { c.x - h * 1.3f, c.y }, col);
+            return;
+        case 7: { // Toxic bubble
+            dl->AddCircleFilled(c, h, col, 10);
+            dl->AddCircle(c, h, ImColor(255, 255, 255, 60), 10, 1.f);
+            return;
+        }
+        default: // Blood, Sparks, Critical
+            dl->AddRectFilled({ c.x - h, c.y - h }, { c.x + h, c.y + h }, col, std::max(0.f, h * 0.35f));
+            return;
+        }
+    }
 }
 
 void HitParticles::onEnable()
@@ -334,6 +366,8 @@ void HitParticles::drawParticles()
             return glm::dot(a.pos - cam, a.pos - cam) > glm::dot(b.pos - cam, b.pos - cam);
         });
 
+    const int style = mStyle.as<int>();
+
     for (const auto& p : mParticles) {
         ImVec2 sc;
         if (!RenderUtils::worldToScreen(p.pos, sc)) continue;
@@ -362,8 +396,7 @@ void HitParticles::drawParticles()
             dl->AddCircleFilled(sc, sz * 2.1f, halo, 10);
         }
 
-        // Square droplet + rounded core: the Kagune blood look.
-        dl->AddRectFilled({ sc.x - half, sc.y - half }, { sc.x + half, sc.y + half }, body, std::max(0.f, half * 0.35f));
+        drawDroplet(dl, sc, half, body, style);
     }
 
     for (const auto& f : mFlashes) {

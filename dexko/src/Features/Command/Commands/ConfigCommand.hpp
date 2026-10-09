@@ -3,7 +3,7 @@
 // Created by vastrakai on 7/2/2024.
 //
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Features/FeatureManager.hpp>
 #include "spdlog/spdlog.h"
 

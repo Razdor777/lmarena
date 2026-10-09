@@ -1,6 +1,6 @@
 # Dexko
 
-Лёгкий отдельный клиент на базе Solstice, из которого вырезано всё лишнее.
+Лёгкий отдельный клиент, из которого вырезано всё лишнее.
 
 ## Что осталось
 
@@ -19,9 +19,8 @@ ClickGUI убран — всё управление через команды в
 - `.htp <style>` — стиль HitParticles: `.htp sparks`, `.htp fire`, `.htp hearts`, `.htp blood`, `.htp critical`, `.htp frost`, `.htp soul`, `.htp toxic`.
 - `.config <load/save/list/delete/default> <name>` — конфиги.
 - `.toggle <module>` — вкл/выкл модуль.
+- `.crosshair <on/off>` — вкл/выкл прицел.
 - `.set <module> <setting> <value>` — изменить настройку.
-- `.bind` / `.unbind` — бинды клавиш.
-- `.module <module>` — инфо о модуле.
 - `.help [command]` — справка по командам.
 
 ## Сборка
@@ -33,6 +32,6 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --target Dexko -- -m
 ```
 
-Готовый файл: `build/Release/Dexko.dll` (~13 МБ).
+Готовый файл: `build/Release/Dexko.dll`.
 
 Данные/конфиги/лог: `%LOCALAPPDATA%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\RoamingState\Dexko\`

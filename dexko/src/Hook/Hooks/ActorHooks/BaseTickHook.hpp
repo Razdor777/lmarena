@@ -45,18 +45,4 @@ public:
         mQueuedMessages.push_back(msg);
         mQueueMutex.unlock();
     }
-
-    // should only be used by this hook
-private:
-    static void setMessageQueue(std::vector<std::string> messages)
-    {
-        mQueuedMessages = messages;
-    }
-
-    static std::vector<std::string> getMessageQueue()
-    {
-        auto messages = mQueuedMessages;
-        return messages;
-    }
 };
-

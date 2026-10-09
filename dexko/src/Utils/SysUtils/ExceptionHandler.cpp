@@ -57,7 +57,7 @@ void ExceptionHandler::init()
 
 void ExceptionHandler::makeCrashLog(const std::string& text, DWORD exceptionCode)
 {
-    std::string excPath = FileUtils::getSolsticeDir() + xorstr_("crash.log");
+    std::string excPath = FileUtils::getDexkoDir() + xorstr_("crash.log");
 
     std::ofstream excFile(excPath, std::ios::app);
 
@@ -87,9 +87,9 @@ void ExceptionHandler::makeCrashLog(const std::string& text, DWORD exceptionCode
 
         // Append the exception code then divider
         excFile << xorstr_("Exception Code: 0x") << fmt::format(xorstr_("{:X}"), exceptionCode) << xorstr_("\n");
-        excFile << xorstr_("Solstice commit: ") << SOLSTICE_BUILD_VERSION << xorstr_("\n");
-        excFile << xorstr_("Solstice branch: ") << SOLSTICE_BUILD_BRANCH << xorstr_("\n");
-        excFile << xorstr_("Solstice commit msg: ") << SOLSTICE_BUILD_COMMIT_MESSAGE << xorstr_("\n");
+        excFile << xorstr_("Dexko commit: ") << DEXKO_BUILD_VERSION << xorstr_("\n");
+        excFile << xorstr_("Dexko branch: ") << DEXKO_BUILD_BRANCH << xorstr_("\n");
+        excFile << xorstr_("Dexko commit msg: ") << DEXKO_BUILD_COMMIT_MESSAGE << xorstr_("\n");
         excFile << xorstr_("Minecraft version: ") << ProcUtils::getVersion() << xorstr_("\n");
         excFile << xorstr_("----------------------------------------\n");
         excFile.flush();

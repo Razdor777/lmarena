@@ -2,7 +2,7 @@
 // Created by vastrakai on 6/24/2024.
 //
 
-#include "Solstice.hpp"
+#include "Dexko.hpp"
 
 
 #include <fstream>
@@ -36,11 +36,11 @@
 #pragma comment(lib, "wininet.lib")
 
 #ifdef __DEBUG__
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [debug]";
+std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "] [debug]";
 #elif __PRIVATE_BUILD__
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [private]";
+std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "] [private]";
 #else
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "]";
+std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "]";
 #endif
 
 
@@ -55,7 +55,7 @@ std::vector<unsigned char> gBpBytes = {0x1c}; // Defines the new offset for mInH
 DEFINE_PATCH_FUNC(patchInHandSlot, SigManager::ItemInHandRenderer_renderItem_bytepatch2+2, gBpBytes);
 
 // called using winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [&]()
-void Solstice::init(HMODULE hModule)
+void Dexko::init(HMODULE hModule)
 {
     // Not doing this could cause crashes if you inject too soon
     // Honestly, I don't think this helps much but it's not a bad idea to have it here
@@ -73,7 +73,7 @@ void Solstice::init(HMODULE hModule)
     console = spdlog::stdout_color_mt(CC(21, 207, 148) + "dexko" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
 
     // Create a file logger sink
-    std::string logFile = FileUtils::getSolsticeDir() + xorstr_("dexko.log");
+    std::string logFile = FileUtils::getDexkoDir() + xorstr_("dexko.log");
  
     // Don't use the file sink if the log file doesn't exist
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -214,11 +214,11 @@ void Solstice::init(HMODULE hModule)
     console->info("Press END to eject dll.");
     mLastTick = NOW;
 
-    mThread = std::thread(&Solstice::shutdownThread);
+    mThread = std::thread(&Dexko::shutdownThread);
     mThread.detach();
 }
 
-void Solstice::shutdownThread()
+void Dexko::shutdownThread()
 {
     // Wait for the user to press END
     bool firstCall = true;
@@ -239,7 +239,7 @@ void Solstice::shutdownThread()
             }
             else if (!latestHash.empty())
             {
-                if (latestHash != SOLSTICE_BUILD_VERSION)
+                if (latestHash != DEXKO_BUILD_VERSION)
                 {
                     console->warn("Dexko is out of date! Latest commit: {}", latestHash);
                     NotifyUtils::notify("There is a new version of Dexko available!\nIt is recommended to update.", 10.0f, Notification::Type::Warning);
@@ -340,7 +340,7 @@ void Solstice::shutdownThread()
     // definitely gone, then calls FreeLibraryAndExitThread, which frees the
     // module and terminates the thread inside kernel32 without ever returning
     // into unmapped code. This thread ends with ExitThread for the same reason.
-    HANDLE unloader = CreateThread(nullptr, 0, &Solstice::unloadThreadProc, mModule, 0, nullptr);
+    HANDLE unloader = CreateThread(nullptr, 0, &Dexko::unloadThreadProc, mModule, 0, nullptr);
     if (unloader)
     {
         CloseHandle(unloader);
@@ -351,7 +351,7 @@ void Solstice::shutdownThread()
     FreeLibraryAndExitThread(mModule, 0);
 }
 
-DWORD WINAPI Solstice::unloadThreadProc(LPVOID module)
+DWORD WINAPI Dexko::unloadThreadProc(LPVOID module)
 {
     // Give the ejecting thread time to actually terminate (it calls ExitThread,
     // so nothing of ours is left running by then).

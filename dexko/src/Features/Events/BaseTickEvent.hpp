@@ -13,11 +13,3 @@ public:
 
     explicit BaseTickEvent(Actor* actor) : mActor(actor) {}
 };
-
-class BaseTickInitEvent : public Event
-{
-public:
-    Actor* mActor;
-
-    explicit BaseTickInitEvent(Actor* actor) : mActor(actor) {}
-};

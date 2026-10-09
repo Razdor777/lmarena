@@ -21,22 +21,11 @@ void BaseTickHook::onBaseTick(Actor* actor)
     if (actor != ClientInstance::get()->getLocalPlayer()) return oFunc(actor);
 
     mQueueMutex.lock();
-    auto messages = mQueuedMessages;
-    if (!messages.empty())
+    if (!mQueuedMessages.empty())
     {
-        // Если включён CustomChat — клиентские сообщения идут в него (он сам
-        // решает, что и как рисовать). Иначе — как раньше, в ванильный чат.
-        if (ChatUtils::sSink)
-        {
-            for (auto& message : messages) ChatUtils::sSink(message);
-        }
-        else
-        {
-            std::string messageStr = "";
-            for (auto& message : messages) messageStr += message + "\n";
-            ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
-        }
-
+        std::string messageStr = "";
+        for (auto& message : mQueuedMessages) messageStr += message + "\n";
+        ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
         mQueuedMessages.clear();
     }
     mQueueMutex.unlock();
@@ -53,15 +42,6 @@ void BaseTickHook::onBaseTick(Actor* actor)
         else ClientInstance::get()->getPacketSender()->send(mPacket.get());
     }
     mQueuedPackets.clear();
-
-    static bool once = false;
-    if (!once)
-    {
-        once = true;
-
-        auto holder = nes::make_holder<BaseTickInitEvent>(actor);
-        gFeatureManager->mDispatcher->trigger(holder);
-    }
 
     auto holder = nes::make_holder<BaseTickEvent>(actor);
     gFeatureManager->mDispatcher->trigger(holder);
