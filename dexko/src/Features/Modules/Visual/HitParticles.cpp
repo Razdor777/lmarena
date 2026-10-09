@@ -323,10 +323,72 @@ void HitParticles::updateParticles(float dt)
     }
 }
 
+namespace {
+
+// Draws one particle as the shape of its style. `r` is the particle's half size on screen.
+void drawShape(ImDrawList* dl, int style, const ImVec2& sc, float r, const ImColor& body, float fade, const ImVec2& tailSc)
+{
+    const float x = sc.x;
+    const float y = sc.y;
+
+    switch (style) {
+    case 1: { // Sparks: a short bright streak with a white-hot core
+        const ImColor core(1.f, 1.f, 0.85f, fade);
+        dl->AddLine(tailSc, sc, body, std::max(1.f, r * 0.6f));
+        dl->AddCircleFilled(sc, std::max(0.8f, r * 0.45f), core, 8);
+        break;
+    }
+    case 2: { // Critical: a four-point star
+        const float arm = r * 1.8f;
+        const float th  = std::max(1.f, r * 0.35f);
+        dl->AddLine({ x - arm, y }, { x + arm, y }, body, th);
+        dl->AddLine({ x, y - arm }, { x, y + arm }, body, th);
+        dl->AddCircleFilled(sc, r * 0.55f, body, 8);
+        break;
+    }
+    case 3: { // Hearts: two lobes and a point
+        const float lobe = r * 0.6f;
+        dl->AddCircleFilled({ x - r * 0.55f, y - r * 0.25f }, lobe, body, 10);
+        dl->AddCircleFilled({ x + r * 0.55f, y - r * 0.25f }, lobe, body, 10);
+        dl->AddTriangleFilled({ x - r * 1.1f, y - r * 0.1f }, { x + r * 1.1f, y - r * 0.1f }, { x, y + r * 1.25f }, body);
+        break;
+    }
+    case 4: { // Fire: a teardrop flame with a hot core
+        dl->AddCircleFilled({ x, y + r * 0.3f }, r * 0.85f, body, 12);
+        dl->AddTriangleFilled({ x - r * 0.85f, y + r * 0.3f }, { x + r * 0.85f, y + r * 0.3f }, { x, y - r * 1.7f }, body);
+        dl->AddCircleFilled({ x, y + r * 0.4f }, r * 0.4f, ImColor(1.f, 0.95f, 0.6f, fade), 8);
+        break;
+    }
+    case 5: { // Frost: an ice-crystal diamond
+        const ImColor edge(0.85f, 0.97f, 1.f, fade);
+        dl->AddQuadFilled({ x, y - r * 1.3f }, { x + r, y }, { x, y + r * 1.3f }, { x - r, y }, body);
+        dl->AddQuad({ x, y - r * 1.3f }, { x + r, y }, { x, y + r * 1.3f }, { x - r, y }, edge, 1.f);
+        break;
+    }
+    case 6: { // Soul: a bright orb with a white core
+        dl->AddCircleFilled(sc, r * 1.1f, body, 12);
+        dl->AddCircleFilled(sc, r * 0.45f, ImColor(0.9f, 1.f, 1.f, fade), 8);
+        break;
+    }
+    case 7: { // Toxic: a hollow bubble with a faint fill
+        dl->AddCircleFilled(sc, r * 1.1f, ImColor(body.Value.x, body.Value.y, body.Value.z, fade * 0.25f), 12);
+        dl->AddCircle(sc, r * 1.1f, body, 12, std::max(1.f, r * 0.3f));
+        break;
+    }
+    default: { // Blood: a square droplet with rounded corners
+        dl->AddRectFilled({ x - r, y - r }, { x + r, y + r }, body, std::max(0.f, r * 0.35f));
+        break;
+    }
+    }
+}
+
+} // namespace
+
 void HitParticles::drawParticles()
 {
     auto* dl = ImGui::GetBackgroundDrawList();
     const glm::vec3 cam = RenderUtils::transform.mOrigin;
+    const int style = mStyle.as<int>();
 
     // Painter's order: far droplets first, so near ones sit on top.
     std::sort(mParticles.begin(), mParticles.end(),
@@ -348,13 +410,13 @@ void HitParticles::drawParticles()
 
         ImColor body(p.col.Value.x, p.col.Value.y, p.col.Value.z, fade);
 
-        if (mTrails.mValue && sz > 1.6f) {
-            glm::vec3 tail = p.pos - p.vel * 0.035f;
-            ImVec2 tailSc;
-            if (RenderUtils::worldToScreen(tail, tailSc)) {
-                ImColor tc(p.col.Value.x, p.col.Value.y, p.col.Value.z, fade * 0.45f);
-                dl->AddLine(tailSc, sc, tc, std::max(1.f, sz * 0.45f));
-            }
+        // Where the particle was a moment ago; sparks use it as their streak.
+        ImVec2 tailSc = sc;
+        const bool hasTail = RenderUtils::worldToScreen(p.pos - p.vel * 0.035f, tailSc);
+
+        if (mTrails.mValue && hasTail && sz > 1.6f && style != 1) {
+            ImColor tc(p.col.Value.x, p.col.Value.y, p.col.Value.z, fade * 0.45f);
+            dl->AddLine(tailSc, sc, tc, std::max(1.f, sz * 0.45f));
         }
 
         if (mGlow.mValue) {
@@ -362,8 +424,7 @@ void HitParticles::drawParticles()
             dl->AddCircleFilled(sc, sz * 2.1f, halo, 10);
         }
 
-        // Square droplet + rounded core: the Kagune blood look.
-        dl->AddRectFilled({ sc.x - half, sc.y - half }, { sc.x + half, sc.y + half }, body, std::max(0.f, half * 0.35f));
+        drawShape(dl, style, sc, half, body, fade, tailSc);
     }
 
     for (const auto& f : mFlashes) {

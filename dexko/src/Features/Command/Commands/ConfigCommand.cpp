@@ -130,8 +130,8 @@ void ConfigCommand::execute(const std::vector<std::string>& args)
         if (args.size() < 3)
         {
             // Clear the current config
-            Solstice::Prefs->mDefaultConfigName = "";
-            PreferenceManager::save(Solstice::Prefs);
+            Dexko::Prefs->mDefaultConfigName = "";
+            PreferenceManager::save(Dexko::Prefs);
             ChatUtils::displayClientMessage("§eSuccessfully cleared the default configuration.");
             return;
         }
@@ -144,8 +144,8 @@ void ConfigCommand::execute(const std::vector<std::string>& args)
             return;
         }
 
-        Solstice::Prefs->mDefaultConfigName = name;
-        PreferenceManager::save(Solstice::Prefs);
+        Dexko::Prefs->mDefaultConfigName = name;
+        PreferenceManager::save(Dexko::Prefs);
         ChatUtils::displayClientMessage("§aSuccessfully set the default configuration to §6" + name + "§a.");
     }
     else

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <queue>
+
 #include <Hook/Hook.hpp>
 #include <Hook/HookManager.hpp>
 #include <SDK/SigManager.hpp>

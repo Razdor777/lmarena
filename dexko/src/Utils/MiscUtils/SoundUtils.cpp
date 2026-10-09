@@ -10,6 +10,8 @@
 
 #include "spdlog/spdlog.h"
 
+#include <fstream>
+
 Audio audioManager;
 
 
@@ -25,8 +27,8 @@ void SoundUtils::playSoundFromEmbeddedResource(std::string resourceName, float v
             return;
         }
         Resource& soundResource = ResourceLoader::Resources[resourceName];
-        std::string path = FileUtils::getSolsticeDir() + "Audio\\" + resourceName;
-        audioManager.BasePath = FileUtils::getSolsticeDir() + "Audio\\";
+        std::string path = FileUtils::getDexkoDir() + "Audio\\" + resourceName;
+        audioManager.BasePath = FileUtils::getDexkoDir() + "Audio\\";
         if (!FileUtils::fileExists(path))
         {
             std::ofstream file(path, std::ios::binary);

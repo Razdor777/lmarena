@@ -4,7 +4,7 @@
 
 #include "Logger.hpp"
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <string>
 
 
@@ -14,7 +14,7 @@ void Logger::initialize()
     if (initialized) return;
     AllocConsole();
 
-    SetConsoleTitle("Solstice Console");
+    SetConsoleTitle("Dexko Console");
 
     freopen_s(reinterpret_cast<FILE**>(stdout), "CONOUT$", "w", stdout);
     freopen_s(reinterpret_cast<FILE**>(stdin), "CONIN$", "r", stdin);

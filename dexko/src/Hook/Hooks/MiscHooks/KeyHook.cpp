@@ -4,24 +4,13 @@
 
 #include "KeyHook.hpp"
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
-#include <Utils/GameUtils/ChatUtils.hpp>
-
-#include <unordered_set>
-
-// Клавиши, которые игра реально видела зажатыми (oFunc вызван с isDown=true).
-// Нужно, чтобы во время набора в CustomChat пропускать игре ОТПУСКАНИЯ этих
-// клавиш: иначе зажатая до открытия чата W «залипла» бы — игра не узнала бы, что
-// клавиша отпущена, и игрок продолжал бы идти после закрытия чата.
-// Отпускания клавиш, которых игра не видела (T/Enter, которыми открыли наш чат),
-// наоборот, гасятся: Bedrock открывает ванильный чат именно по отпусканию Enter.
-static std::unordered_set<int> gGameSeenKeysDown;
 
 std::unique_ptr<Detour> KeyHook::mDetour = nullptr;
 
-ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
+static ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
 {
     switch (wParam)
     {
@@ -136,11 +125,7 @@ void KeyHook::onKey(uint32_t key, bool isDown)
 {
     auto oFunc = mDetour->getOriginal<&onKey>();
 
-    // ── ImGui получает клавиши ДО всего остального ───────────────────────────
-    // Это принципиально для CustomChat: пока игрок печатает в нашем чате, игре
-    // нажатия не отдаются (иначе персонаж шёл бы вперёд), но самому чату символы
-    // нужны — он читает их из io.InputQueueCharacters. Поэтому кормим ImGui
-    // первым, а все остальные проверки (eject, KeyEvent, модули) идут ниже.
+    // Feed ImGui first so its widgets see the key before any module does.
     if (ImGui::GetCurrentContext())
     {
         ImGuiIO& io = ImGui::GetIO();
@@ -170,40 +155,9 @@ void KeyHook::onKey(uint32_t key, bool isDown)
         }
     }
 
-    // ── Пока игрок печатает в нашем чате, клавиатуру держит он ───────────────
-    // Символы уже ушли в ImGui выше, а игре нажатия не нужны: не вызывая oFunc,
-    // мы не даём персонажу идти (W/A/S/D), прыгать (Space) и открывать инвентарь
-    // (E). Заодно гасим состояние для клиентских модулей — Disabler и
-    // InventoryMove читают тот же Keyboard::mPressedKeys.
-    if (ChatUtils::sChatInputActive)
-    {
-        Keyboard::mPressedKeys[key] = false;
-
-        // Отпускание клавиши, которую игра видела зажатой, обязано до неё доехать,
-        // иначе она останется «зажатой» навсегда (стрибун, бег и т.д.). Нажатия же
-        // и отпускания «невидимых» игре клавиш гасим полностью.
-        if (!isDown && gGameSeenKeysDown.count(static_cast<int>(key)) > 0)
-        {
-            gGameSeenKeysDown.erase(static_cast<int>(key));
-            oFunc(key, false);
-        }
-        return;
-    }
-
-    // Отпускание клавиши, закрывшей наш чат, тоже гасим: ванильный Minecraft
-    // открывает чат по ОТПУСКАНИЮ Enter, и если оно «утечёт» в игру после
-    // закрытия нашего чата, оригинальный экран откроется прямо поверх нашего.
-    if (ChatUtils::sChatSwallowKey == static_cast<int>(key) && ImGui::GetCurrentContext() &&
-        ImGui::GetTime() < ChatUtils::sChatSwallowDeadline)
-    {
-        Keyboard::mPressedKeys[key] = false;
-        if (!isDown) ChatUtils::sChatSwallowKey = 0; // отпускание поймано — хватит
-        return;
-    }
-
     if (key == VK_END && isDown && ClientInstance::get()->getScreenName() != "chat_screen" && !ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantTextInput)
     {
-        Solstice::mRequestEject = true;
+        Dexko::mRequestEject = true;
     }
 
     Keyboard::mPressedKeys[key] = isDown;
@@ -231,9 +185,6 @@ void KeyHook::onKey(uint32_t key, bool isDown)
         return;
     }
 
-    if (isDown) gGameSeenKeysDown.insert(static_cast<int>(key));
-    else        gGameSeenKeysDown.erase(static_cast<int>(key));
-
     oFunc(key, isDown);
 
     // Look for modules
@@ -254,24 +205,10 @@ void KeyHook::onKey(uint32_t key, bool isDown)
             }
         }
 
-        /*if (isDown)
-        {
-            for (Setting* setting : module->mSettings)
-            {
-                if (auto boolSetting = dynamic_cast<BoolSetting*>(setting))
-                {
-                    if (boolSetting->mKey == key)
-                    {
-                        bool oldValue = static_cast<bool>(*boolSetting);
-                        boolSetting->setValue(!oldValue);
-                    }
-                }
-            }
-        }*/
     }
 }
 
 void KeyHook::init()
 {
-    mDetour = std::make_unique<Detour>("Keyboard::feed", reinterpret_cast<void*>(SigManager::Keyboard_feed), &KeyHook::onKey);
+    mDetour = std::make_unique<Detour>("Keyboard::feed", reinterpret_cast<void*>(SigManager::Keyboard_feed), reinterpret_cast<void*>(&KeyHook::onKey));
 }

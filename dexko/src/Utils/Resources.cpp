@@ -4,12 +4,6 @@
 void ResourceLoader::loadResources() {
     auto fonts_Roboto_Regular_ttf = GET_RESOURCE(fonts_Roboto_Regular_ttf);
     Resources.emplace("roboto_regular", fonts_Roboto_Regular_ttf);
-    auto fonts_Tenacity_Icons_ttf = GET_RESOURCE(fonts_Tenacity_Icons_ttf);
-    Resources.emplace("tenacity_icons", fonts_Tenacity_Icons_ttf);
     auto fonts_mntsb_ttf = GET_RESOURCE(fonts_mntsb_ttf);
     Resources.emplace("mntsb", fonts_mntsb_ttf);
-    auto fonts_nurik_ttf = GET_RESOURCE(fonts_nurik_ttf);
-    Resources.emplace("nurik", fonts_nurik_ttf);
-    auto skinblinker_txt = GET_RESOURCE(skinblinker_txt);
-    Resources.emplace("skinblinker.txt", skinblinker_txt);
 }

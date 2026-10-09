@@ -11,7 +11,7 @@
 
 std::shared_ptr<Preferences> PreferenceManager::load()
 {
-    std::string path = FileUtils::getSolsticeDir() + "preferences.json";
+    std::string path = FileUtils::getDexkoDir() + "preferences.json";
 
     auto prefs = std::make_shared<Preferences>();
 
@@ -66,7 +66,7 @@ void PreferenceManager::save(const std::shared_ptr<Preferences>& prefs)
         return;
     }
 
-    std::string path = FileUtils::getSolsticeDir() + "preferences.json";
+    std::string path = FileUtils::getDexkoDir() + "preferences.json";
 
     FileUtils::deleteFile(path);
     FileUtils::createFile(path);

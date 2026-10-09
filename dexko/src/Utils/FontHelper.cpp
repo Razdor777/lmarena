@@ -11,7 +11,7 @@
 // Product Sans, SF Pro, Sarabun, Roboto Display и т.д.) удалены из resources —
 // они только раздували атлас и ломали кириллицу.
 //
-// Осталось три вещи, и ни одна из них не выбирается в меню как «шрифт»:
+// Осталось два шрифта, и оба не выбираются в меню напрямую:
 //
 //   1. Mntsb — сам интерфейсный шрифт. Он уже содержит кириллицу, но
 //      нескольких букв/знаков в нём нет, поэтому в него дополнительно
@@ -19,10 +19,6 @@
 //   2. Roboto — «донор» глифов. НЕ показывается в списке шрифтов, нужен
 //      только чтобы в Mntsb гарантированно были все кириллические буквы
 //      и типографика (тире, кавычки, многоточие, №).
-//   3. Tenacity Icons + Nurik — ИКОНОЧНЫЕ шрифты (не текст!). Их глифы
-//      лежат на ASCII-кодах, поэтому если выбрать их как шрифт интерфейса,
-//      весь текст превращается в иконки — именно это и происходит, когда
-//      Nurik выбирался в Font.
 //
 // ВАЖНО: ключи в FontHelper::Fonts именно присваиваются (Fonts[key] = f), а не
 // добавляются через emplace. emplace не перезаписывает уже занятый ключ, а ключ
@@ -96,45 +92,6 @@ void FontHelper::load()
     // ── Roboto — служебный fallback, не отображается в списке шрифтов ─────────
     addFont("roboto",       robotoRes, 20.f, false);
     addFont("roboto_large", robotoRes, 42.f, false);
-
-    // ── Иконочные шрифты ──────────────────────────────────────────────────────
-    // Это НЕ текстовые шрифты: их глифы сидят на ASCII-кодах. Грузим с базовым
-    // диапазоном + Private Use Area, кириллица им не нужна.
-    static const ImWchar sIconRanges[] = { 0x0020, 0x00FF, 0xE000, 0xF8FF, 0x0000 };
-
-    auto addIconFont = [&](const std::string& key, const Resource& res) {
-        ImFontConfig iconCfg;
-        iconCfg.FontBuilderFlags     = ImGuiFreeTypeBuilderFlags_NoHinting;
-        iconCfg.FontDataOwnedByAtlas = false;
-
-        // НЕ называть эти переменные small/big: windows.h (rpcndr.h)
-        // определяет #define small char — и весь файл перестаёт компилироваться.
-        ImFont* iconFont20 = io.Fonts->AddFontFromMemoryTTF(
-            res.data2(), static_cast<int>(res.size()), 20.f, &iconCfg, sIconRanges);
-        if (iconFont20) Fonts[key] = iconFont20;
-
-        ImFont* iconFont42 = io.Fonts->AddFontFromMemoryTTF(
-            res.data2(), static_cast<int>(res.size()), 42.f, &iconCfg, sIconRanges);
-        if (iconFont42) Fonts[key + "_large"] = iconFont42;
-    };
-
-    // Tenacity Icons — иконки ClickGui (чекбоксы, стрелки, шестерёнки).
-    addIconFont("tenacity_icons", GET_RESOURCE(fonts_Tenacity_Icons_ttf));
-
-    // Nurik — оказался НЕ текстовым шрифтом, а набором из 31 иконки, сгенерированным
-    // в Glyphter/Fontello (CFF, без цифр и пробела, буквы A-Z подменены картинками).
-    // Поэтому его больше нельзя выбрать как Font, но сам файл оставлен и теперь
-    // доступен как иконочный шрифт "nurik_icons".
-    addIconFont("nurik_icons", GET_RESOURCE(fonts_nurik_ttf));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-ImFont* FontHelper::getIconFont(bool large)
-{
-    const std::string key = large ? "nurik_icons_large" : "nurik_icons";
-    auto it = Fonts.find(key);
-    return (it != Fonts.end()) ? it->second : nullptr;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

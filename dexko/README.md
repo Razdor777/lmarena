@@ -1,28 +1,26 @@
 # Dexko
 
-Лёгкий отдельный клиент на базе Solstice, из которого вырезано всё лишнее.
+Лёгкий клиент с минимальным набором функций: боевой reach, частицы при ударе, прицел и спуф устройства.
 
-## Что осталось
+## Модули
 
-Модули:
-- **DeviceSpoof** — всегда включён при запуске (спуф устройств).
-- **CustomCrosshair** — динамический прицел (стили, пресеты, sway).
-- **HitParticles** — частицы при попадании (стили: blood/sparks/critical/hearts/fire/frost/soul/toxic).
-- **Reach** — только боевое досягаемость (attack range).
-- Скрытые служебные: `Interface` (тема/цвета), `Notifications` (тосты).
+- **DeviceSpoof** — подмена идентификаторов устройства (включён при запуске).
+- **CustomCrosshair** — настраиваемый динамический прицел.
+- **HitParticles** — частицы при попадании (стили: blood, sparks, critical, hearts, fire, frost, soul, toxic).
+- **Reach** — увеличение дальности атаки.
+- **Interface** — служебный модуль: цвета и тема интерфейса.
 
-ClickGUI убран — всё управление через команды в чате.
+Управление — через команды в чате.
 
 ## Команды
 
-- `.reach 3.00` — установить боевое досягаемость (3.00–7.00), автовключает Reach.
-- `.htp <style>` — стиль HitParticles: `.htp sparks`, `.htp fire`, `.htp hearts`, `.htp blood`, `.htp critical`, `.htp frost`, `.htp soul`, `.htp toxic`.
-- `.config <load/save/list/delete/default> <name>` — конфиги.
-- `.toggle <module>` — вкл/выкл модуль.
-- `.set <module> <setting> <value>` — изменить настройку.
-- `.bind` / `.unbind` — бинды клавиш.
-- `.module <module>` — инфо о модуле.
-- `.help [command]` — справка по командам.
+- `.reach <value>` (alias `.r`) — установить дальность атаки, например `.reach 4.5`; включает Reach. Без аргумента показывает текущее значение.
+- `.htp <style>` (alias `.hitparticles`) — стиль HitParticles: `.htp sparks`, `.htp fire`, `.htp hearts`, `.htp blood`, `.htp critical`, `.htp frost`, `.htp soul`, `.htp toxic`.
+- `.crosshair` (alias `.ch`) — настройки прицела.
+- `.config <load/save/list/delete/default> <name>` (alias `.c`) — конфиги.
+- `.toggle <module>` (alias `.t`) — вкл/выкл модуль.
+- `.set <module> <setting> <value>` (alias `.s`) — изменить настройку.
+- `.help [command]` (alias `.?`) — справка по командам.
 
 ## Сборка
 
@@ -33,6 +31,8 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --target Dexko -- -m
 ```
 
-Готовый файл: `build/Release/Dexko.dll` (~13 МБ).
+Готовый файл: `build/Release/Dexko.dll`.
 
-Данные/конфиги/лог: `%LOCALAPPDATA%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\RoamingState\Dexko\`
+## Данные
+
+Конфиги и настройки хранятся в `%LOCALAPPDATA%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\RoamingState\Dexko\`.

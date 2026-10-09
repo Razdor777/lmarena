@@ -18,7 +18,7 @@ void ReachCommand::execute(const std::vector<std::string>& args)
     {
         ChatUtils::displayClientMessage(
             "§aCombat Reach: §6{:.2f}", reach->mCombatReach.mValue);
-        ChatUtils::displayClientMessage("§7Usage: §e.reach <3.00-7.00>");
+        ChatUtils::displayClientMessage("§7Usage: §e.reach <value> §7(e.g. §e.reach 4.5§7)");
         return;
     }
 
@@ -30,6 +30,12 @@ void ReachCommand::execute(const std::vector<std::string>& args)
     catch (...)
     {
         ChatUtils::displayClientMessage("§cInvalid number §6" + args[1] + "§c.");
+        return;
+    }
+
+    if (value < 0.f)
+    {
+        ChatUtils::displayClientMessage("§cReach cannot be negative.");
         return;
     }
 
@@ -55,5 +61,5 @@ std::string ReachCommand::getDescription() const
 
 std::string ReachCommand::getUsage() const
 {
-    return "Usage: .reach <3.00-7.00>";
+    return "Usage: .reach <value>";
 }

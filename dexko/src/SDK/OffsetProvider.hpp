@@ -142,62 +142,6 @@ public:
     DEFINE_FIELD(ClientInstance_mGuiData, 0x590); // i will make sig for it later (maybe)
     DEFINE_FIELD(BlockPalette_mLevel, 0x80);
 
-    // ═══════════════════════════════════════════════════════════════
-    // All offsets below imported from Flarial OffsetInit::init2140()
-    // Version: 1.21.4X (confirmed compatible with 1.21.44)
-    // ═══════════════════════════════════════════════════════════════
-
-    // --- Level ---
-    DEFINE_FIELD(Flarial_Level_hitResult, 0x248);
-    DEFINE_FIELD(Flarial_Level_worldFolderName, 0x2B8);
-    DEFINE_FIELD(Flarial_Level_getPlayerMap, 0xBF0);
-    DEFINE_FIELD(Flarial_Level_LevelData, 0x110);
-
-    // --- LevelData ---
-    DEFINE_FIELD(Flarial_LevelData_worldName, 0x390);
-
-    // --- Player ---
-    DEFINE_FIELD(Flarial_Player_gamemode, 0xB28);
-    DEFINE_FIELD(Flarial_Player_playerName, 0xCB0);
-
-    // --- ClientInstance ---
-    DEFINE_FIELD(Flarial_ClientInstance_getBlockSource, 29); // vtable index
-    DEFINE_FIELD(Flarial_ClientInstance_minecraftGame, 0xD0);
-    DEFINE_FIELD(Flarial_ClientInstance_levelRenderer, 0xE8);
-    DEFINE_FIELD(Flarial_ClientInstance_camera, 0x2A8);
-    DEFINE_FIELD(Flarial_ClientInstance_viewMatrix, 0x368);
-    DEFINE_FIELD(Flarial_ClientInstance_guiData, 0x590);
-    DEFINE_FIELD(Flarial_ClientInstance_getFovX, 0x728);
-    DEFINE_FIELD(Flarial_ClientInstance_getFovY, 0x73C);
-    DEFINE_FIELD(Flarial_ClientInstance_getPacketSender, 0xF8);
-
-    // --- MinecraftGame ---
-    DEFINE_FIELD(Flarial_MinecraftGame_mouseGrabbed, 0x1A0);
-    DEFINE_FIELD(Flarial_MinecraftGame_textureGroup, 0x650);
-
-    // --- RaknetConnector ---
-    DEFINE_FIELD(Flarial_RaknetConnector_getPeer, 0x2A0);
-    DEFINE_FIELD(Flarial_RaknetConnector_JoinedIp, 0x398);
-    DEFINE_FIELD(Flarial_RaknetConnector_port, 0x3B8);
-    DEFINE_FIELD(Flarial_RaknetConnector_rawIp, 0x378);
-
-    // --- LevelRenderer ---
-    DEFINE_FIELD(Flarial_LevelRender_getLevelRendererPlayer, 0x318);
-    DEFINE_FIELD(Flarial_LevelRendererPlayer_cameraPos, 0x620);
-
-    // --- NetworkSystem ---
-    DEFINE_FIELD(Flarial_NetworkSystem_remoteConnectorComposite, 0x90);
-    DEFINE_FIELD(Flarial_RemoteConnectorComposite_netherNetConnector, 0x68);
-    DEFINE_FIELD(Flarial_RemoteConnectorComposite_rakNetConnector, 0x70);
-    DEFINE_FIELD(Flarial_NetherNetConnector_mPeers, 0x1F0);
-
-    // --- ScreenContext ---
-    DEFINE_FIELD(Flarial_ScreenContext_tessellator, 0xC8);
-
-    // --- Biome ---
-    DEFINE_FIELD(Flarial_Biome_name, 0x10);
-
-
     static void initialize();
     static void deinitialize();
 };

@@ -3,7 +3,7 @@
 // Created by vastrakai on 6/29/2024.
 //
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Features/FeatureManager.hpp>
 
 class ToggleCommand : public Command {

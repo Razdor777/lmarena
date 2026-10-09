@@ -132,7 +132,6 @@ public:
     bool isSwinging();
     void setSwinging(bool swinging);
     int getGameType();
-    void setGameType(int type);
     bool isDebugCameraActive();
     void setDebugCameraActive(bool active);
     void setAllowInsideBlockRender(bool allow);

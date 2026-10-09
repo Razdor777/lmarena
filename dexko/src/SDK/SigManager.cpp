@@ -5,7 +5,7 @@
 #include "SigManager.hpp"
 
 #include <iostream>
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Utils/Logger.hpp>
 #include <Utils/MemUtils.hpp>
 #include <chrono>
@@ -43,11 +43,11 @@ void SigManager::initialize()
     int64_t diff = end - start;
 
     for (const auto& sig : mSigs) {
-        if (sig.second != 0) Solstice::console->info("[signatures] found {} @ {}", sig.first, MemUtils::getMbMemoryString(sig.second));
+        if (sig.second != 0) Dexko::console->info("[signatures] found {} @ {}", sig.first, MemUtils::getMbMemoryString(sig.second));
     }
 
     for (const auto& sig : mSigs) {
-        if (sig.second == 0) Solstice::console->critical("[signatures] failed to find {}", sig.first);
+        if (sig.second == 0) Dexko::console->critical("[signatures] failed to find {}", sig.first);
 
     }
 
@@ -73,7 +73,7 @@ void SigManager::initialize()
     }
 #endif
 
-    Solstice::console->info("[signatures] initialized in {}ms, {} total sigs scanned", diff, mSigScanCount);
+    Dexko::console->info("[signatures] initialized in {}ms, {} total sigs scanned", diff, mSigScanCount);
     mIsInitialized = true;
 }
 

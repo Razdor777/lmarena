@@ -8,7 +8,7 @@
 
 std::string MessageTemplate::getTemplatePath() const
 {
-    return FileUtils::getSolsticeDir() + "templates\\" + mTemplateName + ".txt";
+    return FileUtils::getDexkoDir() + "templates\\" + mTemplateName + ".txt";
 }
 
 void MessageTemplate::createTemplateFile(const std::string& defaultMessage) const

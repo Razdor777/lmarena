@@ -3,7 +3,6 @@
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/ModuleStateChangeEvent.hpp>
 #include <Features/Events/DrawImageEvent.hpp>
-#include <Features/Events/PreGameCheckEvent.hpp>
 
 class Interface : public ModuleBase<Interface>
 {
@@ -18,10 +17,7 @@ public:
         Rainbow = Prism
     };
 
-    // Клиент грузит ровно один текстовый шрифт — Mntsb (см. FontHelper::load()).
-    // Остальные шрифты удалены из resources: они дублировали кириллицу, ломали
-    // вёрстку и раздували атлас. Nurik убран отсюда осознанно — это НЕ текстовый
-    // шрифт, а набор иконок, поэтому он больше не выбирается как Font.
+    // The client ships a single text font (Mntsb, see FontHelper::load()).
     enum class FontType {
         Mntsb,
     };
@@ -47,9 +43,6 @@ public:
     NumberSetting mGlowBoost = NumberSetting("Glow Boost", "Multiplies glow strength of themed elements", 1.f, 0.2f, 2.f, 0.05f);
     BoolSetting mSlotEasing = BoolSetting("Slot Easing", "Eases the selection of slots", true);
     NumberSetting mSlotEasingSpeed = NumberSetting("Easing Speed", "The speed of the slot easing", 20.f, 0.1f, 20.f, 0.01f);
-#ifdef __DEBUG__
-    BoolSetting mForcePackSwitching = BoolSetting("Force Pack Switching", "Allows pack switching in-game", false);
-#endif
 
     Interface() : ModuleBase("Interface", "Customize the visuals!", ModuleCategory::Visual, 0, true) {
         gFeatureManager->mDispatcher->listen<ModuleStateChangeEvent, &Interface::onModuleStateChange, nes::event_priority::FIRST>(this);
@@ -58,7 +51,6 @@ public:
         gFeatureManager->mDispatcher->listen<BaseTickEvent, &Interface::onBaseTickEvent>(this);
         gFeatureManager->mDispatcher->listen<PacketOutEvent, &Interface::onPacketOutEvent, nes::event_priority::ABSOLUTE_LAST>(this);
         gFeatureManager->mDispatcher->listen<DrawImageEvent, &Interface::onDrawImageEvent>(this);
-        gFeatureManager->mDispatcher->listen<PreGameCheckEvent, &Interface::onPregameCheckEvent>(this);
 
         addSettings(
             &mNamingStyle,
@@ -78,9 +70,6 @@ public:
             &mGlowBoost,
             &mSlotEasing,
             &mSlotEasingSpeed
-#ifdef __DEBUG__
-            ,&mForcePackSwitching
-#endif
         );
 
         VISIBILITY_CONDITION(mColorSpeed, mGradientFlow.mValue);
@@ -101,9 +90,7 @@ public:
 
     void onEnable() override;
     void onDisable() override;
-    void renderHoverText();
     void onModuleStateChange(ModuleStateChangeEvent& event);
-    void onPregameCheckEvent(class PreGameCheckEvent& event);
     void onRenderEvent(class RenderEvent& event);
     void onActorRenderEvent(class ActorRenderEvent& event);
     void onDrawImageEvent(class DrawImageEvent& event);

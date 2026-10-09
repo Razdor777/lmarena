@@ -11,7 +11,6 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
 #include <SDK/Minecraft/Network/Packets/UpdateBlockPacket.hpp>
-#include <Utils/GameUtils/PacketUtils.hpp>
 
 #include "HitResult.hpp"
 

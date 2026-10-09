@@ -10,7 +10,6 @@
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
-#include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 
 std::unique_ptr<Detour> BaseTickHook::mDetour = nullptr;
@@ -20,39 +19,23 @@ void BaseTickHook::onBaseTick(Actor* actor)
     auto oFunc = mDetour->getOriginal<&onBaseTick>();
     if (actor != ClientInstance::get()->getLocalPlayer()) return oFunc(actor);
 
-    mQueueMutex.lock();
-    auto messages = mQueuedMessages;
+    std::vector<std::string> messages;
+    {
+        std::lock_guard lock(mQueueMutex);
+        messages.swap(mQueuedMessages);
+    }
+
     if (!messages.empty())
     {
-        // Если включён CustomChat — клиентские сообщения идут в него (он сам
-        // решает, что и как рисовать). Иначе — как раньше, в ванильный чат.
-        if (ChatUtils::sSink)
-        {
-            for (auto& message : messages) ChatUtils::sSink(message);
-        }
-        else
-        {
-            std::string messageStr = "";
-            for (auto& message : messages) messageStr += message + "\n";
-            ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
-        }
-
-        mQueuedMessages.clear();
+        std::string messageStr;
+        for (auto& message : messages) messageStr += message + "\n";
+        ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
     }
-    mQueueMutex.unlock();
 
     if (auto supplies = actor->getSupplies())
     {
         supplies->mInHandSlot = supplies->mSelectedSlot;
     }
-
-    for (auto& [mTime, mPacket, mBypassHook] : mQueuedPackets)
-    {
-        spdlog::trace("Sending packet with ID: {} [queued {}ms ago] [{}]", magic_enum::enum_name(mPacket->getId()), NOW - mTime, mBypassHook ? "bypassing hook" : "not bypassing hook");
-        if (mBypassHook) ClientInstance::get()->getPacketSender()->sendToServer(mPacket.get());
-        else ClientInstance::get()->getPacketSender()->send(mPacket.get());
-    }
-    mQueuedPackets.clear();
 
     static bool once = false;
     if (!once)
@@ -71,6 +54,6 @@ void BaseTickHook::onBaseTick(Actor* actor)
 
 void BaseTickHook::init()
 {
-    mDetour = std::make_unique<Detour>("Actor::baseTick", reinterpret_cast<void*>(ClientInstance::get()->getLocalPlayer()->vtable[OffsetProvider::Actor_baseTick]), &BaseTickHook::onBaseTick);
+    mDetour = std::make_unique<Detour>("Actor::baseTick", reinterpret_cast<void*>(ClientInstance::get()->getLocalPlayer()->vtable[OffsetProvider::Actor_baseTick]), reinterpret_cast<void*>(&BaseTickHook::onBaseTick));
     mDetour->enable();
 }
