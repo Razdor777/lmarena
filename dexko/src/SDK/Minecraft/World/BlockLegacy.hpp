@@ -10,6 +10,8 @@
 
 #include <Utils/Structs.hpp>
 
+class BlockSource;
+
 class Material
 {
 public:

@@ -54,6 +54,22 @@ enum struct EventPriorities {
 #include <functional>
 #include <string>
 
+// Standard headers that used to arrive transitively through the removed Utils files.
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <deque>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <map>
+#include <mutex>
+#include <optional>
+#include <regex>
+#include <sstream>
+
 #include <nlohmann/json.hpp>
 #include <Utils/Utils.hpp>
 #include <imgui_freetype.h>
