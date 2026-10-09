@@ -66,7 +66,10 @@ CPMAddPackage(
         VERSION 3.11.3
 )
 
-# cryptopp нужен не только Auth: StringUtils (md5/aes/base64) тоже его использует
+# cryptopp нужен не только Auth: StringUtils (md5/aes/base64) тоже его использует.
+# Отключаем сборку тестов cryptest — иначе они падают на линковке: cryptopp.lib
+# собирается с /MT (наш MSVC_RUNTIME_LIBRARY), а cryptest — с /MD по умолчанию.
+set(BUILD_TESTING OFF CACHE BOOL "Disable dependency tests (cryptest etc.)" FORCE)
 CPMAddPackage(
         NAME cryptopp-cmake
         GITHUB_REPOSITORY abdes/cryptopp-cmake
@@ -162,16 +165,18 @@ file(GLOB_RECURSE resource_files_list "resources/*")
 function(add_resources out_var)
     set(result)
     foreach(in_f ${ARGN})
+        # in_f приходит относительным ("resources/..."); ld и MSBuild ломаются
+        # на путях с пробелами, поэтому всё берём в кавычки
         file(RELATIVE_PATH src_f ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/${in_f})
         set(out_f "${PROJECT_BINARY_DIR}/${in_f}.o")
-        add_custom_command(OUTPUT ${out_f}
-                COMMAND ${LD_COMMAND} -r -b binary -o ${out_f} ${src_f}
-                DEPENDS ${in_f}
+        add_custom_command(OUTPUT "${out_f}"
+                COMMAND ${LD_COMMAND} -r -b binary -o "${out_f}" "${src_f}"
+                DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${in_f}"
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                 COMMENT "Building object ${out_f}"
                 VERBATIM
         )
-        list(APPEND result ${out_f})
+        list(APPEND result "${out_f}")
         message(STATUS "Embedding resource: ${in_f}")
     endforeach()
     set(${out_var} "${result}" PARENT_SCOPE)
@@ -179,7 +184,10 @@ endfunction()
 
 set(resource_files "")
 foreach(file ${resource_files_list})
-    list(APPEND resource_files ${file})
+    # GLOB возвращает абсолютные пути — превращаем в относительные, иначе
+    # ${PROJECT_BINARY_DIR}/${file}.o даёт невалидный путь "build\C:\..."
+    file(RELATIVE_PATH rel_file ${CMAKE_CURRENT_SOURCE_DIR} ${file})
+    list(APPEND resource_files ${rel_file})
 endforeach()
 
 add_resources(resource_files ${resource_files})
