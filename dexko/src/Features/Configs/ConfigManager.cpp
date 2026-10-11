@@ -6,7 +6,6 @@
 #include <Features/FeatureManager.hpp>
 #include <Utils/FileUtils.hpp>
 #include <nlohmann/json.hpp>
-#include <Utils/MiscUtils/NotifyUtils.hpp>
 
 #include "spdlog/spdlog.h"
 
@@ -34,7 +33,7 @@ bool backupCorruptedConfig(const std::string& path)
 
 std::string ConfigManager::getConfigPath()
 {
-    return FileUtils::getSolsticeDir() + "Configs\\";
+    return FileUtils::getDexkoDir() + "Configs\\";
 }
 
 bool ConfigManager::configExists(const std::string& name)
@@ -50,14 +49,12 @@ void ConfigManager::loadConfig(const std::string& name)
         std::ifstream file(path);
         if (!file.is_open()) {
             spdlog::error("Failed to open config file: {}", path);
-            NotifyUtils::notify("Failed to open config " + name + "!", 3.f, Notification::Type::Error);
             return;
         }
 
         if (file.peek() == std::ifstream::traits_type::eof()) {
             spdlog::error("Config {} is empty", path);
             backupCorruptedConfig(path);
-            NotifyUtils::notify("Config " + name + " is empty. Using defaults.", 5.f, Notification::Type::Error);
             saveConfig(name);
             return;
         }
@@ -69,7 +66,6 @@ void ConfigManager::loadConfig(const std::string& name)
         if (!j.is_object() || !j.contains("modules") || !j["modules"].is_array()) {
             spdlog::error("Config {} has invalid structure", path);
             backupCorruptedConfig(path);
-            NotifyUtils::notify("Config " + name + " has invalid format. Using defaults.", 5.f, Notification::Type::Error);
             saveConfig(name);
             return;
         }
@@ -79,15 +75,12 @@ void ConfigManager::loadConfig(const std::string& name)
         LastLoadedConfig = name;
 
         spdlog::info("Loaded config " + name + " successfully.");
-        NotifyUtils::notify("Loaded config " + name + "!", 3.f, Notification::Type::Info);
     } catch (const nlohmann::json::exception& e) {
         spdlog::error("JSON error loading config {}: {}", name, e.what());
         backupCorruptedConfig(path);
-        NotifyUtils::notify("Config " + name + " is corrupted! Backup created, defaults restored.", 5.f, Notification::Type::Error);
         saveConfig(name);
     } catch (const std::exception& e) {
         spdlog::error("Error loading config {}: {}", name, e.what());
-        NotifyUtils::notify("Failed to load config " + name + "!", 3.f, Notification::Type::Error);
     }
 }
 
@@ -105,7 +98,6 @@ void ConfigManager::saveConfig(const std::string& name)
         std::ofstream file(path);
         if (!file.is_open()) {
             spdlog::error("Failed to open config file for writing: {}", path);
-            NotifyUtils::notify("Failed to save config!", 3.f, Notification::Type::Error);
             return;
         }
         file << content;
@@ -114,9 +106,7 @@ void ConfigManager::saveConfig(const std::string& name)
         LastLoadedConfig = name;
 
         spdlog::info("Config saved successfully.");
-        NotifyUtils::notify("Saved config as " + name + ".", 3.f, Notification::Type::Info);
     } catch (const std::exception& e) {
         spdlog::error("Failed to save config {}: {}", name, e.what());
-        NotifyUtils::notify("Failed to save config! " + std::string(e.what()), 5.f, Notification::Type::Error);
     }
 }

@@ -142,7 +142,7 @@ void ModuleManager::onClientTick() {
 nlohmann::json ModuleManager::serialize() const {
   nlohmann::json j;
   j["client"] = "Dexko";
-  j["version"] = SOLSTICE_VERSION;
+  j["version"] = DEXKO_VERSION;
   j["modules"] = nlohmann::json::array();
 
   for (const auto &module : mModules) {
@@ -155,7 +155,7 @@ nlohmann::json ModuleManager::serialize() const {
 nlohmann::json ModuleManager::serializeModule(Module *module) {
   nlohmann::json j;
   j["client"] = "Dexko";
-  j["version"] = SOLSTICE_VERSION;
+  j["version"] = DEXKO_VERSION;
   j["modules"] = nlohmann::json::array();
 
   j["modules"].push_back(module->serialize());
@@ -174,7 +174,7 @@ void ModuleManager::deserialize(const nlohmann::json &j, bool showMessages) {
   }
 
   const std::string version = j.value("version", std::string{});
-  std::string currentVersion = SOLSTICE_VERSION;
+  std::string currentVersion = DEXKO_VERSION;
 
   if (version != currentVersion) {
     spdlog::warn("Config version mismatch. Expected: {}, Got: {}",

@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/2/2024.
 //
 
 #include "ConfigCommand.hpp"
@@ -7,7 +6,6 @@
 #include <Features/Configs/ConfigManager.hpp>
 #include <Utils/FileUtils.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
-#include <Utils/MiscUtils/NotifyUtils.hpp>
 
 void ConfigCommand::execute(const std::vector<std::string>& args)
 {
@@ -74,7 +72,6 @@ void ConfigCommand::execute(const std::vector<std::string>& args)
         {
             if (args.size() < 4 || args.size() < 4 && args[3] != "overwrite")
             {
-                NotifyUtils::notify(args[2] + " already exists!", 3.f, Notification::Type::Warning);
                 ChatUtils::displayClientMessage("§eWARNING: §6" + args[2] + " §calready exists. Use §6.config save " + args[2] + " overwrite §cto overwrite it.");
                 return;
             }
@@ -130,8 +127,8 @@ void ConfigCommand::execute(const std::vector<std::string>& args)
         if (args.size() < 3)
         {
             // Clear the current config
-            Solstice::Prefs->mDefaultConfigName = "";
-            PreferenceManager::save(Solstice::Prefs);
+            Dexko::Prefs->mDefaultConfigName = "";
+            PreferenceManager::save(Dexko::Prefs);
             ChatUtils::displayClientMessage("§eSuccessfully cleared the default configuration.");
             return;
         }
@@ -144,8 +141,8 @@ void ConfigCommand::execute(const std::vector<std::string>& args)
             return;
         }
 
-        Solstice::Prefs->mDefaultConfigName = name;
-        PreferenceManager::save(Solstice::Prefs);
+        Dexko::Prefs->mDefaultConfigName = name;
+        PreferenceManager::save(Dexko::Prefs);
         ChatUtils::displayClientMessage("§aSuccessfully set the default configuration to §6" + name + "§a.");
     }
     else

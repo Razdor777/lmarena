@@ -1,11 +1,11 @@
 //
 // HitParticles — rewritten from scratch.
 //
-// Hit detection mirrors Kagune / HitEffects (the two that actually work):
+// Hit detection:
 //   PacketOutEvent -> InventoryTransaction -> ItemUseOnEntityTransaction
 //   -> ActionType::Attack -> mActorId
-// The contact point is found with the same eye-ray vs hitbox test Kagune
-// uses, so the burst lands exactly where the hit registered.
+// The contact point comes from an eye-ray vs hitbox test, so the burst lands
+// exactly where the hit registered.
 //
 // Rendering is fully self-contained: world -> screen via RenderUtils and a
 // foreground-ish background draw list, no Level::addParticle involved.
@@ -102,6 +102,60 @@ void HitParticles::onDisable()
     mFlashes.clear();
 }
 
+// ─── Command bridge ───────────────────────────────────────────────────────────
+
+void HitParticles::requestPreview()
+{
+    sPreviewQueued.store(true, std::memory_order_relaxed);
+}
+
+// Same ray the hit detection below uses — eye position plus look direction.
+// Callers must have a local player; the helper re-checks anyway because the
+// command thread can run while the player is being torn down (world change).
+bool HitParticles::getEyeRay(glm::vec3& eye, glm::vec3& dir) const
+{
+    auto* ci = ClientInstance::get();
+    if (!ci) return false;
+    auto* player = ci->getLocalPlayer();
+    if (!player) return false;
+
+    auto* rot = player->getActorRotationComponent();
+    if (!rot) return false;
+    auto* head = player->getActorHeadRotationComponent();
+
+    const float yaw   = (head ? head->mHeadRot : rot->mYaw) * (kPi / 180.f);
+    const float pitch = rot->mPitch * (kPi / 180.f);
+
+    // Positions in this SDK already sit at EYE level (feet + PLAYER_HEIGHT) —
+    // every renderer compensates by dropping PLAYER_HEIGHT before drawing
+    // (see Actor::getAABB). Adding it here, as the first version did, pushed
+    // the whole burst ~1.6 blocks above the head.
+    eye = *player->getPos();
+    dir = glm::vec3(
+        -sinf(yaw) * cosf(pitch),
+        -sinf(pitch),
+         cosf(yaw) * cosf(pitch));
+
+    if (glm::length(dir) < 1e-5f) dir = glm::vec3(0.f, 0.f, 1.f);
+    else dir = glm::normalize(dir);
+
+    return true;
+}
+
+// Immediate, hit-free burst so `.htp <style>` visibly changes something.
+void HitParticles::spawnPreview()
+{
+    glm::vec3 eye, dir;
+    if (!getEyeRay(eye, dir)) return;
+
+    const glm::vec3 center = eye + dir * 2.0f;
+
+    spawnBurst(center, dir, 1.0f, 0.85f, 1.0f);
+
+    if (mFlash.mValue)
+        mFlashes.push_back({ static_cast<uint64_t>(NOW), 280u, center, pickColor(1), 0.5f });
+}
+
 // ─── Hit detection ────────────────────────────────────────────────────────────
 
 void HitParticles::onPacketOutEvent(PacketOutEvent& event)
@@ -138,25 +192,10 @@ void HitParticles::onPacketOutEvent(PacketOutEvent& event)
     if (!target || target == player) return;
 
     // ── Eye ray ─────────────────────────────────────────────────────────────
-    auto* rot  = player->getActorRotationComponent();
-    if (!rot) return;
-    auto* head = player->getActorHeadRotationComponent();
+    glm::vec3 eye, rayDir;
+    if (!getEyeRay(eye, rayDir)) return;
 
-    float yaw   = (head ? head->mHeadRot : rot->mYaw) * (kPi / 180.f);
-    float pitch = rot->mPitch * (kPi / 180.f);
-
-    // Positions in this SDK already sit at EYE level (feet + PLAYER_HEIGHT) —
-    // every renderer compensates by dropping PLAYER_HEIGHT before drawing
-    // (see Actor::getAABB / Nametags / HitEffects). Adding it here, as the
-    // first version did, pushed the whole burst ~1.6 blocks above the head.
-    glm::vec3 eye = *player->getPos();
-
-    glm::vec3 rayDir(
-        -sinf(yaw) * cosf(pitch),
-        -sinf(pitch),
-         cosf(yaw) * cosf(pitch));
-
-    // ── Target hitbox: the game's own AABB (exactly the box ESP draws) ──────
+    // ── Target hitbox: the game's own AABB ──────────────────────────────────
     auto* shape = target->getAABBShapeComponent();
     const float boxH = shape ? shape->mHeight : 1.8f;
     const float boxW = shape ? shape->mWidth  : 0.6f;
@@ -242,8 +281,8 @@ void HitParticles::spawnBurst(const glm::vec3& center, const glm::vec3& dir,
         if (glm::length(spray) < 1e-4f) spray = glm::vec3(0.f, 1.f, 0.f);
         spray = glm::normalize(spray);
 
-        // Directional: the dome of droplets leans away from the eyes, which
-        // is what makes Kagune's blood look like it really splashed off a hit.
+        // Directional: the dome of droplets leans away from the eyes, which is
+        // what makes the spray look like it really splashed off a hit.
         glm::vec3 vel = mDirectional.mValue ? (spray * 0.85f + bias * 1.15f) : spray;
         if (glm::length(vel) < 1e-5f) vel = spray;
         vel = glm::normalize(vel) * speed * frand(0.55f, 1.25f);
@@ -362,7 +401,7 @@ void HitParticles::drawParticles()
             dl->AddCircleFilled(sc, sz * 2.1f, halo, 10);
         }
 
-        // Square droplet + rounded core: the Kagune blood look.
+        // Square droplet with a rounded core.
         dl->AddRectFilled({ sc.x - half, sc.y - half }, { sc.x + half, sc.y + half }, body, std::max(0.f, half * 0.35f));
     }
 
@@ -395,6 +434,16 @@ void HitParticles::onRenderEvent(RenderEvent& event)
     if (!ci->getLocalPlayer()) return;
 
     const float dt = std::clamp(ImGui::GetIO().DeltaTime, 0.0005f, 0.05f);
+
+    if (sPreviewQueued.exchange(false))
+    {
+        // A style change asked to be shown right away: drop whatever the old
+        // style left in the air and burst in front of the crosshair.
+        mParticles.clear();
+        mPending.clear();
+        mFlashes.clear();
+        spawnPreview();
+    }
 
     updateParticles(dt);
 

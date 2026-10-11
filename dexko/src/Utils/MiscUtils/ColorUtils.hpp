@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 7/1/2024.
 //
 
 #include <chrono>
@@ -15,7 +14,7 @@ public:
     static ImColor getThemedColor(float index, uint64_t ms = 0);
     static std::string removeColorCodes(const std::string& text);
 
-    // ── Themed accents (used by Arraylist, ClickGui, Notifications...) ──
+    // ── Themed accents (used by the interface and by module visuals) ──
     // Themed color with only the wave applied (no pulse/shimmer) — for UI chrome
     // that shouldn't strobe while clicking.
     static ImColor getStaticAccentColor(float index = 0.f);

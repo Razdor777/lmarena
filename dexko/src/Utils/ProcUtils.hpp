@@ -1,7 +1,6 @@
 #pragma once
 #include <Hook/Hooks/ActorHooks/BaseTickHook.hpp>
 //
-// Created by vastrakai on 6/24/2024.
 //
 
 

@@ -1,7 +1,6 @@
 #pragma once
 #include <d3d12.h>
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 struct bgfx_rendercontexti

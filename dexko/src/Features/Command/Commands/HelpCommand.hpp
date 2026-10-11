@@ -1,12 +1,11 @@
 #pragma once
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Features/FeatureManager.hpp>
 #include <Features/Command/Command.hpp>
 #include <Features/Command/CommandManager.hpp>
 
 #include "spdlog/spdlog.h"
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 

@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/25/2024.
 //
 
 #include "Actor.hpp"
@@ -7,9 +6,6 @@
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
-#include <SDK/Minecraft/MinecraftSim.hpp>
-#include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
-#include <SDK/Minecraft/Network/MinecraftPackets.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include "SerializedSkin.hpp"
@@ -20,7 +16,6 @@
 #include "Components/FlagComponent.hpp"
 #include "Components/FallDistanceComponent.hpp"
 #include "Components/ActorGameTypeComponent.hpp"
-#include <SDK/Minecraft/Network/Packets/SetPlayerGameTypePacket.hpp>
 
 #define COMPONENT_GET_FUNC(funcName, componentType) \
 componentType* Actor::funcName() \
@@ -84,14 +79,6 @@ void Actor::setSwinging(bool swinging)
 int Actor::getGameType()
 {
     return mContext.getComponent<ActorGameTypeComponent>()->mGameType;
-}
-
-void Actor::setGameType(int type)
-{
-    auto pkt = MinecraftPackets::createPacket<SetPlayerGameTypePacket>();
-    pkt->mPlayerGameType = static_cast<GameType>(type);
-    PacketUtils::sendToSelf(pkt);
-    ClientInstance::get()->getPacketSender()->sendToServer(pkt.get()); // on some servers this can server-side set the gamemode
 }
 
 bool Actor::isDebugCameraActive()

@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 #include "HelpCommand.hpp"
@@ -14,7 +13,6 @@ void HelpCommand::execute(const std::vector<std::string>& args)
     {
         for (const auto& command : commands)
         {
-            if (command->name == "fling") continue;
             if (command->name == args[1])
             {
                 ChatUtils::displayClientMessage("§6Command: §e{}", command->name);

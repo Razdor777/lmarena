@@ -32,7 +32,7 @@ public:
     int mKey;
     int mEnableWhileHeld = false;
 
-    BoolSetting mVisibleInArrayList = BoolSetting("Visible", "Whether the module is visible in the Arraylist", true);
+    BoolSetting mVisibleInArrayList = BoolSetting("Visible", "Whether the module is visible in the arraylist.", true);
     std::vector<class Setting*> mSettings = { &mVisibleInArrayList };
 
     Module(std::string name, std::string description, const ModuleCategory category, const int key, const bool enabled, std::unordered_map<NamingStyle, std::string> names = {})
@@ -74,11 +74,11 @@ public:
     float mArrayListAnim = 0.f;
     float toggleBurst = 0.f;
 
-    // ClickGUI hover / pulse animations
+    // Hover / pulse animations
     float hoverAnim = 0.f;
     float togglePulse = 0.f;
 
-    // Ripple effect for ClickGUI
+    // Ripple effect
     float rippleX      = 0.f;
     float rippleY      = 0.f;
     float rippleRadius = 0.f;
