@@ -6,10 +6,6 @@
 #include <minwindef.h>
 #include <unordered_map>
 #include <Features/Events/SendImmediateEvent.hpp>
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 
 template<typename Func, typename... Args>
 bool TryCallWrapper(Func func, Args&&... args) {

@@ -10,6 +10,4 @@ void ResourceLoader::loadResources() {
     Resources.emplace("mntsb", fonts_mntsb_ttf);
     auto fonts_nurik_ttf = GET_RESOURCE(fonts_nurik_ttf);
     Resources.emplace("nurik", fonts_nurik_ttf);
-    auto skinblinker_txt = GET_RESOURCE(skinblinker_txt);
-    Resources.emplace("skinblinker.txt", skinblinker_txt);
 }

@@ -5,13 +5,15 @@
 // The old version called Level::addParticle, which internally does
 // `base + 0x32A4800` — a hard-coded build address that no longer resolves,
 // so nothing ever spawned. This version owns its particles completely and
-// renders them world->screen through RenderUtils, exactly like Kagune does.
+// renders them world->screen through RenderUtils.
 //
 
 #include <Features/Modules/Module.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <glm/glm.hpp>
+#include <algorithm>
+#include <string>
 #include <vector>
 #include <cstdint>
 
@@ -61,6 +63,11 @@ public:
     BoolSetting mFlash       = BoolSetting("Impact Flash",  "Expanding ring at the contact point", true);
     BoolSetting mSecondBurst = BoolSetting("Second Burst",  "Delayed wide splash that follows the first", true);
 
+    // Prints one short chat line for every hit that got detected. If you hit
+    // something and nothing shows up here, the detection never fired (that is a
+    // different problem from a wrong-looking burst).
+    BoolSetting mDebug       = BoolSetting("Debug", "Report every detected hit in chat", false);
+
     HitParticles() : ModuleBase("HitParticles", "Custom particle burst wherever you land a hit", ModuleCategory::Visual, 0, true)
     {
         addSettings(
@@ -69,7 +76,8 @@ public:
             &mCustomColor,
             &mAmount, &mSpread, &mSpeed, &mSize,
             &mGravity, &mDrag, &mLifetime,
-            &mDirectional, &mGlow, &mTrails, &mFlash, &mSecondBurst
+            &mDirectional, &mGlow, &mTrails, &mFlash, &mSecondBurst,
+            &mDebug
         );
 
         VISIBILITY_CONDITION(mCustomColor, mColorMode.mValue == ColorMode::Custom);
@@ -86,6 +94,34 @@ public:
     void onDisable() override;
     void onRenderEvent(RenderEvent& event);
     void onPacketOutEvent(PacketOutEvent& event);
+
+    // ── Manual control (used by the .htp command) ────────────────────────────
+    // The style is only visible when a burst actually spawns, so `.htp test`
+    // needs a way to fire one without hitting anything: this spawns a burst
+    // right in front of the camera. Returns false when the player/rotation is
+    // not available yet.
+    bool spawnTestBurst();
+
+    [[nodiscard]] size_t particleCount() const
+    {
+        return mParticles.size() + mPending.size() + mFlashes.size();
+    }
+
+    // Drops every live particle/flash. Called when the style changes so the new
+    // style is what you see instead of leftovers of the previous one.
+    void clearParticles()
+    {
+        mParticles.clear();
+        mPending.clear();
+        mFlashes.clear();
+    }
+
+    [[nodiscard]] std::string styleName() const
+    {
+        const int count = static_cast<int>(mStyle.mValues.size());
+        const int idx = std::clamp(mStyle.as<int>(), 0, count - 1);
+        return mStyle.mValues[static_cast<size_t>(idx)];
+    }
 
 private:
     struct Particle {
@@ -125,6 +161,6 @@ private:
 
     std::string getSettingDisplay() override
     {
-        return mStyle.mValues[mStyle.as<int>()];
+        return styleName();
     }
 };

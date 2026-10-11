@@ -1,9 +1,5 @@
 #pragma once
 #include <fstream>
-//
-// Created by vastrakai on 8/17/2024.
-//
-
 template <typename T> // T is the type of object to be stored
 class DataStore {
 public:
@@ -15,7 +11,7 @@ public:
 
     [[nodiscard]] std::string getPath() const
     {
-        return FileUtils::getSolsticeDir() + "\\Databases\\" + mName + ".json";
+        return FileUtils::getDexkoDir() + "\\Databases\\" + mName + ".json";
     }
 
     void load()

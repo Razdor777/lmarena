@@ -3,10 +3,6 @@
 #include <Hook/HookManager.hpp>
 
 #include "Hook.hpp"
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 class HookManager {
 public:
     static inline std::vector<std::shared_ptr<Hook>> mHooks;

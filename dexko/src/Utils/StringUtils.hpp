@@ -4,10 +4,6 @@
 #include <string>
 #include <string_view>
 #include <cctype>
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 #define STRING_EXPAND(s) #s
 #define STRING(s) std::string(STRING_EXPAND(s))
 

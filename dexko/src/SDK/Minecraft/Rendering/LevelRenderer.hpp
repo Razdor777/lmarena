@@ -2,10 +2,6 @@
 #include <Utils/MemUtils.hpp>
 
 
-//
-// Created by vastrakai on 7/7/2024.
-//
-
 class LevelRendererPlayer {
 public:
     glm::vec3* getCameraPos();

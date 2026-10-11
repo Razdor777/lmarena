@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/3/2024.
-//
-
 
 class DeviceSpoof : public ModuleBase<DeviceSpoof>
 {

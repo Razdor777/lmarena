@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 #include "D3DHook.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -242,7 +238,7 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     // Ejecting (or already ejected): never run another line of our code on the
     // render thread, otherwise the module can be unmapped while this thread is
     // still inside it.
-    if (Solstice::mRequestEject || Solstice::mUnloading.load())
+    if (Dexko::mRequestEject || Dexko::mUnloading.load())
     {
         return oPresent(swapChain, syncInterval, flags);
     }
@@ -264,7 +260,7 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
         if (swapChain->GetDevice(__uuidof(ID3D12Device), reinterpret_cast<void **>(&gDevice12)) == S_OK) {
             spdlog::info("[D3D] D3D12 Device acquired");
 
-            if (Solstice::Prefs->mFallbackToD3D11)
+            if (Dexko::Prefs->mFallbackToD3D11)
             {
                 ID3D12Device* bad_device;
                 if (SUCCEEDED(swapChain->GetDevice(IID_PPV_ARGS(&bad_device))))
@@ -414,7 +410,7 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
         : lastWindowSize;
 
     if (lastWindowSize.x != windowSize.x || lastWindowSize.y != windowSize.y) {
-        // This event existed but nothing ever fired it, so ClickGui's resize
+        // This event existed but nothing ever fired it, so the old gui resize
         // handler (which rescales the panel layout) was dead code — the gui kept
         // its stale layout after F11 until it was reopened.
         auto holder = nes::make_holder<WindowResizeEvent>((int)windowSize.x, (int)windowSize.y);
@@ -462,7 +458,7 @@ HRESULT D3DHook::resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UIN
     DXGI_FORMAT newFormat, UINT swapChainFlags)
 {
     // Ejecting: never touch our state from the render thread again.
-    if (Solstice::mUnloading.load())
+    if (Dexko::mUnloading.load())
         return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
 
     if (d3dInitImGui)
@@ -505,15 +501,6 @@ void D3DHook::initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext
     ImGui::CreateContext();
 
     FontHelper::load();
-    static bool onc = false;
-    if (!onc)
-    {
-        auto res = &ResourceLoader::Resources["skinblinker.txt"];
-
-        FileUtils::writeResourceToFile(res, FileUtils::getSolsticeDir() + "BlinkerSkins\\README.txt");
-
-        onc = true;
-    }
 
     ImGui_ImplWin32_Init(ProcUtils::getMinecraftWindow());
     ImGui_ImplDX11_Init(device, deviceContext);
@@ -569,23 +556,23 @@ void D3DHook::init()
 
 void D3DHook::s_init()
 {
-    Solstice::console->info("Initializing D3DHook");
+    Dexko::console->info("Initializing D3DHook");
     // Attempt to init on D3D12
     if (kiero::init(kiero::RenderType::D3D12) == kiero::Status::Success)
     {
-        Solstice::console->info("Initialized kiero [D3D12]");
+        Dexko::console->info("Initialized kiero [D3D12]");
         kiero::bind(140, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
         kiero::bind(145, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
         return;
         // Else, attempt to init on D3D11
     } else if (kiero::init(kiero::RenderType::D3D11) == kiero::Status::Success)
     {
-        Solstice::console->info("Initialized kiero [D3D11]");
+        Dexko::console->info("Initialized kiero [D3D11]");
         kiero::bind(8, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
         kiero::bind(13, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
         return;
     }
-    Solstice::console->error("Failed to initialize kiero");
+    Dexko::console->error("Failed to initialize kiero");
     MessageBoxA(NULL, "Failed to initialize kiero", "Dexko", MB_OK | MB_ICONERROR);
 }
 
@@ -596,7 +583,7 @@ void D3DHook::shutdown()
 
 void D3DHook::s_shutdown()
 {
-    Solstice::console->info("Shutting down D3DHook");
+    Dexko::console->info("Shutting down D3DHook");
     FrameTransforms.reset();
     kiero::unbind(8);
     kiero::unbind(13);

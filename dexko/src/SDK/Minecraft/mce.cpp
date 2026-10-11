@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 9/30/2024.
-//
-
 #include "mce.hpp"
 
 #include <Utils/SysUtils/SHA256.hpp>

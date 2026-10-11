@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/10/2024.
-//
-
 #include <Features/Command/Command.hpp>
 
 class SetCommand : public Command {

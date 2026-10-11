@@ -1,9 +1,5 @@
 #pragma once
 #include <Hook/Hook.hpp>
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 
 class KeyHook : public Hook {
 public:

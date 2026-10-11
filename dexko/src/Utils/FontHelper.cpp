@@ -118,7 +118,7 @@ void FontHelper::load()
         if (iconFont42) Fonts[key + "_large"] = iconFont42;
     };
 
-    // Tenacity Icons — иконки ClickGui (чекбоксы, стрелки, шестерёнки).
+    // Tenacity Icons — иконки оверлея (чекбоксы, стрелки, шестерёнки).
     addIconFont("tenacity_icons", GET_RESOURCE(fonts_Tenacity_Icons_ttf));
 
     // Nurik — оказался НЕ текстовым шрифтом, а набором из 31 иконки, сгенерированным

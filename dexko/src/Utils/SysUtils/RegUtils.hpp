@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/21/2024.
-//
-
 #include <Windows.h>
 #include <string>
 #include <iostream>

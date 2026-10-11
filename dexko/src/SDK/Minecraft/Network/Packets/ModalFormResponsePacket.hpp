@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 8/13/2024.
-//
-
 #pragma once
 
 #include "Packet.hpp"

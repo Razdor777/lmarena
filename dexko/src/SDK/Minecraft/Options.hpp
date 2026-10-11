@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/8/2024.
-//
-
 #include <vector>
 #include <Utils/MemUtils.hpp>
 

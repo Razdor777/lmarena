@@ -1,14 +1,10 @@
-//
-// Created by vastrakai on 7/19/2024.
-//
-
 #include "MessageTemplate.hpp"
 
 #include <fstream>
 
 std::string MessageTemplate::getTemplatePath() const
 {
-    return FileUtils::getSolsticeDir() + "templates\\" + mTemplateName + ".txt";
+    return FileUtils::getDexkoDir() + "templates\\" + mTemplateName + ".txt";
 }
 
 void MessageTemplate::createTemplateFile(const std::string& defaultMessage) const

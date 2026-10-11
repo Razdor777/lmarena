@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/19/2024.
-//
-
 
 /// <summary>
 /// Represents a message template that can be used to generate messages.

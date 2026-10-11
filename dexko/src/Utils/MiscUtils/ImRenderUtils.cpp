@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 #include "ImRenderUtils.hpp"
 
 #include <SDK/Minecraft/ClientInstance.hpp>

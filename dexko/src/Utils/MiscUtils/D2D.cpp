@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 #include "D2D.hpp"
 
 #include <winrt/base.h>

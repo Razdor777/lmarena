@@ -1,10 +1,10 @@
 //
 // HitParticles — rewritten from scratch.
 //
-// Hit detection mirrors Kagune / HitEffects (the two that actually work):
+// Hit detection, the way it has to be done for this game build:
 //   PacketOutEvent -> InventoryTransaction -> ItemUseOnEntityTransaction
 //   -> ActionType::Attack -> mActorId
-// The contact point is found with the same eye-ray vs hitbox test Kagune
+// The contact point is found with an eye-ray vs hitbox test,
 // uses, so the burst lands exactly where the hit registered.
 //
 // Rendering is fully self-contained: world -> screen via RenderUtils and a
@@ -18,6 +18,7 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <Utils/GameUtils/ActorUtils.hpp>
+#include <Utils/GameUtils/ChatUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 
@@ -124,18 +125,25 @@ void HitParticles::onPacketOutEvent(PacketOutEvent& event)
     auto* player = ci->getLocalPlayer();
     if (!player) return;
 
-    // Resolve the victim. `mActorId` carries the actor's UNIQUE id — that's what
-    // ActorUtils::createAttackTransaction writes into it and what the server
-    // accepts — so look that up first. The runtime-id scan stays as a fallback
-    // for builds that encode the field differently.
-    Actor* target = ActorUtils::getActorFromUniqueId(static_cast<int64_t>(iut->mActorId));
-    if (!target) {
-        for (auto* a : ActorUtils::getActorList(false, true)) {
+    // Resolve the victim. Depending on the build/server `mActorId` carries
+    // either the runtime id or the unique id, so try both. The runtime scan goes
+    // first because that is the order the particle modules that are known to
+    // work on the live game use; unique id stays as the fallback.
+    Actor* target = ActorUtils::getActorFromRuntimeID(static_cast<int64_t>(iut->mActorId));
+    if (!target)
+    {
+        for (auto* a : ActorUtils::getActorList(false, true))
+        {
             if (!a) continue;
             if (a->getRuntimeID() == static_cast<int64_t>(iut->mActorId)) { target = a; break; }
         }
     }
-    if (!target || target == player) return;
+    if (!target)
+        target = ActorUtils::getActorFromUniqueId(static_cast<int64_t>(iut->mActorId));
+
+    // Attacking yourself is not a hit. An unresolved target is not a reason to
+    // drop the burst either — the effect then simply plays in front of you.
+    if (target == player) return;
 
     // ── Eye ray ─────────────────────────────────────────────────────────────
     auto* rot  = player->getActorRotationComponent();
@@ -147,7 +155,7 @@ void HitParticles::onPacketOutEvent(PacketOutEvent& event)
 
     // Positions in this SDK already sit at EYE level (feet + PLAYER_HEIGHT) —
     // every renderer compensates by dropping PLAYER_HEIGHT before drawing
-    // (see Actor::getAABB / Nametags / HitEffects). Adding it here, as the
+    // (see Actor::getAABB). Adding it here, as the
     // first version did, pushed the whole burst ~1.6 blocks above the head.
     glm::vec3 eye = *player->getPos();
 
@@ -157,62 +165,116 @@ void HitParticles::onPacketOutEvent(PacketOutEvent& event)
          cosf(yaw) * cosf(pitch));
 
     // ── Target hitbox: the game's own AABB (exactly the box ESP draws) ──────
-    auto* shape = target->getAABBShapeComponent();
-    const float boxH = shape ? shape->mHeight : 1.8f;
-    const float boxW = shape ? shape->mWidth  : 0.6f;
+    glm::vec3 contact;
 
-    AABB body = target->getAABB();
-    const bool boxOk =
-        std::isfinite(body.mMin.x) && std::isfinite(body.mMin.y) && std::isfinite(body.mMin.z) &&
-        std::isfinite(body.mMax.x) && std::isfinite(body.mMax.y) && std::isfinite(body.mMax.z) &&
-        (body.mMax.y - body.mMin.y) > 0.2f && (body.mMax.x - body.mMin.x) > 0.01f;
-    if (!boxOk) {
-        // Missing components — rebuild it the same way the client does:
-        // the stored position is eye-level, so drop to the feet first.
-        const glm::vec3 feet = *target->getPos() - glm::vec3(0.f, PLAYER_HEIGHT, 0.f);
-        body.mMin = feet - glm::vec3(boxW * 0.5f, 0.f, boxW * 0.5f);
-        body.mMax = feet + glm::vec3(boxW * 0.5f, boxH, boxW * 0.5f);
+    if (!target)
+    {
+        // Victim could not be resolved (unknown id mapping on this build) —
+        // keep the burst visible right in front of the camera instead of
+        // silently dropping the hit.
+        contact = eye + rayDir * 1.8f;
     }
+    else
+    {
+        auto* shape = target->getAABBShapeComponent();
+        const float boxH = shape ? shape->mHeight : 1.8f;
+        const float boxW = shape ? shape->mWidth  : 0.6f;
 
-    // ── Ray vs target AABB (slab test) ──────────────────────────────────────
-    float tMin = 0.05f, tMax = 8.f;
-    bool hitBox = true;
-    for (int ax = 0; ax < 3; ++ax) {
-        float d  = (&rayDir.x)[ax];
-        float mn = (&body.mMin.x)[ax];
-        float mx = (&body.mMax.x)[ax];
-        float e  = (&eye.x)[ax];
-        if (fabsf(d) < 1e-6f) {
-            if (e < mn || e > mx) { hitBox = false; break; }
+        AABB body = target->getAABB();
+        const bool boxOk =
+            std::isfinite(body.mMin.x) && std::isfinite(body.mMin.y) && std::isfinite(body.mMin.z) &&
+            std::isfinite(body.mMax.x) && std::isfinite(body.mMax.y) && std::isfinite(body.mMax.z) &&
+            (body.mMax.y - body.mMin.y) > 0.2f && (body.mMax.x - body.mMin.x) > 0.01f;
+        if (!boxOk) {
+            // Missing components — rebuild it the same way the client does:
+            // the stored position is eye-level, so drop to the feet first.
+            const glm::vec3 feet = *target->getPos() - glm::vec3(0.f, PLAYER_HEIGHT, 0.f);
+            body.mMin = feet - glm::vec3(boxW * 0.5f, 0.f, boxW * 0.5f);
+            body.mMax = feet + glm::vec3(boxW * 0.5f, boxH, boxW * 0.5f);
+        }
+
+        // ── Ray vs target AABB (slab test) ──────────────────────────────────
+        float tMin = 0.05f, tMax = 8.f;
+        bool hitBox = true;
+        for (int ax = 0; ax < 3; ++ax) {
+            float d  = (&rayDir.x)[ax];
+            float mn = (&body.mMin.x)[ax];
+            float mx = (&body.mMax.x)[ax];
+            float e  = (&eye.x)[ax];
+            if (fabsf(d) < 1e-6f) {
+                if (e < mn || e > mx) { hitBox = false; break; }
+            } else {
+                float t1 = (mn - e) / d;
+                float t2 = (mx - e) / d;
+                if (t1 > t2) std::swap(t1, t2);
+                tMin = std::max(tMin, t1);
+                tMax = std::min(tMax, t2);
+                if (tMin > tMax) { hitBox = false; break; }
+            }
+        }
+
+        if (hitBox) {
+            contact = eye + rayDir * tMin;
+            contact.x = std::clamp(contact.x, body.mMin.x + 0.05f, body.mMax.x - 0.05f);
+            contact.y = std::clamp(contact.y, body.mMin.y + 0.05f, body.mMax.y - 0.05f);
+            contact.z = std::clamp(contact.z, body.mMin.z + 0.05f, body.mMax.z - 0.05f);
         } else {
-            float t1 = (mn - e) / d;
-            float t2 = (mx - e) / d;
-            if (t1 > t2) std::swap(t1, t2);
-            tMin = std::max(tMin, t1);
-            tMax = std::min(tMax, t2);
-            if (tMin > tMax) { hitBox = false; break; }
+            // No clean intersection (server disagreed, fast move, desync) —
+            // still splash on the body instead of dropping the hit.
+            contact = (body.mMin + body.mMax) * 0.5f;
         }
     }
 
-    glm::vec3 contact;
-    if (hitBox) {
-        contact = eye + rayDir * tMin;
-        contact.x = std::clamp(contact.x, body.mMin.x + 0.05f, body.mMax.x - 0.05f);
-        contact.y = std::clamp(contact.y, body.mMin.y + 0.05f, body.mMax.y - 0.05f);
-        contact.z = std::clamp(contact.z, body.mMin.z + 0.05f, body.mMax.z - 0.05f);
-    } else {
-        // No clean intersection (server disagreed, fast move, desync) —
-        // still splash on the body instead of dropping the hit.
-        contact = (body.mMin + body.mMax) * 0.5f;
-    }
-
     spawnBurst(contact, rayDir, 1.0f, 1.0f, 1.0f);
+
+    if (mDebug.mValue)
+    {
+        ChatUtils::displayClientMessage(
+            "§7[HitParticles] hit §f" +
+            std::string(target ? target->getNameTag() : std::string("<unresolved>")) +
+            "§7 -> §f" + styleName());
+    }
 
     if (mSecondBurst.mValue)
         mPending.push_back({ static_cast<uint64_t>(NOW) + 120u, contact, rayDir });
 
     if (mFlash.mValue)
         mFlashes.push_back({ static_cast<uint64_t>(NOW), 280u, contact, pickColor(1), 0.5f });
+}
+
+// ─── Manual burst (.htp test) ─────────────────────────────────────────────────
+
+bool HitParticles::spawnTestBurst()
+{
+    auto* ci = ClientInstance::get();
+    if (!ci) return false;
+
+    auto* player = ci->getLocalPlayer();
+    if (!player) return false;
+
+    auto* rot = player->getActorRotationComponent();
+    if (!rot) return false;
+    auto* head = player->getActorHeadRotationComponent();
+
+    const float yaw   = (head ? head->mHeadRot : rot->mYaw) * (kPi / 180.f);
+    const float pitch = rot->mPitch * (kPi / 180.f);
+
+    // Same convention as the hit path: getPos() already sits at eye level.
+    const glm::vec3 eye = *player->getPos();
+    const glm::vec3 dir(-sinf(yaw) * cosf(pitch), -sinf(pitch), cosf(yaw) * cosf(pitch));
+
+    // ~1.8 blocks ahead: close enough to fill the screen, far enough to fly.
+    const glm::vec3 center = eye + dir * 1.8f;
+
+    spawnBurst(center, dir, 1.0f, 1.0f, 1.0f);
+
+    if (mSecondBurst.mValue)
+        mPending.push_back({ static_cast<uint64_t>(NOW) + 120u, center, dir });
+
+    if (mFlash.mValue)
+        mFlashes.push_back({ static_cast<uint64_t>(NOW), 280u, center, pickColor(1), 0.5f });
+
+    return true;
 }
 
 // ─── Spawning ─────────────────────────────────────────────────────────────────
@@ -243,7 +305,7 @@ void HitParticles::spawnBurst(const glm::vec3& center, const glm::vec3& dir,
         spray = glm::normalize(spray);
 
         // Directional: the dome of droplets leans away from the eyes, which
-        // is what makes Kagune's blood look like it really splashed off a hit.
+        // is what makes the blood look like it really splashed off a hit.
         glm::vec3 vel = mDirectional.mValue ? (spray * 0.85f + bias * 1.15f) : spray;
         if (glm::length(vel) < 1e-5f) vel = spray;
         vel = glm::normalize(vel) * speed * frand(0.55f, 1.25f);
@@ -362,7 +424,7 @@ void HitParticles::drawParticles()
             dl->AddCircleFilled(sc, sz * 2.1f, halo, 10);
         }
 
-        // Square droplet + rounded core: the Kagune blood look.
+        // Square droplet + rounded core: the classic blood look.
         dl->AddRectFilled({ sc.x - half, sc.y - half }, { sc.x + half, sc.y + half }, body, std::max(0.f, half * 0.35f));
     }
 

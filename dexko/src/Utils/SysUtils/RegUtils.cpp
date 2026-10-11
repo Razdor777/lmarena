@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/21/2024.
-//
-
 #include "RegUtils.hpp"
 
 std::string RegUtils::readReg(const char* path, const char* key, const char* defaultValue)

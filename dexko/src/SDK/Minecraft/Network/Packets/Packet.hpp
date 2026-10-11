@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 
 #include <SDK/Minecraft/Network/PacketID.hpp>
 #include <string>

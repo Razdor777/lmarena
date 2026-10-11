@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 11/5/2024.
-//
-
 
 class PreGameHook : public Hook {
 public:

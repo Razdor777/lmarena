@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 10/10/2024.
-//
-
 #include "KeyboardMouseSettings.hpp"
 
 int KeyboardMouseSettings::operator[](const std::string& key)

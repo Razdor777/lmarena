@@ -1,7 +1,3 @@
-//
-// Created by Solar on 11/18/2024.
-//
-
 #include "HoverTextRendererHook.hpp"
 
 #include <SDK/Minecraft/mce.hpp>

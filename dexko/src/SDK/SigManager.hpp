@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 6/24/2024.
-//
-
 #include <cstdint>
 #include <future>
 #include <include/libhat/include/libhat.hpp>

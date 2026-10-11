@@ -1,7 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/10/2024.
-//
 #include <Utils/MemUtils.hpp>
 #include <SDK/Minecraft/mce.hpp>
 #include <unordered_map>

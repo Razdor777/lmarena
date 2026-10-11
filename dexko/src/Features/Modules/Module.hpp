@@ -61,28 +61,6 @@ public:
     template <typename... Args>
     void addSettings(Args... args) { (addSetting(args), ...); }
 
-    // Animation fields
-    float animPercentage = 0.f;
-    glm::vec2 location = glm::vec2(0, 0);
-    glm::vec2 size     = glm::vec2(0, 0);
-    glm::vec2 pos      = glm::vec2(0, 0);
-    bool  showSettings = false;
-    float cAnim   = 0;
-    float cFade   = 0;
-    float cScale  = 0;
-    float boolScale = 0;
-    float mArrayListAnim = 0.f;
-    float toggleBurst = 0.f;
-
-    // ClickGUI hover / pulse animations
-    float hoverAnim = 0.f;
-    float togglePulse = 0.f;
-
-    // Ripple effect for ClickGUI
-    float rippleX      = 0.f;
-    float rippleY      = 0.f;
-    float rippleRadius = 0.f;
-    float rippleAlpha  = 0.f;
 };
 
 template <typename T>

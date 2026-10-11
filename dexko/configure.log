@@ -34,10 +34,10 @@ CMake Deprecation Warning at build/_deps/glm-src/CMakeLists.txt:2 (cmake_policy)
 -- GLM: Version 1.0.1
 -- GLM: Build with C++ features auto detection
 -- CPM: Adding package nlohmann_json@3.11.3 (v3.11.3)
--- Using the multi-header code from C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/solstice-master-main/dexko/build/_deps/nlohmann_json-src/include/
+-- Using the multi-header code from C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/Dexko/dexko/build/_deps/nlohmann_json-src/include/
 -- CPM: Adding package cryptopp-cmake@ (master)
 -- => Project : cryptopp-cmake v8.9.0
--- Crypto++ auto fetched at: C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/solstice-master-main/dexko/build/_deps/cryptopp-cmake-build/cryptopp
+-- Crypto++ auto fetched at: C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/Dexko/dexko/build/_deps/cryptopp-cmake-build/cryptopp
 -- Using branch master for tests
 -- Adding unit test: disable-asm
 -- Adding unit test: include-prefix
@@ -103,4 +103,4 @@ This warning is for project developers.  Use -Wno-dev to suppress it.
 -- Generated Resources.cpp
 -- Configuring done (34.9s)
 -- Generating done (3.4s)
--- Build files have been written to: C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/solstice-master-main/dexko/build
+-- Build files have been written to: C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/Dexko/dexko/build

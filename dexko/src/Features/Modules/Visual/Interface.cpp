@@ -1,12 +1,7 @@
-//
-// Created by vastrakai on 7/1/2024.
-//
-
 #include <Features/Events/ActorRenderEvent.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/DrawImageEvent.hpp>
 #include <Features/Events/ModuleStateChangeEvent.hpp>
-#include <Features/Events/PacketInEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/PreGameCheckEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>

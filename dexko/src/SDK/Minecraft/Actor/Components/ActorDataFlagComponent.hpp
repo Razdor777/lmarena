@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 11/10/2024.
-//
-
 #pragma once
 
 #include <bitset>

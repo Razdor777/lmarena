@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/7/2024.
-//
-
 #include "SetupAndRenderHook.hpp"
 
 #include <SDK/Minecraft/mce.hpp>
@@ -41,11 +37,10 @@ void* SetupAndRenderHook::onSetupAndRender(void* screenView, void* mcuirc)
 
     if (D3DHook::FrameTransforms) D3DHook::FrameTransforms->push({ ci->getViewMatrix(), origin, playerPos, ci->getFov() });
 
-    // Ванильный экран чата здесь НЕ прячем: внутри setupAndRender живёт не только
-    // рисование, но и весь ввод экрана (набор, Enter-отправка, Esc-закрытие), и без
-    // вызова оригинала чат вообще перестаёт закрываться и отправлять сообщения.
-    // Вместо этого CustomChat перехватывает открытие чата (T/Enter/) и держит свой
-    // ввод, поэтому ванильный экран просто не открывается.
+    // Экран чата здесь НЕ прячем: внутри setupAndRender живёт не только рисование,
+    // но и весь ввод экрана (набор, Enter-отправка, Esc-закрытие). Без вызова
+    // оригинала чат перестаёт закрываться и отправлять сообщения, а команды
+    // (`.reach`, `.htp`, ...) вводятся именно в ванильном чате.
     return original(screenView, mcuirc);
 }
 

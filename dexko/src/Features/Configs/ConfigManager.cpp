@@ -34,7 +34,7 @@ bool backupCorruptedConfig(const std::string& path)
 
 std::string ConfigManager::getConfigPath()
 {
-    return FileUtils::getSolsticeDir() + "Configs\\";
+    return FileUtils::getDexkoDir() + "Configs\\";
 }
 
 bool ConfigManager::configExists(const std::string& name)

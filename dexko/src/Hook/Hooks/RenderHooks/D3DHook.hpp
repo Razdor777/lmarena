@@ -5,10 +5,6 @@
 #include <SDK/SigManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/Structs.hpp>
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 
 
 class D3DHook : public Hook

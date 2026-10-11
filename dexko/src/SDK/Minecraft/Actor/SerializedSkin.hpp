@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 8/22/2024.
-//
-
 #pragma once
 #include <SDK/Minecraft/JSON.hpp>
 #include <SDK/Minecraft/mce.hpp>

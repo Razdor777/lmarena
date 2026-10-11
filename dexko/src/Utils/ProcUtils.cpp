@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/24/2024.
-//
-
 #include "ProcUtils.hpp"
 
 #include <Windows.h>

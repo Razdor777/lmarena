@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/12/2024.
-//
-
 #include "PreferenceManager.hpp"
 
 #include <fstream>
@@ -11,7 +7,7 @@
 
 std::shared_ptr<Preferences> PreferenceManager::load()
 {
-    std::string path = FileUtils::getSolsticeDir() + "preferences.json";
+    std::string path = FileUtils::getDexkoDir() + "preferences.json";
 
     auto prefs = std::make_shared<Preferences>();
 
@@ -42,10 +38,8 @@ std::shared_ptr<Preferences> PreferenceManager::load()
     try
     {
         prefs->mDefaultConfigName = j["DefaultConfigName"];
-        prefs->mFriends = j["Friends"].get<std::vector<std::string>>();
         prefs->mFallbackToD3D11 = j["FallbackToD3D11"];
         prefs->mEnforceDebugging = j["EnforceDebugging"];
-        prefs->mStreamerName = j["StreamerName"];
     }
     catch (std::exception e)
     {
@@ -66,7 +60,7 @@ void PreferenceManager::save(const std::shared_ptr<Preferences>& prefs)
         return;
     }
 
-    std::string path = FileUtils::getSolsticeDir() + "preferences.json";
+    std::string path = FileUtils::getDexkoDir() + "preferences.json";
 
     FileUtils::deleteFile(path);
     FileUtils::createFile(path);
@@ -75,10 +69,8 @@ void PreferenceManager::save(const std::shared_ptr<Preferences>& prefs)
     try
     {
         j["DefaultConfigName"] = prefs->mDefaultConfigName;
-        j["Friends"] = prefs->mFriends;
         j["FallbackToD3D11"] = prefs->mFallbackToD3D11;
         j["EnforceDebugging"] = prefs->mEnforceDebugging;
-        j["StreamerName"] = prefs->mStreamerName;
     } catch (std::exception& e)
     {
         spdlog::error("Error saving preferences: {}", e.what());

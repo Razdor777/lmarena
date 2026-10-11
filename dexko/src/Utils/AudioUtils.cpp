@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 10/15/2024.
-//
-
 #include <Audioclient.h>
 #include <codecvt>
 #include <Mmdeviceapi.h>

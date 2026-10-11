@@ -5,7 +5,8 @@
 #include <nlohmann/json.hpp>
 
 //
-// Setting.hpp — with extra animation fields for ModernDropdown
+// Setting.hpp — settings live outside the GUI: they are read by the commands
+// (SetCommand/ConfigCommand) and serialized into configs.
 //
 
 enum class SettingType
@@ -26,27 +27,12 @@ public:
     std::string mName;
     std::string mDescription;
     SettingType mType;
-    bool mDisplay = false;
-    bool* mHideOnClickGUI = nullptr;
     std::function<bool()> mIsVisible = []() { return true; };
 
     Setting(std::string name, std::string description, SettingType type)
         : mName(std::move(name)), mDescription(std::move(description)), mType(type)
     {
     }
-
-    float sliderEase = 0;
-    float boolScale  = 0;
-    bool  isDragging = false;
-    float hoverAnim  = 0.f;
-
-    // Extra animation field for click feedback (used by NumberSetting knob)
-    float clickScale = 1.f;
-
-    bool enumExtended = false;
-    bool colourExtended = false;
-    float enumSlide  = 0;
-    float colourSlide = 0;
 
     virtual nlohmann::json serialize()
     {
@@ -71,7 +57,6 @@ public:
     }
 
     void setValue(bool value) { mValue = value; }
-    std::string getName() { return mName; }
 
     nlohmann::json serialize() override
     {
@@ -91,10 +76,6 @@ public:
     float mMin = 0.0f;
     float mMax = 0.0f;
     float mStep = 0.0f;
-
-    // Knob bounce animation — triggers when knob hits min/max
-    float knobBounce     = 0.f;
-    float prevSliderEase = 0.f;
 
     NumberSetting(std::string name, std::string description, float value, float min, float max, float step)
         : Setting(std::move(name), std::move(description), SettingType::Number),
@@ -123,9 +104,6 @@ class EnumSetting : public Setting
 public:
     int mValue = 0;
     std::vector<std::string> mValues;
-
-    // Per-value hover animation cache (size = mValues.size())
-    std::vector<float> enumHoverCache;
 
     EnumSetting(std::string name, std::string description, int index, std::vector<std::string> values)
         : Setting(std::move(name), std::move(description), SettingType::Enum),
@@ -197,9 +175,6 @@ class ColorSetting : public Setting
 {
 public:
     float mValue[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    bool mIsExtended = false;
-    float mSlide = 0;
-    static inline float mColorPickerSize = 400;
 
     ColorSetting(std::string name, std::string description, float r, float g, float b, float a)
         : Setting(std::move(name), std::move(description), SettingType::Color)

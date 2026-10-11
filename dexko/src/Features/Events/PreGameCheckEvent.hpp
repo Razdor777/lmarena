@@ -1,6 +1,3 @@
-//
-// Created by vastrakai on 11/5/2024.
-//
 #pragma once
 
 #include "Event.hpp"

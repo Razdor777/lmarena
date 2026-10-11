@@ -2,10 +2,6 @@
 #include <unordered_map>
 #include <string>
 #include <Windows.h>
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 
 class Keyboard {
 public:

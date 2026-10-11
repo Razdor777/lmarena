@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/10/2024.
-//
-
 #pragma once
 //#define DEFINE_FLAG(name) struct name {}; // this is stupid lmao
 

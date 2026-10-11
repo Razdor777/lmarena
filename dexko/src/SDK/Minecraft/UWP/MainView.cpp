@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/24/2024.
-//
-
 #include "MainView.hpp"
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>

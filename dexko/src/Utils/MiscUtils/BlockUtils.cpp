@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/7/2024.
-//
-
 #include "BlockUtils.hpp"
 
 #include <Features/Events/BlockChangedEvent.hpp>

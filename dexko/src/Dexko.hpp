@@ -3,12 +3,8 @@
 #include <atomic>
 #include <Features/Configs/PreferenceManager.hpp>
 #include "spdlog/logger.h"
-//
-// Created by vastrakai on 6/24/2024.
-//
 
-
-class Solstice {
+class Dexko {
 public:
     /* Fields */
     static inline HMODULE mModule;

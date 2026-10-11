@@ -1,38 +1,43 @@
 # Dexko
 
-Лёгкий отдельный клиент на базе Solstice, из которого вырезано всё лишнее.
+Отдельный лёгкий клиент под Minecraft Bedrock (Windows/UWP). Управление только
+через команды в чате: графического меню нет вообще.
 
-## Что осталось
+## Модули
 
-Модули:
-- **DeviceSpoof** — всегда включён при запуске (спуф устройств).
-- **CustomCrosshair** — динамический прицел (стили, пресеты, sway).
-- **HitParticles** — частицы при попадании (стили: blood/sparks/critical/hearts/fire/frost/soul/toxic).
-- **Reach** — только боевое досягаемость (attack range).
-- Скрытые служебные: `Interface` (тема/цвета), `Notifications` (тосты).
-
-ClickGUI убран — всё управление через команды в чате.
+- **DeviceSpoof** — спуф устройства/подписи, включён по умолчанию.
+- **Reach** — боевая и блочная дистанция (`.reach`).
+- **CustomCrosshair** — динамический прицел (`.crosshair on|off`).
+- **HitParticles** — частицы при попадании (`.htp`).
+- Служебный **Interface** — тема, цвета, шрифт, arraylist.
 
 ## Команды
 
-- `.reach 3.00` — установить боевое досягаемость (3.00–7.00), автовключает Reach.
-- `.htp <style>` — стиль HitParticles: `.htp sparks`, `.htp fire`, `.htp hearts`, `.htp blood`, `.htp critical`, `.htp frost`, `.htp soul`, `.htp toxic`.
-- `.config <load/save/list/delete/default> <name>` — конфиги.
-- `.toggle <module>` — вкл/выкл модуль.
-- `.set <module> <setting> <value>` — изменить настройку.
-- `.bind` / `.unbind` — бинды клавиш.
-- `.module <module>` — инфо о модуле.
-- `.help [command]` — справка по командам.
+- `.reach <1.00-20.00>` — боевая дистанция, автовключает Reach.
+  - `.reach force <on|off>` — экспериментально: не «обрезать» значение движка, а
+    подставлять своё. Только так работают значения выше ~7 блоков.
+  - `.reach reset` — вернуть 3.00.
+  - `.reach` — текущее состояние.
+- `.htp <стиль|номер>` — стиль частиц: `blood, sparks, critical, hearts, fire,
+  frost, soul, toxic` (или `.htp 3`).
+  - `.htp test` — выпустить вспышку перед собой, чтобы сразу увидеть стиль.
+  - `.htp list` — список стилей, `.htp` — текущее состояние.
+- `.crosshair <on|off>` — прицел.
+- `.config <load|save|list|delete|default> <имя>` — конфиги.
+- `.toggle <модуль> <on|off>` — вкл/выкл модуль.
+- `.set <модуль> <настройка> <значение>` — изменить настройку.
+- `.help [команда]` — справка.
 
 ## Сборка
 
-Требования: Visual Studio 2022 (x64), CMake, MSYS2 mingw-w64 (для `ld`), доступ в сеть (CPM качает зависимости).
+Требования: Visual Studio 2022 (x64), CMake, MSYS2 mingw-w64 (для `ld`), доступ в
+сеть (CPM качает зависимости).
 
 ```bash
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --target Dexko -- -m
 ```
 
-Готовый файл: `build/Release/Dexko.dll` (~13 МБ).
+Готовый файл: `build/Release/Dexko.dll`.
 
 Данные/конфиги/лог: `%LOCALAPPDATA%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\RoamingState\Dexko\`

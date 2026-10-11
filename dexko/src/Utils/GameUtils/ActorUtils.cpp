@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Components/ActorOwnerComponent.hpp>
 #include <SDK/Minecraft/Actor/Components/ActorTypeComponent.hpp>

@@ -1,11 +1,6 @@
-//
-// Created by vastrakai on 7/22/2024.
-//
-
 #pragma once
 #include "glm/detail/type_quat.hpp"
 
-// Credit: disabledmallis on discord
 
 enum class CameraMode : int {
     FirstPerson = 0,

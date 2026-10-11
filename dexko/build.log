@@ -1,8 +1,8 @@
 Версия MSBuild 17.14.18+a338add32 для .NET Framework
 
   1>Building 2 shaders
-  Building shader C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/solstice-master-main/dexko/src/Utils/Shaders/BlockInstanceVS.hlsl	Building shader C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/solstice-master-main/dexko/src/Utils/Shaders/DefaultPS.hlsl
-  1>Generating build info [C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/solstice-master-main/dexko/build/build_info.h]
+  Building shader C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/Dexko/dexko/src/Utils/Shaders/BlockInstanceVS.hlsl	Building shader C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/Dexko/dexko/src/Utils/Shaders/DefaultPS.hlsl
+  1>Generating build info [C:/Users/RAYYONA/Downloads/AyuGram Desktop/1/Dexko/dexko/build/build_info.h]
   fatal: not a git repository (or any of the parent directories): .git
   -- Build version: 
   -- Build version (short): 
@@ -10,7 +10,7 @@
   -- Build branch: 
   fatal: not a git repository (or any of the parent directories): .git
   -- Build commit message: 
-CUSTOMBUILD : warning : Not a git repository. Use --no-index to compare two paths outside a working tree [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\generate_build_info.vcxproj]
+CUSTOMBUILD : warning : Not a git repository. Use --no-index to compare two paths outside a working tree [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\generate_build_info.vcxproj]
   usage: git diff --no-index [<options>] <path> <path> [<pathspec>...]
   
   Diff output format options
@@ -146,18 +146,18 @@ CUSTOMBUILD : warning : Not a git repository. Use --no-index to compare two path
   -- Minecraft install location: C:/Program Files/WindowsApps/Microsoft.MinecraftUWP_1.21.4401.0_x64__8wekyb3d8bbwe/Minecraft.Windows.exe
   -- Intended version: 1.21.44.1
   -- Updating build_info.h
-C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем Scanner.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\Scanner.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\win32\Scanner.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\libhat\libhat.vcxproj]
-C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем System.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\unix\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\win32\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\arch\x86\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\arch\arm\System.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\libhat\libhat.vcxproj]
-C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем MemoryProtector.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\linux\MemoryProtector.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\win32\MemoryProtector.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\libhat\libhat.vcxproj]
-C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем Process.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\unix\Process.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\include\libhat\src\os\win32\Process.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\libhat\libhat.vcxproj]
-  glm.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\_deps\glm-build\glm\Release\glm.lib
-  libhat.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\libhat\Release\libhat.lib
-  cryptopp_asm.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\_deps\cryptopp-cmake-build\cryptopp\cryptopp_asm.dir\Release\cryptopp_asm.lib
-  spdlog.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\_deps\spdlog-build\Release\spdlog.lib
-  minhook.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\minhook\Release\minhook.x64.lib
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем Scanner.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\Scanner.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\win32\Scanner.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\libhat\libhat.vcxproj]
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем System.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\unix\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\win32\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\arch\x86\System.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\arch\arm\System.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\libhat\libhat.vcxproj]
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем MemoryProtector.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\linux\MemoryProtector.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\win32\MemoryProtector.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\libhat\libhat.vcxproj]
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1129,5): warning MSB8027: два или более файлов с именем Process.cpp выводят результаты в одно и то же расположение. Это может стать причиной неверного результата сборки.  Включенные файлы — C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\unix\Process.cpp, C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\include\libhat\src\os\win32\Process.cpp. [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\libhat\libhat.vcxproj]
+  glm.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\_deps\glm-build\glm\Release\glm.lib
+  libhat.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\libhat\Release\libhat.lib
+  cryptopp_asm.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\_deps\cryptopp-cmake-build\cryptopp\cryptopp_asm.dir\Release\cryptopp_asm.lib
+  spdlog.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\_deps\spdlog-build\Release\spdlog.lib
+  minhook.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\minhook\Release\minhook.x64.lib
   Проверка источников на наличие зависимостей модуля…
-  kiero.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\include\Kiero\Release\kiero.lib
-  cryptopp.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\_deps\cryptopp-cmake-build\cryptopp\Release\cryptopp.lib
+  kiero.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\include\Kiero\Release\kiero.lib
+  cryptopp.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\_deps\cryptopp-cmake-build\cryptopp\Release\cryptopp.lib
   Проверка источников на наличие зависимостей модуля…
   imgui_impl_dx11.cpp
   imgui_demo.cpp
@@ -194,15 +194,15 @@ C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v17
   unity_4_cxx.cxx
   unity_3_cxx.cxx
   unity_2_cxx.cxx
-C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\src\Features\Modules\ModuleManager.cpp(31,7): warning C4286: const nlohmann::json_abi_v3_11_3::basic_json<std::map,std::vector,std::string,bool,int64_t,uint64_t,double,std::allocator,nlohmann::json_abi_v3_11_3::adl_serializer,std::vector<uint8_t,std::allocator<uint8_t>>,void>::exception &: перехвачено базовым классом ("const std::exception &") в строке 28 [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\Dexko.vcxproj]
+C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\src\Features\Modules\ModuleManager.cpp(31,7): warning C4286: const nlohmann::json_abi_v3_11_3::basic_json<std::map,std::vector,std::string,bool,int64_t,uint64_t,double,std::allocator,nlohmann::json_abi_v3_11_3::adl_serializer,std::vector<uint8_t,std::allocator<uint8_t>>,void>::exception &: перехвачено базовым классом ("const std::exception &") в строке 28 [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\Dexko.vcxproj]
   (компиляция исходного файла "CMakeFiles/Dexko.dir/Unity/unity_2_cxx.cxx")
   
-C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\src\Features\Modules\ModuleManager.cpp(133,7): warning C4286: const nlohmann::json_abi_v3_11_3::basic_json<std::map,std::vector,std::string,bool,int64_t,uint64_t,double,std::allocator,nlohmann::json_abi_v3_11_3::adl_serializer,std::vector<uint8_t,std::allocator<uint8_t>>,void>::exception &: перехвачено базовым классом ("const std::exception &") в строке 130 [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\Dexko.vcxproj]
+C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\src\Features\Modules\ModuleManager.cpp(133,7): warning C4286: const nlohmann::json_abi_v3_11_3::basic_json<std::map,std::vector,std::string,bool,int64_t,uint64_t,double,std::allocator,nlohmann::json_abi_v3_11_3::adl_serializer,std::vector<uint8_t,std::allocator<uint8_t>>,void>::exception &: перехвачено базовым классом ("const std::exception &") в строке 130 [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\Dexko.vcxproj]
   (компиляция исходного файла "CMakeFiles/Dexko.dir/Unity/unity_2_cxx.cxx")
   
   unity_1_cxx.cxx
   unity_0_cxx.cxx
-LINK : warning LNK4044: нераспознанный параметр "/Zi"; игнорируется [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\Dexko.vcxproj]
+LINK : warning LNK4044: нераспознанный параметр "/Zi"; игнорируется [C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\Dexko.vcxproj]
   Создание кода
   Создание кода завершено
-  Dexko.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\solstice-master-main\dexko\build\Release\Dexko.dll
+  Dexko.vcxproj -> C:\Users\RAYYONA\Downloads\AyuGram Desktop\1\Dexko\dexko\build\Release\Dexko.dll

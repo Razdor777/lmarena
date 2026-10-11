@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/21/2024.
-//
-
 #include <SDK/Minecraft/mce.hpp>
 #include <array>
 #include <string>

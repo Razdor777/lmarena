@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 #include "ToggleCommand.hpp"
 
 #include <Utils/GameUtils/ChatUtils.hpp>

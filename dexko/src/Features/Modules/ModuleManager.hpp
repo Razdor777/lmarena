@@ -4,10 +4,6 @@
 #include <vector>
 
 #include "Module.hpp"
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 
 
 class ModuleManager {

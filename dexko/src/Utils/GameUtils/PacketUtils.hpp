@@ -3,10 +3,6 @@
 #include <complex.h>
 #include <SDK/Minecraft/Network/Packets/MobEquipmentPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/Packet.hpp>
-//
-// Created by vastrakai on 7/5/2024.
-//
-
 
 class PacketUtils {
 public:

@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 #include "BaseTickHook.hpp"
 
 #include <SDK/Minecraft/Actor/Actor.hpp>
@@ -24,18 +20,9 @@ void BaseTickHook::onBaseTick(Actor* actor)
     auto messages = mQueuedMessages;
     if (!messages.empty())
     {
-        // Если включён CustomChat — клиентские сообщения идут в него (он сам
-        // решает, что и как рисовать). Иначе — как раньше, в ванильный чат.
-        if (ChatUtils::sSink)
-        {
-            for (auto& message : messages) ChatUtils::sSink(message);
-        }
-        else
-        {
-            std::string messageStr = "";
-            for (auto& message : messages) messageStr += message + "\n";
-            ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
-        }
+        std::string messageStr = "";
+        for (auto& message : messages) messageStr += message + "\n";
+        ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
 
         mQueuedMessages.clear();
     }

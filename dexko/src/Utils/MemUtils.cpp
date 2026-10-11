@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 #include "MemUtils.hpp"
 #include <libhat/Access.hpp>
 #include <windows.h>

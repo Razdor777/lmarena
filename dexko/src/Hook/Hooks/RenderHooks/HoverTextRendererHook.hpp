@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by Solar on 11/18/2024.
-//
-
 #include <Hook/Hook.hpp>
 #include <Hook/HookManager.hpp>
 #include <SDK/Minecraft/mce.hpp>

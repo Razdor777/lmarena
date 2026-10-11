@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 #include "ChatUtils.hpp"
 
 #include <SDK/Minecraft/ClientInstance.hpp>
@@ -12,16 +8,17 @@
 void ChatUtils::displayClientMessage(const std::string& msg)
 {
     if (!msg.contains("\n"))
-    {// FUCK YOU DONT CHANGE THE PREIX COLOR U NIGGER
-        ClientInstance::get()->getGuiData()->displayClientMessageQueued("§aJuzdex§7 » §r" + msg);
+    {
+        // Префикс клиента — единственное место, где меняется имя в чате.
+        ClientInstance::get()->getGuiData()->displayClientMessageQueued("§aDexko§7 » §r" + msg);
         return;
     }
 
-    std::string formattedMsg = "§aJuzdex§7 » §r";
+    std::string formattedMsg = "§aDexko§7 » §r";
     for (const auto& c : msg)
     {
         if (c == '\n')
-            formattedMsg += "\n§aJuzdex§7 » §r";
+            formattedMsg += "\n§aDexko§7 » §r";
         else
             formattedMsg += c;
     }
@@ -30,7 +27,7 @@ void ChatUtils::displayClientMessage(const std::string& msg)
 
 void ChatUtils::displayClientMessageSub(const std::string& subcaption, const std::string& msg)
 {
-    ClientInstance::get()->getGuiData()->displayClientMessageQueued("§aJuzdex§7 » §7[" + subcaption + "§7] §r" + msg);
+    ClientInstance::get()->getGuiData()->displayClientMessageQueued("§aDexko§7 » §7[" + subcaption + "§7] §r" + msg);
 }
 
 void ChatUtils::displayClientMessageRaw(const std::string& msg)

@@ -2,10 +2,6 @@
 #include <string_view>
 
 #include "Event.hpp"
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 
 class ChatEvent : public CancelableEvent {
 public:

@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 
 #include "StringUtils.hpp"

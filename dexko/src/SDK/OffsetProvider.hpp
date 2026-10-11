@@ -1,9 +1,5 @@
 #pragma once
 #include <Utils/SysUtils/xorstr.hpp>
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 enum class OffsetType {
     Index,
     FieldOffset,

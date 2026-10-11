@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/28/2024.
-//
-
 #pragma once
 
 #include <Utils/Structs.hpp>

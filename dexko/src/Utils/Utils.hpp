@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/13/2024.
-//
-
 #pragma once
 
 
@@ -25,7 +21,6 @@
 #include "SysUtils/HWUtils.hpp"
 #include "SysUtils/RegUtils.hpp"
 #include "SysUtils/Base64.hpp"
-#include "SysUtils/HttpRequest.hpp"
 #include "MiscUtils/SoundUtils.hpp"
 #include "MiscUtils/RenderUtils.hpp"
 #include "MiscUtils/NotifyUtils.hpp"

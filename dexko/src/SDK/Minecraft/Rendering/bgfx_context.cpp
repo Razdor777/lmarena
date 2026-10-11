@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 #include "bgfx_context.hpp"
 
 #include <d3d12.h>

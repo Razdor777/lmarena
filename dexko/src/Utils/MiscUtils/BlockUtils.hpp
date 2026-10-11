@@ -1,7 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/7/2024.
-//
 #include <map>
 #include <Utils/Structs.hpp>
 #include <SDK/Minecraft/World/Block.hpp>

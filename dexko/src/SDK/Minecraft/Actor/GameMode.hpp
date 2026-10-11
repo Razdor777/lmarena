@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 7/5/2024.
-//
-
 #include <Utils/MemUtils.hpp>
 #include <SDK/SigManager.hpp>
 

@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 7/6/2024.
-//
-
 #include "ItemUtils.hpp"
 
 #include <SDK/Minecraft/ClientInstance.hpp>

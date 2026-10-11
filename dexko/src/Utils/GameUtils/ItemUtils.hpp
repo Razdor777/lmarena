@@ -5,10 +5,6 @@
 #include <SDK/Minecraft/Inventory/ItemStack.hpp>
 
 #include <SDK/Minecraft/World/BlockSource.hpp>
-//
-// Created by vastrakai on 7/6/2024.
-//
-
 class ItemUtils {
 public:
     static int getItemValue(ItemStack* item);

@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 #include <Utils/MemUtils.hpp>
 /*Address of signature = Minecraft.Windows.exe + 0x01B2E0A0
 "\x48\x83\xEC\x00\x48\x0F\x00\x00\x00\x48\x83\xC0\x00\x74\x00\x48\x83\xF8\x00\x48\x8B", "xxx?xx???xxx?x?xxx?xx"

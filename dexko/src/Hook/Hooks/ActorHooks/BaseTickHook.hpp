@@ -1,8 +1,4 @@
 #pragma once
-//
-// Created by vastrakai on 6/25/2024.
-//
-
 #include <Hook/Hook.hpp>
 #include <SDK/Minecraft/Network/Packets/Packet.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>

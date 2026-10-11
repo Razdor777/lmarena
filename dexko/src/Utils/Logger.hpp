@@ -1,9 +1,5 @@
 #pragma once
 #include <string>
-//
-// Created by vastrakai on 6/24/2024.
-//
-
 
 class Logger {
 public:
