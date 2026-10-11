@@ -12,8 +12,8 @@
 //   .htp style <style>          -> same, for scripts
 //   .htp set <style>            -> same
 //   .htp list                   -> list every style
-//   .htp test                   -> show the current style
-//   .htp test <style>           -> try a style without saving it first
+//   .htp test                   -> show the current style right away
+//   .htp test <style>           -> set that style and show it right away
 //   .htp color <mode>           -> Style Color / Theme Color / Custom
 //   .htp color #RRGGBB          -> custom colour + switch to Custom
 //   .htp on | off | toggle      -> module state
@@ -262,7 +262,7 @@ void HtpCommand::execute(const std::vector<std::string>& args)
         return;
     }
 
-    // `.htp test [style]` — preview without touching the saved style.
+    // `.htp test [style]` — set the style (when given) and preview it at once.
     if (action == "test" || action == "preview" || action == "show")
     {
         if (args.size() >= 3)
