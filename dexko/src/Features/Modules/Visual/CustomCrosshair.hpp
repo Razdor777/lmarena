@@ -1,5 +1,6 @@
 #pragma once
 #include <Features/Modules/Module.hpp>
+#include <Features/Events/RenderEvent.hpp>
 #include <Features/Modules/Setting.hpp>
 #include <chrono>
 

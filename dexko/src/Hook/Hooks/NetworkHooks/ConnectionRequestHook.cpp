@@ -3,6 +3,8 @@
 
 #include "ConnectionRequestHook.hpp"
 #include <Features/Events/ConnectionRequestEvent.hpp>
+#include <SDK/Minecraft/Network/ConnectionRequest.hpp>
+#include <SDK/Minecraft/Actor/SerializedSkin.hpp>
 
 std::unique_ptr<Detour> ConnectionRequestHook::mDetour;
 

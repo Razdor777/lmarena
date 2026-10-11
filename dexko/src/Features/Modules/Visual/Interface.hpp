@@ -4,6 +4,8 @@
 #include <Features/Events/ModuleStateChangeEvent.hpp>
 #include <Features/Events/DrawImageEvent.hpp>
 #include <Features/Events/PreGameCheckEvent.hpp>
+#include <Features/Events/RenderEvent.hpp>
+#include <Features/Events/PacketOutEvent.hpp>
 
 class Interface : public ModuleBase<Interface>
 {

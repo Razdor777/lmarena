@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <spdlog/fmt/fmt.h>   // fmt::format_string / fmt::format come from spdlog's bundled fmt
 //
 
 class ChatUtils {

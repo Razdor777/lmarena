@@ -23,17 +23,17 @@
 
 namespace
 {
-    std::string lower(std::string s)
+    std::string reachLower(std::string s)
     {
         std::transform(s.begin(), s.end(), s.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return s;
     }
 
-    bool isFull(const std::string& s) { return s == "full" || s == "override" || s == "over" || s == "bypass" || s == "on"; }
-    bool isMin(const std::string& s) { return s == "min" || s == "clamp" || s == "safe" || s == "off"; }
+    bool isReachFullMode(const std::string& s) { return s == "full" || s == "override" || s == "over" || s == "bypass" || s == "on"; }
+    bool isReachMinMode(const std::string& s) { return s == "min" || s == "clamp" || s == "safe" || s == "off"; }
 
-    void printStatus(Reach* reach)
+    void printReachStatus(Reach* reach)
     {
         ChatUtils::displayClientMessage(fmt::format("§7Combat reach: §6{:.2f}§7, block reach: §6{:.2f}",
                                                     reach->mCombatReach.mValue, reach->mBlockReach.mValue));
@@ -54,19 +54,19 @@ void ReachCommand::execute(const std::vector<std::string>& args)
 
     if (args.size() < 2)
     {
-        printStatus(reach);
+        printReachStatus(reach);
         ChatUtils::displayClientMessage("§7Usage: §e.reach <value> [full|min] §7or §e.reach full §7/ §e.reach min");
         return;
     }
 
-    const std::string first = lower(args[1]);
+    const std::string first = reachLower(args[1]);
 
     // Mode-only forms: `.reach full`, `.reach min`
-    if (isFull(first) || isMin(first))
+    if (isReachFullMode(first) || isReachMinMode(first))
     {
-        reach->mFullOverride.setValue(isFull(first));
+        reach->mFullOverride.setValue(isReachFullMode(first));
         if (!reach->mEnabled) reach->setEnabled(true);
-        printStatus(reach);
+        printReachStatus(reach);
         return;
     }
 
@@ -93,9 +93,9 @@ void ReachCommand::execute(const std::vector<std::string>& args)
     bool modeChanged = false;
     if (args.size() >= 3)
     {
-        const std::string second = lower(args[2]);
-        if (isFull(second)) { reach->mFullOverride.setValue(true);  modeChanged = true; }
-        else if (isMin(second)) { reach->mFullOverride.setValue(false); modeChanged = true; }
+        const std::string second = reachLower(args[2]);
+        if (isReachFullMode(second)) { reach->mFullOverride.setValue(true);  modeChanged = true; }
+        else if (isReachMinMode(second)) { reach->mFullOverride.setValue(false); modeChanged = true; }
         else
         {
             ChatUtils::displayClientMessage("§eUnknown option §6" + args[2] + "§e — use §e full §eor §emin§e.");
@@ -108,7 +108,7 @@ void ReachCommand::execute(const std::vector<std::string>& args)
     ChatUtils::displayClientMessage(fmt::format("§aCombat reach set to §6{:.2f}§a.", reach->mCombatReach.mValue));
 
     if (modeChanged || reach->mFullOverride.mValue)
-        printStatus(reach);
+        printReachStatus(reach);
 
     if (value > 7.f && !reach->mFullOverride.mValue)
     {

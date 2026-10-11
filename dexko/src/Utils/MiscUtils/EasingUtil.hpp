@@ -1,7 +1,7 @@
 #pragma once
 #include <cmath>
 
-constexpr float PI = 3.1415927f;
+constexpr float kEasingPi = 3.1415927f;
 
 class EasingUtil {
 public:
@@ -58,23 +58,23 @@ public:
     }
     static __forceinline float easeInElastic(float t) {
         float t2 = t * t;
-        return t2 * t2 * std::sin(t * PI * 4.5f);
+        return t2 * t2 * std::sin(t * kEasingPi * 4.5f);
     }
     static __forceinline float easeOutElastic(float t) {
         float t2 = (t - 1.f) * (t - 1.f);
-        return 1.f - t2 * t2 * std::cos(t * PI * 2.25f);
+        return 1.f - t2 * t2 * std::cos(t * kEasingPi * 2.25f);
     }
     static __forceinline float easeInOutElastic(float t) {
         float t2;
-        if (t < 0.45f) { t2 = t * t; return 8.f * t2 * t2 * std::sin(t * PI * 9.f); }
-        else if (t < 0.55f) { return 0.5f + 0.75f * std::sin(t * PI * 4.f); }
-        else { t2 = (t - 1.f) * (t - 1.f); return 1.f - 8.f * t2 * t2 * std::sin(t * PI * 9.f); }
+        if (t < 0.45f) { t2 = t * t; return 8.f * t2 * t2 * std::sin(t * kEasingPi * 9.f); }
+        else if (t < 0.55f) { return 0.5f + 0.75f * std::sin(t * kEasingPi * 4.f); }
+        else { t2 = (t - 1.f) * (t - 1.f); return 1.f - 8.f * t2 * t2 * std::sin(t * kEasingPi * 9.f); }
     }
-    static __forceinline float easeInBounce(float t) { return std::pow(2.f, 6.f * (t - 1.f)) * std::abs(std::sin(t * PI * 3.5f)); }
-    static __forceinline float easeOutBounce(float t) { return 1.f - std::pow(2.f, -6.f * t) * std::abs(std::cos(t * PI * 3.5f)); }
+    static __forceinline float easeInBounce(float t) { return std::pow(2.f, 6.f * (t - 1.f)) * std::abs(std::sin(t * kEasingPi * 3.5f)); }
+    static __forceinline float easeOutBounce(float t) { return 1.f - std::pow(2.f, -6.f * t) * std::abs(std::cos(t * kEasingPi * 3.5f)); }
     static __forceinline float easeInOutBounce(float t) {
-        return t < 0.5f ? 8.f * std::pow(2.f, 8.f * (t - 1.f)) * std::abs(std::sin(t * PI * 7.f))
-                        : 1.f - 8.f * std::pow(2.f, -8.f * t) * std::abs(std::sin(t * PI * 7.f));
+        return t < 0.5f ? 8.f * std::pow(2.f, 8.f * (t - 1.f)) * std::abs(std::sin(t * kEasingPi * 7.f))
+                        : 1.f - 8.f * std::pow(2.f, -8.f * t) * std::abs(std::sin(t * kEasingPi * 7.f));
     }
 
     // 🔙 Backward compatibility: instance methods delegating to static ones

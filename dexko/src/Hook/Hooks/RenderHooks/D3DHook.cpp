@@ -3,6 +3,8 @@
 
 #include "D3DHook.hpp"
 
+#include <Dexko.hpp>
+
 #include <kiero.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <SDK/Minecraft/Rendering/bgfx_context.hpp>
@@ -194,7 +196,11 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
                 CHECK_HR(gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(i).get(), nullptr,
                                                      mBackBuffer11Rtv.at(i).put()));
             }
-            oWndProc = (WNDPROC)SetWindowLongPtr(wnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
+            // Dexko has no clickable menu (everything is driven by chat commands),
+            // so no window-proc hook is needed. The old line wrote a NULL proc into
+            // the window (oWndProc was still empty at that point) — just keep the
+            // game's own proc instead of touching it.
+            oWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(wnd, GWLP_WNDPROC));
         }
         d3dInitImGui = true;
     }

@@ -26,7 +26,7 @@
 #include <random>
 
 namespace {
-    constexpr float kPi = 3.14159265358979f;
+    constexpr float kPiHP = 3.14159265358979f;
 
     std::mt19937& rng()
     {
@@ -67,7 +67,7 @@ namespace {
 
     struct Palette { ImColor a, b, c; };
 
-    Palette paletteFor(int style)
+    Palette paletteForStyle(int style)
     {
         switch (style) {
         case 0:  return { ImColor(0.40f, 0.02f, 0.03f, 1.f), ImColor(0.78f, 0.05f, 0.06f, 1.f), ImColor(1.00f, 0.24f, 0.18f, 1.f) };
@@ -123,8 +123,8 @@ bool HitParticles::getEyeRay(glm::vec3& eye, glm::vec3& dir) const
     if (!rot) return false;
     auto* head = player->getActorHeadRotationComponent();
 
-    const float yaw   = (head ? head->mHeadRot : rot->mYaw) * (kPi / 180.f);
-    const float pitch = rot->mPitch * (kPi / 180.f);
+    const float yaw   = (head ? head->mHeadRot : rot->mYaw) * (kPiHP / 180.f);
+    const float pitch = rot->mPitch * (kPiHP / 180.f);
 
     // Positions in this SDK already sit at EYE level (feet + PLAYER_HEIGHT) —
     // every renderer compensates by dropping PLAYER_HEIGHT before drawing
@@ -315,7 +315,7 @@ ImColor HitParticles::pickColor(int index)
         return c;
     }
 
-    const Palette pal = paletteFor(mStyle.as<int>());
+    const Palette pal = paletteForStyle(mStyle.as<int>());
     const int which = index % 3;
     ImColor c = (which == 0) ? pal.a : (which == 1 ? pal.b : pal.c);
 

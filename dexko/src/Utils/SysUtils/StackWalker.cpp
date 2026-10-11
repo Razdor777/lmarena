@@ -2,6 +2,8 @@
 //
 
 #include "StackWalker.hpp"
+
+#include <Dexko.hpp>
 #define _AMD64_
 #include <DbgHelp.h>
 #include <spdlog/spdlog.h>

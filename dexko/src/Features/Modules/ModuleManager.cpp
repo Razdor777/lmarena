@@ -25,10 +25,10 @@ void ModuleManager::init() {
   for (auto &module : mModules) {
     try {
       module->onInit();
-    } catch (const std::exception &e) {
+    } catch (const nlohmann::json::exception &e) {
       spdlog::error("Failed to initialize module {}: {}", module->mName,
                     e.what());
-    } catch (const nlohmann::json::exception &e) {
+    } catch (const std::exception &e) {
       spdlog::error("Failed to initialize module {}: {}", module->mName,
                     e.what());
     } catch (...) {
@@ -127,10 +127,10 @@ void ModuleManager::onClientTick() {
           module->onDisable();
         }
       }
-    } catch (const std::exception &e) {
+    } catch (const nlohmann::json::exception &e) {
       spdlog::error("Failed to enable/disable module {}: {}", module->mName,
                     e.what());
-    } catch (const nlohmann::json::exception &e) {
+    } catch (const std::exception &e) {
       spdlog::error("Failed to enable/disable module {}: {}", module->mName,
                     e.what());
     } catch (...) {

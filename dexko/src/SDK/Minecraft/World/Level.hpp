@@ -46,6 +46,8 @@ public:
     CLASS_FIELD(uint64_t, mTick, OffsetProvider::LevelData_mTick);
 };
 
+class Block;
+
 class BlockPalette {
 public:
     virtual ~BlockPalette();

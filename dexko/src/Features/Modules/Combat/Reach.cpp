@@ -15,6 +15,7 @@
 //
 
 #include "Reach.hpp"
+#include <Features/Events/BaseTickEvent.hpp>
 #include <SDK/SigManager.hpp>
 #include <Utils/Buffer.hpp>
 #include <Utils/MemUtils.hpp>
