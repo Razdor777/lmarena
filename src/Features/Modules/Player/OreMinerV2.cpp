@@ -19,12 +19,19 @@
 #include <SDK/Minecraft/World/Chunk/LevelChunk.hpp>
 #include <SDK/Minecraft/World/Chunk/SubChunkBlockStorage.hpp>
 
+#include <Utils/FileUtils.hpp>
 #include <Utils/GameUtils/ItemUtils.hpp>
 #include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
+
+#include <spdlog/spdlog.h>
+
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 // =============================================================
 // ENABLED BLOCK IDS
@@ -448,6 +455,98 @@ OreMinerV2::findNearestCluster(glm::vec3 playerPos,
 // ENABLE / DISABLE
 // =============================================================
 
+// =============================================================
+// DEBUG DUMP
+// =============================================================
+const char *OreMinerV2::oreTypeName(int blockId) {
+  switch (getOreType(blockId)) {
+  case OreType::Coal:
+    return "coal";
+  case OreType::Diamond:
+    return "diamond";
+  case OreType::Emerald:
+    return "emerald";
+  default:
+    return "other";
+  }
+}
+
+// Открывает новый файл дампа. Имя содержит дату и время, поэтому старые дампы
+// никогда не затираются, а каждый запуск Debug — отдельный чистый файл.
+void OreMinerV2::debugStart() {
+  const std::string dir = FileUtils::getJuzdexDir() + "Dumps\\";
+  FileUtils::createDirectory(dir);
+
+  std::time_t t = std::time(nullptr);
+  std::tm tmBuf{};
+  localtime_s(&tmBuf, &t);
+  char stamp[32] = {};
+  std::strftime(stamp, sizeof(stamp), "%Y-%m-%d_%H-%M-%S", &tmBuf);
+
+  const std::string base = dir + "OreMinerV2_" + std::string(stamp);
+  mDebugCsvPath = base + ".csv";
+  mDebugCoordsPath = base + "_coords.txt";
+
+  mDebugCsv.open(mDebugCsvPath, std::ios::out | std::ios::trunc);
+  mDebugCoords.open(mDebugCoordsPath, std::ios::out | std::ios::trunc);
+
+  if (mDebugCsv.is_open()) {
+    mDebugCsv << "world_x,world_y,world_z,ore,block_id,deepslate,distance,"
+                 "on_screen,screen_x,screen_y,ms\n";
+    mDebugCsv.flush();
+  } else {
+    spdlog::error("[OreMinerV2][Debug] cannot open {}", mDebugCsvPath);
+  }
+
+  mDebugWritten.clear();
+  mDebugRows = 0;
+  mDebugStartedAt = NOW;
+  spdlog::info("[OreMinerV2][Debug] dump started -> {}", mDebugCsvPath);
+}
+
+void OreMinerV2::debugFlush(const std::vector<DebugRow> &rows) {
+  if (rows.empty())
+    return;
+  if (!mDebugCsv.is_open())
+    return;
+
+  const uint64_t now = NOW;
+
+  for (const auto &r : rows) {
+    mDebugCsv << r.pos.x << ',' << r.pos.y << ',' << r.pos.z << ','
+              << oreTypeName(r.blockId) << ',' << r.blockId << ','
+              << (r.deepslate ? 1 : 0) << ',' << std::fixed
+              << std::setprecision(2) << r.distance << ','
+              << (r.onScreen ? 1 : 0) << ',' << std::setprecision(1)
+              << r.screenX << ',' << r.screenY << ',' << now << '\n';
+
+    if (mDebugCoords.is_open())
+      mDebugCoords << r.pos.x << ' ' << r.pos.y << ' ' << r.pos.z << '\n';
+  }
+
+  mDebugCsv.flush();
+  if (mDebugCoords.is_open())
+    mDebugCoords.flush();
+
+  mDebugRows += static_cast<int>(rows.size());
+}
+
+void OreMinerV2::debugStop() {
+  if (mDebugCsv.is_open()) {
+    mDebugCsv.flush();
+    mDebugCsv.close();
+    mDebugCoords.flush();
+    spdlog::info("[OreMinerV2][Debug] {} blocks dumped to {}", mDebugRows,
+                 mDebugCsvPath);
+  }
+  if (mDebugCoords.is_open())
+    mDebugCoords.close();
+
+  mDebugWritten.clear();
+  mDebugRows = 0;
+  mDebugStartedAt = 0;
+}
+
 void OreMinerV2::onEnable() {
   gFeatureManager->mDispatcher
       ->listen<BaseTickEvent, &OreMinerV2::onBaseTickEvent>(this);
@@ -510,6 +609,12 @@ void OreMinerV2::onDisable() {
   mFilteredBlocks.clear();
   mBlacklistedPositions.clear();
   mIsBindingKey = false;
+
+  // Файл дампа держим закрытым, как только модуль выключили: всё, что успело
+  // накопиться, уже сброшено на диск в debugFlush().
+  if (mDebugWasOn)
+    debugStop();
+  mDebugWasOn = false;
 }
 
 // =============================================================
@@ -1094,37 +1199,77 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     alpha = std::clamp(alpha, 0.f, 1.f);
   }
 
-  // ---------- BLOCK ESP ----------
-  if (mDrawBlocks.mValue) {
+  // ---------- BLOCK ESP + DEBUG DUMP ----------
+  // Debug идёт тем же проходом, что и рендер: дампятся ровно те блоки, которые
+  // модуль считает найденными (радиус + тип руды), включая те, что сейчас за
+  // спиной/за кадром — поэтому это «абсолютно вся информация», а не только
+  // то, что попало на экран. Каждая координата пишется один раз.
+  const bool wantEsp = mDrawBlocks.mValue;
+  const bool wantDump = mDebug.mValue;
+
+  if (wantDump && !mDebugWasOn)
+    debugStart();
+  else if (!wantDump && mDebugWasOn)
+    debugStop();
+  mDebugWasOn = wantDump;
+
+  if (wantEsp || wantDump) {
     glm::ivec3 pp = *player->getPos();
     float radSq = mRadius.mValue * mRadius.mValue;
     auto enVec = getEnabledBlockIds();
     std::unordered_set<int> enSet(enVec.begin(), enVec.end());
 
+    std::vector<DebugRow> dumpRows;
     int rendered = 0;
+
     for (auto &[pos, fb] : mFilteredBlocks) {
-      if (rendered >= 500)
-        break;
+      if (!fb.block || !fb.block->mLegacy)
+        continue;
+
+      const int blockId = fb.block->mLegacy->getBlockId();
+      if (!enSet.contains(blockId))
+        continue;
+
       glm::vec3 d = glm::vec3(pos) - glm::vec3(pp);
       if (d.x * d.x + d.y * d.y + d.z * d.z > radSq)
         continue;
-      if (!enSet.contains(fb.block->mLegacy->getBlockId()))
-        continue;
 
       ImVec2 cs;
-      if (!RenderUtils::worldToScreen(glm::vec3(pos) + glm::vec3(0.5f), cs))
-        continue;
+      bool onScreen = false;
+      if (wantDump)
+        onScreen =
+            RenderUtils::worldToScreen(glm::vec3(pos) + glm::vec3(0.5f), cs);
 
-      auto pts = MathUtils::getImBoxPoints(fb.aabb);
-      if (pts.empty())
-        continue;
+      // Рисование — как и раньше, с прежним лимитом 500 боксов на кадр.
+      if (wantEsp && rendered < 500) {
+        auto pts = MathUtils::getImBoxPoints(fb.aabb);
+        if (!pts.empty()) {
+          drawList->AddPolyline(pts.data(), pts.size(), fb.color, 0, 2.0f);
+          drawList->AddConvexPolyFilled(
+              pts.data(), pts.size(),
+              ImColor(fb.color.Value.x, fb.color.Value.y, fb.color.Value.z,
+                      0.15f));
+          rendered++;
+        }
+      }
 
-      drawList->AddPolyline(pts.data(), pts.size(), fb.color, 0, 2.0f);
-      drawList->AddConvexPolyFilled(
-          pts.data(), pts.size(),
-          ImColor(fb.color.Value.x, fb.color.Value.y, fb.color.Value.z, 0.15f));
-      rendered++;
+      if (wantDump && mDebugWritten.insert(pos).second) {
+        DebugRow row;
+        row.pos = pos;
+        row.blockId = blockId;
+        row.deepslate = (blockId == DEEPSLATE_COAL_ORE_ID ||
+                         blockId == DEEPSLATE_DIAMOND_ORE_ID ||
+                         blockId == DEEPSLATE_EMERALD_ORE_ID);
+        row.distance = glm::length(d);
+        row.onScreen = onScreen;
+        row.screenX = onScreen ? cs.x : 0.f;
+        row.screenY = onScreen ? cs.y : 0.f;
+        dumpRows.push_back(row);
+      }
     }
+
+    if (wantDump)
+      debugFlush(dumpRows);
   }
 
   // ---------- TP PATH ----------
@@ -1208,6 +1353,9 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
                  " | Fakes: " + std::to_string(mFakeClusters);
       break;
     }
+
+    if (mDebug.mValue)
+      status += " | Dump: " + std::to_string(mDebugRows) + " blocks";
 
     ImVec2 ts = ImGui::CalcTextSize(status.c_str());
     drawList->AddRectFilled(ImVec2(cx - ts.x * 0.5f - 5.f, topY - 2.f),

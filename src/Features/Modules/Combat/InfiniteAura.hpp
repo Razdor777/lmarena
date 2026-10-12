@@ -65,6 +65,12 @@ public:
     BoolSetting              mDrawPath        = BoolSetting("Draw Path", "Draw movement path", true);
     BoolSetting              mDrawGhost       = BoolSetting("Draw Ghost", "Draw ghost at attack pos", true);
     BoolSetting              mHighlightLocked = BoolSetting("Highlight Locked", "Highlight locked target", true);
+    BoolSetting              mTargetInfo      = BoolSetting("Target Info", "HP bar, armor and distance above the locked target", true);
+    BoolSetting              mHitTrail        = BoolSetting("Hit Trail", "Fading afterimages of the previous hits", true);
+    NumberSetting            mTrailPoints     = NumberSetting("Trail Points", "How many previous hits to keep", 4.f, 1.f, 12.f, 1.f);
+    BoolSetting              mHitSparks      = BoolSetting("Hit Sparks", "Spark burst flying out of the hit point", true);
+    BoolSetting              mPathFlow       = BoolSetting("Path Flow", "Animated dots running along the teleport path", true);
+    NumberSetting            mPathWidth      = NumberSetting("Path Width", "Teleport path line thickness", 2.f, 1.f, 6.f, 0.5f);
 
     InfiniteAura() : ModuleBase("InfiniteAura", "Attack players at any distance via chain TP",
         ModuleCategory::Combat, 0, false)
@@ -79,8 +85,14 @@ public:
             &mFollow, &mSilentAccept, &mIgnoreFriends,
             &mSwapMode, &mHotbarOnly,
             &mAutoShield,
-            &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked
+            &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked,
+            &mTargetInfo, &mHitTrail, &mTrailPoints, &mHitSparks,
+            &mPathFlow, &mPathWidth
         );
+
+        VISIBILITY_CONDITION(mTrailPoints, mHitTrail.mValue);
+        VISIBILITY_CONDITION(mPathFlow,    mDrawPath.mValue);
+        VISIBILITY_CONDITION(mPathWidth,   mDrawPath.mValue && mRenderMode.mValue == RenderMode::Lines);
 
         VISIBILITY_CONDITION(mYOffset,         mOnlySameY.mValue);
         VISIBILITY_CONDITION(mSwitchDelay,     mMode.mValue == Mode::Switch);
@@ -110,6 +122,15 @@ public:
     std::vector<glm::vec3> mPacketPositions;
     uint64_t               mLastPathTime = 0;
     std::mutex             mMutex;
+
+    // Визуал: точки прошлых ударов (новые — в конце) и «болит ли он» для вспышки.
+    // Массив фиксированного размера, а не vector: шлейф читает рендер-поток, и
+    // push_back под ним мог бы ловить реаллокацию в самый неподходящий момент.
+    static constexpr int kMaxTrailPoints = 12;
+    glm::vec3            mGhostHistory[kMaxTrailPoints] = {};
+    int                  mGhostHistoryCount = 0;
+    float                mLastLockedHealth  = -1.f;
+    uint64_t             mLastHpDropTime    = 0;
 
     std::unordered_map<int64_t, uint64_t> mLastAttacksByID;
     std::unordered_map<int64_t, uint64_t> mRecentAttackers;

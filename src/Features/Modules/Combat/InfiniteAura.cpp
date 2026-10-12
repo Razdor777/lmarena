@@ -129,6 +129,9 @@ void InfiniteAura::onEnable() {
 
   mHasTarget = false;
   mGhostVisible = false;
+  mGhostHistoryCount = 0;
+  mLastLockedHealth = -1.f;
+  mLastHpDropTime = 0;
   mLastTargetRuntimeID = -1;
   mLastTargetSwitch = 0;
   mLockedTargetRuntimeID = -1;
@@ -161,6 +164,9 @@ void InfiniteAura::onDisable() {
 
   mHasTarget = false;
   mGhostVisible = false;
+  mGhostHistoryCount = 0;
+  mLastLockedHealth = -1.f;
+  mLastHpDropTime = 0;
   mLockedTargetRuntimeID = -1;
   mLockedTargetName.clear();
   mIsBindingLockKey = false;
@@ -788,6 +794,20 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
     mGhostPos = attackPos;
     mGhostVisible = true;
     mLastAttack = NOW;
+
+    // История ударов для шлейфа (новые точки — в конце, старые вытесняются).
+    if (mHitTrail.mValue) {
+      const int maxTrail =
+          std::clamp(static_cast<int>(mTrailPoints.mValue), 1, kMaxTrailPoints);
+      if (mGhostHistoryCount >= maxTrail) {
+        for (int i = 1; i < mGhostHistoryCount; i++)
+          mGhostHistory[i - 1] = mGhostHistory[i];
+        mGhostHistoryCount = maxTrail - 1;
+      }
+      mGhostHistory[mGhostHistoryCount++] = attackPos;
+    } else if (mGhostHistoryCount != 0) {
+      mGhostHistoryCount = 0;
+    }
     mLastTargetRuntimeID = actorID;
     mLastTargetSwitch = NOW;
     mLastAttacksByID[actorID] = NOW;
@@ -872,7 +892,46 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
         for (size_t i = 0; i + 1 < points.size(); i++) {
           ImColor c = ColorUtils::getThemedColor(static_cast<float>(i) * 0.05f);
           c.Value.w *= alphaMultiplier;
-          drawList->AddLine(points[i], points[i + 1], c, 2.0f);
+          drawList->AddLine(points[i], points[i + 1], c, mPathWidth.mValue);
+        }
+
+        // «Поток» — точки, бегущие по тропе от игрока к цели. Показывает
+        // направление телепорта в моменте, а не только сам маршрут.
+        if (mPathFlow.mValue && points.size() >= 2) {
+          std::vector<float> segmentLengths;
+          segmentLengths.reserve(points.size() - 1);
+          float totalLength = 0.f;
+          for (size_t i = 0; i + 1 < points.size(); i++) {
+            const float dx = points[i + 1].x - points[i].x;
+            const float dy = points[i + 1].y - points[i].y;
+            const float len = std::sqrt(dx * dx + dy * dy);
+            segmentLengths.push_back(len);
+            totalLength += len;
+          }
+
+          if (totalLength > 1.f) {
+            constexpr int kDots = 9;
+            const float flow = static_cast<float>(currentTime % 1000) / 1000.f;
+            for (int k = 0; k < kDots; k++) {
+              float travel = std::fmod(flow + static_cast<float>(k) / kDots, 1.f) * totalLength;
+              for (size_t i = 0; i < segmentLengths.size(); i++) {
+                const bool last = (i + 1 == segmentLengths.size());
+                if (travel > segmentLengths[i] && !last) {
+                  travel -= segmentLengths[i];
+                  continue;
+                }
+                const float t = segmentLengths[i] > 0.f
+                                    ? std::clamp(travel / segmentLengths[i], 0.f, 1.f)
+                                    : 0.f;
+                const ImVec2 dot(points[i].x + (points[i + 1].x - points[i].x) * t,
+                                 points[i].y + (points[i + 1].y - points[i].y) * t);
+                ImColor dc = ColorUtils::getThemedColor(static_cast<float>(k) * 0.08f);
+                dc.Value.w = alphaMultiplier;
+                drawList->AddCircleFilled(dot, mPathWidth.mValue + 1.f, dc, 10);
+                break;
+              }
+            }
+          }
         }
       } else {
         for (auto &pos : mPacketPositions) {
@@ -927,6 +986,58 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
         drawList->AddPolyline(pts.data(), (int)pts.size(), glow, true, 5.f);
         drawList->AddConvexPolyFilled(pts.data(), (int)pts.size(), fill);
         drawList->AddPolyline(pts.data(), (int)pts.size(), outline, true, 2.f);
+      }
+
+      // шлейф: призраки прошлых ударов, чем старше — тем бледнее и тоньше.
+      // Последняя точка истории — это текущий удар, поэтому её пропускаем.
+      if (mHitTrail.mValue && mGhostHistoryCount > 1) {
+        for (int i = 0; i + 1 < mGhostHistoryCount; i++) {
+          // история[0] — самый старый удар, он и должен быть самым бледным
+          const float age = static_cast<float>(mGhostHistoryCount - 1 - i) /
+                            static_cast<float>(mGhostHistoryCount);
+          const float trailAlpha = (1.f - age) * 0.55f * env;
+          if (trailAlpha <= 0.02f) continue;
+
+          const glm::vec3 trailFeet = mGhostHistory[i] - glm::vec3(0.f, 1.62f, 0.f);
+          AABB trailBox;
+          trailBox.mMin = trailFeet - glm::vec3(0.3f, 0.f, 0.3f);
+          trailBox.mMax = trailFeet + glm::vec3(0.3f, 1.8f, 0.3f);
+          auto trailPts = MathUtils::getImBoxPoints(trailBox);
+          if (trailPts.empty()) continue;
+
+          ImColor tc = base;
+          tc.Value.w = trailAlpha;
+          drawList->AddPolyline(trailPts.data(), (int)trailPts.size(), tc, true, 1.5f);
+
+          ImVec2 a, b;
+          if (RenderUtils::worldToScreen(trailFeet, a) &&
+              RenderUtils::worldToScreen(mGhostHistory[i], b)) {
+            ImColor lc2 = base;
+            lc2.Value.w = trailAlpha * 0.6f;
+            drawList->AddLine(a, b, lc2, 1.f);
+          }
+        }
+      }
+
+      // искры: разлетаются из точки удара и гаснут за ~0.4 с
+      if (mHitSparks.mValue && ageMs < 420.f) {
+        const float p = ageMs / 420.f;
+        ImVec2 sparkCenter;
+        if (RenderUtils::worldToScreen(mGhostPos, sparkCenter)) {
+          constexpr int kSparks = 12;
+          for (int i = 0; i < kSparks; i++) {
+            const float ang = (static_cast<float>(i) / kSparks) * 6.2831853f + p * 2.2f;
+            const float r0 = 6.f + 30.f * p;
+            const float r1 = r0 + 8.f + 16.f * (1.f - p);
+            ImColor sc = base;
+            sc.Value.w = (1.f - p) * 0.85f;
+            drawList->AddLine(ImVec2(sparkCenter.x + std::cos(ang) * r0,
+                                     sparkCenter.y + std::sin(ang) * r0),
+                              ImVec2(sparkCenter.x + std::cos(ang) * r1,
+                                     sparkCenter.y + std::sin(ang) * r1),
+                              sc, 1.5f);
+          }
+        }
       }
 
       // луч «игрок → точка атаки» + яркая точка в конце
@@ -1003,8 +1114,60 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
     targetAABB.mMax = feet + glm::vec3(0.3f, 1.8f, 0.3f);
     auto pts = MathUtils::getImBoxPoints(targetAABB);
 
-    if (!pts.empty())
-      drawList->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 215, 0, 180), true, 3.f);
+    // ── Сколько у него осталось и не прилетело ли только что ──
+    // Скачок HP вниз подкрашивает бокс красным: видно, что удар дошёл.
+    float lockedHp = 20.f;
+    try { lockedHp = locked->getHealth(); } catch (...) { lockedHp = 20.f; }
+    if (mLastLockedHealth >= 0.f && lockedHp < mLastLockedHealth - 0.01f)
+      mLastHpDropTime = NOW;
+    mLastLockedHealth = lockedHp;
+
+    const bool hpFlashed = mLastHpDropTime != 0 && (NOW - (int64_t)mLastHpDropTime) < 350;
+    const ImU32 boxColor = hpFlashed ? IM_COL32(255, 95, 95, 235) : IM_COL32(255, 215, 0, 180);
+
+    if (!pts.empty()) {
+      drawList->AddPolyline(pts.data(), (int)pts.size(), boxColor, true,
+                            hpFlashed ? 4.f : 3.f);
+
+      if (mTargetInfo.mValue) {
+        float minX = pts[0].x, maxX = pts[0].x, minY = pts[0].y, maxY = pts[0].y;
+        for (const auto& p : pts) {
+          minX = std::min(minX, p.x);
+          maxX = std::max(maxX, p.x);
+          minY = std::min(minY, p.y);
+          maxY = std::max(maxY, p.y);
+        }
+
+        // Уголки — «рамка» вокруг цели, не мешает обзору внутри бокса.
+        const float len = std::clamp((maxX - minX) * 0.25f, 6.f, 26.f);
+        const float th  = 2.f;
+        const ImU32 cornerCol = hpFlashed ? IM_COL32(255, 120, 120, 255)
+                                          : IM_COL32(255, 235, 150, 230);
+        const ImVec2 corners[4][3] = {
+            { {minX, minY + len}, {minX, minY}, {minX + len, minY} },
+            { {maxX - len, minY}, {maxX, minY}, {maxX, minY + len} },
+            { {maxX, maxY - len}, {maxX, maxY}, {maxX - len, maxY} },
+            { {minX + len, maxY}, {minX, maxY}, {minX, maxY - len} }
+        };
+        for (const auto& c : corners) {
+          drawList->AddLine(c[0], c[1], cornerCol, th);
+          drawList->AddLine(c[1], c[2], cornerCol, th);
+        }
+
+        // HP-бар над боксом (у игроков максимум 20 HP).
+        const float barW = std::max(24.f, maxX - minX);
+        const float barH = 4.f;
+        const float barY = minY - 9.f;
+        const float hpFrac = std::clamp(lockedHp / 20.f, 0.f, 1.f);
+        const ImU32 hpColor = hpFrac > 0.6f ? IM_COL32(120, 255, 120, 235)
+                            : hpFrac > 0.3f ? IM_COL32(255, 215, 0, 235)
+                                            : IM_COL32(255, 80, 80, 235);
+        drawList->AddRectFilled(ImVec2(minX, barY), ImVec2(minX + barW, barY + barH),
+                                IM_COL32(0, 0, 0, 170), 2.f);
+        drawList->AddRectFilled(ImVec2(minX, barY), ImVec2(minX + barW * hpFrac, barY + barH),
+                                hpColor, 2.f);
+      }
+    }
 
     ImVec2 screenPos;
     if (RenderUtils::worldToScreen(targetPos + glm::vec3(0.f, 0.5f, 0.f), screenPos)) {
@@ -1012,13 +1175,23 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
       try { lockText = "Locked: " + locked->getRawName() + "  [" + getKeyName(mLockTargetKey) + "]"; }
       catch (...) { lockText = "Locked  [" + std::string(getKeyName(mLockTargetKey)) + "]"; }
 
+      if (mTargetInfo.mValue) {
+        float dist = 0.f;
+        try { dist = locked->distanceTo(player); } catch (...) { dist = 0.f; }
+        const int armor = getArmorPieces(locked);
+        lockText += fmt::format("  {:.1f}m  HP {:.0f}/20  Armor {}", dist, lockedHp, armor);
+      }
+
       ImVec2 textSize = ImGui::CalcTextSize(lockText.c_str());
       screenPos.x -= textSize.x * 0.5f;
       screenPos.y -= textSize.y + 5.f;
 
       drawList->AddRectFilled({screenPos.x - 4, screenPos.y - 2}, {screenPos.x + textSize.x + 4, screenPos.y + textSize.y + 2}, IM_COL32(0, 0, 0, 140), 3.f);
-      drawList->AddText(screenPos, IM_COL32(255, 215, 0, 255), lockText.c_str());
+      drawList->AddText(screenPos, hpFlashed ? IM_COL32(255, 130, 130, 255) : IM_COL32(255, 215, 0, 255), lockText.c_str());
     }
+  } else {
+    // Цели нет — забываем её HP, чтобы следующая цель не «мигала» с чужого урона.
+    mLastLockedHealth = -1.f;
   }
 
   // BIND PANEL
