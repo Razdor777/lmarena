@@ -32,6 +32,7 @@ namespace CombatantGuiImpl
     constexpr float kGap     = 12.f;
     constexpr float kTop     = 64.f;
     constexpr float kFontPx  = 14.f;
+    constexpr float kSlide   = 18.f;   // сдвиг списка при переходе list <-> settings
 
     // Цвета — combatant (ModulesMenuStyle / Themes default): ON/OFF и стекло.
     constexpr uint32_t kGlass    = 0xB30C0C0C;
@@ -111,6 +112,12 @@ namespace CombatantGuiImpl
     {
         dl->AddText(ImGui::GetFont(), px, ImVec2(std::floor(p.x), std::floor(p.y)), col, s.c_str());
     }
+
+    // Описание не должно раздувать строку на весь экран.
+    std::string clipText(const std::string& s, size_t maxLen)
+    {
+        return s.size() <= maxLen ? s : s.substr(0, maxLen - 3) + "...";
+    }
 }
 
 using namespace CombatantGuiImpl;
@@ -141,6 +148,11 @@ ImVec2 CombatantGui::itf(ImVec2 p) const
 ImVec4 CombatantGui::numberTrack(const ImVec4& rr) const
 {
     return { rr.x + S(8.f), rr.y + S(20.f), rr.z - S(8.f), rr.y + S(24.f) };
+}
+
+float CombatantGui::viewOffset(const PanelState& p, bool settingsView) const
+{
+    return settingsView ? (1.f - p.swap) * S(kSlide) : -p.swap * S(kSlide);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,26 +215,25 @@ void CombatantGui::bringToFront(size_t i)
     mDrawOrder.push_back(i);
 }
 
-// Строки панели: либо модули категории, либо (после правого клика) настройки модуля.
-std::vector<CombatantGui::Row> CombatantGui::buildRows(size_t cat, const PanelState& p) const
+std::vector<CombatantGui::Row> CombatantGui::buildModuleRows(size_t cat) const
 {
     std::vector<Row> rows;
-    if (p.selected)
+    for (auto& m : gFeatureManager->mModuleManager->getModulesInCategory(static_cast<int>(cat)))
+        rows.push_back({ RowKind::Module, m.get(), nullptr, S(kRowH) });
+    return rows;
+}
+
+std::vector<CombatantGui::Row> CombatantGui::buildSettingRows(Module* m) const
+{
+    std::vector<Row> rows;
+    rows.push_back({ RowKind::Back, m, nullptr, S(kRowH) });
+    rows.push_back({ RowKind::Bind, m, nullptr, S(kRowH) });
+    for (Setting* s : m->mSettings)
     {
-        rows.push_back({ RowKind::Back, p.selected, nullptr, S(kRowH) });
-        rows.push_back({ RowKind::Bind, p.selected, nullptr, S(kRowH) });
-        for (Setting* s : p.selected->mSettings)
-        {
-            if (!s) continue;
-            if (s->mIsVisible && !s->mIsVisible()) continue;
-            const float h = s->mType == SettingType::Number ? S(kNumberH) : S(kRowH);
-            rows.push_back({ RowKind::Setting, p.selected, s, h });
-        }
-    }
-    else
-    {
-        for (auto& m : gFeatureManager->mModuleManager->getModulesInCategory(static_cast<int>(cat)))
-            rows.push_back({ RowKind::Module, m.get(), nullptr, S(kRowH) });
+        if (!s) continue;
+        if (s->mIsVisible && !s->mIsVisible()) continue;
+        const float h = s->mType == SettingType::Number ? S(kNumberH) : S(kRowH);
+        rows.push_back({ RowKind::Setting, m, s, h });
     }
     return rows;
 }
@@ -240,7 +251,7 @@ void CombatantGui::handleRowClick(size_t i, const Row& row, const ImVec4& rr,
     case RowKind::Back:
         if (left || right)
         {
-            p.selected = nullptr;
+            p.selected = nullptr;   // shown остаётся, пока панель уезжает обратно
             p.scroll = 0.f;
             p.smoothScroll = 0.f;
         }
@@ -332,6 +343,7 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
     mScreen = ImRenderUtils::getScreenSize();
     mCenter = { mScreen.x * 0.5f, mScreen.y * 0.5f };
     mLayoutMouse = itf(mMouse);
+    mHoverInfo.clear();
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
 
     initPanels(n);
@@ -379,9 +391,12 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
     {
         if (mouseDown)
         {
-            const float w = std::max(1.f, mDragTrack.z - mDragTrack.x);
-            const float t = std::clamp((mLayoutMouse.x - mDragTrack.x) / w, 0.f, 1.f);
-            mDragNumber->setValue(mDragNumber->mMin + t * (mDragNumber->mMax - mDragNumber->mMin));
+            if (mDragNumber->mStep > 0.f)
+            {
+                const float w = std::max(1.f, mDragTrack.z - mDragTrack.x);
+                const float t = std::clamp((mLayoutMouse.x - mDragTrack.x) / w, 0.f, 1.f);
+                mDragNumber->setValue(mDragNumber->mMin + t * (mDragNumber->mMax - mDragNumber->mMin));
+            }
         }
         else
         {
@@ -404,8 +419,15 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         }
     }
 
-    // Строки, размеры и прокрутка.
-    std::vector<std::vector<Row>> rows(n);
+    // Строки обоих видов, геометрия и прокрутка.
+    auto totalOf = [this](const std::vector<Row>& rows)
+    {
+        float t = S(kPad) * 2.f;
+        for (const Row& r : rows) t += r.h;
+        return t;
+    };
+
+    std::vector<std::vector<Row>> modRows(n), setRows(n);
     std::vector<ImVec4> rects(n);
     for (size_t i = 0; i < n; i++)
     {
@@ -413,15 +435,22 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         p.x = std::clamp(p.x, 0.f, std::max(0.f, mScreen.x - S(kPanelW)));
         p.y = std::clamp(p.y, 0.f, std::max(0.f, mScreen.y - S(kHeaderH)));
 
-        rows[i] = buildRows(i, p);
-        float total = S(kPad) * 2.f;
-        for (const Row& r : rows[i]) total += r.h;
+        if (p.selected) p.shown = p.selected;
+        p.swap = approach(p.swap, p.selected ? 1.f : 0.f, mDt, 10.f);
+        if (!p.selected && p.swap < 0.01f) p.shown = nullptr;
 
-        const float listH = std::min(total, S(kMaxList));
+        modRows[i] = buildModuleRows(i);
+        setRows[i] = p.shown ? buildSettingRows(p.shown) : std::vector<Row>{};
+
+        const float modTotal = totalOf(modRows[i]);
+        const float setTotal = totalOf(setRows[i]);
+        const float total = settingsDominant(p) ? setTotal : modTotal;
+        const float listTotal = modTotal + (setTotal - modTotal) * p.swap;   // высота плавно меняется
+        const float listH = std::min(listTotal, S(kMaxList));
+
         p.maxScroll = std::max(0.f, total - listH);
         p.scroll = std::clamp(p.scroll, 0.f, p.maxScroll);
         p.smoothScroll = approach(p.smoothScroll, p.scroll, mDt, 16.f);
-        p.swap = approach(p.swap, p.selected ? 1.f : 0.f, mDt, 10.f);
 
         rects[i] = { p.x, p.y, p.x + S(kPanelW), p.y + S(kHeaderH) + listH };
     }
@@ -437,7 +466,7 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         }
     }
 
-    // Клики по панели.
+    // Клики и колесо по панели. Работают только с «главным» видом.
     if (mHoverPanel >= 0 && mAnim > 0.5f)
     {
         const size_t i = static_cast<size_t>(mHoverPanel);
@@ -446,6 +475,10 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         const float hBottom = r.y + S(kHeaderH);
         const ImVec4 header = { r.x, r.y, r.z, hBottom };
         const ImVec4 list = { r.x, hBottom, r.z, r.w };
+
+        const bool settingsView = settingsDominant(p);
+        const std::vector<Row>& rows = settingsView ? setRows[i] : modRows[i];
+        const float off = viewOffset(p, settingsView);
 
         if (clickL || clickR || clickM) bringToFront(i);
 
@@ -457,14 +490,32 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         }
 
         if (mWheel != 0.f && inside(r, mLayoutMouse))
-            p.scroll = std::clamp(p.scroll - mWheel * S(kRowH) * 2.f, 0.f, p.maxScroll);
+        {
+            bool adjusted = false;
+            float y = list.y + S(kPad) - p.smoothScroll;
+            for (const Row& row : rows)
+            {
+                const ImVec4 rr = { r.x + S(4.f) + off, y, r.z - S(4.f) + off, y + row.h };
+                if (row.kind == RowKind::Setting && row.set->mType == SettingType::Number && inside(rr, mLayoutMouse))
+                {
+                    auto* ns = static_cast<NumberSetting*>(row.set);
+                    if (ns->mStep > 0.f)
+                        ns->setValue(std::clamp(ns->mValue + mWheel * ns->mStep, ns->mMin, ns->mMax));
+                    adjusted = true;
+                    break;
+                }
+                y += row.h;
+            }
+            if (!adjusted)
+                p.scroll = std::clamp(p.scroll - mWheel * S(kRowH) * 2.f, 0.f, p.maxScroll);
+        }
 
         if ((clickL || clickR || clickM) && inside(list, mLayoutMouse))
         {
             float y = list.y + S(kPad) - p.smoothScroll;
-            for (const Row& row : rows[i])
+            for (const Row& row : rows)
             {
-                const ImVec4 rr = { r.x + S(4.f), y, r.z - S(4.f), y + row.h };
+                const ImVec4 rr = { r.x + S(4.f) + off, y, r.z - S(4.f) + off, y + row.h };
                 if (inside(rr, mLayoutMouse))
                 {
                     handleRowClick(i, row, rr, clickL, clickR, clickM);
@@ -478,19 +529,27 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
     // Отрисовка.
     dl->AddRectFilled({ 0.f, 0.f }, mScreen, IM_COL32(0, 0, 0, static_cast<int>(90.f * mAnim)));
     for (size_t i : mDrawOrder)
-        drawPanel(dl, i, rects[i], rows[i]);
+        drawPanel(dl, i, rects[i], modRows[i], setRows[i]);
 
+    // Подсказки: описание наведённого элемента и строка управления.
     const float hfs = S(kFontPx) * mInScale;
-    const std::string hint = mBindModule
+    if (!mHoverInfo.empty())
+    {
+        const std::string info = clipText(mHoverInfo, 110);
+        drawText(dl, { (mScreen.x - textWidth(info, hfs)) * 0.5f, mScreen.y - S(58.f) },
+                 info, argb(kMuted, mAnim), hfs);
+    }
+    const std::string controls = mBindModule
         ? "Press a key to bind " + mBindModule->getName() + "   (ESC = clear)"
-        : std::string("Left: toggle  |  Right: settings  |  Middle: bind  |  Drag header: move");
-    const float hw = textWidth(hint, hfs);
-    drawText(dl, { (mScreen.x - hw) * 0.5f, mScreen.y - S(36.f) }, hint, argb(kFaint, mAnim), hfs);
+        : std::string("Left: toggle  |  Right: settings  |  Middle: bind  |  Wheel on slider: fine-tune  |  Drag header: move");
+    drawText(dl, { (mScreen.x - textWidth(controls, hfs)) * 0.5f, mScreen.y - S(36.f) },
+             controls, argb(kFaint, mAnim), hfs);
 
     ImGui::PopFont();
 }
 
-void CombatantGui::drawPanel(ImDrawList* dl, size_t i, const ImVec4& r, const std::vector<Row>& rows)
+void CombatantGui::drawPanel(ImDrawList* dl, size_t i, const ImVec4& r,
+                             const std::vector<Row>& modRows, const std::vector<Row>& setRows)
 {
     const PanelState& p = mPanels[i];
     const float a = mAnim;
@@ -498,6 +557,7 @@ void CombatantGui::drawPanel(ImDrawList* dl, size_t i, const ImVec4& r, const st
     const float rnd = S(kRound) * mInScale;
     const float hH = S(kHeaderH) * mInScale;
     const float fs = S(kFontPx) * mInScale;
+    const bool settingsView = settingsDominant(p);
 
     dl->AddRectFilled({ R.x, R.y }, { R.z, R.w }, argb(kGlass, a), rnd);
     dl->AddRect({ R.x, R.y }, { R.z, R.w }, argb(kStroke, a), rnd, 0, 1.f);
@@ -506,46 +566,77 @@ void CombatantGui::drawPanel(ImDrawList* dl, size_t i, const ImVec4& r, const st
                 accent(0.55f * a), 1.f);
 
     // Заголовок: категория, либо имя модуля в режиме настроек.
-    const std::string title = p.selected ? p.selected->getName() : ModuleCategoryNames[i];
+    const std::string title = settingsView ? p.shown->getName() : ModuleCategoryNames[i];
     drawText(dl, { R.x + S(9.f) * mInScale, R.y + (hH - fs) * 0.5f }, title, argb(kText, a), fs);
 
-    if (!p.selected)
+    // Счётчик: сколько модулей включено из общего числа.
+    if (!settingsView)
     {
-        const std::string count = std::to_string(rows.size());
+        int on = 0;
+        for (const Row& row : modRows)
+            if (row.mod->mEnabled) on++;
+        const std::string count = std::to_string(on) + "/" + std::to_string(modRows.size());
         const float cw = textWidth(count, fs);
-        drawText(dl, { R.z - S(9.f) * mInScale - cw, R.y + (hH - fs) * 0.5f }, count, argb(kMuted, a), fs);
+        drawText(dl, { R.z - S(9.f) * mInScale - cw, R.y + (hH - fs) * 0.5f }, count, accent(a), fs);
     }
 
-    // Список (с обрезкой по панели и прокруткой).
+    // Список: модули уходят влево, настройки приходят справа (и наоборот).
     const ImVec4 listL = { r.x, r.y + S(kHeaderH), r.z, r.w };
     const ImVec4 listR = T(listL);
     const bool canHover = mHoverPanel == static_cast<int>(i) && a > 0.5f && !p.dragging;
     dl->PushClipRect({ listR.x, listR.y }, { listR.z, listR.w }, true);
 
-    float y = listL.y + S(kPad) - p.smoothScroll;
-    for (const Row& row : rows)
+    if (p.swap < 0.999f)
     {
-        const ImVec4 rr = { r.x + S(4.f), y, r.z - S(4.f), y + row.h };
-        const bool selected = row.kind == RowKind::Module && p.selected == row.mod;
-        drawRow(dl, row, rr, selected, canHover);
-        y += row.h;
+        const float off = viewOffset(p, false);
+        float y = listL.y + S(kPad) - p.smoothScroll;
+        for (const Row& row : modRows)
+        {
+            const ImVec4 rr = { r.x + S(4.f) + off, y, r.z - S(4.f) + off, y + row.h };
+            drawRow(dl, row, rr, p.selected == row.mod, canHover && !settingsView, 1.f - p.swap);
+            y += row.h;
+        }
+    }
+
+    if (p.shown && p.swap > 0.001f)
+    {
+        const float off = viewOffset(p, true);
+        float y = listL.y + S(kPad) - p.smoothScroll;
+        for (const Row& row : setRows)
+        {
+            const ImVec4 rr = { r.x + S(4.f) + off, y, r.z - S(4.f) + off, y + row.h };
+            drawRow(dl, row, rr, false, canHover && settingsView, p.swap);
+            y += row.h;
+        }
     }
 
     dl->PopClipRect();
 }
 
-void CombatantGui::drawRow(ImDrawList* dl, const Row& row, const ImVec4& rr, bool selected, bool canHover)
+void CombatantGui::drawRow(ImDrawList* dl, const Row& row, const ImVec4& rr,
+                           bool selected, bool canHover, float alpha)
 {
-    const float a = mAnim;
+    const float a = mAnim * alpha;
     const float fs = S(kFontPx) * mInScale;
     const float rnd = S(6.f) * mInScale;
 
-    // Плавная подсветка при наведении.
+    // Плавная подсветка при наведении и описание строки.
     const bool hovered = canHover && inside(rr, mLayoutMouse);
     const void* owner = row.set ? static_cast<const void*>(row.set) : static_cast<const void*>(row.mod);
     const uintptr_t key = (reinterpret_cast<uintptr_t>(owner) << 2) | static_cast<uintptr_t>(row.kind);
     float& hover = mHover[key];
     hover = approach(hover, hovered ? 1.f : 0.f, mDt, 16.f);
+
+    if (hovered)
+    {
+        switch (row.kind)
+        {
+        case RowKind::Back:    mHoverInfo = "Back to the module list"; break;
+        case RowKind::Bind:    mHoverInfo = "Bind a key to this module (Esc clears)"; break;
+        case RowKind::Module:  mHoverInfo = row.mod->mDescription; break;
+        case RowKind::Setting: mHoverInfo = row.set->mDescription; break;
+        }
+    }
 
     const ImVec4 R = T(rr);
     if (hover > 0.01f)
@@ -636,7 +727,7 @@ void CombatantGui::drawRow(ImDrawList* dl, const Row& row, const ImVec4& rr, boo
         case SettingType::Color:
         {
             auto* c = static_cast<ColorSetting*>(s);
-            ImVec4 cv = { c->mValue[0], c->mValue[1], c->mValue[2], c->mValue[3] * a };
+            const ImVec4 cv = { c->mValue[0], c->mValue[1], c->mValue[2], c->mValue[3] * a };
             const float sw = S(10.f) * mInScale;
             dl->AddRectFilled({ rx - sw, cy - sw * 0.5f }, { rx, cy + sw * 0.5f },
                               ImGui::ColorConvertFloat4ToU32(cv), S(2.f) * mInScale);
