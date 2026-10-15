@@ -29,6 +29,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -471,8 +472,17 @@ const char *OreMinerV2::oreTypeName(int blockId) {
   }
 }
 
-// Открывает новый файл дампа. Имя содержит дату и время, поэтому старые дампы
-// никогда не затираются, а каждый запуск Debug — отдельный чистый файл.
+// "minecraft:diamond" -> "diamond" (чтобы дамп читался глазами)
+std::string OreMinerV2::shortItemName(std::string name) {
+  std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+  const size_t colon = name.find(':');
+  if (colon != std::string::npos)
+    name = name.substr(colon + 1);
+  return name;
+}
+
+// Открывает новые файлы дампа. Имя содержит дату и время, поэтому старые дампы
+// никогда не затираются, а каждый запуск Debug — отдельный чистый набор файлов.
 void OreMinerV2::debugStart() {
   const std::string dir = FileUtils::getJuzdexDir() + "Dumps\\";
   FileUtils::createDirectory(dir);
@@ -484,66 +494,164 @@ void OreMinerV2::debugStart() {
   std::strftime(stamp, sizeof(stamp), "%Y-%m-%d_%H-%M-%S", &tmBuf);
 
   const std::string base = dir + "OreMinerV2_" + std::string(stamp);
-  mDebugCsvPath = base + ".csv";
-  mDebugCoordsPath = base + "_coords.txt";
+  mDebugVerifiedPath = base + "_verified.csv";
+  mDebugRealCoordsPath = base + "_real_coords.txt";
+  mDebugFakeCoordsPath = base + "_fake_coords.txt";
+  mDebugScanPath = base + "_scan.csv";
+  mDebugScanCoordsPath = base + "_scan_coords.txt";
 
-  mDebugCsv.open(mDebugCsvPath, std::ios::out | std::ios::trunc);
-  mDebugCoords.open(mDebugCoordsPath, std::ios::out | std::ios::trunc);
-
-  if (mDebugCsv.is_open()) {
-    mDebugCsv << "world_x,world_y,world_z,ore,block_id,deepslate,distance,"
-                 "on_screen,screen_x,screen_y,ms\n";
-    mDebugCsv.flush();
+  // 1) Главный файл: вердикт по каждой сломанной координате (real/fake/unknown).
+  mDebugVerifiedCsv.open(mDebugVerifiedPath, std::ios::out | std::ios::trunc);
+  if (mDebugVerifiedCsv.is_open()) {
+    mDebugVerifiedCsv
+        << "world_x,world_y,world_z,ore,block_id,deepslate,result,"
+           "expected_drop,observed,cluster_id,cluster_index,cluster_size,"
+           "distance,ms\n";
+    mDebugVerifiedCsv.flush();
   } else {
-    spdlog::error("[OreMinerV2][Debug] cannot open {}", mDebugCsvPath);
+    spdlog::error("[OreMinerV2][Debug] cannot open {}", mDebugVerifiedPath);
   }
 
+  // 2) Чистые списки координат: подтверждённая руда и подтверждённые фейки.
+  mDebugRealCoords.open(mDebugRealCoordsPath, std::ios::out | std::ios::trunc);
+  mDebugFakeCoords.open(mDebugFakeCoordsPath, std::ios::out | std::ios::trunc);
+
+  // 3) Сырой скан — откроется лениво, только если Verified Only выключен.
+  if (mDebugScanCsv.is_open())
+    mDebugScanCsv.close();
+  if (mDebugScanCoords.is_open())
+    mDebugScanCoords.close();
+
   mDebugWritten.clear();
+  mDebugVerifiedWritten.clear();
   mDebugRows = 0;
+  mDebugVerifiedRows = 0;
   mDebugStartedAt = NOW;
-  spdlog::info("[OreMinerV2][Debug] dump started -> {}", mDebugCsvPath);
+
+  spdlog::info("[OreMinerV2][Debug] dump started -> {} (verified) | {} (real "
+               "coords) | {} (fake coords)",
+               mDebugVerifiedPath, mDebugRealCoordsPath, mDebugFakeCoordsPath);
+}
+
+void OreMinerV2::debugEnsureScanFiles() {
+  if (mDebugScanCsv.is_open() || mDebugScanPath.empty())
+    return;
+
+  mDebugScanCsv.open(mDebugScanPath, std::ios::out | std::ios::trunc);
+  mDebugScanCoords.open(mDebugScanCoordsPath, std::ios::out | std::ios::trunc);
+
+  if (mDebugScanCsv.is_open()) {
+    mDebugScanCsv << "world_x,world_y,world_z,ore,block_id,deepslate,distance,"
+                     "on_screen,screen_x,screen_y,verified,ms\n";
+    mDebugScanCsv.flush();
+    spdlog::info("[OreMinerV2][Debug] raw scan dump -> {}", mDebugScanPath);
+  }
 }
 
 void OreMinerV2::debugFlush(const std::vector<DebugRow> &rows) {
   if (rows.empty())
     return;
-  if (!mDebugCsv.is_open())
+
+  // Verified Only: отчёт по каждой координате и так уже построчно лёг в
+  // *_verified.csv — сырой скан писать не нужно и файлы не создаются.
+  if (mDebugVerifiedOnly.mValue)
+    return;
+
+  debugEnsureScanFiles();
+  if (!mDebugScanCsv.is_open())
     return;
 
   const uint64_t now = NOW;
 
   for (const auto &r : rows) {
-    mDebugCsv << r.pos.x << ',' << r.pos.y << ',' << r.pos.z << ','
-              << oreTypeName(r.blockId) << ',' << r.blockId << ','
-              << (r.deepslate ? 1 : 0) << ',' << std::fixed
-              << std::setprecision(2) << r.distance << ','
-              << (r.onScreen ? 1 : 0) << ',' << std::setprecision(1)
-              << r.screenX << ',' << r.screenY << ',' << now << '\n';
+    mDebugScanCsv << r.pos.x << ',' << r.pos.y << ',' << r.pos.z << ','
+                  << oreTypeName(r.blockId) << ',' << r.blockId << ','
+                  << (r.deepslate ? 1 : 0) << ',' << std::fixed
+                  << std::setprecision(2) << r.distance << ','
+                  << (r.onScreen ? 1 : 0) << ',' << std::setprecision(1)
+                  << r.screenX << ',' << r.screenY << ','
+                  << (r.verified ? 1 : 0) << ',' << now << '\n';
 
-    if (mDebugCoords.is_open())
-      mDebugCoords << r.pos.x << ' ' << r.pos.y << ' ' << r.pos.z << '\n';
+    if (mDebugScanCoords.is_open())
+      mDebugScanCoords << r.pos.x << ' ' << r.pos.y << ' ' << r.pos.z << '\n';
   }
 
-  mDebugCsv.flush();
-  if (mDebugCoords.is_open())
-    mDebugCoords.flush();
+  mDebugScanCsv.flush();
+  if (mDebugScanCoords.is_open())
+    mDebugScanCoords.flush();
 
   mDebugRows += static_cast<int>(rows.size());
 }
 
-void OreMinerV2::debugStop() {
-  if (mDebugCsv.is_open()) {
-    mDebugCsv.flush();
-    mDebugCsv.close();
-    mDebugCoords.flush();
-    spdlog::info("[OreMinerV2][Debug] {} blocks dumped to {}", mDebugRows,
-                 mDebugCsvPath);
+// Одна строка на проверенную координату: real / fake / unknown + что реально
+// прилетело в инвентарь. Пишется ровно один раз за сессию дампа.
+void OreMinerV2::debugLogVerified(const BlockPos &pos, int oreId,
+                                  const DropCheckResult &res, int clusterIdx,
+                                  int clusterSize, float distance) {
+  if (!mDebugVerifiedWritten.insert(pos).second)
+    return;
+
+  const char *verdict = res.verdict();
+
+  if (mDebugVerifiedCsv.is_open()) {
+    mDebugVerifiedCsv << pos.x << ',' << pos.y << ',' << pos.z << ','
+                      << oreTypeName(oreId) << ',' << oreId << ','
+                      << (isDeepslateOre(oreId) ? 1 : 0) << ',' << verdict
+                      << ',' << (res.expectedDrop.empty() ? "-"
+                                                          : res.expectedDrop)
+                      << ',' << res.observed << ',' << mClusterId << ','
+                      << clusterIdx << ',' << clusterSize << ',' << std::fixed
+                      << std::setprecision(2) << distance << ',' << NOW << '\n';
+    mDebugVerifiedCsv.flush();
   }
-  if (mDebugCoords.is_open())
-    mDebugCoords.close();
+
+  if (res.real && mDebugRealCoords.is_open())
+    mDebugRealCoords << pos.x << ' ' << pos.y << ' ' << pos.z << '\n';
+  else if (res.fake && mDebugFakeCoords.is_open())
+    mDebugFakeCoords << pos.x << ' ' << pos.y << ' ' << pos.z << '\n';
+
+  if (mDebugRealCoords.is_open())
+    mDebugRealCoords.flush();
+  if (mDebugFakeCoords.is_open())
+    mDebugFakeCoords.flush();
+
+  mDebugVerifiedRows++;
+}
+
+void OreMinerV2::debugStop() {
+  if (!mDebugVerifiedPath.empty() && mDebugStartedAt != 0) {
+    spdlog::info("[OreMinerV2][Debug] {} verified rows -> {} | real: {}, "
+                 "fake: {}, unknown: {}",
+                 mDebugVerifiedRows, mDebugVerifiedPath,
+                 mRealPositions.size(), mFakePositions.size(),
+                 mUnknownPositions.size());
+  }
+
+  if (mDebugVerifiedCsv.is_open()) {
+    mDebugVerifiedCsv.flush();
+    mDebugVerifiedCsv.close();
+  }
+  if (mDebugRealCoords.is_open()) {
+    mDebugRealCoords.flush();
+    mDebugRealCoords.close();
+  }
+  if (mDebugFakeCoords.is_open()) {
+    mDebugFakeCoords.flush();
+    mDebugFakeCoords.close();
+  }
+  if (mDebugScanCsv.is_open()) {
+    mDebugScanCsv.flush();
+    mDebugScanCsv.close();
+  }
+  if (mDebugScanCoords.is_open()) {
+    mDebugScanCoords.flush();
+    mDebugScanCoords.close();
+  }
 
   mDebugWritten.clear();
+  mDebugVerifiedWritten.clear();
   mDebugRows = 0;
+  mDebugVerifiedRows = 0;
   mDebugStartedAt = 0;
 }
 
@@ -564,12 +672,23 @@ void OreMinerV2::onEnable() {
   mCurrentCluster.clear();
   mCurrentClusterIdx = 0;
   mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
-  mNeedFirstVerify = false;
+  mPendingVerify = false;
+  mLastMinedPos = {INT_MAX, INT_MAX, INT_MAX};
+  mLastMinedOreId = 0;
+  mLastMinedClusterIdx = 0;
+  mLastMinedDistance = 0.f;
   mTickDelay = 0;
   mBlocksMined = 0;
   mFakeClusters = 0;
+  mRealBlocks = 0;
+  mFakeBlocks = 0;
+  mUnknownBlocks = 0;
+  mClusterId = 0;
   mMinedPositions.clear();
   mPreSnapshot.clear();
+  mRealPositions.clear();
+  mFakePositions.clear();
+  mUnknownPositions.clear();
   mQuickTPKeyWasDown = false;
   mIsBindingKey = false;
   mBindWaitRelease = false;
@@ -604,14 +723,19 @@ void OreMinerV2::onDisable() {
   mCurrentCluster.clear();
   mMinedPositions.clear();
   mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+  mPendingVerify = false;
+  mLastMinedPos = {INT_MAX, INT_MAX, INT_MAX};
   mPacketPositions.clear();
   mFoundBlocks.clear();
   mFilteredBlocks.clear();
   mBlacklistedPositions.clear();
+  mRealPositions.clear();
+  mFakePositions.clear();
+  mUnknownPositions.clear();
   mIsBindingKey = false;
 
-  // Файл дампа держим закрытым, как только модуль выключили: всё, что успело
-  // накопиться, уже сброшено на диск в debugFlush().
+  // Файлы дампа держим закрытыми, как только модуль выключили: всё, что успело
+  // накопиться, уже сброшено на диск в debugFlush()/debugLogVerified().
   if (mDebugWasOn)
     debugStop();
   mDebugWasOn = false;
@@ -736,80 +860,181 @@ std::unordered_map<std::string, int> OreMinerV2::getInventorySnapshot() {
 }
 
 // =============================================================
-// FAKE DROP CHECK — case-insensitive + expected drop check
+// DROP CHECK — real / fake / unknown по приросту инвентаря
 // =============================================================
 
-bool OreMinerV2::checkForFakeDrop(
+OreMinerV2::DropCheckResult OreMinerV2::checkDrop(
     const std::unordered_map<std::string, int> &before,
-    const std::unordered_map<std::string, int> &after,
-    int expectedOreId)
-{
-    // 1. Прирост мусора (булыжник, камень, земля, гравий, etc.)
-    static const std::vector<std::string> fakes = {
-        "cobblestone", "cobbled_deepslate", "stone", "dirt", "grass",
-        "gravel", "andesite", "granite", "diorite", "tuff",
-        "netherrack", "end_stone", "deepslate"
-    };
+    const std::unordered_map<std::string, int> &after, int expectedOreId) {
+  DropCheckResult res;
+  res.expectedDrop = expectedDropName(expectedOreId);
 
-    // Prefer a confirmed ore drop over incidental garbage pickup. This avoids
-    // blacklisting a real cluster when inventory changes happen in one window.
-    std::string expectedDrop;
-    OreType type = getOreType(expectedOreId);
-    if (type == OreType::Diamond) expectedDrop = "diamond";
-    else if (type == OreType::Coal) expectedDrop = "coal";
-    else if (type == OreType::Emerald) expectedDrop = "emerald";
+  // 1. Считаем чистый прирост по каждому предмету (имя без namespace).
+  std::vector<std::pair<std::string, int>> gained;
+  for (const auto &[name, cnt] : after) {
+    int prev = 0;
+    auto it = before.find(name);
+    if (it != before.end())
+      prev = it->second;
+    if (cnt > prev)
+      gained.emplace_back(shortItemName(name), cnt - prev);
+  }
 
-    if (!expectedDrop.empty()) {
-        for (const auto &[name, cnt] : after) {
-            std::string ln = name;
-            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
-            if (ln.find(expectedDrop) == std::string::npos) continue;
-            auto it = before.find(name);
-            const int prev = it == before.end() ? 0 : it->second;
-            if (cnt > prev) return false;
-        }
+  std::sort(gained.begin(), gained.end());
+  if (!gained.empty()) {
+    std::string obs;
+    for (size_t i = 0; i < gained.size(); i++) {
+      if (i)
+        obs += ' ';
+      obs += gained[i].first + " x" + std::to_string(gained[i].second);
+    }
+    res.observed = obs;
+  }
+
+  // 2. Пришла ли ОЖИДАЕМАЯ руда (diamond / coal / emerald)?
+  //    Сравнение по подстроке — так ловится и шелк-тач дроп (diamond_ore).
+  if (!res.expectedDrop.empty()) {
+    for (const auto &[name, delta] : gained) {
+      if (name.find(res.expectedDrop) != std::string::npos) {
+        res.real = true;
+        break;
+      }
+    }
+  }
+
+  // 3. Дроп есть, но руды среди него нет => блок был фейком.
+  if (!res.real && !gained.empty())
+    res.fake = true;
+
+  // 4. Инвентарь вообще не изменился: дроп не успел прийти (лаг) или его не
+  //    было. Это НЕ повод хоронить весь кластер — помечаем как unknown.
+  if (!res.real && !res.fake)
+    res.unknown = true;
+
+  return res;
+}
+
+// Проверяет последний сломанный блок и обновляет статистику/дамп.
+// false => текущий кластер забракован (первый блок оказался фейком).
+bool OreMinerV2::resolvePendingDrop() {
+  mPendingVerify = false;
+
+  if (mLastMinedPos.x == INT_MAX)
+    return true;
+
+  const BlockPos pos = mLastMinedPos;
+  const int oreId = mLastMinedOreId;
+  const int idx = mLastMinedClusterIdx;
+
+  auto post = getInventorySnapshot();
+  DropCheckResult res = checkDrop(mPreSnapshot, post, oreId);
+
+  const char *oreName = oreTypeName(oreId);
+  const char *verdict = res.verdict();
+
+  if (res.real) {
+    mRealBlocks++;
+    mRealPositions.insert(pos);
+  } else if (res.fake) {
+    mFakeBlocks++;
+    mFakePositions.insert(pos);
+  } else {
+    mUnknownBlocks++;
+    mUnknownPositions.insert(pos);
+  }
+
+  // Одна строка лога на каждый проверенный блок — по ней видно, что реально
+  // прилетело в инвентарь (или почему вердикт unknown).
+  spdlog::info("[OreMinerV2] ({}, {}, {}) {} -> {} (observed: {})", pos.x,
+               pos.y, pos.z, oreName, verdict, res.observed);
+
+  if (!res.real && !res.fake)
+    spdlog::warn("[OreMinerV2] ({}, {}, {}) {} -> no inventory change within {} "
+                 "ticks (raise Verify Ticks if the server is slow)",
+                 pos.x, pos.y, pos.z, oreName,
+                 static_cast<int>(mVerifyTicks.mValue));
+
+  if (mDebug.mValue)
+    debugLogVerified(pos, oreId, res, idx,
+                     static_cast<int>(mCurrentCluster.size()),
+                     mLastMinedDistance);
+
+  // Первый блок кластера — «пробный»: по нему и решаем судьбу всего кластера.
+  if (idx == 0 && !mCurrentCluster.empty()) {
+    if (res.fake) {
+      mFakeClusters++;
+      spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
+                   mCurrentCluster.size());
+
+      // Отмечаем весь кластер как фейковый (для дампа/статистики).
+      for (const auto &p : mCurrentCluster) {
+        if (p == pos)
+          continue;
+        mFakePositions.insert(p);
+      }
+
+      blacklistPositions(mCurrentCluster);
+      for (const auto &p : mCurrentCluster)
+        mMinedPositions.insert(p);
+
+      mCurrentCluster.clear();
+      mCurrentClusterIdx = 0;
+      mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+      mState = MineState::Idle;
+      mTickDelay = 2;
+      return false;
     }
 
-    for (const auto &fake : fakes) {
-        for (const auto &[name, cnt] : after) {
-            std::string ln = name;
-            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
-            if (ln.find(fake) == std::string::npos) continue;
-            auto it = before.find(name);
-            const int prev = it == before.end() ? 0 : it->second;
-            if (cnt > prev) {
-                spdlog::warn("[OreMinerV2] FAKE! Got garbage '{}' ({} -> {})", name, prev, cnt);
-                return true;
-            }
-        }
+    if (res.unknown) {
+      // Кластер не трогаем (дроп мог просто задержаться), но повторно эту
+      // координату долбить не будем.
+      blacklistPositions({pos});
     }
+  } else if (res.fake) {
+    // Одиночный фейк внутри настоящего кластера — просто больше не майним.
+    blacklistPositions({pos});
+  }
 
-    // 2. Ghost-block check: если сервер просто стёр блок и не дал дропа,
-    //    ожидаемой руды в инвентаре не прибавится.
-    if (!expectedDrop.empty()) {
-        bool gotIt = false;
-        for (auto &[name, cnt] : after) {
-            std::string ln = name;
-            std::transform(ln.begin(), ln.end(), ln.begin(), ::tolower);
-            if (ln.find(expectedDrop) == std::string::npos) continue;
+  mLastMinedPos = {INT_MAX, INT_MAX, INT_MAX};
+  return true;
+}
 
-            int prev = 0;
-            auto it = before.find(name);
-            if (it != before.end()) prev = it->second;
+// Снимок инвентаря → слом блока → проверка дропа ставится на паузу.
+void OreMinerV2::mineBlockWithVerify(const BlockPos &pos, Actor *player) {
+  mPreSnapshot = getInventorySnapshot();
+  mLastMinedPos = pos;
+  mLastMinedClusterIdx = mCurrentClusterIdx;
 
-            if (cnt > prev) {
-                gotIt = true;
-                break;
-            }
-        }
+  // Тип руды берём по конкретной координате, а не только по кластеру.
+  mLastMinedOreId = mCurrentClusterOreId;
+  const FoundBlock *fb = nullptr;
+  auto fit = mFilteredBlocks.find(pos);
+  if (fit != mFilteredBlocks.end()) {
+    fb = &fit->second;
+  } else {
+    auto fit2 = mFoundBlocks.find(pos);
+    if (fit2 != mFoundBlocks.end())
+      fb = &fit2->second;
+  }
+  if (fb && fb->block && fb->block->mLegacy)
+    mLastMinedOreId = fb->block->mLegacy->getBlockId();
 
-        if (!gotIt) {
-            spdlog::warn("[OreMinerV2] FAKE! No '{}' drop received for ore id {}", expectedDrop, expectedOreId);
-            return true;
-        }
-    }
+  mPendingVerify = true;
 
-    return false;
+  if (player) {
+    mLastMinedDistance =
+        glm::distance(*player->getPos(), glm::vec3(pos) + glm::vec3(0.5f));
+  } else {
+    mLastMinedDistance = 0.f;
+  }
+
+  mineBlockAtPos(pos, player);
+
+  // Минимум 1 тик + время на дроп, заданное в Verify Ticks.
+  int wait = static_cast<int>(mSpeed.mValue);
+  if (static_cast<int>(mVerifyTicks.mValue) > wait)
+    wait = static_cast<int>(mVerifyTicks.mValue);
+  mTickDelay = std::max(1, wait);
 }
 
 // =============================================================
@@ -1021,9 +1246,17 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
   }
 
   // =================== MINING ===================
+  // Пауза между блоками. Когда она кончилась — сначала закрываем проверку
+  // дропа предыдущего блока, потом майним следующий.
   if (mTickDelay > 0) {
     mTickDelay--;
-    return;
+    if (mTickDelay > 0)
+      return;
+  }
+
+  if (mPendingVerify) {
+    if (!resolvePendingDrop())
+      return; // кластер оказался фейком — уже сброшен в Idle
   }
 
   glm::vec3 playerPos = *player->getPos();
@@ -1036,7 +1269,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
 
     mCurrentCluster = cluster;
     mCurrentClusterIdx = 0;
-    mNeedFirstVerify = true;
+    mClusterId++;
 
     // Запоминаем тип руды кластера по первому блоку
     auto it = mFilteredBlocks.find(mCurrentCluster[0]);
@@ -1051,39 +1284,17 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       return;
     }
 
-    mPreSnapshot = getInventorySnapshot();
-    mineBlockAtPos(fp, player);
+    // Снимок -> слом -> проверка дропа (через mTickDelay тиков).
+    mineBlockWithVerify(fp, player);
     mMinedPositions.insert(fp);
     mCurrentClusterIdx = 1;
 
     mState = MineState::Mining;
-    mTickDelay = 1; // 1 тик на то чтобы сервер положил дроп в инвентарь
     break;
   }
 
   // ----- MINING -----
   case MineState::Mining: {
-    // Verify first block immediately after 1 tick delay
-    if (mNeedFirstVerify) {
-      mNeedFirstVerify = false;
-      auto post = getInventorySnapshot();
-      if (checkForFakeDrop(mPreSnapshot, post, mCurrentClusterOreId)) {
-        mFakeClusters++;
-        spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
-                     mCurrentCluster.size());
-
-        blacklistPositions(mCurrentCluster);
-        for (auto &p : mCurrentCluster) mMinedPositions.insert(p);
-
-        mCurrentCluster.clear();
-        mCurrentClusterIdx = 0;
-        mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
-        mState = MineState::Idle;
-        mTickDelay = 2;
-        return;
-      }
-      // Real cluster — continue mining remaining blocks
-    }
 
     // Mine next block in cluster (strict order, no skipping)
     if (mCurrentClusterIdx >= static_cast<int>(mCurrentCluster.size())) {
@@ -1098,12 +1309,16 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     }
 
     const BlockPos &p = mCurrentCluster[mCurrentClusterIdx];
-    if (!mMinedPositions.contains(p)) {
-      mineBlockAtPos(p, player);
+    if (mMinedPositions.contains(p)) {
+      mCurrentClusterIdx++;
+      mTickDelay = std::max(1, static_cast<int>(mSpeed.mValue));
+      break;
     }
+
+    // Снимок -> слом -> проверка дропа (через mTickDelay тиков).
+    mineBlockWithVerify(p, player);
     mMinedPositions.insert(p); // помечаем в любом случае, чтобы не застрять
     mCurrentClusterIdx++;
-    mTickDelay = static_cast<int>(mSpeed.mValue);
 
     // VeinMiner: after mining, BFS from this pos to find more same-type ore
     if (mVeinMiner.mValue) {
@@ -1200,12 +1415,18 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
   }
 
   // ---------- BLOCK ESP + DEBUG DUMP ----------
-  // Debug идёт тем же проходом, что и рендер: дампятся ровно те блоки, которые
-  // модуль считает найденными (радиус + тип руды), включая те, что сейчас за
-  // спиной/за кадром — поэтому это «абсолютно вся информация», а не только
-  // то, что попало на экран. Каждая координата пишется один раз.
+  // ESP идёт тем же проходом, что и рендер: рисуются ровно те блоки, которые
+  // модуль считает найденными (радиус + тип руды).
+  //
+  // Дамп (Debug) — это уже НЕ сырой скан, а вердикты по факту: что реально
+  // прилетело в инвентарь за сломанный блок. Пишет их debugLogVerified() в
+  // момент проверки дропа, так что за спиной/за кадром тут ничего не теряется.
+  // Сырой скан (*_scan.csv) пишется только при выключенном Verified Only.
   const bool wantEsp = mDrawBlocks.mValue;
   const bool wantDump = mDebug.mValue;
+  // Сырой скан пишем только когда Verified Only выключен — иначе в файлах
+  // остаётся ровно то, что подтверждено дропом (*_verified.csv + coords).
+  const bool wantScanDump = wantDump && !mDebugVerifiedOnly.mValue;
 
   if (wantDump && !mDebugWasOn)
     debugStart();
@@ -1213,7 +1434,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     debugStop();
   mDebugWasOn = wantDump;
 
-  if (wantEsp || wantDump) {
+  if (wantEsp || wantScanDump) {
     glm::ivec3 pp = *player->getPos();
     float radSq = mRadius.mValue * mRadius.mValue;
     auto enVec = getEnabledBlockIds();
@@ -1236,7 +1457,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
 
       ImVec2 cs;
       bool onScreen = false;
-      if (wantDump)
+      if (wantScanDump)
         onScreen =
             RenderUtils::worldToScreen(glm::vec3(pos) + glm::vec3(0.5f), cs);
 
@@ -1253,22 +1474,27 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
         }
       }
 
-      if (wantDump && mDebugWritten.insert(pos).second) {
+      if (wantScanDump && !mDebugWritten.contains(pos)) {
+        const bool verified = mRealPositions.contains(pos);
+
+        // В сыром скане показываем, что из этих блоков уже подтверждено
+        // дропом, а что пока нет (дроп ещё не пришёл).
+        mDebugWritten.insert(pos);
+
         DebugRow row;
         row.pos = pos;
         row.blockId = blockId;
-        row.deepslate = (blockId == DEEPSLATE_COAL_ORE_ID ||
-                         blockId == DEEPSLATE_DIAMOND_ORE_ID ||
-                         blockId == DEEPSLATE_EMERALD_ORE_ID);
+        row.deepslate = isDeepslateOre(blockId);
         row.distance = glm::length(d);
         row.onScreen = onScreen;
         row.screenX = onScreen ? cs.x : 0.f;
         row.screenY = onScreen ? cs.y : 0.f;
+        row.verified = verified;
         dumpRows.push_back(row);
       }
     }
 
-    if (wantDump)
+    if (wantScanDump)
       debugFlush(dumpRows);
   }
 
@@ -1316,7 +1542,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
   // ---------- REMAINING CLUSTER ----------
   if (mDrawCluster.mValue && !mCurrentCluster.empty() &&
       mState != MineState::Idle) {
-    ImColor cc = mNeedFirstVerify
+    ImColor cc = mPendingVerify
                      ? ImColor(255, 255, 0, static_cast<int>(60 * alpha))
                      : ImColor(0, 200, 255, static_cast<int>(60 * alpha));
 
@@ -1339,13 +1565,16 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
 
     switch (mState) {
     case MineState::Idle:
+      // Пустой скан — не повод выходить из рендера целиком (иначе пропадает
+      // кнопка QuickTP внизу), просто показываем один счётчик.
       if (mFilteredBlocks.empty())
-        return;
-      status =
-          "Scanning... [" + std::to_string(mFilteredBlocks.size()) + " ores]";
+        status = "Idle";
+      else
+        status =
+            "Scanning... [" + std::to_string(mFilteredBlocks.size()) + " ores]";
       break;
     case MineState::Mining:
-      if (mNeedFirstVerify)
+      if (mPendingVerify)
         status = "Checking...";
       else
         status = "Mining " + std::to_string(mCurrentClusterIdx) + "/" +
@@ -1354,8 +1583,11 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
       break;
     }
 
+    status += " | real " + std::to_string(mRealBlocks) + " fake " +
+              std::to_string(mFakeBlocks);
+
     if (mDebug.mValue)
-      status += " | Dump: " + std::to_string(mDebugRows) + " blocks";
+      status += " | Dump: " + std::to_string(mDebugVerifiedRows) + " checked";
 
     ImVec2 ts = ImGui::CalcTextSize(status.c_str());
     drawList->AddRectFilled(ImVec2(cx - ts.x * 0.5f - 5.f, topY - 2.f),
