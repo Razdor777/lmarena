@@ -889,10 +889,37 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
           ImVec2 pt;
           if (RenderUtils::worldToScreen(pos, pt)) points.emplace_back(pt);
         }
+        // свечение под тропой: широкая полупрозрачная линия, основная — поверх
+        for (size_t i = 0; i + 1 < points.size(); i++) {
+          ImColor g = ColorUtils::getThemedColor(static_cast<float>(i) * 0.05f);
+          g.Value.w = 0.16f * alphaMultiplier;
+          drawList->AddLine(points[i], points[i + 1], g, mPathWidth.mValue * 3.f);
+        }
         for (size_t i = 0; i + 1 < points.size(); i++) {
           ImColor c = ColorUtils::getThemedColor(static_cast<float>(i) * 0.05f);
           c.Value.w *= alphaMultiplier;
           drawList->AddLine(points[i], points[i + 1], c, mPathWidth.mValue);
+        }
+
+        // наконечник в конце тропы — показывает, куда уходит телепорт
+        if (points.size() >= 2) {
+          const ImVec2 tip = points.back();
+          const ImVec2 prev = points[points.size() - 2];
+          float dx = tip.x - prev.x;
+          float dy = tip.y - prev.y;
+          const float segLen = std::sqrt(dx * dx + dy * dy);
+          if (segLen > 2.f) {
+            dx /= segLen;
+            dy /= segLen;
+            const float headLen = 9.f + mPathWidth.mValue * 2.f;
+            const float halfW = headLen * 0.55f;
+            const ImVec2 back(tip.x - dx * headLen, tip.y - dy * headLen);
+            const ImVec2 left(back.x - dy * halfW, back.y + dx * halfW);
+            const ImVec2 right(back.x + dy * halfW, back.y - dx * halfW);
+            ImColor hc = ColorUtils::getThemedColor(static_cast<float>(points.size()) * 0.05f);
+            hc.Value.w = alphaMultiplier;
+            drawList->AddTriangleFilled(tip, left, right, hc);
+          }
         }
 
         // «Поток» — точки, бегущие по тропе от игрока к цели. Показывает
@@ -1128,6 +1155,32 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
     if (!pts.empty()) {
       drawList->AddPolyline(pts.data(), (int)pts.size(), boxColor, true,
                             hpFlashed ? 4.f : 3.f);
+
+      // прицел под ногами цели: три вращающиеся дуги, краснеют при ударе.
+      // Аргумент считаем в double, иначе NOW (ms от эпохи) теряет точность во float.
+      {
+        constexpr float kRingR = 0.7f;
+        constexpr int kArcs = 3;
+        constexpr int kArcSeg = 6;
+        const float spin = static_cast<float>(
+            std::fmod(static_cast<double>(NOW) / 1000.0 * 1.6, 2.0 * PI));
+        const ImU32 ringCol = hpFlashed ? IM_COL32(255, 110, 110, 230)
+                                        : IM_COL32(255, 215, 0, 200);
+        const float arcSpan = (2.f * PI / kArcs) * 0.6f;
+        for (int arc = 0; arc < kArcs; arc++) {
+          const float start = spin + arc * (2.f * PI / kArcs);
+          ImVec2 seg[kArcSeg + 1];
+          bool allOk = true;
+          for (int s = 0; s <= kArcSeg && allOk; s++) {
+            const float ang = start + arcSpan * static_cast<float>(s) / kArcSeg;
+            const glm::vec3 wp(feet.x + std::cos(ang) * kRingR, feet.y + 0.02f,
+                               feet.z + std::sin(ang) * kRingR);
+            allOk = RenderUtils::worldToScreen(wp, seg[s]);
+          }
+          // если хоть одна точка за экраном — дугу пропускаем целиком, без «прыжков»
+          if (allOk) drawList->AddPolyline(seg, kArcSeg + 1, ringCol, false, 2.f);
+        }
+      }
 
       if (mTargetInfo.mValue) {
         float minX = pts[0].x, maxX = pts[0].x, minY = pts[0].y, maxY = pts[0].y;
