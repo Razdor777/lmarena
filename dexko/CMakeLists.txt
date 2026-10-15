@@ -1,11 +1,12 @@
-# have fun dark you retard <3
+# Dexko — standalone Minecraft Bedrock client (x64 / MSVC).
+# Minimal build: only the sources the client actually uses are compiled.
 cmake_minimum_required(VERSION 3.28)
 include(cmake/CPM.cmake)
-project(Solstice)
+project(Dexko)
 
 # throw error if building for x86
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-    message(FATAL_ERROR "Solstice only supports x64 builds.")
+    message(FATAL_ERROR "Dexko only supports x64 builds.")
 endif ()
 
 add_compile_definitions(__PRIVATE_DEBUG__)
@@ -55,12 +56,6 @@ CPMAddPackage(
 )
 
 CPMAddPackage(
-        NAME DirectXTK
-        GITHUB_REPOSITORY microsoft/DirectXTK
-        GIT_TAG main
-)
-
-CPMAddPackage(
         NAME cryptopp-cmake
         GITHUB_REPOSITORY abdes/cryptopp-cmake
         GIT_TAG master
@@ -71,18 +66,18 @@ if(MSVC)
 endif()
 
 set(SHADER_DIR ${CMAKE_CURRENT_LIST_DIR}/src/Utils/Shaders)
-set(SHADER_BIN_DIR ${CMAKE_BINARY_DIR}/SolsticeShaders)
+set(SHADER_BIN_DIR ${CMAKE_BINARY_DIR}/DexkoShaders)
 set(HLSL_FILES_VS ${SHADER_DIR}/BlockInstanceVS.hlsl)
 set(HLSL_FILES_PS ${SHADER_DIR}/DefaultPS.hlsl)
 list(LENGTH HLSL_FILES_VS HLSL_FILES_VS_COUNT)
 list(LENGTH HLSL_FILES_PS HLSL_FILES_PS_COUNT)
 math(EXPR HLSL_FILES_COUNT "${HLSL_FILES_VS_COUNT} + ${HLSL_FILES_PS_COUNT}")
 
-add_custom_target(SolsticeShaders ALL COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/SolsticeShaders COMMENT "Building ${HLSL_FILES_COUNT} shaders" VERBATIM)
+add_custom_target(DexkoShaders ALL COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/DexkoShaders COMMENT "Building ${HLSL_FILES_COUNT} shaders" VERBATIM)
 
 foreach(FILE ${HLSL_FILES_VS})
     get_filename_component(FILE_WE ${FILE} NAME_WE)
-    add_custom_command(TARGET SolsticeShaders
+    add_custom_command(TARGET DexkoShaders
             COMMAND cmd /c fxc.exe /nologo /Evertex_main /T vs_5_0 /Zi /Fh ${SHADER_BIN_DIR}/${FILE_WE}.inc /Fd ${CMAKE_BINARY_DIR}/${FILE_WE}.pdb ${FILE} > nul
             DEPENDS ${FILE}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -93,7 +88,7 @@ endforeach(FILE)
 
 foreach(FILE ${HLSL_FILES_PS})
     get_filename_component(FILE_WE ${FILE} NAME_WE)
-    add_custom_command(TARGET SolsticeShaders
+    add_custom_command(TARGET DexkoShaders
             COMMAND cmd /c fxc.exe /nologo /Epixel_main /T ps_5_0 /Zi /Fh ${SHADER_BIN_DIR}/${FILE_WE}.inc /Fd ${CMAKE_BINARY_DIR}/${FILE_WE}.pdb ${FILE} > nul
             DEPENDS ${FILE}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -133,6 +128,8 @@ add_compile_options($<$<CONFIG:Debug>:/Zi>)
 add_link_options($<$<CONFIG:Release>:/Zi>) # generate pdb
 add_link_options($<$<CONFIG:Release>:/INCREMENTAL:NO>) # disable incremental linking
 add_link_options($<$<CONFIG:Release>:/LTCG>) # link-time code generation
+add_link_options($<$<CONFIG:Release>:/OPT:REF>) # drop unreferenced code
+add_link_options($<$<CONFIG:Release>:/OPT:ICF>) # fold identical functions (smaller dll)
 add_link_options($<$<CONFIG:Release>:/DEBUG>) # enable debugging
 add_compile_options($<$<CONFIG:Release>:/O2>) # optimize for speed
 add_compile_options($<$<CONFIG:Release>:/Oi>) # enable intrinsic functions
@@ -153,8 +150,8 @@ add_compile_options($<$<CONFIG:Release>:/Oy->) # omit frame pointers
 
 
 
-set(SOLSTICE_VERSION "v1.0.0")
-add_compile_definitions(SOLSTICE_VERSION="${SOLSTICE_VERSION}")
+set(DEXKO_VERSION "v1.0.0")
+add_compile_definitions(DEXKO_VERSION="${DEXKO_VERSION}")
 
 add_definitions(-DWIN32_LEAN_AND_MEAN)
 
@@ -172,8 +169,8 @@ include_directories(include/nes)
 file(GLOB_RECURSE sourceFiles "src/*.cpp")
 file(GLOB_RECURSE includeFiles "include/*.hpp")
 
-# Папка с чужими исходниками (референсные клиенты) лежит внутри src/, но не является
-# частью Solstice: иначе GLOB_RECURSE затянет их в цель и сборка упадёт.
+# Anything that must not be compiled lives outside src/ — the glob below is
+# the only source list, so an empty src/ means an empty client (by design).
 list(FILTER sourceFiles EXCLUDE REGEX "/1\\.26\\.4x or 1\\.26\\.5x/")
 list(FILTER includeFiles EXCLUDE REGEX "/1\\.26\\.4x or 1\\.26\\.5x/")
 
@@ -181,7 +178,7 @@ set_source_files_properties(${sourceFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 set_source_files_properties(${includeFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
 
-# Krazy resource embedding code
+# Resource embedding (resources/* -> .o via ld)
 
 file(GLOB_RECURSE resource_files_list "resources/*")
 
@@ -212,8 +209,8 @@ endforeach()
 
 add_resources(resource_files ${resource_files})
 
-add_library(Solstice SHARED ${sourceFiles} ${resource_files})
-add_dependencies(${PROJECT_NAME} generate_build_info SolsticeShaders)
+add_library(Dexko SHARED ${sourceFiles} ${resource_files})
+add_dependencies(${PROJECT_NAME} generate_build_info DexkoShaders)
 
 set(RESOURCE_HEADER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.hpp")
 set(RESOURCE_SOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.cpp")
@@ -286,17 +283,16 @@ add_subdirectory(include/ImGui)
 add_subdirectory(include/Kiero)
 add_subdirectory(include/nes)
 
-set_property(TARGET DirectXTK PROPERTY UNITY_BUILD FALSE)
 set_property(TARGET minhook PROPERTY UNITY_BUILD FALSE)
 
-target_include_directories(Solstice PRIVATE include/ImGui)
-target_include_directories(Solstice PRIVATE include/Kiero)
+target_include_directories(Dexko PRIVATE include/ImGui)
+target_include_directories(Dexko PRIVATE include/Kiero)
 
-target_link_libraries(Solstice PRIVATE OpenMP::OpenMP_CXX DirectXTK spdlog version.lib nlohmann_json glm minhook kiero nuvola_event_system libhat dbghelp.lib winmm.lib magic_enum d3d12.lib d3d11.lib d2d1.lib dxgi.lib dxguid.lib dwrite.lib winmm.lib dbghelp.lib comctl32.lib ws2_32.lib cryptopp ole32.lib Mmdevapi.lib RuntimeObject.lib)
+target_link_libraries(Dexko PRIVATE OpenMP::OpenMP_CXX spdlog version.lib nlohmann_json glm minhook kiero nuvola_event_system libhat dbghelp.lib magic_enum d3d12.lib d3d11.lib d2d1.lib dxgi.lib dxguid.lib dwrite.lib cryptopp ole32.lib RuntimeObject.lib)
 
-set_property(TARGET Solstice nlohmann_json minhook spdlog cryptopp DirectXTK glm kiero nuvola_event_system magic_enum libhat PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
+set_property(TARGET Dexko nlohmann_json minhook spdlog cryptopp glm kiero nuvola_event_system magic_enum libhat PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
 
 
-target_precompile_headers(Solstice PRIVATE
+target_precompile_headers(Dexko PRIVATE
         "$<$<COMPILE_LANGUAGE:CXX>:<src/pch.hpp$<ANGLE-R>>"
 )

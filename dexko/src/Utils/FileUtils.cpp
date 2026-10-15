@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 #include "FileUtils.hpp"
@@ -21,12 +20,9 @@ std::string FileUtils::getRoamingStatePath() {
                                 "8wekyb3d8bbwe\\RoamingState\\";
 }
 
-std::string FileUtils::getJuzdexDir() {
-  return getRoamingStatePath() + xorstr_("Juzdex\\");
+std::string FileUtils::getDexkoDir() {
+  return getRoamingStatePath() + xorstr_("Dexko\\");
 }
-
-// Alias for compatibility
-std::string FileUtils::getSolsticeDir() { return getJuzdexDir(); }
 
 bool FileUtils::fileExists(const std::string &path) {
   return std::filesystem::exists(path);
@@ -40,8 +36,8 @@ void FileUtils::createDirectory(const std::string &path) {
 }
 
 void FileUtils::validateDirectories() {
-  createDirectory(getJuzdexDir());
-  createDirectory(getJuzdexDir() + "Configs\\");
+  createDirectory(getDexkoDir());
+  createDirectory(getDexkoDir() + "Configs\\");
   spdlog::info("Directories created successfully.");
 }
 
@@ -54,21 +50,6 @@ bool FileUtils::deleteFile(const std::string &path) {
     return false;
   }
 }
-
-void FileUtils::writeResourceToFile(Resource *resource,
-                                    const std::string &path) {
-  writeResourceToFile(path,
-                      reinterpret_cast<const unsigned char *>(resource->data()),
-                      resource->size());
-}
-
-void FileUtils::writeResourceToFile(const std::string &path,
-                                    const unsigned char *data, size_t size) {
-  std::ofstream file(path, std::ios::binary);
-  file.write(reinterpret_cast<const char *>(data), size);
-  file.close();
-  spdlog::info("Wrote resource to file: {}", path);
-};
 
 std::vector<std::string> FileUtils::listFiles(const std::string &path) {
   std::vector<std::string> files;

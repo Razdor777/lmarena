@@ -1,27 +1,22 @@
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 #include "D3DHook.hpp"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <Dexko.hpp>
 
 #include <kiero.hpp>
 #include <Features/Events/RenderEvent.hpp>
-#include <Features/Events/WindowResizeEvent.hpp>
 #include <SDK/Minecraft/Rendering/bgfx_context.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/FontHelper.hpp>
 #include <Utils/ProcUtils.hpp>
-#include <Utils/Resource.hpp>
-#include <Utils/Resources.hpp>
 #include <Utils/MiscUtils/D2D.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include <winrt/base.h>
 
-// skidded (i do not care :trollcat:)
+// ImGui/D3D11 presenter hook (Kiero + ImGui backends).
 
 using winrt::com_ptr;
 
@@ -56,193 +51,12 @@ static bool d3dInitImGui = false;
 
 
 
-struct LoadedResource {
-    ID3D11ShaderResourceView* srv;
-    int width;
-    int height;
-};
-
-bool D3DHook::loadTextureFromEmbeddedResource(const char* resourceName, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height)
-{
-
-    static std::unordered_map<std::string, LoadedResource> loadedResources;
-    if (loadedResources.contains(resourceName))
-    {
-        LoadedResource& resource = loadedResources[resourceName];
-        *out_srv = resource.srv;
-        *out_width = resource.width;
-        *out_height = resource.height;
-        return true;
-    }
-
-    Resource resource = ResourceLoader::Resources[resourceName];
-    if (resource.data() == nullptr)
-    {
-        spdlog::error("Failed to load embedded resource: {0}", resourceName);
-        return false;
-    }
-
-
-    // The texture WILL be in a .png format, so we can just load it directly
-    int image_width = 0;
-    int image_height = 0;
-    unsigned char* image_data = stbi_load_from_memory(static_cast<stbi_uc const*>(resource.data2()), resource.size(), &image_width, &image_height, nullptr, 4);
-    if (image_data == NULL)
-    {
-        spdlog::error("Failed to load embedded image: {0}", resourceName);
-        return false;
-    };
-
-    // Create texture
-    D3D11_TEXTURE2D_DESC desc;
-    ZeroMemory(&desc, sizeof(desc));
-    desc.Width = image_width;
-    desc.Height = image_height;
-    desc.MipLevels = 1;
-    desc.ArraySize = 1;
-    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    desc.SampleDesc.Count = 1;
-    desc.Usage = D3D11_USAGE_DEFAULT;
-    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    desc.CPUAccessFlags = 0;
-
-    ID3D11Texture2D *pTexture = NULL;
-    D3D11_SUBRESOURCE_DATA subResource;
-    subResource.pSysMem = image_data;
-    subResource.SysMemPitch = desc.Width * 4;
-    subResource.SysMemSlicePitch = 0;
-    gDevice11->CreateTexture2D(&desc, &subResource, &pTexture);
-
-    // Create texture view
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-    ZeroMemory(&srvDesc, sizeof(srvDesc));
-    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = desc.MipLevels;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    gDevice11->CreateShaderResourceView(pTexture, &srvDesc, out_srv);
-    pTexture->Release();
-
-    *out_width = image_width;
-    *out_height = image_height;
-    stbi_image_free(image_data);
-
-    loadedResources[resourceName] = { *out_srv, image_width, image_height };
-
-    return true;
-}
-
-/*ID3D11ShaderResourceView** createTextureFromData(ID3D11Device* device, const uint8_t* data, int width, int height) {
-	if (!device || !data || width <= 0 || height <= 0) {
-		return nullptr;
-		throw std::invalid_argument("Invalid argument(s) provided to CreateTextureFromData.");
-	}
-
-	// Define the texture description
-	D3D11_TEXTURE2D_DESC textureDesc = {}; // OLD
-	textureDesc.Width = static_cast<UINT>(width);
-	textureDesc.Height = static_cast<UINT>(height);
-	textureDesc.MipLevels = 1;
-	textureDesc.ArraySize = 1;
-	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // assuming it's 32-bit RGBA format
-	textureDesc.SampleDesc.Count = 1;
-	textureDesc.Usage = D3D11_USAGE_DEFAULT;
-	textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	textureDesc.CPUAccessFlags = 0;
-	textureDesc.MiscFlags = 0;
-
-	// Define the subresource data
-	D3D11_SUBRESOURCE_DATA initData = {};
-	initData.pSysMem = data;
-	initData.SysMemPitch = static_cast<UINT>(width * 4); // assuming it's 32-bit RGBA format
-	initData.SysMemSlicePitch = 0;
-
-	// Create the texture
-	ID3D11Texture2D* texture = nullptr;
-	HRESULT hr = device->CreateTexture2D(&textureDesc, &initData, &texture);
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to create texture from data.");
-	}
-
-	// Create the shader resource view
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = textureDesc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = 1;
-
-	ID3D11ShaderResourceView** shaderResourceView;
-	hr = device->CreateShaderResourceView(texture, &srvDesc, shaderResourceView);
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to create shader resource view.");
-	}
-
-	return shaderResourceView;
-}*/
-
-bool D3DHook::createTextureFromData(const uint8_t* data, int width, int height, ID3D11ShaderResourceView** out_srv)
-{
-    ID3D11Device* device = gDevice11.get();
-
-    if (!device || !data || width <= 0 || height <= 0) {
-        spdlog::error("Invalid argument(s) provided to CreateTextureFromData.");
-        return false;
-    }
-
-    // use nearest neighbor filtering
-
-    // Define the texture description
-    D3D11_TEXTURE2D_DESC textureDesc = {}; // OLD
-    textureDesc.Width = static_cast<UINT>(width);
-
-    textureDesc.Height = static_cast<UINT>(height);
-    textureDesc.MipLevels = 1;
-    textureDesc.ArraySize = 1;
-    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // assuming it's 32-bit RGBA format
-    textureDesc.SampleDesc.Count = 1;
-    textureDesc.Usage = D3D11_USAGE_DEFAULT;
-    textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    textureDesc.CPUAccessFlags = 0;
-    textureDesc.MiscFlags = 0;
-
-    // Define the subresource data
-    D3D11_SUBRESOURCE_DATA initData = {};
-
-    initData.pSysMem = data;
-    initData.SysMemPitch = static_cast<UINT>(width * 4); // assuming it's 32-bit RGBA format
-    initData.SysMemSlicePitch = 0;
-
-    // Create the texture
-    ID3D11Texture2D* texture = nullptr;
-    HRESULT hr = device->CreateTexture2D(&textureDesc, &initData, &texture);
-    if (FAILED(hr)) {
-        spdlog::error("Failed to create texture from data.");
-        return false;
-    }
-
-    // Create the shader resource view
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-
-    srvDesc.Format = textureDesc.Format;
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    hr = device->CreateShaderResourceView(texture, &srvDesc, out_srv);
-    if (FAILED(hr)) {
-        spdlog::error("Failed to create shader resource view.");
-        return false;
-    }
-
-    return true;
-}
-
 HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT flags)
 {
     // Ejecting (or already ejected): never run another line of our code on the
     // render thread, otherwise the module can be unmapped while this thread is
     // still inside it.
-    if (Solstice::mRequestEject || Solstice::mUnloading.load())
+    if (Dexko::mRequestEject || Dexko::mUnloading.load())
     {
         return oPresent(swapChain, syncInterval, flags);
     }
@@ -256,7 +70,6 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
             static bool msgwarn = false;
             if (!msgwarn)
             {
-                NotifyUtils::notify("WARNING! Dexko is currently running in D3D11 mode. \nThis is NOT recommended and may cause instability.\nI strongly advise you to use D3D12 for the time being.", 15.f, Notification::Type::Warning);
                 msgwarn = true;
             }
         }
@@ -264,7 +77,7 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
         if (swapChain->GetDevice(__uuidof(ID3D12Device), reinterpret_cast<void **>(&gDevice12)) == S_OK) {
             spdlog::info("[D3D] D3D12 Device acquired");
 
-            if (Solstice::Prefs->mFallbackToD3D11)
+            if (Dexko::Prefs->mFallbackToD3D11)
             {
                 ID3D12Device* bad_device;
                 if (SUCCEEDED(swapChain->GetDevice(IID_PPV_ARGS(&bad_device))))
@@ -383,7 +196,11 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
                 CHECK_HR(gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(i).get(), nullptr,
                                                      mBackBuffer11Rtv.at(i).put()));
             }
-            oWndProc = (WNDPROC)SetWindowLongPtr(wnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
+            // Dexko has no clickable menu (everything is driven by chat commands),
+            // so no window-proc hook is needed. The old line wrote a NULL proc into
+            // the window (oWndProc was still empty at that point) — just keep the
+            // game's own proc instead of touching it.
+            oWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(wnd, GWLP_WNDPROC));
         }
         d3dInitImGui = true;
     }
@@ -412,14 +229,6 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     ImVec2 windowSize = guiData
         ? ImVec2(guiData->mResolution.x, guiData->mResolution.y)
         : lastWindowSize;
-
-    if (lastWindowSize.x != windowSize.x || lastWindowSize.y != windowSize.y) {
-        // This event existed but nothing ever fired it, so ClickGui's resize
-        // handler (which rescales the panel layout) was dead code — the gui kept
-        // its stale layout after F11 until it was reopened.
-        auto holder = nes::make_holder<WindowResizeEvent>((int)windowSize.x, (int)windowSize.y);
-        gFeatureManager->mDispatcher->trigger(holder);
-    }
 
     lastWindowSize = windowSize;
 
@@ -462,7 +271,7 @@ HRESULT D3DHook::resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UIN
     DXGI_FORMAT newFormat, UINT swapChainFlags)
 {
     // Ejecting: never touch our state from the render thread again.
-    if (Solstice::mUnloading.load())
+    if (Dexko::mUnloading.load())
         return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
 
     if (d3dInitImGui)
@@ -505,15 +314,6 @@ void D3DHook::initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext
     ImGui::CreateContext();
 
     FontHelper::load();
-    static bool onc = false;
-    if (!onc)
-    {
-        auto res = &ResourceLoader::Resources["skinblinker.txt"];
-
-        FileUtils::writeResourceToFile(res, FileUtils::getSolsticeDir() + "BlinkerSkins\\README.txt");
-
-        onc = true;
-    }
 
     ImGui_ImplWin32_Init(ProcUtils::getMinecraftWindow());
     ImGui_ImplDX11_Init(device, deviceContext);
@@ -569,23 +369,23 @@ void D3DHook::init()
 
 void D3DHook::s_init()
 {
-    Solstice::console->info("Initializing D3DHook");
+    Dexko::console->info("Initializing D3DHook");
     // Attempt to init on D3D12
     if (kiero::init(kiero::RenderType::D3D12) == kiero::Status::Success)
     {
-        Solstice::console->info("Initialized kiero [D3D12]");
+        Dexko::console->info("Initialized kiero [D3D12]");
         kiero::bind(140, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
         kiero::bind(145, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
         return;
         // Else, attempt to init on D3D11
     } else if (kiero::init(kiero::RenderType::D3D11) == kiero::Status::Success)
     {
-        Solstice::console->info("Initialized kiero [D3D11]");
+        Dexko::console->info("Initialized kiero [D3D11]");
         kiero::bind(8, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
         kiero::bind(13, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
         return;
     }
-    Solstice::console->error("Failed to initialize kiero");
+    Dexko::console->error("Failed to initialize kiero");
     MessageBoxA(NULL, "Failed to initialize kiero", "Dexko", MB_OK | MB_ICONERROR);
 }
 
@@ -596,7 +396,7 @@ void D3DHook::shutdown()
 
 void D3DHook::s_shutdown()
 {
-    Solstice::console->info("Shutting down D3DHook");
+    Dexko::console->info("Shutting down D3DHook");
     FrameTransforms.reset();
     kiero::unbind(8);
     kiero::unbind(13);

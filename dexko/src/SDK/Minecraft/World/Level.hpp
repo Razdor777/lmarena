@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 7/10/2024.
 //
 #include <Utils/MemUtils.hpp>
 #include <SDK/Minecraft/mce.hpp>
@@ -46,6 +45,8 @@ class LevelData
 public:
     CLASS_FIELD(uint64_t, mTick, OffsetProvider::LevelData_mTick);
 };
+
+class Block;
 
 class BlockPalette {
 public:

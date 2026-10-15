@@ -11,6 +11,7 @@ class ClickGui : public ModuleBase<ClickGui>
 public:
     enum class ClickGuiStyle {
         Modern,
+        Combatant, // новый стиль рядом с Modern (вид combatant-client)
     };
     enum class ClickGuiAnimation {
         Zoom,
@@ -20,7 +21,7 @@ public:
     };
 
     EnumSettingT<ClickGuiStyle> mStyle = EnumSettingT<ClickGuiStyle>(
-        "Style", "The style of the ClickGui.", ClickGuiStyle::Modern, "Modern");
+        "Style", "The style of the ClickGui.", ClickGuiStyle::Modern, "Modern", "Combatant");
     EnumSettingT<ClickGuiAnimation> mAnimation = EnumSettingT<ClickGuiAnimation>(
         "Animation", "The animation of the ClickGui.", ClickGuiAnimation::Bounce,
         "Zoom", "Bounce", "Float", "Elastic");

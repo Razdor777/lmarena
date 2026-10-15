@@ -5,10 +5,7 @@
 #include "Resource.hpp"
 
 LOAD_RESOURCE(fonts_Roboto_Regular_ttf);
-LOAD_RESOURCE(fonts_Tenacity_Icons_ttf);
 LOAD_RESOURCE(fonts_mntsb_ttf);
-LOAD_RESOURCE(fonts_nurik_ttf);
-LOAD_RESOURCE(skinblinker_txt);
 
 class ResourceLoader {
 public:

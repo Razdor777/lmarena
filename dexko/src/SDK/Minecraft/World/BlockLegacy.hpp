@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 7/3/2024.
 //
 
 #include <optional>
@@ -9,6 +8,12 @@
 
 
 #include <Utils/Structs.hpp>
+
+
+// Forward declarations: the members below only take pointers/references, so the
+// header stays standalone no matter which order the unity build includes it in.
+class Block;
+class BlockSource;
 
 class Material
 {

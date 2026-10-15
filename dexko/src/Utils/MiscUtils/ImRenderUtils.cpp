@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 #include "ImRenderUtils.hpp"
@@ -47,7 +46,7 @@ void ImRenderUtils::drawShadowText(ImDrawList* drawList, const std::string& text
 {
     ImVec2 shadowPos = pos;
     ImVec2 charSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, -1, text.c_str());
-	// Needed for ItemESP because of dynamic font size, but it causes issues with other text
+	// Needed for dynamic font sizes, but it causes issues with other text
 	float shadowPosMultiplier = specializedMultiplier ? fontSize / 24.f : 1.f;
 
     shadowPos.x += 1.25f * shadowPosMultiplier;

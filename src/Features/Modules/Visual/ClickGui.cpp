@@ -6,11 +6,13 @@
 
 #include <Features/Events/MouseEvent.hpp>
 #include <Features/Events/KeyEvent.hpp>
+#include <Features/GUI/CombatantGui.hpp>
 #include <Features/GUI/ModernDropdown.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 
 static ModernGui modernGui = ModernGui();
+static CombatantGui combatantGui = CombatantGui();
 
 void ClickGui::onEnable()
 {
@@ -22,6 +24,7 @@ void ClickGui::onEnable()
     gFeatureManager->mDispatcher->listen<KeyEvent, &ClickGui::onKeyEvent, nes::event_priority::FIRST>(this);
 
     modernGui.onOpen();
+    combatantGui.onOpen();
 }
 
 void ClickGui::onDisable()
@@ -31,6 +34,7 @@ void ClickGui::onDisable()
 
     mGuiOpen = false;
     modernGui.onClose();
+    combatantGui.onClose();
 
     if (mWasGrabbed)
         ClientInstance::get()->grabMouse();
@@ -39,6 +43,7 @@ void ClickGui::onDisable()
 void ClickGui::onWindowResizeEvent(WindowResizeEvent& event)
 {
     modernGui.onWindowResizeEvent(event);
+    combatantGui.onWindowResizeEvent(event);
 }
 
 void ClickGui::onMouseEvent(MouseEvent& event)
@@ -48,7 +53,10 @@ void ClickGui::onMouseEvent(MouseEvent& event)
 
 void ClickGui::onKeyEvent(KeyEvent& event)
 {
-    if (modernGui.onKey(event.mKey, event.mPressed)) {
+    const bool consumed = mStyle.mValue == ClickGuiStyle::Combatant
+        ? combatantGui.onKey(event.mKey, event.mPressed)
+        : modernGui.onKey(event.mKey, event.mPressed);
+    if (consumed) {
         event.mCancelled = true;
         return;
     }
@@ -104,5 +112,9 @@ void ClickGui::onRenderEvent(RenderEvent& event)
             mUiScale.mValue, mAmbientOrbs.mValue, mShowHints.mValue,
             mEffectIntensity.mValue, mPanelGlow.mValue,
             mCursorGlow.mValue, mParallax.mValue, mBackdropGrid.mValue);
+    }
+    else if (mStyle.mValue == ClickGuiStyle::Combatant)
+    {
+        combatantGui.render(animation, inScale, mUiScale.mValue);
     }
 }

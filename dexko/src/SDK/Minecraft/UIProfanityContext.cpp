@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/19/2024.
 //
 
 #include "UIProfanityContext.hpp"

@@ -9,7 +9,6 @@
 #include "Hooks/MiscHooks/KeyHook.hpp"
 #include "Hooks/MiscHooks/PreGameHook.hpp"
 #include "Hooks/NetworkHooks/ConnectionRequestHook.hpp"
-#include "Hooks/NetworkHooks/PacketReceiveHook.hpp"
 #include "Hooks/NetworkHooks/PacketSendHook.hpp"
 #include "Hooks/RenderHooks/ActorRenderDispatcherHook.hpp"
 #include "Hooks/RenderHooks/D3DHook.hpp"
@@ -37,7 +36,6 @@ void HookManager::init(bool initLp)
         ADD_HOOK(SetupAndRenderHook);
         ADD_HOOK(D3DHook);
         ADD_HOOK(ConnectionRequestHook);
-        ADD_HOOK(PacketReceiveHook);
         ADD_HOOK(PacketSendHook);
         ADD_HOOK(ActorRenderDispatcherHook);
         ADD_HOOK(HoverTextRendererHook);

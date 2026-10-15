@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 
@@ -123,7 +122,7 @@ int MathUtils::random(int min, int max)
     return distr(eng);
 }
 
-#define PI IM_PI
+// IM_PI is used directly (imgui.h) — no project-wide IM_PI macro.
 
 std::vector<glm::vec2> MathUtils::getBoxPoints(const AABB& aabb) {
     ClientInstance* ci = ClientInstance::get();
@@ -169,7 +168,7 @@ std::vector<glm::vec2> MathUtils::getBoxPoints(const AABB& aabb) {
     glm::vec2 lastDir = glm::vec2(0, -1);
 
     do {
-        float smallestAngle = 2 * PI;
+        float smallestAngle = 2 * IM_PI;
         glm::vec2 smallestDir = {0, 0};
         glm::vec2 smallestE = {0, 0};
         float lastDirAtan2 = atan2(lastDir.y, lastDir.x);
@@ -179,8 +178,8 @@ std::vector<glm::vec2> MathUtils::getBoxPoints(const AABB& aabb) {
 
             glm::vec2 dir = t - current;
             float angle = atan2(dir.y, dir.x) - lastDirAtan2;
-            if (angle > PI) angle -= 2 * PI;
-            else if (angle <= -PI) angle += 2 * PI;
+            if (angle > IM_PI) angle -= 2 * IM_PI;
+            else if (angle <= -IM_PI) angle += 2 * IM_PI;
 
             if (angle >= 0 && angle < smallestAngle) {
                 smallestAngle = angle;

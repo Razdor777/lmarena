@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/23/2024.
 //
 
 #pragma once

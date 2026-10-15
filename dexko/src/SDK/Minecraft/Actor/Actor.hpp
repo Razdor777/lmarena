@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/25/2024.
 //
 #pragma once
 
@@ -132,7 +131,6 @@ public:
     bool isSwinging();
     void setSwinging(bool swinging);
     int getGameType();
-    void setGameType(int type);
     bool isDebugCameraActive();
     void setDebugCameraActive(bool active);
     void setAllowInsideBlockRender(bool allow);

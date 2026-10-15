@@ -6,6 +6,7 @@
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Modules/Module.hpp>
+#include <fstream>
 
 
 class OreMinerV2 : public ModuleBase<OreMinerV2> {
@@ -45,6 +46,15 @@ public:
   BoolSetting mDiamond = BoolSetting("Diamond", "Mine diamond ore", true);
   BoolSetting mEmerald = BoolSetting("Emerald", "Mine emerald ore", true);
 
+  // === Debug ===
+  // Включил -> модуль открывает CSV в Juzdex\Dumps\ и пишет туда КАЖДЫЙ
+  // найденный блок (все, что проходят фильтр радиуса и типа руды), по одной
+  // строке на координату, ровно один раз за сессию дампа. Файл кладётся рядом
+  // с конфигами, так что его можно открыть любым «софтом»: Excel, Python,
+  // блокнот (есть и plain-версия "x y z" построчно).
+  BoolSetting mDebug =
+      BoolSetting("Debug", "Dump every found ore block into a CSV/TXT file", false);
+
   // === Render settings ===
   BoolSetting mDrawBlocks =
       BoolSetting("Draw Blocks", "Draw ESP on found ores", true);
@@ -62,8 +72,8 @@ public:
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
                 &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
                 &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
-                &mDiamond, &mEmerald, &mDrawBlocks, &mDrawPath, &mDrawTarget,
-                &mDrawCluster);
+                &mDiamond, &mEmerald, &mDebug, &mDrawBlocks, &mDrawPath,
+                &mDrawTarget, &mDrawCluster);
 
     mNames = {{Lowercase, "oreminerv2"},
               {LowercaseSpaced, "ore miner v2"},
@@ -192,6 +202,33 @@ public:
   // Key binding state
   bool mIsBindingKey = false;
   bool mBindWaitRelease = false;
+
+  // =====================================================
+  // Debug dump
+  // =====================================================
+  struct DebugRow {
+    BlockPos pos{};
+    int      blockId  = 0;
+    bool     deepslate = false;
+    float    distance = 0.f;
+    bool     onScreen = false;
+    float    screenX  = 0.f;
+    float    screenY  = 0.f;
+  };
+
+  std::string mDebugCsvPath;
+  std::string mDebugCoordsPath;
+  std::ofstream mDebugCsv;
+  std::ofstream mDebugCoords;
+  std::unordered_set<BlockPos> mDebugWritten; // каждая координата — ровно один раз
+  int  mDebugRows    = 0;
+  bool mDebugWasOn   = false;
+  uint64_t mDebugStartedAt = 0;
+
+  void debugStart();                                  // новый файл под дамп
+  void debugFlush(const std::vector<DebugRow> &rows);  // дописать строки
+  void debugStop();                                   // закрыть файлы
+  static const char *oreTypeName(int blockId);
 
   // =====================================================
   // Scan methods

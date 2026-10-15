@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 #include <string>
@@ -9,15 +8,11 @@
 class FileUtils {
 public:
   static std::string getRoamingStatePath();
-  static std::string getJuzdexDir();
-  static std::string getSolsticeDir(); // Alias for compatibility
+  static std::string getDexkoDir();
   static bool fileExists(const std::string &path);
   static void createDirectory(const std::string &path);
   static void validateDirectories();
   static bool deleteFile(const std::string &path);
-  static void writeResourceToFile(Resource *resource, const std::string &path);
-  static void writeResourceToFile(const std::string &path,
-                                  const unsigned char *data, size_t size);
   static std::vector<std::string> listFiles(const std::string &path);
   static void createFile(const std::string &path);
   // getFileSize

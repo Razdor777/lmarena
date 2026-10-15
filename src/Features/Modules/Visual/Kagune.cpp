@@ -73,7 +73,7 @@ static inline ImU32 kgCol(const glm::vec3& c, float a)
 // ═════════════════════════════════════════════════════════════════════════════
 struct KPal { glm::vec3 blade, shade, glow; };
 static const KPal kPals[3] = {
-    { {0.80f, 0.03f, 0.06f}, {0.22f, 0.00f, 0.03f}, {1.00f, 0.30f, 0.16f} },   // Crimson
+    { {0.52f, 0.03f, 0.05f}, {0.08f, 0.00f, 0.01f}, {1.00f, 0.26f, 0.16f} },   // Crimson (тёмная плоть, яркая кромка)
     { {0.58f, 0.02f, 0.05f}, {0.15f, 0.00f, 0.02f}, {0.95f, 0.16f, 0.12f} },   // Blood
     { {0.95f, 0.10f, 0.04f}, {0.30f, 0.02f, 0.02f}, {1.00f, 0.55f, 0.20f} },   // Ember
 };
@@ -86,12 +86,14 @@ static const glm::vec3 kKL = kgVSafe({0.4f, -1.f, 0.3f});
 struct KMat {
     glm::vec3 blade, shade, glow;
     float t, flash, pulse;
+    float bands = 0.f;   // >0: число ступеней освещения (Minecraft)
 };
 
 static ImVec4 kgShade(const KMat& m, const glm::vec3& n, const glm::vec3& V, float u, float ang)
 {
     const glm::vec3 Ld = -kKL;
     float d = glm::dot(n, Ld) * 0.5f + 0.5f;
+    if (m.bands > 0.f) d = std::floor(d * m.bands) / m.bands;   // плоские полосы света
 
     // анимешные полосы света с мягкими границами
     glm::vec3 hot = kgMix(m.blade, m.glow, 0.55f);
@@ -288,9 +290,13 @@ static std::vector<ImVec2>    sOL, sOR;
 // ═════════════════════════════════════════════════════════════════════════════
 void Kagune::onEnable()
 {
-    gFeatureManager->mDispatcher->listen<RenderEvent,    &Kagune::onRenderEvent   >(this);
-    gFeatureManager->mDispatcher->listen<PacketOutEvent, &Kagune::onPacketOutEvent>(this);
-    gFeatureManager->mDispatcher->listen<LookInputEvent, &Kagune::onLookInputEvent>(this);
+    mClosing = false;   // включили обратно во время втягивания — просто отменяем его
+    if (!mListening) {
+        gFeatureManager->mDispatcher->listen<RenderEvent,    &Kagune::onRenderEvent   >(this);
+        gFeatureManager->mDispatcher->listen<PacketOutEvent, &Kagune::onPacketOutEvent>(this);
+        gFeatureManager->mDispatcher->listen<LookInputEvent, &Kagune::onLookInputEvent>(this);
+        mListening = true;
+    }
 
     mEnableTime = NOW;
     mLastHit    = NOW;
@@ -316,9 +322,23 @@ void Kagune::onEnable()
 
 void Kagune::onDisable()
 {
+    // Exit Anim: не отписываемся сразу — рендер доигрывает втягивание и сам отпишется
+    if (mExitAnim.mValue && mListening && mVis > 0.f) {
+        mClosing   = true;
+        mWantShown = false;
+        return;
+    }
+    unlisten();
+}
+
+void Kagune::unlisten()
+{
+    if (!mListening) return;
     gFeatureManager->mDispatcher->deafen<RenderEvent,    &Kagune::onRenderEvent   >(this);
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Kagune::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->deafen<LookInputEvent, &Kagune::onLookInputEvent>(this);
+    mListening = false;
+    mClosing   = false;
     mParticles.clear();
 }
 
@@ -371,7 +391,7 @@ void Kagune::onLookInputEvent(LookInputEvent& event)
 // ═════════════════════════════════════════════════════════════════════════════
 void Kagune::onPacketOutEvent(PacketOutEvent& event)
 {
-    if (!event.mPacket) return;
+    if (mClosing || !event.mPacket) return;
     if (event.mPacket->getId() != PacketID::InventoryTransaction) return;
     auto pkt = event.getPacket<InventoryTransactionPacket>();
     if (!pkt || !pkt->mTransaction) return;
@@ -454,12 +474,14 @@ void Kagune::onRenderEvent(RenderEvent& event)
 {
     auto* ci = ClientInstance::get();
     if (!ci) return;
+    // втягивание закончено (или игрока нет) — отписываемся от рендера
+    if (mClosing && (mVis <= 0.f || !ci->getLocalPlayer())) { unlisten(); return; }
     auto* opts = ci->getOptions();
     if (!opts) return;
 
     const int  camMode = opts->mThirdPerson->value;
     const bool isFPV   = (camMode == 0);
-    if (!mShowFPV.mValue && isFPV) return;
+    if (!mShowFPV.mValue && isFPV) { if (mClosing) mVis = 0.f; return; }
 
     auto* player = ci->getLocalPlayer();
     if (!player) return;
@@ -515,6 +537,8 @@ void Kagune::onRenderEvent(RenderEvent& event)
 
     const float pH    = sh ? sh->mHeight : 1.8f;
     const float feetY = kPosIsEye ? pPos.y - PLAYER_HEIGHT : pPos.y;
+    // 3-е лицо: корень на доле роста + ручная поправка «Height Offset»
+    const float kRootH = pH * Kagune::kRootFrac + mYOffset.mValue;
 
     // ── Камера ────────────────────────────────────────────────────────────
     const glm::vec3 camPos = RenderUtils::transform.mOrigin;
@@ -541,9 +565,11 @@ void Kagune::onRenderEvent(RenderEvent& event)
     }
 
     // ── Настройки ─────────────────────────────────────────────────────────
+    const bool  blocky  = mStyle.mValue == Style::Minecraft;
+    const float fpvK    = isFPV ? mFpvSize.mValue : 1.f;   // FPV Size: масштаб от первого лица
     const int   cnt     = std::clamp((int)mCount.mValue,    1, kMax);
-    const float maxLen  = mLength.mValue;
-    const float baseRad = mThickness.mValue * 0.014f;
+    const float maxLen  = mLength.mValue * fpvK;
+    const float baseRad = mThickness.mValue * 0.02f * fpvK;   // толщина: тело, а не верёвка
     const int   M       = std::clamp((int)mSegments.mValue, 8, 48);
     const int   res     = std::clamp(((int)mRingRes.mValue / 4) * 4, 8, 16);   // кратно 4
     const float animDur = std::max(mAnimTime.mValue, 0.2f);
@@ -907,7 +933,7 @@ void Kagune::onRenderEvent(RenderEvent& event)
     //  Проход 2: отрисовка
     // ═════════════════════════════════════════════════════════════════════
     // сечение — суперэллипс (острые кромки, выпуклые грани)
-    constexpr float kP = 1.5f;
+    const float kP = blocky ? 10.f : 1.5f;   // Minecraft: почти квадратное сечение
     float cxk[16], syk[16], nxk[16], nyk[16], cs[16], sn[16];
     for (int k = 0; k < res; k++) {
         float a = K2PI * float(k) / float(res);
@@ -923,7 +949,7 @@ void Kagune::onRenderEvent(RenderEvent& event)
     auto drawTentacle = [&](const Act& ac)
     {
         const auto& st = mTentacles[ac.ti];
-        const KMat km{cBlade, cShade, cGlow, iT, ac.flash, pulseK};
+        const KMat km{cBlade, cShade, cGlow, iT, ac.flash, pulseK, blocky ? 3.f : 0.f};
 
         // 0. след кончика (под телом щупальца)
         if (detail) {
@@ -957,8 +983,9 @@ void Kagune::onRenderEvent(RenderEvent& event)
         }
 
         // 2. рамки колец: N — широкая ось лезвия, B — тонкая
-        const float rW = ac.R * 1.7f * widthK;
-        const float rT = ac.R * 0.42f;
+        // почти круглое сечение (было 1.7 / 0.42 — плоская лента, «бумага»)
+        const float rW = ac.R * 1.30f * widthK;
+        const float rT = ac.R * 1.05f;
         sR.resize(M);
         for (int j = 0; j < M; j++) {
             glm::vec3 d = (j == 0) ? sSp[1] - sSp[0]
@@ -970,6 +997,15 @@ void Kagune::onRenderEvent(RenderEvent& event)
             sR[j].c  = sSp[j];
             sR[j].rw = rW * kgWidthProf(u) * br;
             sR[j].rt = rT * kgThickProf(u) * br;
+        }
+        if (blocky) {
+            // радиусы кратны шагу «блока» — силуэт собирается из ступеней
+            const float step  = std::max(ac.R * 0.55f, 0.012f);
+            const float stepT = step * 0.6f;
+            for (int j = 0; j < M; j++) {
+                sR[j].rw = std::max(step,  std::round(sR[j].rw / step)  * step);
+                sR[j].rt = std::max(stepT, std::round(sR[j].rt / stepT) * stepT);
+            }
         }
         {
             const glm::vec3& T0 = sR[0].T;
@@ -1131,6 +1167,39 @@ void Kagune::onRenderEvent(RenderEvent& event)
                 dl->PrimVtx(A.s, uv, A.col);
                 dl->PrimVtx(B.s, uv, B.col);
                 dl->PrimVtx(C.s, uv, C.col);
+            }
+        }
+
+        // 6b. костяные шипы (манга): треугольники от поверхности, сметены к кончику
+        if (mSpikes.mValue) {
+            const int spStep = std::max(2, M / 8);
+            for (int j = 1; j < M - 2; j += spStep) {
+                const KRing& R  = sR[j];
+                const float  u  = float(j) / float(M - 1);
+                const float  phi = float(j) * 2.39996f + float(ac.ti) * 1.3f;   // золотой угол: не в линию
+                const glm::vec3 radial = R.N * cosf(phi) + R.B * sinf(phi);
+                const glm::vec3 dirS   = kgVSafe(radial * 0.75f + R.T * (0.55f + 0.25f * (1.f - u)));
+                const glm::vec3 spBase = R.c + radial * (R.rw * 0.5f);
+                const glm::vec3 toCam  = kgVSafe(camPos - spBase);
+                if (glm::dot(radial, toCam) < 0.15f) continue;         // обратная сторона
+                if (kgOccluded(body, camPos, spBase)) continue;        // спрятан за телом игрока
+
+                const float     len    = R.rw * (2.2f - 1.2f * u) * (blocky ? 1.25f : 1.f);
+                const glm::vec3 spTip  = spBase + dirS * len;
+                const glm::vec3 spSide = kgVSafe(glm::cross(dirS, radial), R.T) * (R.rw * (blocky ? 0.55f : 0.42f));
+
+                glm::vec2 p0, p1, pt;
+                if (!mat.OWorldToScreen(camPos, spBase + spSide, p0, MathUtils::fov, guiRes)) continue;
+                if (!mat.OWorldToScreen(camPos, spBase - spSide, p1, MathUtils::fov, guiRes)) continue;
+                if (!mat.OWorldToScreen(camPos, spTip,           pt, MathUtils::fov, guiRes)) continue;
+
+                const ImVec2 a(p0.x, p0.y), b(p1.x, p1.y), c(pt.x, pt.y);
+                const ImVec4 sc = kgShade(km, radial, toCam, u, phi);
+                dl->AddTriangleFilled(a, b, c, ImGui::ColorConvertFloat4ToU32(sc));
+                dl->AddTriangle(a, b, c, kgCol(cShade * 0.3f, 0.9f), 1.0f);
+                // красная жила вдоль шипа: светится сильнее при ударе
+                const ImVec2 mid((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+                dl->AddLine(mid, c, kgCol(cGlow, 0.35f + 0.35f * ac.flash), 1.2f);
             }
         }
 

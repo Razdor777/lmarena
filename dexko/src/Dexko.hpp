@@ -4,11 +4,10 @@
 #include <Features/Configs/PreferenceManager.hpp>
 #include "spdlog/logger.h"
 //
-// Created by vastrakai on 6/24/2024.
 //
 
 
-class Solstice {
+class Dexko {
 public:
     /* Fields */
     static inline HMODULE mModule;
@@ -21,7 +20,6 @@ public:
     static inline int64_t mLastTick = 0;
     static inline std::shared_ptr<spdlog::logger> console;
     static inline std::shared_ptr<Preferences> Prefs;
-    static inline std::string sHWID;
     static inline std::thread mThread;
 
 

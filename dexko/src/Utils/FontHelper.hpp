@@ -16,9 +16,4 @@ public:
     static void setFontScale(float scale);
 
     static float getScaledSize(float baseSize);
-
-    // Иконочный шрифт Nurik (в нём картинки, а не текст — см. NurikIcons.hpp).
-    // Возвращает nullptr, если шрифт не загрузился, поэтому вызывающий код
-    // обязан это проверять.
-    static ImFont* getIconFont(bool large = false);
 };

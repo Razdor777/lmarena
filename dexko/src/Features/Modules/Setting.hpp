@@ -27,7 +27,7 @@ public:
     std::string mDescription;
     SettingType mType;
     bool mDisplay = false;
-    bool* mHideOnClickGUI = nullptr;
+    bool* mHideInMenu = nullptr;
     std::function<bool()> mIsVisible = []() { return true; };
 
     Setting(std::string name, std::string description, SettingType type)

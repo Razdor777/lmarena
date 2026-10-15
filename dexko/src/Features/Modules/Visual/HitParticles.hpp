@@ -2,16 +2,16 @@
 //
 // HitParticles — rewritten from scratch.
 //
-// The old version called Level::addParticle, which internally does
-// `base + 0x32A4800` — a hard-coded build address that no longer resolves,
-// so nothing ever spawned. This version owns its particles completely and
-// renders them world->screen through RenderUtils, exactly like Kagune does.
+// Particles are owned by the module itself: they are stepped here and drawn
+// world->screen through RenderUtils, so nothing depends on the game's own
+// particle system (versions/offsets change, this does not).
 //
 
 #include <Features/Modules/Module.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <glm/glm.hpp>
+#include <atomic>
 #include <vector>
 #include <cstdint>
 
@@ -87,7 +87,17 @@ public:
     void onRenderEvent(RenderEvent& event);
     void onPacketOutEvent(PacketOutEvent& event);
 
+    // ── Command bridge (used by `.htp`) ─────────────────────────────────────
+    // The chat command runs on the tick thread while particles live on the
+    // render thread, so the command never touches the vectors itself: it just
+    // raises this flag and the next frame replaces the old droplets with a
+    // burst in the freshly picked style. That is what makes `.htp fire` show
+    // a result immediately instead of only on the next landed hit.
+    void requestPreview();
+
 private:
+    static inline std::atomic<bool> sPreviewQueued{ false };
+    void spawnPreview();
     struct Particle {
         glm::vec3 pos{};
         glm::vec3 vel{};
@@ -117,6 +127,7 @@ private:
     std::vector<Pending>  mPending;
     std::vector<Flash>    mFlashes;
 
+    bool getEyeRay(glm::vec3& eye, glm::vec3& dir) const;
     void spawnBurst(const glm::vec3& center, const glm::vec3& dir,
                     float amountMul, float speedMul, float spreadMul);
     ImColor pickColor(int index);

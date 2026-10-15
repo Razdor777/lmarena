@@ -19,6 +19,14 @@ public:
         "Attack Mode", "Slap = шлепок по дуге, Sting = укол", AttackMode::Alternate,
         "Alternate", "Sting", "Slap");
 
+    // ── Стиль формы ───────────────────────────────────────────────────────
+    // Manga: гладкая органика с костяными шипами. Minecraft: квадратное сечение,
+    // ступенчатое сужение и плоское затенение «как блоки».
+    enum class Style { Manga, Minecraft };
+    EnumSettingT<Style> mStyle = EnumSettingT<Style>(
+        "Style", "Manga: smooth flesh and bone spikes. Minecraft: blocky square segments",
+        Style::Manga, "Manga", "Minecraft");
+
     // ── Кровь ─────────────────────────────────────────────────────────────
     enum class ParticleColor { DarkRed, BrightRed, Gradient };
     EnumSettingT<ParticleColor> mParticleColor = EnumSettingT<ParticleColor>(
@@ -48,6 +56,7 @@ public:
     BoolSetting mGlow    = BoolSetting("Glow",     "Blood particles",                      true);
     BoolSetting mShowFPV = BoolSetting("FPV Show", "Show in first person",                 true);
     BoolSetting mDetail  = BoolSetting("Detail",   "Glow bands + strike trail",            true);
+    NumberSetting mRingRes = NumberSetting("Ring Detail", "Cross-section polygon count (higher = smoother)", 12.0f, 8.0f, 16.0f, 4.0f);
 
     // ── Цвета (Palette = Custom) ──────────────────────────────────────────
     ColorSetting mColBlade = ColorSetting("Blade Color", "Flesh color",          0.52f, 0.03f, 0.06f, 1.0f);
@@ -177,7 +186,8 @@ public:
             &mShake,
             &mPulse, &mWidth,
             &mPalette, &mDetail,
-            &mSpikes, &mLegs, &mExitAnim, &mFpvSize, &mYOffset
+            &mSpikes, &mLegs, &mExitAnim, &mFpvSize, &mYOffset,
+            &mStyle, &mRingRes
         );
 
         VISIBILITY_CONDITION(mColBlade, mPalette.mValue == Palette::Custom);
