@@ -46,14 +46,32 @@ public:
   BoolSetting mDiamond = BoolSetting("Diamond", "Mine diamond ore", true);
   BoolSetting mEmerald = BoolSetting("Emerald", "Mine emerald ore", true);
 
+  // === Verify (real / fake) ===
+  // Сколько тиков ждать перед тем, как судить о дропе. 1-2 тика хватает, если
+  // автоподбор/плагин ложит дроп в инвентарь сразу; на лагающем сервере подними.
+  NumberSetting mVerifyTicks = NumberSetting(
+      "Verify Ticks", "Ticks to wait for the drop before judging real/fake",
+      2.f, 1.f, 40.f, 1.f);
+
   // === Debug ===
-  // Включил -> модуль открывает CSV в Juzdex\Dumps\ и пишет туда КАЖДЫЙ
-  // найденный блок (все, что проходят фильтр радиуса и типа руды), по одной
-  // строке на координату, ровно один раз за сессию дампа. Файл кладётся рядом
-  // с конфигами, так что его можно открыть любым «софтом»: Excel, Python,
-  // блокнот (есть и plain-версия "x y z" построчно).
-  BoolSetting mDebug =
-      BoolSetting("Debug", "Dump every found ore block into a CSV/TXT file", false);
+  // Включил -> модуль пишет доклад в Juzdex\Dumps\ и НЕ по скану, а по факту:
+  // каждый сломанный блок проверяется по инвентарю (до/после), и сохраняется
+  // вердикт real / fake / unknown:
+  //   real    — в дропе пришла именно эта руда (алмаз -> diamond) => настоящая;
+  //   fake    — выпало что-то другое (булыжник, камень, ...) => это был фейк;
+  //   unknown — инвентарь вообще не изменился (дроп не успел/не пришёл).
+  // Файлы:
+  //   *_verified.csv     — все проверенные блоки с вердиктом (одна строка = одна
+  //                        координата, пишется ровно один раз);
+  //   *_real_coords.txt  — только те координаты, где руда оказалась НАСТОЯЩЕЙ
+  //                        ("x y z" построчно, готовый список для ТП);
+  //   *_fake_coords.txt  — только подтверждённые фейки.
+  // Плюс, если "Verified Only" выключен, дополнительно пишется сырой скан
+  // (*_scan.csv / *_scan_coords.txt) — всё, что нашёл скан по радиусу и типу.
+  BoolSetting mDebug = BoolSetting(
+      "Debug", "Save verified ores (real/fake) into CSV/TXT files", false);
+  BoolSetting mDebugVerifiedOnly = BoolSetting(
+      "Verified Only", "Save only ores confirmed real by their drop", true);
 
   // === Render settings ===
   BoolSetting mDrawBlocks =
@@ -72,8 +90,9 @@ public:
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
                 &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
                 &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
-                &mDiamond, &mEmerald, &mDebug, &mDrawBlocks, &mDrawPath,
-                &mDrawTarget, &mDrawCluster);
+                &mDiamond, &mEmerald, &mVerifyTicks, &mDebug,
+                &mDebugVerifiedOnly, &mDrawBlocks, &mDrawPath, &mDrawTarget,
+                &mDrawCluster);
 
     mNames = {{Lowercase, "oreminerv2"},
               {LowercaseSpaced, "ore miner v2"},
@@ -139,6 +158,25 @@ public:
     }
   }
 
+  static bool isDeepslateOre(int id) {
+    return id == DEEPSLATE_COAL_ORE_ID || id == DEEPSLATE_DIAMOND_ORE_ID ||
+           id == DEEPSLATE_EMERALD_ORE_ID;
+  }
+
+  // Что должно прилететь в инвентарь, если блок настоящий.
+  static const char *expectedDropName(int blockId) {
+    switch (getOreType(blockId)) {
+    case OreType::Coal:
+      return "coal";
+    case OreType::Diamond:
+      return "diamond";
+    case OreType::Emerald:
+      return "emerald";
+    default:
+      return "";
+    }
+  }
+
   // =====================================================
   // Scan data
   // =====================================================
@@ -170,23 +208,44 @@ public:
   MineState mState = MineState::Idle;
   glm::vec3 mRots = {0, 0, 0};
 
-  // В секции Mining state machine (после glm::vec3 mRots):
   int mCurrentClusterOreId = 0;
-
-  // Сигнатуру checkForFakeDrop замени на:
-  bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
-                        const std::unordered_map<std::string, int> &after,
-                        int expectedOreId);
+  int mClusterId = 0; // номер текущего кластера (для дампа)
 
   std::vector<BlockPos> mCurrentCluster;
   int mCurrentClusterIdx = 0;
   BlockPos mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
 
+  // ==== Проверка дропа (real / fake) ====
+  // Перед каждым сломом блока снимаем инвентарь (mPreSnapshot), через
+  // mVerifyTicks тиков сравниваем и выносим вердикт по конкретной координате.
+  struct DropCheckResult {
+    bool real = false;    // в инвентарь пришла ожидаемая руда
+    bool fake = false;    // пришло что-то другое => блок был фейком
+    bool unknown = false; // инвентарь не изменился (дроп ещё в пути)
+    std::string expectedDrop;   // "diamond" / "coal" / "emerald"
+    std::string observed = "-"; // что реально прибавилось: "diamond x1"
+    [[nodiscard]] const char *verdict() const {
+      return real ? "real" : (fake ? "fake" : "unknown");
+    }
+  };
+
   std::unordered_map<std::string, int> mPreSnapshot;
-  bool mNeedFirstVerify = false;
+  bool mPendingVerify = false;
+  BlockPos mLastMinedPos = {INT_MAX, INT_MAX, INT_MAX};
+  int mLastMinedOreId = 0;
+  int mLastMinedClusterIdx = 0;
+  float mLastMinedDistance = 0.f;
+
+  // Итоги проверки: сюда попадают только подтверждённые координаты
+  std::unordered_set<BlockPos> mRealPositions;
+  std::unordered_set<BlockPos> mFakePositions;
+  std::unordered_set<BlockPos> mUnknownPositions;
 
   int mTickDelay = 0;
   int mBlocksMined = 0;
+  int mRealBlocks = 0;
+  int mFakeBlocks = 0;
+  int mUnknownBlocks = 0;
   int mFakeClusters = 0;
 
   std::unordered_set<BlockPos> mMinedPositions;
@@ -204,7 +263,7 @@ public:
   bool mBindWaitRelease = false;
 
   // =====================================================
-  // Debug dump
+  // Debug dump (verified real/fake)
   // =====================================================
   struct DebugRow {
     BlockPos pos{};
@@ -214,21 +273,39 @@ public:
     bool     onScreen = false;
     float    screenX  = 0.f;
     float    screenY  = 0.f;
+    bool     verified = false; // подтверждено дропом (real)
   };
 
-  std::string mDebugCsvPath;
-  std::string mDebugCoordsPath;
-  std::ofstream mDebugCsv;
-  std::ofstream mDebugCoords;
-  std::unordered_set<BlockPos> mDebugWritten; // каждая координата — ровно один раз
-  int  mDebugRows    = 0;
+  std::string mDebugScanPath;
+  std::string mDebugScanCoordsPath;
+  std::string mDebugVerifiedPath;
+  std::string mDebugRealCoordsPath;
+  std::string mDebugFakeCoordsPath;
+
+  std::ofstream mDebugScanCsv;
+  std::ofstream mDebugScanCoords;
+  std::ofstream mDebugVerifiedCsv;
+  std::ofstream mDebugRealCoords;
+  std::ofstream mDebugFakeCoords;
+
+  std::unordered_set<BlockPos> mDebugWritten;         // каждая координата — ровно один раз
+  std::unordered_set<BlockPos> mDebugVerifiedWritten; // то же для verified-лога
+
+  int  mDebugRows    = 0; // строк в *_scan.csv
+  int  mDebugVerifiedRows = 0; // строк в *_verified.csv
   bool mDebugWasOn   = false;
   uint64_t mDebugStartedAt = 0;
 
   void debugStart();                                  // новый файл под дамп
-  void debugFlush(const std::vector<DebugRow> &rows);  // дописать строки
+  void debugFlush(const std::vector<DebugRow> &rows);  // дописать строки скана
+  void debugEnsureScanFiles();                         // ленивое открытие scan-файлов
+  void debugLogVerified(const BlockPos &pos, int oreId,
+                        const DropCheckResult &res, int clusterIdx,
+                        int clusterSize, float distance);
   void debugStop();                                   // закрыть файлы
   static const char *oreTypeName(int blockId);
+  static bool isDeepslateOre(int blockId);
+  static std::string shortItemName(std::string name);
 
   // =====================================================
   // Scan methods
@@ -263,8 +340,13 @@ public:
   void mineBlockAtPos(const BlockPos &pos, Actor *player);
 
   std::unordered_map<std::string, int> getInventorySnapshot();
-  bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
-                        const std::unordered_map<std::string, int> &after);
+  DropCheckResult checkDrop(const std::unordered_map<std::string, int> &before,
+                            const std::unordered_map<std::string, int> &after,
+                            int expectedOreId);
+  // Проверяет последний сломанный блок. false => кластер забракован (фейк).
+  bool resolvePendingDrop();
+  // Снимок инвентаря + слом блока + постановка проверки на паузу.
+  void mineBlockWithVerify(const BlockPos &pos, class Actor *player);
 
   // Key helpers
   static const char *getKeyName(int vk);
@@ -293,6 +375,9 @@ public:
     }
     if (!mFilteredBlocks.empty())
       s += " [" + std::to_string(mFilteredBlocks.size()) + "]";
+    if (mRealBlocks || mFakeBlocks)
+      s += " R:" + std::to_string(mRealBlocks) + " F:" +
+           std::to_string(mFakeBlocks);
     return s;
   }
 };
