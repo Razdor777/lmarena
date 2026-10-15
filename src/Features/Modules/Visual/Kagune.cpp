@@ -569,7 +569,7 @@ void Kagune::onRenderEvent(RenderEvent& event)
     const float fpvK    = isFPV ? mFpvSize.mValue : 1.f;   // FPV Size: масштаб от первого лица
     const int   cnt     = std::clamp((int)mCount.mValue,    1, kMax);
     const float maxLen  = mLength.mValue * fpvK;
-    const float baseRad = mThickness.mValue * 0.014f * fpvK;
+    const float baseRad = mThickness.mValue * 0.02f * fpvK;   // толщина: тело, а не верёвка
     const int   M       = std::clamp((int)mSegments.mValue, 8, 48);
     const int   res     = std::clamp(((int)mRingRes.mValue / 4) * 4, 8, 16);   // кратно 4
     const float animDur = std::max(mAnimTime.mValue, 0.2f);
@@ -983,8 +983,9 @@ void Kagune::onRenderEvent(RenderEvent& event)
         }
 
         // 2. рамки колец: N — широкая ось лезвия, B — тонкая
-        const float rW = ac.R * 1.7f * widthK;
-        const float rT = ac.R * 0.42f;
+        // почти круглое сечение (было 1.7 / 0.42 — плоская лента, «бумага»)
+        const float rW = ac.R * 1.30f * widthK;
+        const float rT = ac.R * 1.05f;
         sR.resize(M);
         for (int j = 0; j < M; j++) {
             glm::vec3 d = (j == 0) ? sSp[1] - sSp[0]
