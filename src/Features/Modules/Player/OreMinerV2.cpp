@@ -41,6 +41,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <map>
+#include <queue>
 #include <sstream>
 
 // =============================================================
@@ -58,7 +59,11 @@
 //     Скачок — сдвиг больше 100 блоков за тик (столько не пройти и не
 //     пролететь). Свои прыжки (переезд, спуск) и ручной .tp — не скачок. Если
 //     /rtp только что набрали руками, сразу спуск: второй /rtp не шлём.
-namespace {
+// Именованное пространство, не анонимное: при unity-сборке (CMAKE_UNITY_BUILD)
+// соседние .cpp склеиваются в один, и анонимные chunkOf/since/... сталкивались
+// с одноимёнными функциями других файлов (OreMiner.cpp). Снаружи — только
+// с префиксом OreMinerV2Impl::.
+namespace OreMinerV2Impl {
 constexpr uint64_t kHealEveryMs = 5ull * 60ull * 1000ull;
 constexpr float kJumpDist = 100.f;      // за один тик столько не пройти
 constexpr uint64_t kJumpPauseMs = 1500; // скачок -> пауза -> /rtp
@@ -306,7 +311,7 @@ bool hiddenTick(OreMinerV2 &m, Actor *player, uint64_t now) {
     return false;
   }
 }
-} // namespace
+} // namespace OreMinerV2Impl
 
 // =============================================================
 // ENABLED BLOCK IDS
@@ -351,7 +356,7 @@ void OreMinerV2::resetScan() {
 
   auto player = ClientInstance::get()->getLocalPlayer();
   if (player) {
-    mSearchCenter = chunkOf(*player->getPos());
+    mSearchCenter = OreMinerV2Impl::chunkOf(*player->getPos());
     mCurrentChunkPos = mSearchCenter;
   }
 }
@@ -1278,7 +1283,7 @@ void OreMinerV2::onEnable() {
   mLastMinedAt = 0;
   mDropSettle = false;
   mJunkDropped = 0;
-  hiddenReset(static_cast<uint64_t>(NOW));
+  OreMinerV2Impl::hiddenReset(static_cast<uint64_t>(NOW));
 
   {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
@@ -1328,7 +1333,8 @@ void OreMinerV2::onDisable() {
   mSinceLastDrop.clear();
   mRetriedOnce.clear();
   cancelRelocation();
-  hiddenReset(static_cast<uint64_t>(NOW)); // восстановление после скачка — стоп
+  // восстановление после скачка — стоп
+  OreMinerV2Impl::hiddenReset(static_cast<uint64_t>(NOW));
 
   // Файлы дампа закрываем, как только модуль выключили: каждая строка уже
   // сброшена на диск в момент записи, здесь только итог в чат.
@@ -1771,8 +1777,9 @@ void OreMinerV2::learnJunk(uint64_t now) {
     return;
   }
   InvSnapshot cur = getInventorySnapshot();
-  const bool fromMining = mPending.active || mState == MineState::Mining ||
-                          (mLastMinedAt != 0 && since(now, mLastMinedAt) < 2000);
+  const bool fromMining =
+      mPending.active || mState == MineState::Mining ||
+      (mLastMinedAt != 0 && OreMinerV2Impl::since(now, mLastMinedAt) < 2000);
   if (mInvPrevValid && fromMining) {
     for (const auto &[name, cnt] : cur) {
       auto it = mInvPrev.find(name);
@@ -1799,7 +1806,8 @@ void OreMinerV2::dropJunkHere(Inventory *container) {
     const std::string &name = item->getItem()->mName;
     if (!mJunkNames.contains(name) || isKeptItem(toLowerAscii(name)))
       continue;
-    if (mDropAskedAt[i] != 0 && since(now, mDropAskedAt[i]) < 1500)
+    if (mDropAskedAt[i] != 0 &&
+        OreMinerV2Impl::since(now, mDropAskedAt[i]) < 1500)
       continue; // уже выкидывали — ждём, пока сервер ответит
     mJustDropped[name] += item->mCount; // до dropSlot: стак ещё на месте
     container->dropSlot(i);
@@ -2085,7 +2093,7 @@ void OreMinerV2::maybeAutoRelocate(Actor *player, uint64_t now) {
     return;
   const auto idleMs = static_cast<uint64_t>(
       std::clamp(mIdleTime.mValue, 0.f, 10.f) * 1000.f + 0.5f);
-  const uint64_t idle = since(now, mLastBusyAt);
+  const uint64_t idle = OreMinerV2Impl::since(now, mLastBusyAt);
   if (idle < idleMs)
     return;
   if (stopIfEmptyRelocations(*this))
@@ -2226,7 +2234,8 @@ void OreMinerV2::finishRelocation(Actor *player, bool chunksReady,
   mHopsDone = 0;
   resetScan();       // центр спирали — здесь, mScanComplete = false
   mLastBusyAt = now; // Idle Time — заново, от прибытия
-  hiddenQuiet(now + kQuietMs); // поздний откат сервера — не «скачок»
+  // поздний откат сервера — не «скачок»
+  OreMinerV2Impl::hiddenQuiet(now + OreMinerV2Impl::kQuietMs);
 
   // Сдвинулись меньше чем на чанк — дальше в эту сторону не пускают.
   const bool blocked = total < 16;
@@ -2305,7 +2314,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
   // =================== HIDDEN ===================
   // /heal раз в 5 минут и сторож координат (скачок -> /rtp -> вниз на y=10).
   // Пока сторож чинит позицию, ничего не сканируем и не копаем.
-  if (hiddenTick(*this, player, now))
+  if (OreMinerV2Impl::hiddenTick(*this, player, now))
     return;
 
   // Auto Drop: что принесла копка (вещи выкидываются в mineBlockAtPos).
@@ -2343,7 +2352,8 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
         // были все чанки в пределах досягаемости (или какие-то так и не
         // пришли за kScanGiveUpMs — тогда хватит и того, что есть).
         if (!mScanComplete &&
-            (mPassMissing == 0 || since(now, mScanStartedAt) >= kScanGiveUpMs))
+            (mPassMissing == 0 ||
+             OreMinerV2Impl::since(now, mScanStartedAt) >= kScanGiveUpMs))
           mScanComplete = true;
         mPassMissing = 0;
         if (mScanDirty) {
@@ -2351,7 +2361,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
           updateClusters();
           mLastClusterUpdate = now;
         }
-        mSearchCenter = chunkOf(pp);
+        mSearchCenter = OreMinerV2Impl::chunkOf(pp);
         mCurrentChunkPos = mSearchCenter;
         mStepsCount = 0;
         mSteps = 1;
@@ -2392,7 +2402,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     BlockPos bp = *player->getPos();
     int sc = (bp.y - depth) >> 4;
     bool r = false;
-    tryProcessSub(r, chunkOf(pp), sc);
+    tryProcessSub(r, OreMinerV2Impl::chunkOf(pp), sc);
 
     if (mScanDirty && now - mLastClusterUpdate > 2000) {
       mScanDirty = false; // до вызова: updateClusters может вернуть true
@@ -2564,7 +2574,7 @@ void OreMinerV2::onPacketOutEvent(PacketOutEvent &event) {
     const std::string c = toLowerAscii(pkt->mCommand);
     for (const char *k : {"/rtp", "/wild", "/randomtp"})
       if (c.rfind(k, 0) == 0)
-        hiddenRtpSent(static_cast<uint64_t>(NOW));
+        OreMinerV2Impl::hiddenRtpSent(static_cast<uint64_t>(NOW));
   }
 }
 
@@ -2589,7 +2599,8 @@ void OreMinerV2::onPacketInEvent(PacketInEvent &event) {
       if (glm::distance(pkt->mPos, *player->getPos()) > 2.f)
         mHopCorrections.fetch_add(1);
     } else if (mSilentAccept.mValue &&
-               glm::distance(pkt->mPos, *player->getPos()) <= kJumpDist) {
+               glm::distance(pkt->mPos, *player->getPos()) <=
+                   OreMinerV2Impl::kJumpDist) {
       event.cancel();
       ClientInstance::get()->getPacketSender()->sendToServer(pkt.get());
     }
@@ -2789,14 +2800,14 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     std::string status;
 
     const bool paused = now < mPauseUntil;
-    const bool recovering = hiddenRecovering();
+    const bool recovering = OreMinerV2Impl::hiddenRecovering();
     // Auto Relocate ждёт Idle Time — показываем обратный отсчёт.
     const bool idleWait = mAutoRelocate.mValue && !recovering &&
                           mHopPhase == HopPhase::None &&
                           mState == MineState::Idle && !paused &&
                           !mPending.active;
     if (recovering) {
-      status = hiddenStatus(now);
+      status = OreMinerV2Impl::hiddenStatus(now);
     } else if (mHopPhase == HopPhase::Hopping) {
       status = "Relocating: hop " + std::to_string(mHopsDone) + "/" +
                std::to_string(kHopCount);
@@ -2823,7 +2834,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
           } else {
             const auto idleMs = static_cast<uint64_t>(
                 std::clamp(mIdleTime.mValue, 0.f, 10.f) * 1000.f + 0.5f);
-            const uint64_t idle = since(now, mLastBusyAt);
+            const uint64_t idle = OreMinerV2Impl::since(now, mLastBusyAt);
             const uint64_t left = idle < idleMs ? idleMs - idle : 0;
             char buf[48];
             snprintf(buf, sizeof(buf), " | hop in %.1fs",
@@ -2871,7 +2882,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
 }
 
 std::string OreMinerV2::getSettingDisplay() {
-  if (hiddenRecovering())
+  if (OreMinerV2Impl::hiddenRecovering())
     return "RTP";
   if (mHopPhase == HopPhase::Hopping)
     return "Hop " + std::to_string(mHopsDone) + "/" + std::to_string(kHopCount);

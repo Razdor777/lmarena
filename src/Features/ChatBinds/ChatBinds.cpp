@@ -21,17 +21,14 @@
 #include <filesystem>
 #include <fstream>
 
-namespace
-{
-    std::string bindsPath() { return FileUtils::getSolsticeDir() + "chat_binds.json"; }
+std::string ChatBinds::bindsPath() { return FileUtils::getSolsticeDir() + "chat_binds.json"; }
 
-    std::string trimmed(const std::string& s)
-    {
-        size_t a = s.find_first_not_of(" \t");
-        if (a == std::string::npos) return {};
-        size_t b = s.find_last_not_of(" \t");
-        return s.substr(a, b - a + 1);
-    }
+std::string ChatBinds::trimmed(const std::string& s)
+{
+    size_t a = s.find_first_not_of(" \t");
+    if (a == std::string::npos) return {};
+    size_t b = s.find_last_not_of(" \t");
+    return s.substr(a, b - a + 1);
 }
 
 void ChatBinds::loadLocked()

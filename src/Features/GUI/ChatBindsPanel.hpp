@@ -66,6 +66,27 @@ private:
     float textW(const std::string& s, float px) const;
     void  text(ImDrawList* dl, ImVec2 p, const std::string& s, ImU32 col, float px) const;
 
+    // Размеры и помощники — члены класса, а не свободные функции в .cpp.
+    // Unity-сборка (CMAKE_UNITY_BUILD) склеивает соседние .cpp в один, и
+    // одноимённые in/rgba/kRowH... из ModernDropdown/CombatantGui давали
+    // «уже имеет текст реализации» / «неоднозначный символ». Внутри методов
+    // члены класса находятся раньше любых имён из других файлов.
+    static constexpr float kRowH = 38.f, kHeaderH = 44.f, kAddH = 38.f, kFootH = 28.f, kPad = 10.f, kW = 420.f;
+    static constexpr int   kVisibleRows = 8;
+
+    static bool        in(const ImVec4& r, ImVec2 p);
+    static ImVec2      mn(const ImVec4& r);
+    static ImVec2      mx(const ImVec4& r);
+    static ImU32       rgba(int r, int g, int b, float a);
+    static ImU32       white(float a);
+    static ImU32       withA(const ImColor& c, float a);
+    static float       smoothTo(float cur, float tgt, float speed, float dt);
+    static std::string toUtf8(const wchar_t* w, int n);
+    static void        popUtf8(std::string& s);
+    static std::string charFromKey(int vk);
+    static std::string clipboardText();
+    static int         clickGuiKey();
+
     void beginEdit(int idx);
     void commitEdit();
     void cancelEdit();

@@ -54,6 +54,10 @@ public:
 private:
     static void loadLocked();
     static void saveLocked();
+    // Члены класса, а не свободные функции в .cpp: при unity-сборке соседние
+    // .cpp склеиваются в один, и одноимённые свободные функции конфликтуют.
+    static std::string bindsPath();
+    static std::string trimmed(const std::string& s);
 
     static inline std::mutex sMutex;
     static inline std::vector<ChatBind> sBinds;

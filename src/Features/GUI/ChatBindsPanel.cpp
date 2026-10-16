@@ -13,71 +13,72 @@
 #include <cmath>
 #include <cstring>
 
-namespace
+// Помощники — static-члены ChatBindsPanel (см. .hpp: unity-сборка).
+
+bool   ChatBindsPanel::in(const ImVec4& r, ImVec2 p) { return p.x >= r.x && p.y >= r.y && p.x < r.z && p.y < r.w; }
+ImVec2 ChatBindsPanel::mn(const ImVec4& r) { return { r.x, r.y }; }
+ImVec2 ChatBindsPanel::mx(const ImVec4& r) { return { r.z, r.w }; }
+ImU32  ChatBindsPanel::rgba(int r, int g, int b, float a) { return IM_COL32(r, g, b, (int)(std::clamp(a, 0.f, 1.f) * 255.f)); }
+ImU32  ChatBindsPanel::white(float a) { return rgba(255, 255, 255, a); }
+ImU32  ChatBindsPanel::withA(const ImColor& c, float a) { return ImColor(c.Value.x, c.Value.y, c.Value.z, std::clamp(a, 0.f, 1.f)); }
+
+float ChatBindsPanel::smoothTo(float cur, float tgt, float speed, float dt)
 {
-    bool   in(const ImVec4& r, ImVec2 p) { return p.x >= r.x && p.y >= r.y && p.x < r.z && p.y < r.w; }
-    ImVec2 mn(const ImVec4& r) { return { r.x, r.y }; }
-    ImVec2 mx(const ImVec4& r) { return { r.z, r.w }; }
-    ImU32  rgba(int r, int g, int b, float a) { return IM_COL32(r, g, b, (int)(std::clamp(a, 0.f, 1.f) * 255.f)); }
-    ImU32  white(float a) { return rgba(255, 255, 255, a); }
-    ImU32  withA(const ImColor& c, float a) { return ImColor(c.Value.x, c.Value.y, c.Value.z, std::clamp(a, 0.f, 1.f)); }
-    float  smoothTo(float cur, float tgt, float speed, float dt)
-    {
-        float v = tgt + (cur - tgt) * std::exp(-speed * dt);
-        return std::fabs(v - tgt) < 0.0005f ? tgt : v;
-    }
+    float v = tgt + (cur - tgt) * std::exp(-speed * dt);
+    return std::fabs(v - tgt) < 0.0005f ? tgt : v;
+}
 
-    std::string toUtf8(const wchar_t* w, int n)
-    {
-        if (n <= 0) return {};
-        char buf[512];
-        int len = WideCharToMultiByte(CP_UTF8, 0, w, n, buf, sizeof(buf), nullptr, nullptr);
-        return len > 0 ? std::string(buf, len) : std::string();
-    }
-    void popUtf8(std::string& s)
-    {
-        if (s.empty()) return;
-        size_t i = s.size() - 1;
-        while (i > 0 && (s[i] & 0xC0) == 0x80) --i;
-        s.erase(i);
-    }
-    // Символ с учётом раскладки и Shift/Caps (как в поиске ModernGui).
-    std::string charFromKey(int vk)
-    {
-        BYTE ks[256] = {};
-        BYTE sh = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 0x80 : 0;
-        ks[VK_SHIFT] = ks[VK_LSHIFT] = ks[VK_RSHIFT] = sh;
-        ks[VK_CAPITAL] = (GetKeyState(VK_CAPITAL) & 1) ? 1 : 0;
-        HKL hkl = GetKeyboardLayout(0);
-        UINT sc = MapVirtualKeyExW((UINT)vk, MAPVK_VK_TO_VSC, hkl);
-        WCHAR out[8]{};
-        int n = ToUnicodeEx((UINT)vk, sc, ks, out, 8, 0x4, hkl);
-        if (n <= 0 || out[0] < 32) return {};
-        return toUtf8(out, n);
-    }
-    std::string clipboardText()
-    {
-        std::string out;
-        if (!OpenClipboard(nullptr)) return out;
-        if (HANDLE h = GetClipboardData(CF_UNICODETEXT)) {
-            if (auto* w = (const wchar_t*)GlobalLock(h)) {
-                out = toUtf8(w, (int)wcslen(w));
-                GlobalUnlock(h);
-            }
+std::string ChatBindsPanel::toUtf8(const wchar_t* w, int n)
+{
+    if (n <= 0) return {};
+    char buf[512];
+    int len = WideCharToMultiByte(CP_UTF8, 0, w, n, buf, sizeof(buf), nullptr, nullptr);
+    return len > 0 ? std::string(buf, len) : std::string();
+}
+
+void ChatBindsPanel::popUtf8(std::string& s)
+{
+    if (s.empty()) return;
+    size_t i = s.size() - 1;
+    while (i > 0 && (s[i] & 0xC0) == 0x80) --i;
+    s.erase(i);
+}
+
+// Символ с учётом раскладки и Shift/Caps (как в поиске ModernGui).
+std::string ChatBindsPanel::charFromKey(int vk)
+{
+    BYTE ks[256] = {};
+    BYTE sh = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 0x80 : 0;
+    ks[VK_SHIFT] = ks[VK_LSHIFT] = ks[VK_RSHIFT] = sh;
+    ks[VK_CAPITAL] = (GetKeyState(VK_CAPITAL) & 1) ? 1 : 0;
+    HKL hkl = GetKeyboardLayout(0);
+    UINT sc = MapVirtualKeyExW((UINT)vk, MAPVK_VK_TO_VSC, hkl);
+    WCHAR out[8]{};
+    int n = ToUnicodeEx((UINT)vk, sc, ks, out, 8, 0x4, hkl);
+    if (n <= 0 || out[0] < 32) return {};
+    return toUtf8(out, n);
+}
+
+std::string ChatBindsPanel::clipboardText()
+{
+    std::string out;
+    if (!OpenClipboard(nullptr)) return out;
+    if (HANDLE h = GetClipboardData(CF_UNICODETEXT)) {
+        if (auto* w = (const wchar_t*)GlobalLock(h)) {
+            out = toUtf8(w, (int)wcslen(w));
+            GlobalUnlock(h);
         }
-        CloseClipboard();
-        out.erase(std::remove_if(out.begin(), out.end(), [](char c) { return c == '\r' || c == '\n' || c == '\t'; }), out.end());
-        return out;
     }
-    int clickGuiKey()
-    {
-        if (!gFeatureManager || !gFeatureManager->mModuleManager) return VK_TAB;
-        auto cg = gFeatureManager->mModuleManager->getModule<ClickGui>();
-        return cg ? cg->mKey : VK_TAB;
-    }
+    CloseClipboard();
+    out.erase(std::remove_if(out.begin(), out.end(), [](char c) { return c == '\r' || c == '\n' || c == '\t'; }), out.end());
+    return out;
+}
 
-    constexpr float kRowH = 38.f, kHeaderH = 44.f, kAddH = 38.f, kFootH = 28.f, kPad = 10.f, kW = 420.f;
-    constexpr int   kVisibleRows = 8;
+int ChatBindsPanel::clickGuiKey()
+{
+    if (!gFeatureManager || !gFeatureManager->mModuleManager) return VK_TAB;
+    auto cg = gFeatureManager->mModuleManager->getModule<ClickGui>();
+    return cg ? cg->mKey : VK_TAB;
 }
 
 float ChatBindsPanel::textW(const std::string& s, float px) const
