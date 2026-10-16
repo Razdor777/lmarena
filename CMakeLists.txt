@@ -174,13 +174,14 @@ file(GLOB_RECURSE includeFiles "include/*.hpp")
 set_source_files_properties(${sourceFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 set_source_files_properties(${includeFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
-# Чат-бинды — новые .cpp; собираются отдельно, вне unity-чанков. Unity-сборка
-# режет список .cpp на чанки по 8 подряд, и каждый новый файл сдвигал бы все
-# чанки после себя: в одном .cpp оказывались бы соседи, которые раньше
-# собирались порознь (одноимённые функции/константы -> ошибки C2084/C2872).
+# Чат-бинды и AutoContract — новые .cpp; собираются отдельно, вне unity-чанков.
+# Unity-сборка режет список .cpp на чанки по 8 подряд, и каждый новый файл
+# сдвигал бы все чанки после себя: в одном .cpp оказывались бы соседи, которые
+# раньше собирались порознь (одноимённые функции/константы -> ошибки C2084/C2872).
 set_source_files_properties(
         src/Features/ChatBinds/ChatBinds.cpp
         src/Features/GUI/ChatBindsPanel.cpp
+        src/Features/Modules/Misc/AutoContract.cpp
         PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 
