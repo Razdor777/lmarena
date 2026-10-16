@@ -46,14 +46,27 @@ public:
   BoolSetting mDiamond = BoolSetting("Diamond", "Mine diamond ore", true);
   BoolSetting mEmerald = BoolSetting("Emerald", "Mine emerald ore", true);
 
-  // === Debug ===
-  // Включил -> модуль открывает CSV в Juzdex\Dumps\ и пишет туда КАЖДЫЙ
-  // найденный блок (все, что проходят фильтр радиуса и типа руды), по одной
-  // строке на координату, ровно один раз за сессию дампа. Файл кладётся рядом
-  // с конфигами, так что его можно открыть любым «софтом»: Excel, Python,
-  // блокнот (есть и plain-версия "x y z" построчно).
-  BoolSetting mDebug =
-      BoolSetting("Debug", "Dump every found ore block into a CSV/TXT file", false);
+  // === Fake check / Debug ===
+  // Сервер (плагин авто-подбора) кладёт дроп сломанного блока сразу в
+  // инвентарь. Поэтому «инвентарь до слома» vs «инвентарь после» однозначно
+  // говорит, что на этой координате было НА САМОМ ДЕЛЕ:
+  //   пришёл алмаз/уголь/изумруд (или сама руда при шёлке) -> руда настоящая;
+  //   пришло что-то другое (булыжник, камень, ...)         -> это был фейк.
+  // Verify Timeout — сколько максимум ждать, пока дроп долетит до инвентаря.
+  // Вердикт выносится сразу, как только инвентарь изменился; таймаут нужен
+  // только на случай, когда не пришло вообще ничего.
+  NumberSetting mVerifyTimeout = NumberSetting(
+      "Verify Timeout", "Max ms to wait for the drop to land in inventory",
+      1000.f, 100.f, 5000.f, 50.f);
+
+  // Включил -> так проверяется КАЖДЫЙ сломанный блок (а не только первый в
+  // кластере), и в Juzdex\Dumps\ сохраняется только проверенное:
+  //   OreMinerV2_<дата_время>.csv       — все вердикты по координатам
+  //   OreMinerV2_<дата_время>_real.txt  — только настоящие руды, "x y z ore"
+  //   OreMinerV2_<дата_время>_fake.txt  — только фейки,         "x y z ore"
+  BoolSetting mDebug = BoolSetting(
+      "Debug", "Check every mined ore by its drop, save real/fake coords to Dumps",
+      false);
 
   // === Render settings ===
   BoolSetting mDrawBlocks =
@@ -72,8 +85,8 @@ public:
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
                 &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
                 &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
-                &mDiamond, &mEmerald, &mDebug, &mDrawBlocks, &mDrawPath,
-                &mDrawTarget, &mDrawCluster);
+                &mDiamond, &mEmerald, &mVerifyTimeout, &mDebug, &mDrawBlocks,
+                &mDrawPath, &mDrawTarget, &mDrawCluster);
 
     mNames = {{Lowercase, "oreminerv2"},
               {LowercaseSpaced, "ore miner v2"},
@@ -106,6 +119,11 @@ public:
   static bool isSameOreType(int a, int b) {
     OreType ta = getOreType(a), tb = getOreType(b);
     return ta != OreType::None && ta == tb;
+  }
+
+  static bool isDeepslateOre(int id) {
+    return id == DEEPSLATE_COAL_ORE_ID || id == DEEPSLATE_DIAMOND_ORE_ID ||
+           id == DEEPSLATE_EMERALD_ORE_ID;
   }
 
   static void getClusterRange(OreType t, int &lo, int &hi) {
@@ -170,20 +188,13 @@ public:
   MineState mState = MineState::Idle;
   glm::vec3 mRots = {0, 0, 0};
 
-  // В секции Mining state machine (после glm::vec3 mRots):
-  int mCurrentClusterOreId = 0;
-
-  // Сигнатуру checkForFakeDrop замени на:
-  bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
-                        const std::unordered_map<std::string, int> &after,
-                        int expectedOreId);
+  int mCurrentClusterOreId = 0; // тип руды кластера (по первому блоку)
 
   std::vector<BlockPos> mCurrentCluster;
   int mCurrentClusterIdx = 0;
   BlockPos mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
 
-  std::unordered_map<std::string, int> mPreSnapshot;
-  bool mNeedFirstVerify = false;
+  bool mNeedFirstVerify = false; // ждём дроп с первого блока кластера
 
   int mTickDelay = 0;
   int mBlocksMined = 0;
@@ -204,31 +215,88 @@ public:
   bool mBindWaitRelease = false;
 
   // =====================================================
-  // Debug dump
+  // Drop verification (сервер кладёт дроп сразу в инвентарь)
+  // =====================================================
+  enum class DropVerdict {
+    Pending,  // в инвентаре ещё ничего не прибавилось, таймаут не вышел
+    Real,     // прибавилась именно эта руда       -> блок был настоящим
+    Fake,     // прибавилось что-то другое          -> блок был фейком
+    NoDrop,   // за Verify Timeout не пришло ничего (лаг / сервер не дал сломать)
+    InvFull,  // ничего не пришло, а свободных слотов нет — проверить нельзя
+    Revealed, // не ломали: сервер уже показал, что тут не эта руда
+    Skipped,  // не ломали: первый блок кластера оказался фейком
+  };
+
+  struct DropCheck {
+    DropVerdict verdict = DropVerdict::Pending;
+    std::string got; // что прибавилось: "diamond x1", "cobblestone x1 + dirt x1"
+  };
+
+  // Блок, который уже сломан и чей дроп мы ждём. Одновременно ждём максимум
+  // один блок: следующий ломается только после вердикта по предыдущему, иначе
+  // нельзя сказать, чей именно дроп упал в инвентарь.
+  struct PendingCheck {
+    bool active = false;
+    bool probe = false; // первый блок кластера: его вердикт решает весь кластер
+    BlockPos pos{};
+    int blockId = 0;
+    uint64_t sentAt = 0;
+    int clusterNo = 0;
+    int clusterIdx = 0;
+    int clusterSize = 0;
+    bool settling = false; // инвентарь уже изменился, ждём тик «досыпания»
+    int seenWaitMs = 0;    // через сколько мс после слома он изменился
+    std::unordered_map<std::string, int> before; // инвентарь до слома
+  };
+
+  enum class PollResult {
+    Waiting,       // дроп ещё не пришёл — ждём дальше
+    Resolved,      // вердикт вынесен, можно ломать следующий блок
+    ClusterDropped // вердикт по первому блоку — кластер брошен
+  };
+
+  PendingCheck mPending;
+  int mClusterNo = 0;         // сквозной номер кластера (для CSV)
+  bool mInvFullPause = false; // нет свободного слота — дроп некуда класть
+
+  // =====================================================
+  // Debug dump — только проверенные дропом блоки
   // =====================================================
   struct DebugRow {
     BlockPos pos{};
-    int      blockId  = 0;
-    bool     deepslate = false;
-    float    distance = 0.f;
-    bool     onScreen = false;
-    float    screenX  = 0.f;
-    float    screenY  = 0.f;
+    int blockId = 0;
+    DropVerdict verdict = DropVerdict::Skipped;
+    std::string got;
+    int waitMs = -1; // -1 = блок не ломали
+    int clusterNo = 0;
+    int clusterIdx = 0;
+    int clusterSize = 0;
+    bool listAsFake = false; // попадает ли координата в _fake.txt
   };
 
-  std::string mDebugCsvPath;
-  std::string mDebugCoordsPath;
+  std::string mDebugBasePath; // ...\Dumps\OreMinerV2_<дата_время>
   std::ofstream mDebugCsv;
-  std::ofstream mDebugCoords;
-  std::unordered_set<BlockPos> mDebugWritten; // каждая координата — ровно один раз
-  int  mDebugRows    = 0;
-  bool mDebugWasOn   = false;
-  uint64_t mDebugStartedAt = 0;
+  std::ofstream mDebugRealTxt;
+  std::ofstream mDebugFakeTxt;
+  // Одна строка на координату. Исключение: «skipped» (вывод без слома) можно
+  // потом уточнить настоящим вердиктом, если блок всё-таки сломали.
+  std::unordered_map<BlockPos, DropVerdict> mDebugWritten;
+  bool mDebugWasOn = false;
+  bool mDebugOpenFailed = false;
+  int mDebugReal = 0;
+  int mDebugFake = 0;
+  int mDebugNoDrop = 0;
+  int mDebugRevealed = 0;
+  int mDebugSkipped = 0;
 
-  void debugStart();                                  // новый файл под дамп
-  void debugFlush(const std::vector<DebugRow> &rows);  // дописать строки
-  void debugStop();                                   // закрыть файлы
+  void debugSync();                     // Debug вкл/выкл -> новая сессия / закрыть
+  bool debugOpen();                     // файлы создаются на первом вердикте
+  void debugWrite(const DebugRow &row); // дописать вердикт во все файлы
+  void debugClose();                    // закрыть файлы + итог в чат
   static const char *oreTypeName(int blockId);
+  static const char *expectedDropName(int blockId);
+  static const char *verdictName(DropVerdict v);
+  static std::string cleanName(std::string name); // без "minecraft:", для CSV
 
   // =====================================================
   // Scan methods
@@ -260,11 +328,28 @@ public:
 
   std::shared_ptr<class MovePlayerPacket> createPacketForPos(glm::vec3 pos);
   void straightLineTP(glm::vec3 from, glm::vec3 to, bool saveForRender);
-  void mineBlockAtPos(const BlockPos &pos, Actor *player);
+  bool mineBlockAtPos(const BlockPos &pos, Actor *player);
 
   std::unordered_map<std::string, int> getInventorySnapshot();
-  bool checkForFakeDrop(const std::unordered_map<std::string, int> &before,
-                        const std::unordered_map<std::string, int> &after);
+  bool hasFreeInventorySlot();
+  void pauseForFullInventory();
+  void resumeAfterFullInventory();
+
+  // Сравнить инвентарь до/после слома руды oreBlockId -> вердикт.
+  static DropCheck
+  classifyDrop(const std::unordered_map<std::string, int> &before,
+               const std::unordered_map<std::string, int> &after,
+               int oreBlockId);
+  void startPendingCheck(const BlockPos &pos, int blockId, bool probe,
+                         int clusterIdx,
+                         std::unordered_map<std::string, int> before);
+  PollResult pollPendingCheck();
+  void recordVerdict(const PendingCheck &pc, const DropCheck &chk, int waitMs);
+  void recordUnminedRow(const BlockPos &pos, int blockId, DropVerdict verdict,
+                        const std::string &got, int clusterIdx,
+                        bool listAsFake);
+  int knownBlockIdAt(const BlockPos &pos) const;
+  void abandonCluster(); // бросить кластер без чёрного списка
 
   // Key helpers
   static const char *getKeyName(int vk);
