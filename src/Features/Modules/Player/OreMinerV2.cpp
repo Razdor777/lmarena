@@ -169,6 +169,7 @@ void OreMinerV2::resetScan() {
   mFoundBlocks.clear();
   mFilteredBlocks.clear();
   mBlacklistedPositions.clear();
+  mPatternBlocks.clear();
   mScanComplete = false;
   mScanDirty = false;
   mLastClusterUpdate = 0;
@@ -250,6 +251,7 @@ bool OreMinerV2::processSub(ChunkPos processChunk, int index) {
   if (!reader)
     return false;
 
+  markChunkScanned(processChunk);
   std::vector<int> enabled = getEnabledBlockIds();
   bool changed = false;
 
@@ -276,10 +278,17 @@ bool OreMinerV2::processSub(ChunkPos processChunk, int index) {
           continue;
         }
 
+        const bool wanted =
+            std::ranges::find(enabled, found->mLegacy->getBlockId()) !=
+            enabled.end();
+        // В память шаблонов — до чёрного списка и Only Exposed: повтор фигуры
+        // по чанкам улика независимо от того, копаем мы этот блок или нет.
+        if (wanted)
+          rememberOre(pos, false);
+
         if (mBlacklistedPositions.contains(pos))
           continue;
-        if (std::ranges::find(enabled, found->mLegacy->getBlockId()) ==
-            enabled.end())
+        if (!wanted)
           continue;
         if (mOnlyExposedOres.mValue && BlockUtils::getExposedFace(pos) == -1)
           continue;
@@ -356,6 +365,11 @@ OreMinerV2::getCluster(const BlockPos &startPos,
 
 void OreMinerV2::updateClusters() {
   mFilteredBlocks.clear();
+  mPatternBlocks.clear();
+
+  const bool usePattern = mPatternFilter.mValue;
+  if (usePattern)
+    prunePatternMemory();
 
   std::unordered_set<BlockPos> processed;
 
@@ -390,12 +404,156 @@ void OreMinerV2::updateClusters() {
     if (bl)
       continue;
 
+    // Шаблон анти-xray: блоки, чья фигура повторяется в соседних чанках, не
+    // копаем совсем. Остаток кластера (настоящая жила, к которой прилип
+    // кусок шаблона) копается как обычно — размер кластера считали выше
+    // целиком, как и раньше.
+    std::unordered_set<BlockPos> pattern;
+    if (usePattern) {
+      if (!patternReady(cluster))
+        continue; // соседние чанки ещё не прочитаны — сравнить не с чем
+      findPatternBlocks(cluster, pattern);
+      for (auto &cp : pattern) {
+        mPatternBlocks.insert(cp);
+        if (mPatternSkipped.insert(cp).second && mDebug.mValue)
+          mDbgPattern++;
+      }
+    }
+
     for (auto &cp : cluster) {
+      if (pattern.contains(cp))
+        continue;
       auto fit = mFoundBlocks.find(cp);
       if (fit != mFoundBlocks.end())
         mFilteredBlocks[cp] = fit->second;
     }
   }
+}
+
+// =============================================================
+// PATTERN FILTER — фейки анти-xray повторяются от чанка к чанку
+// =============================================================
+//
+// По логу Debug с сервера (4 сессии, 446 проверенных блоков): фейковые алмазы —
+// это одна и та же фигура на одном и том же месте внутри чанка (x&15, y, z&15),
+// повторённая в соседних чанках (там — вдоль X, у каждой «строки» чанков своя).
+// 286 из 301 фейкового кластера нашлись точно такими же ещё в каком-нибудь
+// чанке; из 121 настоящего блока на таком месте стоял один. Настоящие жилы
+// случайные и так не повторяются — значит, повтор = фейк, и копать его, даже
+// ради проверки, незачем.
+
+void OreMinerV2::syncSpotsWorld() {
+  const void *world = ClientInstance::get()->getBlockSource();
+  if (world != mSpotsWorld) {
+    mChunkSpots.clear();
+    mSpotsWorld = world;
+  }
+}
+
+void OreMinerV2::markChunkScanned(const ChunkPos &chunk) {
+  mChunkSpots.try_emplace(chunkKeyOf(chunk.x, chunk.y));
+}
+
+// onlyScannedChunk: блок пришёл событием (сервер что-то обновил), а не со
+// сканера — пишем, только если чанк уже сканировали, иначе «пустой» ключ
+// выглядел бы как прочитанный чанк.
+void OreMinerV2::rememberOre(const BlockPos &pos, bool onlyScannedChunk) {
+  if (onlyScannedChunk) {
+    auto it = mChunkSpots.find(chunkKeyOf(pos));
+    if (it != mChunkSpots.end())
+      it->second.insert(spotOf(pos));
+    return;
+  }
+  mChunkSpots[chunkKeyOf(pos)].insert(spotOf(pos));
+}
+
+// Пока первый проход сканирования не закончен, соседние чанки могут быть ещё
+// не прочитаны: фейк в них не с чем сравнить, и модуль копнул бы его вслепую.
+// Поэтому до конца первого прохода кластер берём, только когда и по строке, и
+// по столбцу (±2 чанка) прочитано хотя бы по 2 соседа.
+bool OreMinerV2::patternReady(const std::vector<BlockPos> &cluster) const {
+  if (mScanComplete)
+    return true;
+  std::unordered_set<uint64_t> checked;
+  for (auto &p : cluster) {
+    const int cx = p.x >> 4, cz = p.z >> 4;
+    if (!checked.insert(chunkKeyOf(cx, cz)).second)
+      continue;
+    if (!mChunkSpots.contains(chunkKeyOf(cx, cz)))
+      continue; // сам чанк сканер не читал — сравнивать всё равно не с чем
+    int row = 0, col = 0;
+    for (int d = -2; d <= 2; d++) {
+      if (d == 0)
+        continue;
+      row += mChunkSpots.contains(chunkKeyOf(cx + d, cz)) ? 1 : 0;
+      col += mChunkSpots.contains(chunkKeyOf(cx, cz + d)) ? 1 : 0;
+    }
+    if (row < 2 || col < 2)
+      return false;
+  }
+  return true;
+}
+
+// Часть кластера в чанке C — шаблон, если на одной линии с C (та же строка
+// или тот же столбец, до kPatternReach чанков) есть хотя бы kPatternMinChunks
+// чанков, у каждого из которых руда стоит минимум на kPatternMinSpots тех же
+// местах. Шаблонным считается блок, чьё место повторяется минимум в
+// kPatternMinChunks из этих чанков. Требование «два соседа на ОДНОЙ линии»
+// отсекает случайные совпадения с фигурой из другой строки чанков.
+void OreMinerV2::findPatternBlocks(const std::vector<BlockPos> &cluster,
+                                   std::unordered_set<BlockPos> &out) const {
+  std::unordered_map<uint64_t, std::vector<BlockPos>> parts;
+  for (auto &p : cluster)
+    parts[chunkKeyOf(p)].push_back(p);
+
+  for (auto &[key, ps] : parts) {
+    if (static_cast<int>(ps.size()) < kPatternMinSpots)
+      continue;
+    const int cx = ps[0].x >> 4, cz = ps[0].z >> 4;
+    for (int axis = 0; axis < 2; axis++) {
+      const std::unordered_set<uint32_t> *hits[2 * kPatternReach] = {};
+      int nh = 0;
+      for (int d = -kPatternReach; d <= kPatternReach; d++) {
+        if (d == 0)
+          continue;
+        auto it = mChunkSpots.find(axis == 0 ? chunkKeyOf(cx + d, cz)
+                                             : chunkKeyOf(cx, cz + d));
+        if (it == mChunkSpots.end() || it->second.empty())
+          continue;
+        int common = 0;
+        for (auto &p : ps)
+          common += it->second.contains(spotOf(p)) ? 1 : 0;
+        if (common >= kPatternMinSpots)
+          hits[nh++] = &it->second;
+      }
+      if (nh < kPatternMinChunks)
+        continue;
+      for (auto &p : ps) {
+        const uint32_t s = spotOf(p);
+        int n = 0;
+        for (int i = 0; i < nh; i++)
+          n += hits[i]->contains(s) ? 1 : 0;
+        if (n >= kPatternMinChunks)
+          out.insert(p);
+      }
+    }
+  }
+}
+
+// Память о чанках растёт, пока летаешь; далёкие чанки для сравнения не нужны.
+void OreMinerV2::prunePatternMemory() {
+  if (mChunkSpots.size() <= 8192)
+    return;
+  auto player = ClientInstance::get()->getLocalPlayer();
+  if (!player)
+    return;
+  const BlockPos pp = *player->getPos();
+  const int pcx = pp.x >> 4, pcz = pp.z >> 4;
+  std::erase_if(mChunkSpots, [&](const auto &kv) {
+    const int cx = static_cast<int32_t>(static_cast<uint32_t>(kv.first >> 32));
+    const int cz = static_cast<int32_t>(static_cast<uint32_t>(kv.first));
+    return std::abs(cx - pcx) > 64 || std::abs(cz - pcz) > 64;
+  });
 }
 
 // =============================================================
@@ -533,6 +691,7 @@ void OreMinerV2::debugStart() {
   mDebugWritten.clear();
   mDebugRows = 0;
   mDbgReal = mDbgFake = mDbgNoDrop = mDbgUnknown = mDbgSkip = 0;
+  mDbgPattern = 0;
 
   spdlog::info("[OreMinerV2][Debug] session {} -> {}OreMinerV2.txt",
                mDebugSession, mDebugDir);
@@ -560,6 +719,8 @@ void OreMinerV2::debugStop() {
       mDbgFile << ", " << mDbgUnknown << " unknown";
     if (mDbgSkip > 0)
       mDbgFile << ", " << mDbgSkip << " skip";
+    if (mDbgPattern > 0)
+      mDbgFile << ", " << mDbgPattern << " pattern";
     mDbgFile << '\n';
   }
   if (wroteSeen)
@@ -572,16 +733,23 @@ void OreMinerV2::debugStop() {
                  "{} skipped -> {}OreMinerV2.txt",
                  mDbgReal, mDbgFake, mDbgNoDrop, mDbgUnknown, mDbgSkip,
                  mDebugDir);
-    const std::string unknown =
+    std::string extra =
         mDbgUnknown > 0 ? fmt::format(", {} unknown", mDbgUnknown) : "";
+    if (mDbgPattern > 0)
+      extra += fmt::format(", §b{} по шаблону§7", mDbgPattern);
     ChatUtils::displayClientMessage(fmt::format(
         "§7[OreMinerV2] §fDebug сохранён: §a{} real§7, §c{} fake§7, §e{} "
         "nodrop§7{} -> §fDumps\\OreMinerV2.txt",
-        mDbgReal, mDbgFake, mDbgNoDrop, unknown));
+        mDbgReal, mDbgFake, mDbgNoDrop, extra));
   } else if (wroteSeen) {
     ChatUtils::displayClientMessage(
         "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен (Dump Seen -> "
         "§fDumps\\OreMinerV2_seen.txt§f)");
+  } else if (mDbgPattern > 0) {
+    ChatUtils::displayClientMessage(fmt::format(
+        "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен (§b{} пропущено "
+        "по шаблону§f), в файл ничего не записано",
+        mDbgPattern));
   } else {
     ChatUtils::displayClientMessage(
         "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен, в файл ничего "
@@ -631,7 +799,9 @@ bool OreMinerV2::debugOpenFile() {
           "#   nodrop  - не упало ничего (призрак или полный инвентарь)\n"
           "#   skip    - не копали: первый блок этого кластера оказался "
           "фейком\n"
-          "#   unknown - проверку прервали (выключил модуль, сменил мир)\n",
+          "#   unknown - проверку прервали (выключил модуль, сменил мир)\n"
+          "#   pattern - (только в итоге) не копали вовсе: та же фигура на том "
+          "же месте в соседних чанках = фейк\n",
           mDebugSession)) {
     mDbgFileFailed = true;
     spdlog::error("[OreMinerV2][Debug] cannot open {}", path);
@@ -756,6 +926,11 @@ void OreMinerV2::onEnable() {
   mClusterNo = 0;
   mClusterReal = mClusterFake = mClusterNoDrop = 0;
   mMinedPositions.clear();
+  mPatternSkipped.clear();
+  mNoDropStreak = mStreakLevel = 0;
+  mPauseUntil = 0;
+  mSinceLastDrop.clear();
+  mRetriedOnce.clear();
   mQuickTPKeyWasDown = false;
   mIsBindingKey = false;
   mBindWaitRelease = false;
@@ -763,6 +938,7 @@ void OreMinerV2::onEnable() {
   {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
     mPacketPositions.clear();
+    syncSpotsWorld(); // тот же мир — память шаблонов с прошлого включения цела
     resetScan();
   }
 
@@ -801,6 +977,11 @@ void OreMinerV2::onDisable() {
   mFoundBlocks.clear();
   mFilteredBlocks.clear();
   mBlacklistedPositions.clear();
+  mPatternBlocks.clear();
+  mNoDropStreak = mStreakLevel = 0;
+  mPauseUntil = 0;
+  mSinceLastDrop.clear();
+  mRetriedOnce.clear();
   mIsBindingKey = false;
 
   // Файлы дампа закрываем, как только модуль выключили: каждая строка уже
@@ -836,6 +1017,7 @@ void OreMinerV2::onBlockChangedEvent(BlockChangedEvent &event) {
   auto enabled = getEnabledBlockIds();
 
   if (std::ranges::find(enabled, newId) != enabled.end()) {
+    rememberOre(event.mBlockPos, true);
     mFoundBlocks[event.mBlockPos] = {
         event.mNewBlock, AABB(event.mBlockPos, glm::vec3(1.f, 1.f, 1.f)),
         getOreColor(newId)};
@@ -1103,11 +1285,14 @@ void OreMinerV2::finishCheck(DropVerdict v, uint64_t now) {
         "проверить нельзя");
   }
 
-  if (!pc.decides || v == DropVerdict::Real)
-    return;
+  if (pc.decides && v != DropVerdict::Real)
+    rejectCluster(pc, v);
+  trackNoDropStreak(v, pc.invFull, now);
+}
 
-  // Первый блок кластера не дал нужного дропа — кластер фейковый: в чёрный
-  // список целиком (как и раньше), остальные блоки не трогаем.
+// Первый блок кластера не дал нужного дропа — кластер фейковый: в чёрный
+// список целиком (как и раньше), остальные блоки не трогаем.
+void OreMinerV2::rejectCluster(const PendingCheck &pc, DropVerdict v) {
   mFakeClusters++;
   spdlog::warn("[OreMinerV2] FAKE cluster ({} blocks)! Blacklisting.",
                mCurrentCluster.size());
@@ -1127,12 +1312,89 @@ void OreMinerV2::finishCheck(DropVerdict v, uint64_t now) {
   blacklistPositions(mCurrentCluster);
   for (auto &p : mCurrentCluster)
     mMinedPositions.insert(p);
+  // Выкинут за «без дропа»: если окажется, что это сервер перестал ломать
+  // блоки, trackNoDropStreak вернёт кластер на перепроверку.
+  if (v == DropVerdict::NoDrop)
+    mSinceLastDrop.insert(mSinceLastDrop.end(), mCurrentCluster.begin(),
+                          mCurrentCluster.end());
 
   mCurrentCluster.clear();
   mCurrentClusterIdx = 0;
   mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
   mState = MineState::Idle;
   mTickDelay = 2;
+}
+
+// Сервер иногда перестаёт ломать блоки (откат античита, сломалась кирка, лаг):
+// тогда «без дропа» идёт с ЛЮБОГО блока — даже с фейка, который обычно даёт
+// булыжник. В логе так было дважды (9 и 24 проверки подряд), и два настоящих
+// алмаза из такой полосы ушли в чёрный список — в следующей сессии те же
+// координаты дали real. Поэтому kNoDropStreak «без дропа» подряд -> пауза
+// (2, 4, 8, 16 с), а всё, что сломано/выкинуто с последнего нормального дропа,
+// возвращается на перепроверку. Каждый блок — максимум один раз, чтобы честные
+// пустышки (фейк поверх воздуха/бедрока) не крутились по кругу.
+void OreMinerV2::trackNoDropStreak(DropVerdict v, bool invFull, uint64_t now) {
+  if (v == DropVerdict::Real || v == DropVerdict::Fake) {
+    // Дроп идёт — сервер блоки ломает; одиночный nodrop до этого был честным.
+    mNoDropStreak = 0;
+    mStreakLevel = 0;
+    mSinceLastDrop.clear();
+    return;
+  }
+  if (v != DropVerdict::NoDrop)
+    return;
+  if (++mNoDropStreak % kNoDropStreak != 0)
+    return;
+
+  auto source = ClientInstance::get()->getBlockSource();
+  const std::vector<int> enabled = getEnabledBlockIds();
+  int returned = 0;
+  for (const BlockPos &p : mSinceLastDrop) {
+    if (!mRetriedOnce.insert(p).second)
+      continue;
+    mBlacklistedPositions.erase(p);
+    mMinedPositions.erase(p);
+    returned++;
+    // Не сломанный сервером блок возвращается клиенту — подхватываем сразу,
+    // не дожидаясь, пока сканер снова дойдёт до этого чанка.
+    Block *b = source ? source->getBlock(p) : nullptr;
+    if (b && b->mLegacy &&
+        std::ranges::find(enabled, b->mLegacy->getBlockId()) != enabled.end())
+      mFoundBlocks[p] = {b, AABB(p, glm::vec3(1.f, 1.f, 1.f)),
+                         getOreColor(b->mLegacy->getBlockId())};
+  }
+  mSinceLastDrop.clear();
+  mScanDirty = true;
+
+  // Недокопанный кластер бросаем: его остаток не помечен как сломанный и
+  // вернётся вместе с остальными после паузы.
+  mCurrentCluster.clear();
+  mCurrentClusterIdx = 0;
+  mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+  mState = MineState::Idle;
+
+  const int pauseMs = 2000 << std::min(mStreakLevel, 3); // 2, 4, 8, 16 с
+  mStreakLevel++;
+  mPauseUntil = now + static_cast<uint64_t>(pauseMs);
+
+  const char *why = invFull ? "инвентарь полон, освободи место"
+                            : "похоже, сервер не ломает блоки (откат "
+                              "античита? сломалась кирка? лаг?)";
+  spdlog::warn("[OreMinerV2] {} checks in a row without any drop{} -> pause {} "
+               "ms, {} blocks back for re-check",
+               mNoDropStreak, invFull ? " (inventory full)" : "", pauseMs,
+               returned);
+  ChatUtils::displayClientMessage(fmt::format(
+      "§7[OreMinerV2] §cПодряд без дропа: {}§7 — {}. Пауза {} с, на "
+      "перепроверку: {} бл.",
+      mNoDropStreak, why, pauseMs / 1000, returned));
+  if (mDebug.mValue && mDbgFile.is_open()) {
+    mDbgFile << "# " << clockString() << " подряд без дропа: " << mNoDropStreak
+             << " - " << (invFull ? "инвентарь полон" : "сервер не ломает блоки")
+             << ", пауза " << pauseMs / 1000 << " с, на перепроверку: "
+             << returned << " бл.\n";
+    mDbgFile.flush();
+  }
 }
 
 void OreMinerV2::abortCheck() {
@@ -1239,6 +1501,11 @@ bool OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
 
   mBlocksMined++;
   mCurrentTarget = pos;
+  // Сломано, но дроп ещё не подтверждён — если окажется, что сервер в это
+  // время блоки не ломал, вернём на перепроверку (trackNoDropStreak).
+  if (mSinceLastDrop.size() > 1024)
+    mSinceLastDrop.erase(mSinceLastDrop.begin(), mSinceLastDrop.begin() + 512);
+  mSinceLastDrop.push_back(pos);
   return true;
 }
 
@@ -1264,6 +1531,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
 
   auto source = ClientInstance::get()->getBlockSource();
   if (!source) return;
+  syncSpotsWorld();
 
   // =================== KEYBIND CAPTURE ===================
   if (mIsBindingKey) {
@@ -1374,6 +1642,11 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     return;
   }
 
+  // Пауза после серии «без дропа» (см. trackNoDropStreak): сканер работает,
+  // проверки дожидаются, но новые блоки не ломаем.
+  if (static_cast<uint64_t>(NOW) < mPauseUntil)
+    return;
+
   glm::vec3 playerPos = *player->getPos();
 
   switch (mState) {
@@ -1471,6 +1744,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       auto cluster = getCluster(p, mFoundBlocks);
       for (auto &cp : cluster) {
         if (mMinedPositions.contains(cp)) continue;
+        if (mPatternBlocks.contains(cp)) continue;
         bool already = false;
         for (auto &ep : mCurrentCluster) {
           if (ep == cp) { already = true; break; }
@@ -1519,6 +1793,7 @@ void OreMinerV2::onPacketInEvent(PacketInEvent &event) {
     mMinedPositions.clear();
     mPacketPositions.clear();
     mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+    mChunkSpots.clear(); // другое измерение — шаблоны оттуда не годятся
     resetScan();
   }
 
@@ -1697,9 +1972,10 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     float topY = ss.y * 0.05f;
     std::string status;
 
+    const bool paused = now < mPauseUntil;
     switch (mState) {
     case MineState::Idle:
-      if (mFilteredBlocks.empty())
+      if (mFilteredBlocks.empty() && !paused)
         return;
       status =
           "Scanning... [" + std::to_string(mFilteredBlocks.size()) + " ores]";
@@ -1722,6 +1998,12 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
       if (mDumpSeen.mValue)
         status += " | Seen: " + std::to_string(mDebugRows);
     }
+    if (mPatternFilter.mValue && !mPatternSkipped.empty())
+      status += " | Pattern: " + std::to_string(mPatternSkipped.size());
+    if (paused)
+      status = "Paused: no drops (" +
+               std::to_string((mPauseUntil - now + 999) / 1000) + "s) | " +
+               status;
 
     ImVec2 ts = ImGui::CalcTextSize(status.c_str());
     drawList->AddRectFilled(ImVec2(cx - ts.x * 0.5f - 5.f, topY - 2.f),

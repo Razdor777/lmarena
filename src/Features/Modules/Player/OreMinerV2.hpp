@@ -40,6 +40,15 @@ public:
       "Chunks/Tick", "Subchunks to scan per tick", 5.f, 1.f, 24.f, 1.f);
   BoolSetting mOnlyExposedOres =
       BoolSetting("Only Exposed", "Only mine exposed ores", false);
+  // Анти-xray рисует фейковые руды по шаблону: ОДНА И ТА ЖЕ фигура на одном и
+  // том же месте внутри чанка (x%16, y, z%16) повторяется в соседних чанках.
+  // Настоящие жилы случайные и так не повторяются. Включено — такие блоки не
+  // копаются вообще (даже первый, ради проверки) и не рисуются.
+  BoolSetting mPatternFilter = BoolSetting(
+      "Pattern Filter",
+      "Skip fakes that repeat at the same spot in neighbour chunks "
+      "(anti-xray pattern)",
+      true);
 
   // === Ore toggles ===
   BoolSetting mCoal = BoolSetting("Coal", "Mine coal ore", true);
@@ -86,7 +95,8 @@ public:
             ModuleCategory::Player, 0, false) {
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
                 &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
-                &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
+                &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres,
+                &mPatternFilter, &mCoal,
                 &mDiamond, &mEmerald, &mDebug, &mDumpSeen, &mVerifyTimeout,
                 &mDrawBlocks, &mDrawPath, &mDrawTarget, &mDrawCluster);
 
@@ -253,6 +263,55 @@ public:
 
   std::unordered_set<BlockPos> mMinedPositions;
 
+  // =====================================================
+  // Pattern filter — фейки анти-xray повторяются от чанка к чанку
+  // =====================================================
+  static uint64_t chunkKeyOf(int cx, int cz) {
+    return (static_cast<uint64_t>(static_cast<uint32_t>(cx)) << 32) |
+           static_cast<uint32_t>(cz);
+  }
+  static uint64_t chunkKeyOf(const BlockPos &p) {
+    return chunkKeyOf(p.x >> 4, p.z >> 4);
+  }
+  // Место внутри чанка: x&15, z&15 и y (со сдвигом, чтобы y<0 тоже влез).
+  static uint32_t spotOf(const BlockPos &p) {
+    return (static_cast<uint32_t>(p.x & 15) << 16) |
+           (static_cast<uint32_t>(p.z & 15) << 12) |
+           (static_cast<uint32_t>(p.y + 2048) & 0xFFFu);
+  }
+  static constexpr int kPatternReach = 8;     // чанков в каждую сторону
+  static constexpr int kPatternMinSpots = 2;  // общих мест с чанком-соседом
+  static constexpr int kPatternMinChunks = 2; // ...и таких соседей на линии
+
+  // Все руды, которые модуль когда-либо видел, по чанкам. НЕ чистится, когда
+  // блок сломан или ушёл в чёрный список: повтор фигуры остаётся уликой.
+  // Есть ключ — чанк уже сканировался (даже если руд в нём нет). Живёт, пока
+  // тот же мир (переживает выключение модуля), сбрасывается при смене мира.
+  std::unordered_map<uint64_t, std::unordered_set<uint32_t>> mChunkSpots;
+  const void *mSpotsWorld = nullptr;
+  std::unordered_set<BlockPos> mPatternBlocks;  // сейчас считаются шаблоном
+  std::unordered_set<BlockPos> mPatternSkipped; // за сессию модуля (счётчик)
+  int mDbgPattern = 0;                          // за сессию Debug
+
+  void syncSpotsWorld();
+  void markChunkScanned(const ChunkPos &chunk);
+  void rememberOre(const BlockPos &pos, bool onlyScannedChunk);
+  bool patternReady(const std::vector<BlockPos> &cluster) const;
+  void findPatternBlocks(const std::vector<BlockPos> &cluster,
+                         std::unordered_set<BlockPos> &out) const;
+  void prunePatternMemory();
+
+  // =====================================================
+  // NoDrop streak — сервер перестал ломать блоки
+  // =====================================================
+  static constexpr int kNoDropStreak = 3; // столько «без дропа» подряд
+  int mNoDropStreak = 0;     // nodrop подряд (real/fake обнуляют)
+  int mStreakLevel = 0;      // сработало подряд -> пауза растёт
+  uint64_t mPauseUntil = 0;  // до этого момента ничего не копаем
+  std::vector<BlockPos> mSinceLastDrop;      // сломано/в ЧС с последнего дропа
+  std::unordered_set<BlockPos> mRetriedOnce; // уже возвращали на перепроверку
+  void trackNoDropStreak(DropVerdict v, bool invFull, uint64_t now);
+
   // Render (protected by mMutex)
   std::vector<glm::vec3> mPacketPositions;
   uint64_t mLastPathTime = 0;
@@ -359,6 +418,7 @@ public:
                   InvSnapshot before);
   bool pollCheck();  // true — вердикт вынесен (или проверять было нечего)
   void finishCheck(DropVerdict v, uint64_t now);
+  void rejectCluster(const PendingCheck &pc, DropVerdict v); // кластер — фейк
   void abortCheck(); // прервать ожидание (выключение, смена мира)
   void recordCheck(const PendingCheck &pc, DropVerdict v, uint64_t now);
 
