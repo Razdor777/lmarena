@@ -148,7 +148,6 @@ bool ChatBinds::handleKey(int vk, bool down)
 {
     if (vk <= 0 || vk > 255) return false;
 
-    std::string text;
     {
         std::lock_guard lk(sMutex);
         loadLocked();
@@ -183,10 +182,24 @@ bool ChatBinds::handleKey(int vk, bool down)
         const uint64_t now = static_cast<uint64_t>(NOW);
         if (now - sLastFire[vk] < 300) return true;
         sLastFire[vk] = now;
-        text = it->text;
+        // Отправка — не отсюда: KeyHook может работать не в потоке игры, а
+        // пакеты/телепорт (.tp) из чужого потока — гонка с игрой. Уйдёт в
+        // ближайшем тике (flushPending).
+        if (sPending.size() < 16) sPending.push_back(it->text);
     }
-    send(text); // без блокировки: отправка может вызвать другие хуки
     return true;
+}
+
+void ChatBinds::flushPending()
+{
+    std::vector<std::string> texts;
+    {
+        std::lock_guard lk(sMutex);
+        if (sPending.empty()) return;
+        texts.swap(sPending);
+    }
+    for (const auto& text : texts)
+        send(text); // без блокировки: отправка может вызвать другие хуки
 }
 
 void ChatBinds::send(const std::string& raw)

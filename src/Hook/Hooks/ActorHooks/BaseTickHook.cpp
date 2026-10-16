@@ -7,6 +7,8 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
+#include <Features/ChatBinds/ChatBinds.hpp>
+#include <Features/Modules/ModuleToggle.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
@@ -19,6 +21,11 @@ void BaseTickHook::onBaseTick(Actor* actor)
 {
     auto oFunc = mDetour->getOriginal<&onBaseTick>();
     if (actor != ClientInstance::get()->getLocalPlayer()) return oFunc(actor);
+
+    ExceptionHandler::markThread(ExceptionHandler::Game);
+
+    // onEnable/onDisable модулей — здесь, в потоке игры (см. ModuleToggle.hpp).
+    ModuleToggle::fromGameThread();
 
     mQueueMutex.lock();
     auto messages = mQueuedMessages;
@@ -46,13 +53,26 @@ void BaseTickHook::onBaseTick(Actor* actor)
         supplies->mInHandSlot = supplies->mSelectedSlot;
     }
 
-    for (auto& [mTime, mPacket, mBypassHook] : mQueuedPackets)
+    // Очередь забираем целиком и отправляем уже свою копию: send() без обхода
+    // хука вызывает PacketOutEvent, и модуль оттуда может поставить в очередь
+    // ещё пакет. Раньше это был emplace_back в вектор, по которому прямо сейчас
+    // шёл цикл (перевыделение памяти под ногами -> краш); теперь такой пакет
+    // просто уйдёт в следующем тике.
+    std::vector<QueuedPacket> packets;
+    {
+        std::lock_guard<std::mutex> lock(mPacketQueueMutex);
+        packets.swap(mQueuedPackets);
+    }
+    for (auto& [mTime, mPacket, mBypassHook] : packets)
     {
         spdlog::trace("Sending packet with ID: {} [queued {}ms ago] [{}]", magic_enum::enum_name(mPacket->getId()), NOW - mTime, mBypassHook ? "bypassing hook" : "not bypassing hook");
         if (mBypassHook) ClientInstance::get()->getPacketSender()->sendToServer(mPacket.get());
         else ClientInstance::get()->getPacketSender()->send(mPacket.get());
     }
-    mQueuedPackets.clear();
+
+    // Чат-бинды: клавишу ловит KeyHook, а сама отправка — здесь, в потоке
+    // игры, как и обычный чат.
+    ChatBinds::flushPending();
 
     static bool once = false;
     if (!once)

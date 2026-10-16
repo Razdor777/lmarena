@@ -15,8 +15,9 @@
 // Хранится отдельно от конфигов — Solstice\chat_binds.json, сохраняется сразу
 // при каждом изменении: бинды не пропадут при смене/загрузке конфига.
 //
-// Потокобезопасно: клавиши приходят из KeyHook (поток игры), правки — из
-// ClickGui (поток рендера).
+// Потокобезопасно: клавиши приходят из KeyHook (поток ввода), правки — из
+// ClickGui (поток рендера), а отправка — из Actor::baseTick (поток игры):
+// handleKey только ставит текст в очередь, flushPending его отправляет.
 //
 
 #include <array>
@@ -45,8 +46,10 @@ public:
     static void remove(size_t index);
 
     // Из KeyHook, до того как клавиша уйдёт игре. true — клавиша забиндена и
-    // съедена (игре её не отдавать).
+    // съедена (игре её не отдавать). Сам текст уходит позже, в flushPending.
     static bool handleKey(int vk, bool down);
+    // Из BaseTickHook (поток игры): отправить то, что накопил handleKey.
+    static void flushPending();
 
     static void send(const std::string& text);
     static std::string keyName(int vk);
@@ -61,6 +64,7 @@ private:
 
     static inline std::mutex sMutex;
     static inline std::vector<ChatBind> sBinds;
+    static inline std::vector<std::string> sPending;   // нажато, ещё не отправлено
     static inline bool sLoaded = false;
     static inline std::array<bool, 256> sDown{};       // клавиша уже зажата (без автоповтора)
     static inline std::array<uint64_t, 256> sLastFire{};

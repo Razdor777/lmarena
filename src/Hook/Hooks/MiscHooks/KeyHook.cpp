@@ -8,6 +8,7 @@
 #include <Features/ChatBinds/ChatBinds.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
 #include <Features/Events/KeyEvent.hpp>
+#include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 
@@ -137,6 +138,7 @@ ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
 void KeyHook::onKey(uint32_t key, bool isDown)
 {
     auto oFunc = mDetour->getOriginal<&onKey>();
+    ExceptionHandler::markThread(ExceptionHandler::Input);
 
     // ── ImGui получает клавиши ДО всего остального ───────────────────────────
     // Это принципиально для CustomChat: пока игрок печатает в нашем чате, игре
@@ -145,6 +147,10 @@ void KeyHook::onKey(uint32_t key, bool isDown)
     // первым, а все остальные проверки (eject, KeyEvent, модули) идут ниже.
     if (ImGui::GetCurrentContext())
     {
+        // ImGui::NewFrame в потоке рендера разбирает эту же очередь событий —
+        // добавляем только под блокировкой (иначе её буфер мог перевыделиться
+        // прямо во время чтения -> порча памяти и краш).
+        std::lock_guard<std::mutex> imguiLock(D3DHook::ImGuiInputMutex);
         ImGuiIO& io = ImGui::GetIO();
 
         ImGuiKey imKey = ImGui_ImplWin32_VirtualKeyToImGuiKey(key);
