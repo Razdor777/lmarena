@@ -73,6 +73,10 @@ public:
     NumberSetting mPlaces = NumberSetting("Places", "The amount of blocks to place per tick", 1, 0, 20, 0.01);
     NumberSetting mRange = NumberSetting("Range", "The range at which to place blocks", 5, 0, 10, 0.01);
     NumberSetting mExtend = NumberSetting("Extend", "The distance to extend the placement", 3, 0, 10, 1);
+    // Как живой игрок: блок ставится, только когда ты вот-вот на него
+    // наступишь (под точкой, где ноги будут через ~2 тика), и не дальше
+    // одного блока вперёд — никаких блоков «за 1-3 до того, как дошёл».
+    BoolSetting mLegitPlace = BoolSetting("Legit Place", "Place a block only right before you step onto it (never 1-3 blocks ahead)", true);
     EnumSettingT<RotateMode> mRotateMode = EnumSettingT<RotateMode>("Rotate Mode", "The mode of rotation", RotateMode::Normal, "None", "Normal", "Down", "Backwards");
     EnumSettingT<FlickMode> mFlickMode = EnumSettingT<FlickMode>("Flick Mode", "The mode for block flicking", FlickMode::Combat, "None", "Combat", "Always");
     EnumSettingT<PlacementMode> mPlacementMode = EnumSettingT<PlacementMode>("Placement", "The mode for block placement", PlacementMode::Normal, "Normal", "Flareon");
@@ -93,10 +97,12 @@ public:
     BoolSetting mTest = BoolSetting("Diagonal bypass", "Test", false);
 
     EnumSettingT<BridgeMode> mBridgeMode = EnumSettingT<BridgeMode>("Bridge Mode", "Bridging style: where the block goes, where the head looks and the rhythm", BridgeMode::Normal, "Normal", "GodBridge", "Breezily", "Moonwalk", "Telly");
-    BoolSetting mVisibleRotate = BoolSetting("Visible Rotate", "Actually turn the head to the block instead of only spoofing the packet rotation", true);
-    NumberSetting mRotateSpeed = NumberSetting("Rotate Speed", "How fast the head turns down to the block", 1.6, 0.2, 5, 0.05);
-    NumberSetting mRotateHold = NumberSetting("Rotate Hold", "How long the head stays on the block (ms)", 70, 0, 500, 5);
-    BoolSetting mRotateFirst = BoolSetting("Rotate First", "Place only after the head reached the block (looks legit, a bit slower)", false);
+    BoolSetting mVisibleRotate = BoolSetting("Visible Rotate", "Your camera dips down with the head while bridging (yaw stays yours)", true);
+    NumberSetting mRotateSpeed = NumberSetting("Rotate Speed", "How fast the head turns to the block (x18 degrees per tick)", 1.6, 0.2, 5, 0.05);
+    NumberSetting mRotateHold = NumberSetting("Rotate Hold", "How long the head keeps looking at the bridge after the last block (ms, min 250)", 300, 0, 1500, 10);
+    // Новое имя (было "Rotate First", по умолчанию выключено): старые конфиги
+    // не должны выключать то, на чём теперь держатся ротации.
+    BoolSetting mRotateFirst = BoolSetting("Look First", "Place a block only when the server already sees you looking at it (rotation first, then the block)", true);
     BoolSetting mAutoJump = BoolSetting("Auto Jump", "Jump automatically while bridging (Telly / GodBridge)", false);
     NumberSetting mJumpDelay = NumberSetting("Jump Delay", "Delay between automatic jumps (ms)", 150, 0, 1000, 5);
     BoolSetting mKeepSprint = BoolSetting("Keep Sprint", "Force sprint while bridging", false);
@@ -107,6 +113,7 @@ public:
             &mPlaces,
             &mRange,
             &mExtend,
+            &mLegitPlace,
             &mRotateMode,
             &mFlickMode,
             &mPlacementMode,
@@ -141,10 +148,11 @@ public:
         VISIBILITY_CONDITION(mTowerSpeed, mTowerMode.mValue != TowerMode::Vanilla);
         VISIBILITY_CONDITION(mClutchFallDistance, mFastClutch.mValue);
         VISIBILITY_CONDITION(mCluchPlaces, mFastClutch.mValue);
+        VISIBILITY_CONDITION(mExtend, !mLegitPlace.mValue);
         VISIBILITY_CONDITION(mVisibleRotate, mRotateMode.mValue != RotateMode::None);
-        VISIBILITY_CONDITION(mRotateSpeed, mVisibleRotate.mValue && mRotateMode.mValue != RotateMode::None);
-        VISIBILITY_CONDITION(mRotateHold, mVisibleRotate.mValue && mRotateMode.mValue != RotateMode::None);
-        VISIBILITY_CONDITION(mRotateFirst, mVisibleRotate.mValue && mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mRotateSpeed, mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mRotateHold, mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mRotateFirst, mRotateMode.mValue != RotateMode::None);
         VISIBILITY_CONDITION(mJumpDelay, mAutoJump.mValue);
 
         mNames = {
@@ -166,14 +174,30 @@ public:
     bool mShouldClip = false;
     bool mIsTowering = false;
 
-    // ── видимая ротация (флик головой) ────────────────────────────────────
-    bool mFlickActive = false;
-    uint64_t mFlickStart = 0;
-    glm::vec2 mFlickTarget = { 0.f, 0.f };   // {pitch, yaw} в MC-градусах
-    glm::vec2 mFlickBase = { 0.f, 0.f };     // ротация игрока на момент старта флика
-    glm::vec2 mUserRot = { 0.f, 0.f };       // текущая «настоящая» ротация игрока (MC-градусы)
-    glm::vec2 mLastApplied = { 0.f, 0.f };   // что мы вписали в камеру в прошлом кадре
+    // ── голова: настоящая ротация (сервер + своя модель + камера) ─────────
+    // Голова плавно поворачивается к блоку, держится, пока строишь мост, и
+    // так же плавно возвращается туда, куда смотришь ты. Шаг — раз в тик, в
+    // PlayerAuthInput (это и есть ротация, которую видит сервер и другие
+    // игроки; свою модель в F5 рисует Interface по тем же пакетам). Блок
+    // ставится, только когда сервер уже получил взгляд на него (Rotate First).
+    bool      mHeadActive = false;            // ротация сейчас наша
+    glm::vec2 mHeadRot    = { 0.f, 0.f };     // {pitch, yaw} в MC-градусах
+    glm::vec2 mHeadPrev   = { 0.f, 0.f };     // прошлый шаг (камера плавно между тиками)
+    uint64_t  mHeadStepAt = 0;
+    uint64_t  mCamSettleUntil = 0;            // голову отпустили — камера доезжает
+    glm::vec2 mHeadTarget = { 0.f, 0.f };     // куда смотреть (блок)
+    uint64_t  mWantUntil  = 0;                // до этого момента — смотрим на мост
+    glm::vec2 mSentRot    = { 0.f, 0.f };     // что ушло в последнем PlayerAuthInput
+    bool      mSentValid  = false;
+    uint64_t  mNeedSince  = 0;                // блок ждёт поворота головы с ...
+    glm::vec2 mUserRot = { 0.f, 0.f };        // «настоящая» ротация игрока (MC-градусы)
+    glm::vec2 mLastApplied = { 0.f, 0.f };    // что мы вписали в камеру в прошлом кадре
     bool mOverrodeCamera = false;
+
+    // ── человеческая постановка ───────────────────────────────────────────
+    uint64_t  mLastPlaceTime = 0;
+    float     mPlaceAhead    = 1.8f;          // на сколько тиков вперёд смотрим (на блок)
+    glm::ivec3 mAheadCell    = glm::ivec3(INT_MAX);
 
     // ── авто-прыжки ──────────────────────────────────────────────────────
     bool mDidForceJump = false;
@@ -186,6 +210,8 @@ public:
     glm::vec3 mAimCell      = glm::vec3(-99999.f);
     float     mAimPitchBias = 0.f;
     float     mAimYawBias   = 0.f;
+    float     mAimMinPitch  = 82.f;   // Normal: ниже не смотрит (свой у каждого блока)
+    float     mAimDownPitch = 89.9f;  // Down
 
     void onEnable() override;
     void onDisable() override;
@@ -197,9 +223,10 @@ public:
 
     BridgeProfile getBridgeProfile() const;
     glm::vec2 getTargetRots();                 // {pitch, yaw} в MC-градусах
-    void startFlick();                          // начать «кивок» головой к блоку
-    glm::vec2 sampleFlick(uint64_t now, bool& active); // ротация флика на этот кадр
-    bool flickAligned(float tolerance);
+    bool rotationAllowed() const;               // RotateMode != None и Aura не мешает
+    glm::vec2 stepHead(const glm::vec2& user, uint64_t now, bool& override); // шаг головы (тик)
+    bool headAligned(const glm::vec2& target) const; // сервер уже смотрит туда
+    glm::vec3 getLegitPlacePos(bool& soon);     // Legit Place: что ставить сейчас
     void updateAutoJump(class BaseTickEvent& event);
     void releaseForcedJump();
     glm::vec3 getRotBasedPos(float extend, float yPos);

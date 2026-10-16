@@ -6,16 +6,13 @@
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Modules/Module.hpp>
+#include <array>
 #include <atomic>
 #include <fstream>
 
 
 class OreMinerV2 : public ModuleBase<OreMinerV2> {
 public:
-  // Куда прыгать при переезде (Auto Relocate / Hop Key). Look — куда смотрит
-  // камера; остальные — по сторонам света (".tp 10000 ~ 10000" — это +X +Z).
-  enum class HopDir { Look, PxPz, PxNz, NxPz, NxNz, Px, Nx, Pz, Nz };
-
   // === Mining settings ===
   NumberSetting mSpeed = NumberSetting("Speed", "Ticks between mining blocks",
                                        2.f, 0.f, 20.f, 1.f);
@@ -30,55 +27,36 @@ public:
   // === Follow mode (TP to cluster and stay there) ===
   BoolSetting mFollow = BoolSetting("Follow", "Teleport to clusters and mine continuously without returning", false);
 
-  // === Auto Relocate (вместо Quick TP) ===
-  // То, что раньше делалось руками: всё вокруг выкопано -> выключить модуль,
-  // 2-3 раза ".tp 10000 ~ 10000" с паузой ~0.6 с, включить модуль. Теперь
-  // сам: Idle Time секунд нечего копать (сканер уже прошёл всё вокруг) ->
-  // Hops прыжков по Hop Distance блоков в сторону Hop Direction с паузой
-  // Hop Delay, дождаться чанков и копать дальше. Прыжок тот же, что у .tp
-  // (цепочка телепорт-пакетов по Step Distance); сервер пускает только до
-  // края прогруженных чанков, поэтому реальный сдвиг меряется и пишется в чат.
+  // === Auto Relocate ===
+  // То, что раньше делалось руками: всё вокруг выкопано -> 2-3 раза
+  // ".tp 10000 ~ 10000" с паузой ~0.6 с -> копать дальше. Теперь само:
+  //   - копать нечего (всё, что ближе 60 блоков, выкопано или дальше
+  //     60 — не достать) Idle Time секунд с последнего блока/дропа;
+  //   - или в инвентарь перестало что-либо падать (3 проверки подряд без
+  //     дропа) — сразу, без ожидания.
+  // Прыжки скрыты: 3 по 300 блоков на +X +Z с паузой 0.6 с (упёрлись в стену
+  // — следующий переезд повернёт на 90°), той же цепочкой телепорт-пакетов,
+  // что и .tp; потом ждём чанки и копаем на новом месте.
   BoolSetting mAutoRelocate = BoolSetting(
       "Auto Relocate",
-      "Nothing to mine for Idle Time -> hop to a new spot and keep mining",
+      "Nothing left to mine (or nothing drops) -> hop to a new spot and keep "
+      "mining",
       false);
   NumberSetting mIdleTime = NumberSetting(
-      "Idle Time", "Seconds with nothing to mine before relocating", 5.f, 1.f,
-      60.f, 1.f);
-  EnumSettingT<HopDir> mHopDirection = EnumSettingT(
-      "Hop Direction", "Where to hop (Look = where the camera looks)",
-      HopDir::PxPz, "Look", "+X +Z", "+X -Z", "-X +Z", "-X -Z", "+X", "-X",
-      "+Z", "-Z");
-  NumberSetting mHopDistance = NumberSetting(
-      "Hop Distance",
-      "Blocks per hop (the server may stop you earlier, at unloaded chunks)",
-      300.f, 50.f, 1000.f, 10.f);
-  NumberSetting mHopCount =
-      NumberSetting("Hops", "Hops per relocation", 3.f, 1.f, 10.f, 1.f);
-  NumberSetting mHopDelay = NumberSetting(
-      "Hop Delay", "Ms between hops (chunks load meanwhile)", 600.f, 100.f,
-      3000.f, 50.f);
-  // Бывший Quick TP Key: теперь по нажатию — тот же переезд, что и авто
-  // (работает и при выключенном Auto Relocate).
-  NumberSetting mHopKey = NumberSetting(
-      "Hop Key", "Key VK code: relocate right now (0=disabled)", 0.f, 0.f,
-      255.f, 1.f);
+      "Idle Time",
+      "Seconds since the last mined block before hopping (0 = right away)",
+      2.f, 0.f, 10.f, 0.5f);
+  // Всё, что принесла копка, кроме алмазов (и угля/изумрудов, если их
+  // копаем), выкидывается. Выкидывается в момент, когда сервер видит нас у
+  // руды (до телепорта обратно), — вещи остаются там, автоподбор не
+  // подбирает их снова.
+  BoolSetting mAutoDrop = BoolSetting(
+      "Auto Drop",
+      "Throw out everything mining brings except diamonds (andesite, "
+      "cobblestone, ...)",
+      false);
 
   // === Scan settings ===
-  NumberSetting mRadius =
-      NumberSetting("Radius", "Render / mine radius", 20.f, 1.f, 100.f, 0.01f);
-  // Дальше этого не копаем: на большой дистанции цепочка телепортов до блока
-  // чаще не доходит, и вместо дропа — nodrop. Кластер берётся, если его
-  // ближний блок ближе Max Distance. 0 — без ограничения (как раньше). Какое
-  // число ставить — подскажет Debug: в каждой строке дампа d=дистанция, а в
-  // итоге сессии таблица real/fake/nodrop по дистанции и совет.
-  NumberSetting mMaxDistance = NumberSetting(
-      "Max Distance", "Don't mine ores farther than this, blocks (0 = no limit)",
-      0.f, 0.f, 200.f, 1.f);
-  NumberSetting mChunkRadius = NumberSetting(
-      "Chunk Radius", "Max chunk radius to scan", 4.f, 1.f, 32.f, 1.f);
-  NumberSetting mChunkUpdatesPerTick = NumberSetting(
-      "Chunks/Tick", "Subchunks to scan per tick", 5.f, 1.f, 24.f, 1.f);
   BoolSetting mOnlyExposedOres =
       BoolSetting("Only Exposed", "Only mine exposed ores", false);
   // Анти-xray рисует фейковые руды по шаблону: ОДНА И ТА ЖЕ фигура на одном и
@@ -136,24 +114,12 @@ public:
             ModuleCategory::Player, 0, false) {
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
                 &mVeinMiner, &mFollow, &mAutoRelocate, &mIdleTime,
-                &mHopDirection, &mHopDistance, &mHopCount, &mHopDelay,
-                &mHopKey, &mRadius, &mMaxDistance, &mChunkRadius,
-                &mChunkUpdatesPerTick, &mOnlyExposedOres, &mPatternFilter,
-                &mCoal, &mDiamond, &mEmerald, &mDebug, &mDumpSeen,
-                &mVerifyTimeout, &mDrawBlocks, &mDrawPath, &mDrawTarget,
-                &mDrawCluster);
+                &mAutoDrop, &mOnlyExposedOres, &mPatternFilter, &mCoal,
+                &mDiamond, &mEmerald, &mDebug, &mDumpSeen, &mVerifyTimeout,
+                &mDrawBlocks, &mDrawPath, &mDrawTarget, &mDrawCluster);
 
     VISIBILITY_CONDITION(mDumpSeen, mDebug.mValue);
     VISIBILITY_CONDITION(mIdleTime, mAutoRelocate.mValue);
-    // Параметры прыжка нужны и авто-переезду, и клавише.
-    VISIBILITY_CONDITION(mHopDirection,
-                         mAutoRelocate.mValue || mHopKey.mValue > 0.f);
-    VISIBILITY_CONDITION(mHopDistance,
-                         mAutoRelocate.mValue || mHopKey.mValue > 0.f);
-    VISIBILITY_CONDITION(mHopCount,
-                         mAutoRelocate.mValue || mHopKey.mValue > 0.f);
-    VISIBILITY_CONDITION(mHopDelay,
-                         mAutoRelocate.mValue || mHopKey.mValue > 0.f);
 
     mNames = {{Lowercase, "oreminerv2"},
               {LowercaseSpaced, "ore miner v2"},
@@ -248,13 +214,31 @@ public:
   std::unordered_map<BlockPos, FoundBlock> mFilteredBlocks;
   std::unordered_set<BlockPos> mBlacklistedPositions;
 
+  // Скрыто: копаем руду не дальше kMineReach блоков (от глаз до центра
+  // блока) — дальше цепочка телепортов чаще не доходит, вместо дропа nodrop.
+  // Сканер читает чуть шире (чанки, чья ближняя точка ближе kScanReach по
+  // горизонтали), чтобы у Pattern Filter были соседние чанки, и только
+  // подчанки в пределах y ± kMineReach — остальные копать всё равно нельзя.
+  static constexpr float kMineReach = 60.f;
+  static constexpr float kScanReach = kMineReach + 16.f;
+  static constexpr int kScanRings = 5;    // ceil(76 / 16): дальше колец нет
+  static constexpr int kScanPerTick = 16; // прочитанных подчанков за тик
+
   ChunkPos mSearchCenter;
   ChunkPos mCurrentChunkPos;
   int mSubChunkIndex = 0;
   int mDirectionIndex = 0;
   int mSteps = 1;
   int mStepsCount = 0;
+  // Первый полный проход после включения/переезда закончен — только после
+  // него Auto Relocate может решить, что копать нечего. Проход считается,
+  // если все чанки в пределах kMineReach были у клиента (иначе руда могла
+  // быть в непришедшем чанке) — или если скан на этом месте идёт уже
+  // kScanGiveUpMs (какие-то чанки так и не приходят).
+  static constexpr uint64_t kScanGiveUpMs = 5000;
   bool mScanComplete = false;
+  int mPassMissing = 0;        // чанков в пределах досягаемости не было
+  uint64_t mScanStartedAt = 0; // resetScan: скан на этом месте начат
   bool mScanDirty = false;
   uint64_t mLastClusterUpdate = 0;
 
@@ -309,6 +293,8 @@ public:
     uint64_t firstGainAt = 0; // когда в инвентаре впервые что-то прибавилось
     bool invFull = false;     // все 36 слотов заняты — дропу некуда лечь
     InvSnapshot before;       // инвентарь прямо перед ударом
+    InvSnapshot dropped;      // Auto Drop выкинул в этом же ударе (имя -> шт.)
+    bool dropApplied = false; // ...и сервер это уже применил
     DropList seen;            // максимум прироста за всё ожидание
   };
 
@@ -372,11 +358,15 @@ public:
   // =====================================================
   enum class HopPhase {
     None,    // обычная работа
-    Hopping, // прыгаем: Hops раз по Hop Distance, между прыжками Hop Delay
+    Hopping, // прыгаем: kHopCount раз по kHopDistance с паузой kHopDelayMs
     Settling // прыгнули — ждём, пока клиент получит чанки вокруг
   };
-  static constexpr int kMaxEmptyRelocations = 10; // подряд без руды -> стоп
+  static constexpr int kMaxEmptyRelocations = 10; // подряд без дропа -> стоп
   static constexpr uint64_t kSettleMaxMs = 5000;  // дольше чанки не ждём
+  // Скрыто: как руками ".tp 10000 ~ 10000" три раза с паузой ~0.6 с.
+  static constexpr float kHopDistance = 300.f;
+  static constexpr int kHopCount = 3;
+  static constexpr uint64_t kHopDelayMs = 600;
 
   HopPhase mHopPhase = HopPhase::None;
   // Пока переезжаем, Silent Accept не глотает откаты сервера: он пускает
@@ -385,14 +375,15 @@ public:
   // onPacketInEvent, поэтому atomic.
   std::atomic<bool> mRelocating{false};
   std::atomic<int> mHopCorrections{0}; // сколько раз сервер поправил позицию
-  bool mHopRequested = false;          // нажали Hop Key: переехать, как только
-                                       // дождёмся проверки текущего блока
-  std::string mHopReason;              // почему переезжаем (чат/дамп)
+  std::string mRelocateNow; // не пусто — переехать в этом тике (в инвентарь
+                            // ничего не падает), строка — причина
+  std::string mHopReason;   // почему переезжаем (чат/дамп)
   int mHopsDone = 0;
   int mHopTurn = 0;            // поворотов на 90° (прыжки упёрлись в стену)
-  int mEmptyRelocations = 0;   // переездов подряд, после которых не копали
+  int mEmptyRelocations = 0;   // переездов подряд, после которых не было
+                               // ни одного дропа (real/fake)
   int mRelocations = 0;        // за включение модуля
-  int mMinedAtRelocate = 0;    // mBlocksMined на момент прошлого переезда
+  int mDropsSinceHop = 0;      // дропов (real/fake) с прошлого переезда
   uint64_t mHopNextAt = 0;     // когда можно следующий прыжок / замер
   uint64_t mHopStartedAt = 0;  // начало переезда
   uint64_t mSettleSince = 0;   // начало ожидания чанков
@@ -401,11 +392,9 @@ public:
   glm::vec3 mHopFrom{};        // откуда последний прыжок
   glm::vec3 mHopDir{};         // направление (одно на весь переезд)
   std::vector<int> mHopMoves;  // реальный сдвиг каждого прыжка, блоков
-  bool mHopKeyWasDown = false;
-  int mOutOfReach = 0;         // руд дальше Max Distance (для статуса)
+  int mOutOfReach = 0;         // руд дальше kMineReach (для статуса)
 
-  static const char *hopDirName(HopDir d);
-  glm::vec3 hopDirection(Actor *player) const;
+  glm::vec3 hopDirection() const;
   void startRelocation(Actor *player, std::string why, uint64_t now);
   void tickRelocation(Actor *player, uint64_t now);
   void finishRelocation(Actor *player, bool chunksReady, uint64_t now);
@@ -413,14 +402,32 @@ public:
   bool chunksReadyAround(const glm::vec3 &pos, int radius);
   void maybeAutoRelocate(Actor *player, uint64_t now);
 
+  // =====================================================
+  // Auto Drop — мусор после копки на пол (у руды, а не под ноги)
+  // =====================================================
+  static constexpr int kDropStacksPerBlock = 4; // за один сломанный блок
+  static constexpr int kDropSettleTicks = 6;    // после выброса: ответ сервера
+                                                // успевает прийти до снимка
+                                                // «до» следующего удара
+  std::unordered_set<std::string> mJunkNames; // что копка приносила, кроме
+                                              // нужного (имена предметов)
+  InvSnapshot mInvPrev;                       // инвентарь прошлого тика
+  bool mInvPrevValid = false;
+  std::array<uint64_t, 36> mDropAskedAt{};    // слот уже выкидывали (ждём
+                                              // ответ сервера)
+  InvSnapshot mJustDropped; // выкинуто в последнем mineBlockAtPos: уходит в
+                            // проверку дропа (PendingCheck::dropped)
+  uint64_t mLastMinedAt = 0;
+  bool mDropSettle = false; // в последнем ударе что-то выкинули
+  int mJunkDropped = 0;     // стаков выкинуто за включение (для статуса)
+  bool isKeptItem(const std::string &lowerName) const;
+  void learnJunk(uint64_t now);            // раз в тик: что прибавилось
+  void dropJunkHere(class Inventory *container); // из mineBlockAtPos, у руды
+
   // Render (protected by mMutex)
   std::vector<glm::vec3> mPacketPositions;
   uint64_t mLastPathTime = 0;
   std::recursive_mutex mMutex;
-
-  // Key binding state
-  bool mIsBindingKey = false;
-  bool mBindWaitRelease = false;
 
   // =====================================================
   // Debug dump
@@ -451,24 +458,24 @@ public:
   bool mDebugWasOn   = false;
 
   // Дистанция -> вердикт по каждому проверенному блоку сессии Debug: из них в
-  // итоге таблица real/fake/nodrop по дистанции и совет, какой Max Distance
-  // ставить. nodrop при полном инвентаре сюда не идёт — дистанция ни при чём.
+  // итоге таблица real/fake/nodrop по дистанции и порог, дальше которого
+  // nodrop заметно чаще (чтобы видеть, хорош ли скрытый лимит 60 блоков).
+  // nodrop при полном инвентаре сюда не идёт — дистанция ни при чём.
   struct DistSample {
     float d = 0.f;
     DropVerdict v = DropVerdict::Unknown;
   };
   struct DistAdvice {
     bool ok = false; // nodrop заметно чаще дальше какой-то дистанции
-    int limit = 0;   // её и советуем как Max Distance
+    int limit = 0;   // сама эта дистанция
     int nearNo = 0, nearAll = 0, farNo = 0, farAll = 0;
     int noDrops = 0;           // nodrop всего (без полного инвентаря)
     float farthestReal = -1.f; // самый дальний real
   };
   std::vector<DistSample> mDbgDist;
-  float mDbgNotedMaxDist = -1.f; // какой Max Distance уже записан в дамп
   static DistAdvice adviseMaxDistance(std::vector<DistSample> samples);
   void debugWriteDistanceSummary();
-  void debugNoteSettings(); // Max Distance и т.п. — строкой-комментарием
+  void debugNoteSettings(); // скрытые лимиты и т.п. — строкой-комментарием
 
   void syncDebugSession();  // Debug включили/выключили -> старт/стоп сессии
   void debugStart();        // новая сессия
@@ -540,11 +547,6 @@ public:
   void abortCheck(); // прервать ожидание (выключение, смена мира)
   void recordCheck(const PendingCheck &pc, DropVerdict v, uint64_t now);
 
-  // Key helpers
-  static const char *getKeyName(int vk);
-  static bool sIsAnyKeyHeld();
-  static int sFindHeldKey();
-
   // =====================================================
   // Events
   // =====================================================
@@ -554,24 +556,5 @@ public:
   void onRenderEvent(class RenderEvent &event);
   void onBlockChangedEvent(class BlockChangedEvent &event);
 
-  std::string getSettingDisplay() override {
-    if (mHopPhase == HopPhase::Hopping)
-      return "Hop " + std::to_string(mHopsDone) + "/" +
-             std::to_string(static_cast<int>(mHopCount.mValue));
-    if (mHopPhase == HopPhase::Settling)
-      return "Hop: chunks";
-    std::string s;
-    switch (mState) {
-    case MineState::Idle:
-      s = "Idle";
-      break;
-    case MineState::Mining:
-      s = std::to_string(mCurrentClusterIdx) + "/" +
-          std::to_string(mCurrentCluster.size());
-      break;
-    }
-    if (!mFilteredBlocks.empty())
-      s += " [" + std::to_string(mFilteredBlocks.size()) + "]";
-    return s;
-  }
+  std::string getSettingDisplay() override;
 };

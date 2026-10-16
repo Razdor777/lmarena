@@ -1,5 +1,6 @@
 #include "OreMinerV2.hpp"
 
+#include <Features/Command/Commands/TeleportCommand.hpp>
 #include <Features/FeatureManager.hpp>
 
 #include <SDK/Minecraft/Actor/Actor.hpp>
@@ -10,6 +11,7 @@
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
+#include <SDK/Minecraft/Network/Packets/CommandRequestPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/MobEquipmentPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
@@ -25,6 +27,7 @@
 #include <Utils/GameUtils/PacketUtils.hpp>
 #include <Utils/MiscUtils/BlockUtils.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
+#include <Utils/MiscUtils/CommandUtils.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
 
@@ -39,6 +42,271 @@
 #include <iomanip>
 #include <map>
 #include <sstream>
+
+// =============================================================
+// СКРЫТОЕ — без настроек, всегда включено (в .hpp ничего нет)
+// =============================================================
+//
+//  1. "/heal" раз в 5 минут, пока модуль включён (первый — через 5 минут).
+//  2. Сторож координат. Копали на 8931 13 9313 — и вдруг стоим на 383 67 312
+//     (сервер кинул на спавн, смерть, смена мира...). Тогда:
+//       - пауза: ничего не копаем, проверку текущего блока бросаем;
+//       - через 1.5 с "/rtp" и ждём, пока он перекинет (до 20 с, 3 попытки);
+//       - ".tp ~ 10 ~": вниз на y=10, x и z те же — так же, как .tp (цепочка
+//         телепорт-пакетов + клиент туда же);
+//       - скан заново — и копаем дальше.
+//     Скачок — сдвиг больше 100 блоков за тик (столько не пройти и не
+//     пролететь). Свои прыжки (переезд, спуск) и ручной .tp — не скачок. Если
+//     /rtp только что набрали руками, сразу спуск: второй /rtp не шлём.
+namespace {
+constexpr uint64_t kHealEveryMs = 5ull * 60ull * 1000ull;
+constexpr float kJumpDist = 100.f;      // за один тик столько не пройти
+constexpr uint64_t kJumpPauseMs = 1500; // скачок -> пауза -> /rtp
+constexpr uint64_t kRtpWaitMs = 20000;  // столько ждём телепорт от /rtp
+constexpr int kRtpTries = 3;
+constexpr uint64_t kRtpRecentMs = 60000; // /rtp ушёл недавно -> скачок от него
+constexpr float kDownY = 10.f;          // ".tp ~ 10 ~"
+constexpr uint64_t kDownMinMs = 800;    // после rtp: дать прийти чанкам...
+constexpr uint64_t kDownMaxMs = 6000;   // ...но не дольше
+constexpr uint64_t kResumeMs = 500;     // после спуска: откат успевает прийти
+constexpr uint64_t kQuietMs = 2000;     // после своих прыжков скачки не ловим
+constexpr uint64_t kManualTpMs = 3000;  // ручной .tp — не скачок
+
+enum class Recover { None, Pause, WaitRtp, Down, Resume };
+
+struct HiddenState {
+  uint64_t nextHealAt = 0;
+  bool havePos = false;
+  glm::vec3 lastPos{};       // позиция в конце прошлого тика
+  uint64_t quietUntil = 0;   // свои телепорты: сдвиг скачком не считается
+  std::atomic<uint64_t> rtpSentAt{0}; // когда ушёл "/rtp" (наш или руками)
+  Recover phase = Recover::None;
+  uint64_t phaseAt = 0;      // когда следующий шаг (или конец ожидания)
+  uint64_t phaseStart = 0;
+  glm::vec3 jumpFrom{}, jumpTo{};
+  glm::vec3 rtpFrom{};       // где стояли, когда отправили /rtp
+  int rtpTries = 0;
+};
+HiddenState sHidden;
+
+uint64_t since(uint64_t now, uint64_t t) { return now > t ? now - t : 0; }
+
+std::string fmtPos(const glm::vec3 &p) {
+  return fmt::format("{} {} {}", static_cast<int>(std::floor(p.x)),
+                     static_cast<int>(std::floor(p.y)),
+                     static_cast<int>(std::floor(p.z)));
+}
+
+// Чанк, в котором стоит точка (floor: ChunkPos(vec3) режет к нулю и на
+// минусовых координатах ошибается на чанк).
+ChunkPos chunkOf(const glm::vec3 &p) {
+  return ChunkPos(static_cast<int>(std::floor(p.x)) >> 4,
+                  static_cast<int>(std::floor(p.z)) >> 4);
+}
+
+void hiddenReset(uint64_t now) {
+  auto &h = sHidden;
+  h.nextHealAt = now + kHealEveryMs;
+  h.havePos = false;
+  h.quietUntil = 0;
+  h.phase = Recover::None;
+  h.rtpTries = 0;
+}
+
+// Свой телепорт (переезд закончен и т.п.): точка отсчёта — новая позиция,
+// поздний откат сервера скачком не считается.
+void hiddenQuiet(uint64_t until) {
+  sHidden.quietUntil = (std::max)(sHidden.quietUntil, until);
+  sHidden.havePos = false;
+}
+
+void hiddenRtpSent(uint64_t now) { sHidden.rtpSentAt.store(now); }
+
+bool hiddenRecovering() { return sHidden.phase != Recover::None; }
+
+std::string hiddenStatus(uint64_t now) {
+  const auto &h = sHidden;
+  switch (h.phase) {
+  case Recover::Pause:
+    return fmt::format("Position jumped! /rtp in {:.1f}s",
+                       static_cast<double>(since(h.phaseAt, now)) / 1000.0);
+  case Recover::WaitRtp:
+    return fmt::format("Waiting for /rtp (try {}/{})", h.rtpTries, kRtpTries);
+  case Recover::Down:
+    return "RTP done, going down to y=10";
+  case Recover::Resume:
+    return "At y=10, resuming";
+  default:
+    return {};
+  }
+}
+
+void hiddenLog(OreMinerV2 &m, const std::string &line) {
+  spdlog::info("[OreMinerV2] {}", line);
+  if (m.mDebug.mValue && m.debugOpenFile()) {
+    m.mDbgFile << "# " << OreMinerV2::clockString() << ' ' << line << '\n';
+    m.mDbgFile.flush();
+  }
+}
+
+void sendRtp(OreMinerV2 &m, const glm::vec3 &pos, uint64_t now) {
+  auto &h = sHidden;
+  h.rtpTries++;
+  h.rtpFrom = pos;
+  h.phase = Recover::WaitRtp;
+  h.phaseStart = now;
+  h.phaseAt = now + kRtpWaitMs;
+  CommandUtils::executeCommand("/rtp");
+  hiddenLog(m, fmt::format("/rtp (попытка {}/{}) с {}", h.rtpTries, kRtpTries,
+                           fmtPos(pos)));
+}
+
+void startRecovery(OreMinerV2 &m, const glm::vec3 &from, const glm::vec3 &to,
+                   uint64_t now) {
+  auto &h = sHidden;
+  m.abortCheck();
+  m.cancelRelocation();
+  m.mRelocateNow.clear();
+  m.mState = OreMinerV2::MineState::Idle;
+  m.mCurrentCluster.clear();
+  m.mCurrentClusterIdx = 0;
+  m.mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+  m.mMinedPositions.clear(); // то место далеко, его блоки больше не нужны
+  m.mPauseUntil = 0;
+  m.mNoDropStreak = m.mStreakLevel = 0;
+  m.mSinceLastDrop.clear();
+  m.resetScan();
+  m.mRelocating.store(true); // откаты сервера не глотаем, пока чиним
+
+  h.jumpFrom = from;
+  h.jumpTo = to;
+  h.rtpTries = 0;
+  h.phaseStart = now;
+  // /rtp только что набрали (руками или мы) — это его телепорт: сразу вниз.
+  const bool byRtp = since(now, h.rtpSentAt.load()) < kRtpRecentMs;
+  h.rtpSentAt.store(0);
+  const int dist = static_cast<int>(glm::distance(from, to));
+  if (byRtp) {
+    h.phase = Recover::Down;
+    h.phaseAt = now + kDownMinMs;
+    hiddenLog(m, fmt::format("rtp: {} -> {} ({} бл.), вниз на y=10",
+                             fmtPos(from), fmtPos(to), dist));
+    ChatUtils::displayClientMessage(fmt::format(
+        "§7[OreMinerV2] §bRTP§7: {} -> {}. Спускаюсь на y=10 и копаю дальше",
+        fmtPos(from), fmtPos(to)));
+  } else {
+    h.phase = Recover::Pause;
+    h.phaseAt = now + kJumpPauseMs;
+    hiddenLog(m, fmt::format("скачок позиции: {} -> {} ({} бл.), пауза, /rtp",
+                             fmtPos(from), fmtPos(to), dist));
+    ChatUtils::displayClientMessage(fmt::format(
+        "§7[OreMinerV2] §eПозицию резко сменило§7: {} -> {}. Пауза, потом "
+        "§f/rtp§7 и вниз на y=10",
+        fmtPos(from), fmtPos(to)));
+  }
+}
+
+void finishRecovery(OreMinerV2 &m, const glm::vec3 &pos, uint64_t now,
+                    bool ok) {
+  auto &h = sHidden;
+  h.phase = Recover::None;
+  m.mRelocating.store(false);
+  m.resetScan();       // центр скана — новое место
+  m.mLastBusyAt = now; // Idle Time — заново
+  hiddenQuiet(now + kQuietMs);
+  if (ok) {
+    hiddenLog(m, fmt::format("на месте: {}, копаю", fmtPos(pos)));
+    ChatUtils::displayClientMessage(fmt::format(
+        "§7[OreMinerV2] §aНа месте§7 ({}) — копаю дальше", fmtPos(pos)));
+  } else {
+    hiddenLog(m, fmt::format("/rtp не перекинул ({} попытки), копаю на {}",
+                             h.rtpTries, fmtPos(pos)));
+    ChatUtils::displayClientMessage(fmt::format(
+        "§7[OreMinerV2] §c/rtp не перекинул§7 ({} попытки) — копаю здесь",
+        h.rtpTries));
+  }
+}
+
+// Раз в тик, до всего остального. true — в этом тике модуль не сканирует и
+// не копает (идёт восстановление после скачка).
+bool hiddenTick(OreMinerV2 &m, Actor *player, uint64_t now) {
+  auto &h = sHidden;
+  if (now >= h.nextHealAt) {
+    h.nextHealAt = now + kHealEveryMs;
+    CommandUtils::executeCommand("/heal");
+  }
+
+  const glm::vec3 pos = *player->getPos();
+  if (h.phase == Recover::None) {
+    const bool ownMove =
+        m.mRelocating.load() || now < h.quietUntil ||
+        since(now, TeleportCommand::sLastUse.load()) < kManualTpMs;
+    if (h.havePos && !ownMove && glm::distance(pos, h.lastPos) > kJumpDist)
+      startRecovery(m, h.lastPos, pos, now);
+    h.lastPos = pos;
+    h.havePos = true;
+    return h.phase != Recover::None;
+  }
+
+  h.lastPos = pos;
+  h.havePos = true;
+  m.mRelocating.store(true); // смена измерения и т.п. могли сбросить
+  switch (h.phase) {
+  case Recover::Pause:
+    if (now >= h.phaseAt)
+      sendRtp(m, pos, now);
+    return true;
+
+  case Recover::WaitRtp:
+    if (glm::distance(pos, h.rtpFrom) > kJumpDist) {
+      h.rtpSentAt.store(0);
+      h.phase = Recover::Down;
+      h.phaseStart = now;
+      h.phaseAt = now + kDownMinMs;
+      hiddenLog(m, fmt::format("rtp -> {}, вниз на y=10", fmtPos(pos)));
+      return true;
+    }
+    if (now < h.phaseAt)
+      return true;
+    if (h.rtpTries < kRtpTries) {
+      sendRtp(m, pos, now);
+      return true;
+    }
+    finishRecovery(m, pos, now, false);
+    return false;
+
+  case Recover::Down: {
+    if (now < h.phaseAt)
+      return true;
+    if (!m.chunksReadyAround(pos, 1) && since(now, h.phaseStart) < kDownMaxMs)
+      return true;
+    if (pos.y > kDownY + 3.f) {
+      // ".tp ~ 10 ~": как TeleportCommand — телепорт-пакеты по Step
+      // Distance до точки, потом сам клиент туда же.
+      const glm::vec3 to(pos.x, kDownY, pos.z);
+      m.straightLineTP(pos, to, true);
+      player->setPosition(to);
+      if (auto sv = player->getStateVectorComponent())
+        sv->mVelocity = glm::vec3(0.f);
+      h.lastPos = to;
+      hiddenLog(m, fmt::format("вниз: {} -> {}", fmtPos(pos), fmtPos(to)));
+    }
+    h.phase = Recover::Resume;
+    h.phaseAt = now + kResumeMs;
+    return true;
+  }
+
+  case Recover::Resume:
+    if (now < h.phaseAt)
+      return true;
+    finishRecovery(m, pos, now, true);
+    return false;
+
+  default:
+    return false;
+  }
+}
+} // namespace
 
 // =============================================================
 // ENABLED BLOCK IDS
@@ -62,110 +330,6 @@ std::vector<int> OreMinerV2::getEnabledBlockIds() {
 }
 
 // =============================================================
-// KEY HELPERS
-// =============================================================
-
-const char *OreMinerV2::getKeyName(int vk) {
-  static char buf[32];
-  switch (vk) {
-  case 0:
-    return "None";
-  case VK_LBUTTON:
-    return "LMB";
-  case VK_RBUTTON:
-    return "RMB";
-  case VK_MBUTTON:
-    return "MMB";
-  case VK_BACK:
-    return "Back";
-  case VK_TAB:
-    return "Tab";
-  case VK_RETURN:
-    return "Enter";
-  case VK_SHIFT:
-    return "Shift";
-  case VK_CONTROL:
-    return "Ctrl";
-  case VK_MENU:
-    return "Alt";
-  case VK_ESCAPE:
-    return "Esc";
-  case VK_SPACE:
-    return "Space";
-  case VK_DELETE:
-    return "Del";
-  case VK_INSERT:
-    return "Ins";
-  case VK_HOME:
-    return "Home";
-  case VK_END:
-    return "End";
-  case VK_CAPITAL:
-    return "CapsLock";
-  default:
-    break;
-  }
-  if (vk >= VK_F1 && vk <= VK_F12) {
-    snprintf(buf, 32, "F%d", vk - VK_F1 + 1);
-    return buf;
-  }
-  if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) {
-    snprintf(buf, 32, "Num%d", vk - VK_NUMPAD0);
-    return buf;
-  }
-  if ((vk >= '0' && vk <= '9') || (vk >= 'A' && vk <= 'Z')) {
-    snprintf(buf, 32, "%c", (char)vk);
-    return buf;
-  }
-  snprintf(buf, 32, "0x%02X", vk);
-  return buf;
-}
-
-bool OreMinerV2::sIsAnyKeyHeld() {
-  for (int vk = 8; vk <= 254; vk++) {
-    if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU)
-      continue;
-    if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-      continue;
-    if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-      continue;
-    if (vk == VK_LMENU || vk == VK_RMENU)
-      continue;
-    if (vk == VK_LWIN || vk == VK_RWIN)
-      continue;
-    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON)
-      continue;
-    if (vk == VK_ESCAPE)
-      continue;
-    if (GetAsyncKeyState(vk) & 0x8000)
-      return true;
-  }
-  return false;
-}
-
-int OreMinerV2::sFindHeldKey() {
-  for (int vk = 8; vk <= 254; vk++) {
-    if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU)
-      continue;
-    if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-      continue;
-    if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-      continue;
-    if (vk == VK_LMENU || vk == VK_RMENU)
-      continue;
-    if (vk == VK_LWIN || vk == VK_RWIN)
-      continue;
-    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON)
-      continue;
-    if (vk == VK_ESCAPE)
-      continue;
-    if (GetAsyncKeyState(vk) & 0x8000)
-      return vk;
-  }
-  return -1;
-}
-
-// =============================================================
 // SCAN — reset
 // =============================================================
 
@@ -175,16 +339,19 @@ void OreMinerV2::resetScan() {
   mBlacklistedPositions.clear();
   mPatternBlocks.clear();
   mScanComplete = false;
+  mPassMissing = 0;
+  mScanStartedAt = static_cast<uint64_t>(NOW);
   mScanDirty = false;
   mLastClusterUpdate = 0;
   mStepsCount = 0;
   mSteps = 1;
   mDirectionIndex = 0;
   mSubChunkIndex = 0;
+  mOutOfReach = 0;
 
   auto player = ClientInstance::get()->getLocalPlayer();
   if (player) {
-    mSearchCenter = ChunkPos(*player->getPos());
+    mSearchCenter = chunkOf(*player->getPos());
     mCurrentChunkPos = mSearchCenter;
   }
 }
@@ -589,10 +756,9 @@ OreMinerV2::findNearestCluster(glm::vec3 playerPos,
   BlockPos nearestPos;
   float nearestDist = FLT_MAX;
   bool found = false;
-  // Max Distance: кластер берём, только если его ближний блок не дальше
-  // лимита. Остальные руды не трогаем — они ждут, пока игрок окажется ближе
-  // (Follow, переезд), а в статусе видно, сколько их «не достать».
-  const float maxDist = mMaxDistance.mValue;
+  // Кластер берём, только если его ближний блок не дальше kMineReach (60).
+  // Остальные руды не трогаем — они ждут, пока игрок окажется ближе (Follow),
+  // в статусе видно, сколько их «не достать». Ближе нечего — Auto Relocate.
   mOutOfReach = 0;
 
   for (auto &[pos, fb] : mFilteredBlocks) {
@@ -601,7 +767,7 @@ OreMinerV2::findNearestCluster(glm::vec3 playerPos,
     if (mBlacklistedPositions.contains(pos))
       continue;
     float d = glm::distance(playerPos, glm::vec3(pos) + glm::vec3(0.5f));
-    if (maxDist > 0.f && d > maxDist) {
+    if (d > kMineReach) {
       mOutOfReach++;
       continue;
     }
@@ -712,7 +878,6 @@ void OreMinerV2::debugStart() {
   mDbgReal = mDbgFake = mDbgNoDrop = mDbgUnknown = mDbgSkip = 0;
   mDbgPattern = 0;
   mDbgDist.clear();
-  mDbgNotedMaxDist = -1.f;
 
   spdlog::info("[OreMinerV2][Debug] session {} -> {}OreMinerV2.txt",
                mDebugSession, mDebugDir);
@@ -767,9 +932,9 @@ void OreMinerV2::debugStop() {
     if (advice.ok)
       ChatUtils::displayClientMessage(fmt::format(
           "§7[OreMinerV2] §fДистанция: дальше §e{}§f бл. nodrop §e{} из {}§f, "
-          "ближе — {} из {}. Поставь §aMax Distance {}",
+          "ближе — {} из {} (копаю до {:.0f})",
           advice.limit, advice.farNo, advice.farAll, advice.nearNo,
-          advice.nearAll, advice.limit));
+          advice.nearAll, kMineReach));
   } else if (wroteSeen) {
     ChatUtils::displayClientMessage(
         "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен (Dump Seen -> "
@@ -835,7 +1000,7 @@ bool OreMinerV2::debugOpenFile() {
           "#   pattern - (только в итоге) не копали вовсе: та же фигура на том "
           "же месте в соседних чанках = фейк\n"
           "#   d=      - сколько блоков было от тебя до руды в момент удара; "
-          "в итоге сессии - таблица по дистанции и совет для Max Distance\n",
+          "в итоге сессии - таблица по дистанции\n",
           mDebugSession)) {
     mDbgFileFailed = true;
     spdlog::error("[OreMinerV2][Debug] cannot open {}", path);
@@ -845,29 +1010,22 @@ bool OreMinerV2::debugOpenFile() {
   return true;
 }
 
-// Строка-комментарий с настройками, от которых зависит дистанция: чтобы по
-// дампу было видно, при каком Max Distance копали. Пишется при открытии файла
-// и каждый раз, когда Max Distance поменяли посреди сессии.
+// Строка-комментарий с тем, от чего зависят вердикты: по дампу видно, при
+// каких условиях копали. Пишется при открытии файла.
 void OreMinerV2::debugNoteSettings() {
   if (!mDbgFile.is_open())
     return;
-  const float md = mMaxDistance.mValue;
-  mDbgNotedMaxDist = md;
-  mDbgFile << "# " << clockString() << " Max Distance: ";
-  if (md > 0.f)
-    mDbgFile << static_cast<int>(md);
-  else
-    mDbgFile << "нет";
-  mDbgFile << ", Step Distance: " << std::fixed << std::setprecision(1)
-           << mStepDistance.mValue << ", Follow: "
-           << (mFollow.mValue ? "on" : "off") << ", Auto Relocate: ";
+  mDbgFile << "# " << clockString() << " копаю до "
+           << static_cast<int>(kMineReach) << " бл., Step Distance: "
+           << std::fixed << std::setprecision(1) << mStepDistance.mValue
+           << ", Follow: " << (mFollow.mValue ? "on" : "off")
+           << ", Auto Relocate: ";
   if (mAutoRelocate.mValue)
-    mDbgFile << "on (" << hopDirName(mHopDirection.as<HopDir>()) << ", "
-             << static_cast<int>(mHopCount.mValue) << " x "
-             << static_cast<int>(mHopDistance.mValue) << ")";
+    mDbgFile << "on (Idle Time " << mIdleTime.mValue << " с, "
+             << kHopCount << " x " << static_cast<int>(kHopDistance) << ")";
   else
     mDbgFile << "off";
-  mDbgFile << '\n';
+  mDbgFile << ", Auto Drop: " << (mAutoDrop.mValue ? "on" : "off") << '\n';
   mDbgFile.flush();
 }
 
@@ -977,7 +1135,7 @@ void OreMinerV2::debugWriteSkip(const BlockPos &pos,
 }
 
 // =============================================================
-// DEBUG — дистанция: таблица и совет для Max Distance
+// DEBUG — дистанция: таблица и порог nodrop
 // =============================================================
 //
 // Совет — простейший порог: перебираем все границы между отсортированными
@@ -1061,15 +1219,15 @@ void OreMinerV2::debugWriteDistanceSummary() {
 
   const DistAdvice a = adviseMaxDistance(mDbgDist);
   if (a.ok)
-    mDbgFile << "# совет: Max Distance " << a.limit << " (ближе: " << a.nearNo
-             << " nodrop из " << a.nearAll << ", дальше: " << a.farNo
-             << " из " << a.farAll << ")\n";
+    mDbgFile << "# nodrop заметно чаще дальше " << a.limit << " бл. (ближе: "
+             << a.nearNo << " nodrop из " << a.nearAll << ", дальше: "
+             << a.farNo << " из " << a.farAll << "), копаю до "
+             << static_cast<int>(kMineReach) << "\n";
   else if (a.noDrops < 3 || mDbgDist.size() < 10)
-    mDbgFile << "# совет: пока мало данных (nodrop: " << a.noDrops
-             << ") - покопай ещё\n";
+    mDbgFile << "# порог nodrop: пока мало данных (nodrop: " << a.noDrops
+             << ")\n";
   else
-    mDbgFile << "# совет: nodrop от дистанции не зависит - Max Distance не "
-                "поможет\n";
+    mDbgFile << "# nodrop от дистанции не зависит\n";
   if (a.farthestReal >= 0.f)
     mDbgFile << "# самый дальний real: " << std::fixed << std::setprecision(1)
              << a.farthestReal << '\n';
@@ -1108,16 +1266,19 @@ void OreMinerV2::onEnable() {
   mHopTurn = 0;
   mEmptyRelocations = 0;
   mRelocations = 0;
-  mMinedAtRelocate = 0;
+  mDropsSinceHop = 0;
   mOutOfReach = 0;
   mLastBusyAt = static_cast<uint64_t>(NOW);
-  // Клавиша, зажатая в момент включения, не должна сразу же дать переезд.
-  {
-    const int vk = static_cast<int>(mHopKey.mValue);
-    mHopKeyWasDown = vk > 0 && (GetAsyncKeyState(vk) & 0x8000) != 0;
-  }
-  mIsBindingKey = false;
-  mBindWaitRelease = false;
+  // Auto Drop: что считать мусором, узнаём заново.
+  mJunkNames.clear();
+  mInvPrev.clear();
+  mInvPrevValid = false;
+  mDropAskedAt.fill(0);
+  mJustDropped.clear();
+  mLastMinedAt = 0;
+  mDropSettle = false;
+  mJunkDropped = 0;
+  hiddenReset(static_cast<uint64_t>(NOW));
 
   {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
@@ -1166,8 +1327,8 @@ void OreMinerV2::onDisable() {
   mPauseUntil = 0;
   mSinceLastDrop.clear();
   mRetriedOnce.clear();
-  mIsBindingKey = false;
   cancelRelocation();
+  hiddenReset(static_cast<uint64_t>(NOW)); // восстановление после скачка — стоп
 
   // Файлы дампа закрываем, как только модуль выключили: каждая строка уже
   // сброшена на диск в момент записи, здесь только итог в чат.
@@ -1192,7 +1353,7 @@ void OreMinerV2::onBlockChangedEvent(BlockChangedEvent &event) {
 
   float dist = glm::distance(glm::vec3(event.mBlockPos) + glm::vec3(0.5f),
                              *player->getPos());
-  if (dist > mRadius.mValue)
+  if (dist > kScanReach)
     return;
 
   if (mBlacklistedPositions.contains(event.mBlockPos))
@@ -1398,6 +1559,9 @@ void OreMinerV2::startCheck(const BlockPos &pos, int seenId, bool decides,
   mPending.minedAt = NOW;
   mPending.dist = mLastMineDist; // мерили до телепорта (Follow двигает игрока)
   mPending.before = std::move(before);
+  // Auto Drop выкинул стаки в этом же ударе — учитывается в pollCheck.
+  mPending.dropped = std::move(mJustDropped);
+  mJustDropped.clear();
 }
 
 bool OreMinerV2::pollCheck() {
@@ -1406,7 +1570,27 @@ bool OreMinerV2::pollCheck() {
 
   int used = 0;
   const InvSnapshot after = getInventorySnapshot(&used);
-  mergeGains(mPending.seen, inventoryGains(mPending.before, after));
+  if (mPending.dropped.empty()) {
+    mergeGains(mPending.seen, inventoryGains(mPending.before, after));
+  } else {
+    // Auto Drop выкинул стаки в этом же ударе. Пока сервер этого не
+    // подтвердил, стаки ещё в инвентаре; потом их станет меньше на столько
+    // же. Стало меньше, чем было до удара, — выброс применён, считаем от
+    // «было минус выкинуто», иначе — от «было». Так дроп с этого блока
+    // (булыжник у фейка) не теряется на фоне выкинутого и не появляется
+    // ложный прирост, пока сервер ещё не ответил.
+    InvSnapshot base = mPending.before;
+    for (const auto &[name, cnt] : mPending.dropped) {
+      auto a = after.find(name);
+      const int have = a == after.end() ? 0 : a->second;
+      int &b = base[name];
+      if (have < b) {
+        b = (std::max)(0, b - cnt);
+        mPending.dropApplied = true;
+      }
+    }
+    mergeGains(mPending.seen, inventoryGains(base, after));
+  }
   mPending.invFull = used >= 36;
 
   const uint64_t now = NOW;
@@ -1424,7 +1608,13 @@ bool OreMinerV2::pollCheck() {
   if (mPending.seen.empty() && !timedOut)
     return false; // дроп ещё в пути
 
-  finishCheck(judgeDrop(mPending.seen, mPending.oreId), now);
+  DropVerdict v = judgeDrop(mPending.seen, mPending.oreId);
+  // Сервер ломает и выкидывает по порядку: дроп с блока (булыжник у фейка)
+  // мог лечь в тот же стак и уйти вместе с ним. Тогда «ничего не пришло» —
+  // не nodrop, а неизвестно (в серию «без дропа» не идёт).
+  if (v == DropVerdict::NoDrop && mPending.dropApplied)
+    v = DropVerdict::Unknown;
+  finishCheck(v, now);
   return true;
 }
 
@@ -1462,6 +1652,8 @@ void OreMinerV2::finishCheck(DropVerdict v, uint64_t now) {
   const PendingCheck pc = std::move(mPending);
   mPending = PendingCheck{};
   mLastBusyAt = now;
+  if (v == DropVerdict::Real || v == DropVerdict::Fake)
+    mDropsSinceHop++; // что-то упало — переезд был не впустую
   recordCheck(pc, v, now);
 
   // Полный инвентарь: автоподбору некуда положить дроп, и любой кластер
@@ -1515,6 +1707,110 @@ void OreMinerV2::rejectCluster(const PendingCheck &pc, DropVerdict v) {
   mTickDelay = 2;
 }
 
+// Столько переездов подряд — и ни одного дропа: дело не в месте (не те руды
+// включены, стоишь слишком высоко, регион, где ломать нельзя...). Дальше не
+// прыгаем, чтобы не улететь неизвестно куда: Auto Relocate выключается.
+// true — выключили, переезжать нельзя.
+static bool stopIfEmptyRelocations(OreMinerV2 &m) {
+  if (m.mRelocations == 0 || m.mDropsSinceHop > 0 ||
+      m.mEmptyRelocations + 1 < OreMinerV2::kMaxEmptyRelocations)
+    return false;
+  m.mAutoRelocate.mValue = false;
+  m.mEmptyRelocations = 0;
+  std::string hint = "Проверь, какие руды включены";
+  if (auto player = ClientInstance::get()->getLocalPlayer()) {
+    const float y = player->getPos()->y;
+    if (y > 40.f)
+      hint = fmt::format("Ты на y={:.0f}, а алмазы ниже y=16 — спустись "
+                         "(.tp ~ 10 ~)",
+                         y);
+  }
+  spdlog::warn("[OreMinerV2] Auto Relocate stopped: {} relocations in a row "
+               "without any drop",
+               OreMinerV2::kMaxEmptyRelocations);
+  ChatUtils::displayClientMessage(fmt::format(
+      "§7[OreMinerV2] §cAuto Relocate выключен§7: {} переездов подряд — и ни "
+      "одного дропа. {}",
+      OreMinerV2::kMaxEmptyRelocations, hint));
+  return true;
+}
+
+// =============================================================
+// AUTO DROP — мусор после копки
+// =============================================================
+//
+// Мусор — всё, что прибавилось в инвентаре, пока модуль копает (ломает блок
+// или прошло меньше 2 с с последнего), кроме нужного: алмазов (и угля /
+// изумрудов, если их копаем) и на всякий случай инструментов, брони, еды.
+// Выкидывается целыми стаками прямо в mineBlockAtPos, между ударом и
+// телепортом обратно: сервер в этот момент видит нас у руды, и вещи падают
+// там (до 60 блоков от нас), автоподбор не возвращает их обратно.
+
+bool OreMinerV2::isKeptItem(const std::string &n) const {
+  if (n.find("diamond") != std::string::npos)
+    return true; // алмазы, алмазная руда (шёлк), алмазные инструменты
+  if (mCoal.mValue && n.find("coal") != std::string::npos)
+    return true;
+  if (mEmerald.mValue && n.find("emerald") != std::string::npos)
+    return true;
+  static const char *const kKeep[] = {
+      "pickaxe", "sword",  "_axe",    "shovel", "_hoe",   "helmet",
+      "chestplate", "leggings", "boots", "totem", "elytra", "shield",
+      "bow",     "apple",  "bread",   "beef",   "porkchop", "steak",
+      "carrot",  "potato", "golden",  "pearl",  "shulker", "netherite"};
+  for (const char *k : kKeep)
+    if (n.find(k) != std::string::npos)
+      return true;
+  return false;
+}
+
+void OreMinerV2::learnJunk(uint64_t now) {
+  if (!mAutoDrop.mValue) {
+    mJunkNames.clear();
+    mInvPrevValid = false;
+    return;
+  }
+  InvSnapshot cur = getInventorySnapshot();
+  const bool fromMining = mPending.active || mState == MineState::Mining ||
+                          (mLastMinedAt != 0 && since(now, mLastMinedAt) < 2000);
+  if (mInvPrevValid && fromMining) {
+    for (const auto &[name, cnt] : cur) {
+      auto it = mInvPrev.find(name);
+      const int was = it == mInvPrev.end() ? 0 : it->second;
+      if (cnt > was && !isKeptItem(toLowerAscii(name)) &&
+          mJunkNames.insert(name).second)
+        spdlog::info("[OreMinerV2] Auto Drop: '{}' -> junk", name);
+    }
+  }
+  mInvPrev = std::move(cur);
+  mInvPrevValid = true;
+}
+
+void OreMinerV2::dropJunkHere(Inventory *container) {
+  mJustDropped.clear();
+  if (!mAutoDrop.mValue || mJunkNames.empty() || !container)
+    return;
+  const uint64_t now = NOW;
+  int n = 0;
+  for (int i = 0; i < 36 && n < kDropStacksPerBlock; i++) {
+    auto item = container->getItem(i);
+    if (!item || !item->mItem || !item->getItem() || item->mCount <= 0)
+      continue;
+    const std::string &name = item->getItem()->mName;
+    if (!mJunkNames.contains(name) || isKeptItem(toLowerAscii(name)))
+      continue;
+    if (mDropAskedAt[i] != 0 && since(now, mDropAskedAt[i]) < 1500)
+      continue; // уже выкидывали — ждём, пока сервер ответит
+    mJustDropped[name] += item->mCount; // до dropSlot: стак ещё на месте
+    container->dropSlot(i);
+    mDropAskedAt[i] = now;
+    n++;
+  }
+  mJunkDropped += n;
+  if (n > 0)
+    mDropSettle = true;
+}
+
 // Сервер иногда перестаёт ломать блоки (откат античита, сломалась кирка, лаг):
 // тогда «без дропа» идёт с ЛЮБОГО блока — даже с фейка, который обычно даёт
 // булыжник. В логе так было дважды (9 и 24 проверки подряд), и два настоящих
@@ -1535,6 +1831,17 @@ void OreMinerV2::trackNoDropStreak(DropVerdict v, bool invFull, uint64_t now) {
     return;
   if (++mNoDropStreak % kNoDropStreak != 0)
     return;
+
+  // Auto Relocate: в инвентарь ничего не падает — не ждём и не ставим на
+  // паузу, а сразу переезжаем (переезд — в этом же тике, см. mRelocateNow).
+  // Полный инвентарь переездом не лечится — тогда, как и раньше, пауза.
+  if (mAutoRelocate.mValue && !invFull && !stopIfEmptyRelocations(*this)) {
+    spdlog::warn("[OreMinerV2] {} checks in a row without any drop -> "
+                 "relocating",
+                 mNoDropStreak);
+    mRelocateNow = fmt::format("{} блока подряд без дропа", mNoDropStreak);
+    return;
+  }
 
   auto source = ClientInstance::get()->getBlockSource();
   const std::vector<int> enabled = getEnabledBlockIds();
@@ -1604,6 +1911,7 @@ void OreMinerV2::abortCheck() {
 // =============================================================
 
 bool OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
+  mJustDropped.clear();
   auto sender = ClientInstance::get()->getPacketSender();
   if (!sender) return false;
   auto source = ClientInstance::get()->getBlockSource();
@@ -1679,6 +1987,10 @@ bool OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
     sender->sendToServer(r.get());
   }
 
+  // 7.5) Auto Drop: мусор выкидываем сейчас — сервер видит нас у руды, вещи
+  // упадут там, а не под ноги (иначе автоподбор поднял бы их обратно).
+  dropJunkHere(container);
+
   // 8) TP back — только если Follow ВЫКЛЮЧЕН
   if (!mFollow.mValue) {
     straightLineTP(mp, pp, false);
@@ -1693,6 +2005,7 @@ bool OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
 
   mBlocksMined++;
   mLastBusyAt = NOW;
+  mLastMinedAt = mLastBusyAt;
   mCurrentTarget = pos;
   // Сломано, но дроп ещё не подтверждён — если окажется, что сервер в это
   // время блоки не ломал, вернём на перепроверку (trackNoDropStreak).
@@ -1710,81 +2023,29 @@ bool OreMinerV2::mineBlockAtPos(const BlockPos &pos, Actor *player) {
 // ".tp 10000 ~ 10000" с паузой ~0.6 с -> включить. Сервер пускает телепорт
 // только до края чанков, прогруженных у него вокруг игрока, поэтому первый
 // прыжок длинный, а следующие сразу за ним короче — чанки впереди ещё не
-// прогрузились. Здесь то же самое, но само:
-//   1. Idle Time секунд нечего копать, и сканер уже прошёл всё вокруг;
-//   2. Hops прыжков по Hop Distance в сторону Hop Direction с паузой
-//      Hop Delay — той же цепочкой телепорт-пакетов, что и .tp; сколько
-//      сервер реально пустил, меряем после каждого прыжка;
-//   3. ждём, пока клиент получит чанки вокруг нового места (до 5 с);
-//   4. скан заново — и копаем дальше.
+// прогрузились. Здесь то же самое, но само. Когда переезжать:
+//   A. копать нечего (ближе 60 блоков руды нет — выкопано или фейки, а что
+//      дальше, не достать) Idle Time секунд с последнего сломанного блока
+//      или дропа. Решение — только после полного прохода сканера по новому
+//      месту, но таймер идёт и во время прохода (считается от последней
+//      работы, а не от конца скана);
+//   B. в инвентарь перестало падать что-либо (kNoDropStreak проверок подряд
+//      без дропа) — сразу, без Idle Time.
+// Переезд: kHopCount прыжков по kHopDistance на +X +Z (упёрлись — следующий
+// переезд повернёт на 90°) с паузой kHopDelayMs, той же цепочкой
+// телепорт-пакетов, что и .tp; сколько сервер реально пустил, меряется после
+// каждого прыжка; потом ждём чанки вокруг нового места (до 5 с) и сканируем.
 // Пока идёт переезд, Silent Accept не глотает откаты сервера, иначе клиент
 // останется там, куда сервер его не пустил. Уже сломанное (mMinedPositions) и
 // память шаблонов не забываются — не то что при выключении модуля руками.
 
-const char *OreMinerV2::hopDirName(HopDir d) {
-  switch (d) {
-  case HopDir::Look:
-    return "Look";
-  case HopDir::PxPz:
-    return "+X +Z";
-  case HopDir::PxNz:
-    return "+X -Z";
-  case HopDir::NxPz:
-    return "-X +Z";
-  case HopDir::NxNz:
-    return "-X -Z";
-  case HopDir::Px:
-    return "+X";
-  case HopDir::Nx:
-    return "-X";
-  case HopDir::Pz:
-    return "+Z";
-  case HopDir::Nz:
-    return "-Z";
-  }
-  return "?";
-}
-
-glm::vec3 OreMinerV2::hopDirection(Actor *player) const {
-  glm::vec3 dir(1.f, 0.f, 1.f);
-  switch (mHopDirection.as<HopDir>()) {
-  case HopDir::Look: {
-    auto rot = player ? player->getActorRotationComponent() : nullptr;
-    const float yaw = rot ? glm::radians(rot->mYaw) : 0.f;
-    dir = glm::vec3(-std::sin(yaw), 0.f, std::cos(yaw));
-    break;
-  }
-  case HopDir::PxPz:
-    dir = {1.f, 0.f, 1.f};
-    break;
-  case HopDir::PxNz:
-    dir = {1.f, 0.f, -1.f};
-    break;
-  case HopDir::NxPz:
-    dir = {-1.f, 0.f, 1.f};
-    break;
-  case HopDir::NxNz:
-    dir = {-1.f, 0.f, -1.f};
-    break;
-  case HopDir::Px:
-    dir = {1.f, 0.f, 0.f};
-    break;
-  case HopDir::Nx:
-    dir = {-1.f, 0.f, 0.f};
-    break;
-  case HopDir::Pz:
-    dir = {0.f, 0.f, 1.f};
-    break;
-  case HopDir::Nz:
-    dir = {0.f, 0.f, -1.f};
-    break;
-  }
+glm::vec3 OreMinerV2::hopDirection() const {
+  glm::vec3 dir(1.f, 0.f, 1.f); // как ".tp 10000 ~ 10000": +X +Z
   // Прыжки упирались в стену (граница мира, сервер не пускает) — каждый раз
   // поворачиваем на 90° по часовой (вид сверху: +X -> +Z -> -X -> -Z).
   for (int i = 0; i < (mHopTurn & 3); i++)
     dir = glm::vec3(-dir.z, 0.f, dir.x);
-  const float len = glm::length(dir);
-  return len > 0.001f ? dir / len : glm::vec3(1.f, 0.f, 0.f);
+  return glm::normalize(dir);
 }
 
 // Клиент получил чанки вокруг: в каждом из (2r+1)^2 чанков есть данные
@@ -1816,52 +2077,38 @@ bool OreMinerV2::chunksReadyAround(const glm::vec3 &pos, int radius) {
 
 // Вызывается из Idle, когда копать нечего (findNearestCluster пуст).
 void OreMinerV2::maybeAutoRelocate(Actor *player, uint64_t now) {
-  // Сканер ещё не прошёл всё вокруг — может, руда просто не найдена пока.
-  // Idle Time начинаем считать только после полного прохода.
-  if (!mScanComplete) {
-    mLastBusyAt = now;
-    return;
-  }
   if (!mAutoRelocate.mValue)
     return;
-  const auto idleMs = static_cast<uint64_t>(mIdleTime.mValue * 1000.f);
-  if (now - mLastBusyAt < idleMs)
+  // Сканер ещё не прошёл всё вокруг — руда, может, просто не найдена пока.
+  // Таймер при этом не сбрасываем: Idle Time считается от последней работы.
+  if (!mScanComplete)
     return;
-
-  // Столько переездов подряд — и ни одного блока: похоже, дело не в месте
-  // (руды выключены, всё режет Max Distance/Pattern Filter, не тот мир...).
-  // Дальше не прыгаем, чтобы не улететь неизвестно куда.
-  if (mRelocations > 0 && mBlocksMined == mMinedAtRelocate &&
-      mEmptyRelocations + 1 >= kMaxEmptyRelocations) {
-    mAutoRelocate.mValue = false;
-    mEmptyRelocations = 0;
-    spdlog::warn("[OreMinerV2] Auto Relocate stopped: {} relocations in a row "
-                 "without mining anything",
-                 kMaxEmptyRelocations);
-    ChatUtils::displayClientMessage(fmt::format(
-        "§7[OreMinerV2] §cAuto Relocate выключен§7: {} переездов подряд — и "
-        "ни одной руды. Проверь руды/Max Distance (Hop Key — переехать "
-        "вручную)",
-        kMaxEmptyRelocations));
+  const auto idleMs = static_cast<uint64_t>(
+      std::clamp(mIdleTime.mValue, 0.f, 10.f) * 1000.f + 0.5f);
+  const uint64_t idle = since(now, mLastBusyAt);
+  if (idle < idleMs)
     return;
-  }
-  startRelocation(
-      player,
-      fmt::format("нечего копать {} с", static_cast<int>(mIdleTime.mValue)),
-      now);
+  if (stopIfEmptyRelocations(*this))
+    return;
+  std::string why =
+      fmt::format("нечего копать {:.1f} с", static_cast<double>(idle) / 1000.0);
+  if (mOutOfReach > 0)
+    why += fmt::format(", дальше {} бл. ещё {}", static_cast<int>(kMineReach),
+                       mOutOfReach);
+  startRelocation(player, std::move(why), now);
 }
 
 void OreMinerV2::startRelocation(Actor *player, std::string why,
                                  uint64_t now) {
-  mHopRequested = false;
+  mRelocateNow.clear();
   abortCheck(); // сюда приходят уже без ожидающей проверки — на всякий случай
 
-  // Переезды подряд, после которых ничего не сломали (стоп-кран в авто).
-  // Место, где модуль включили, — не результат переезда, его не считаем.
+  // Переезды подряд, после которых ничего не упало (стоп-кран). Считаются
+  // дропы, а не сломанные блоки: блоки «ломаются» и тогда, когда сервер их
+  // не ломает. Место, где модуль включили, — не результат переезда.
   if (mRelocations > 0)
-    mEmptyRelocations =
-        mBlocksMined == mMinedAtRelocate ? mEmptyRelocations + 1 : 0;
-  mMinedAtRelocate = mBlocksMined;
+    mEmptyRelocations = mDropsSinceHop == 0 ? mEmptyRelocations + 1 : 0;
+  mDropsSinceHop = 0;
 
   mState = MineState::Idle;
   mCurrentCluster.clear();
@@ -1886,7 +2133,7 @@ void OreMinerV2::startRelocation(Actor *player, std::string why,
   mSettleSince = 0;
   mHopOrigin = *player->getPos();
   mHopFrom = mHopOrigin;
-  mHopDir = hopDirection(player);
+  mHopDir = hopDirection();
   mHopMoves.clear();
   mRelocations++;
 
@@ -1900,17 +2147,14 @@ void OreMinerV2::startRelocation(Actor *player, std::string why,
     where += where.empty() ? "+Z" : " +Z";
   else if (mHopDir.z < -0.38f)
     where += where.empty() ? "-Z" : " -Z";
-  if (mHopDirection.as<HopDir>() == HopDir::Look)
-    where += " (Look)";
   if (mHopTurn % 4 != 0)
     where += " (повернул)";
   spdlog::info("[OreMinerV2] relocate #{} ({}): {} hops x {} blocks, dir {}",
-               mRelocations, mHopReason, static_cast<int>(mHopCount.mValue),
-               static_cast<int>(mHopDistance.mValue), where);
+               mRelocations, mHopReason, kHopCount,
+               static_cast<int>(kHopDistance), where);
   ChatUtils::displayClientMessage(fmt::format(
       "§7[OreMinerV2] §bПереезд§7 ({}): {} x {} бл. на §f{}", mHopReason,
-      static_cast<int>(mHopCount.mValue),
-      static_cast<int>(mHopDistance.mValue), where));
+      kHopCount, static_cast<int>(kHopDistance), where));
 
   tickRelocation(player, now); // первый прыжок — сразу, в этом же тике
 }
@@ -1930,7 +2174,7 @@ void OreMinerV2::tickRelocation(Actor *player, uint64_t now) {
       mHopMoves.push_back(static_cast<int>(std::lround(moved)));
       stuck = moved < 4.f; // не пустил вовсе — дальше биться бесполезно
     }
-    if (mHopsDone >= static_cast<int>(mHopCount.mValue) || stuck) {
+    if (mHopsDone >= kHopCount || stuck) {
       mHopPhase = HopPhase::Settling;
       mSettleSince = now;
       return;
@@ -1938,14 +2182,14 @@ void OreMinerV2::tickRelocation(Actor *player, uint64_t now) {
 
     // Прыжок — как .tp: цепочка телепорт-пакетов по Step Distance + сам
     // клиент туда же. Не пустит сервер — вернёт откатом (его не глотаем).
-    const glm::vec3 to = pos + mHopDir * mHopDistance.mValue;
+    const glm::vec3 to = pos + mHopDir * kHopDistance;
     straightLineTP(pos, to, true);
     player->setPosition(to);
     if (auto sv = player->getStateVectorComponent())
       sv->mVelocity = glm::vec3(0.f);
     mHopFrom = pos;
     mHopsDone++;
-    mHopNextAt = now + static_cast<uint64_t>(mHopDelay.mValue);
+    mHopNextAt = now + kHopDelayMs;
     return;
   }
 
@@ -1981,7 +2225,8 @@ void OreMinerV2::finishRelocation(Actor *player, bool chunksReady,
   mRelocating.store(false);
   mHopsDone = 0;
   resetScan();       // центр спирали — здесь, mScanComplete = false
-  mLastBusyAt = now; // Idle Time — заново, после нового полного прохода
+  mLastBusyAt = now; // Idle Time — заново, от прибытия
+  hiddenQuiet(now + kQuietMs); // поздний откат сервера — не «скачок»
 
   // Сдвинулись меньше чем на чанк — дальше в эту сторону не пускают.
   const bool blocked = total < 16;
@@ -2025,7 +2270,7 @@ void OreMinerV2::finishRelocation(Actor *player, bool chunksReady,
 void OreMinerV2::cancelRelocation() {
   mHopPhase = HopPhase::None;
   mRelocating.store(false);
-  mHopRequested = false;
+  mRelocateNow.clear();
   mHopsDone = 0;
   mHopMoves.clear();
 }
@@ -2055,98 +2300,104 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
   if (!source) return;
   syncSpotsWorld();
 
-  // =================== KEYBIND CAPTURE ===================
-  if (mIsBindingKey) {
-    if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
-      mIsBindingKey = false;
-      mBindWaitRelease = false;
-      return;
-    }
-    if (mBindWaitRelease) {
-      if (!sIsAnyKeyHeld()) mBindWaitRelease = false;
-      return;
-    }
-    int pressed = sFindHeldKey();
-    if (pressed > 0) {
-      mHopKey.mValue = (float)pressed;
-      mIsBindingKey = false;
-      mBindWaitRelease = false;
-      mHopKeyWasDown = true; // та же клавиша не должна сразу дать переезд
-      ChatUtils::displayClientMessage(
-          std::string("§7[OreMinerV2] §aHop Key: §f") + getKeyName(pressed) +
-          "§7 — нажми, чтобы переехать на новое место");
-    }
-    return;
-  }
+  const uint64_t now = static_cast<uint64_t>(NOW);
 
-  // =================== HOP KEY ===================
-  // Бывший Quick TP: вместо «телепорт на N блоков вперёд» — тот же переезд,
-  // что делает Auto Relocate (прыжки, ожидание чанков, новый скан).
-  {
-    const int vk = static_cast<int>(mHopKey.mValue);
-    if (vk > 0) {
-      const bool down = (GetAsyncKeyState(vk) & 0x8000) != 0;
-      if (down && !mHopKeyWasDown &&
-          !ClientInstance::get()->getMouseGrabbed() &&
-          mHopPhase == HopPhase::None)
-        mHopRequested = true;
-      mHopKeyWasDown = down;
-    }
-  }
+  // =================== HIDDEN ===================
+  // /heal раз в 5 минут и сторож координат (скачок -> /rtp -> вниз на y=10).
+  // Пока сторож чинит позицию, ничего не сканируем и не копаем.
+  if (hiddenTick(*this, player, now))
+    return;
+
+  // Auto Drop: что принесла копка (вещи выкидываются в mineBlockAtPos).
+  learnJunk(now);
 
   // =================== RELOCATION ===================
   // Пока переезжаем, не сканируем и не копаем: чанки вокруг меняются, а всё
   // найденное раньше осталось позади.
   if (mHopPhase != HopPhase::None) {
-    tickRelocation(player, static_cast<uint64_t>(NOW));
+    tickRelocation(player, now);
     return;
   }
 
-  // Max Distance поменяли посреди сессии Debug — отметить в дампе.
-  if (mDbgFile.is_open() && mMaxDistance.mValue != mDbgNotedMaxDist)
-    debugNoteSettings();
-
   // =================== SCANNING ===================
+  // Спираль по чанкам вокруг игрока. Читаются только подчанки, где может быть
+  // руда в пределах досягаемости: чанк ближней точкой не дальше kScanReach
+  // по горизонтали и подчанк в пределах y ± kMineReach. Остальное
+  // пропускается, не тратя бюджет тика, поэтому полный проход — пара секунд.
   {
-    bool spiralDone =
-        glm::distance(glm::vec2(mCurrentChunkPos), glm::vec2(mSearchCenter)) >
-        mChunkRadius.mValue;
-
-    if (spiralDone) {
-      if (!mScanComplete) {
-        mScanComplete = true;
+    const glm::vec3 pp = *player->getPos();
+    const int depth = source->getBuildDepth();
+    const int numSub = (source->getBuildHeight() - depth) / 16;
+    const int subLo = (std::max)(
+        0, static_cast<int>(std::floor((pp.y - kMineReach - depth) / 16.f)));
+    const int subHi = (std::min)(
+        numSub - 1,
+        static_cast<int>(std::floor((pp.y + kMineReach - depth) / 16.f)));
+    int budget = kScanPerTick;
+    for (int guard = 0; budget > 0 && guard < 4096; guard++) {
+      const int ring =
+          (std::max)(std::abs(mCurrentChunkPos.x - mSearchCenter.x),
+                     std::abs(mCurrentChunkPos.y - mSearchCenter.y));
+      if (ring > kScanRings) {
+        // Проход закончен. Первым полным считается тот, в котором у клиента
+        // были все чанки в пределах досягаемости (или какие-то так и не
+        // пришли за kScanGiveUpMs — тогда хватит и того, что есть).
+        if (!mScanComplete &&
+            (mPassMissing == 0 || since(now, mScanStartedAt) >= kScanGiveUpMs))
+          mScanComplete = true;
+        mPassMissing = 0;
         if (mScanDirty) {
           mScanDirty = false; // до вызова: updateClusters может вернуть true
           updateClusters();
-          mLastClusterUpdate = NOW;
+          mLastClusterUpdate = now;
+        }
+        mSearchCenter = chunkOf(pp);
+        mCurrentChunkPos = mSearchCenter;
+        mStepsCount = 0;
+        mSteps = 1;
+        mDirectionIndex = 0;
+        mSubChunkIndex = 0;
+        break;
+      }
+      const float cx0 = mCurrentChunkPos.x * 16.f, cz0 = mCurrentChunkPos.y * 16.f;
+      const float hx = pp.x - std::clamp(pp.x, cx0, cx0 + 16.f);
+      const float hz = pp.z - std::clamp(pp.z, cz0, cz0 + 16.f);
+      const float h2 = hx * hx + hz * hz;
+      if (h2 > kScanReach * kScanReach || subLo > subHi ||
+          mSubChunkIndex > subHi) {
+        mSubChunkIndex = numSub - 1; // весь чанк (или его остаток) — мимо
+        moveToNext();
+        continue;
+      }
+      if (mSubChunkIndex <= subLo) {
+        // Первый подчанк окна: есть ли у клиента этот чанк вообще.
+        mSubChunkIndex = subLo;
+        LevelChunk *ch = nullptr;
+        TRY_CALL([&]() { ch = source->getChunk(mCurrentChunkPos); });
+        if (!ch) {
+          if (h2 <= kMineReach * kMineReach)
+            mPassMissing++;
+          mSubChunkIndex = numSub - 1;
+          moveToNext();
+          continue;
         }
       }
-      mSearchCenter = ChunkPos(*player->getPos());
-      mCurrentChunkPos = mSearchCenter;
-      mStepsCount = 0;
-      mSteps = 1;
-      mDirectionIndex = 0;
-      mSubChunkIndex = 0;
-    }
-
-    for (int i = 0; i < static_cast<int>(mChunkUpdatesPerTick.mValue); i++) {
       bool ok = false;
       tryProcessSub(ok, mCurrentChunkPos, mSubChunkIndex);
+      if (ok)
+        budget--;
       moveToNext();
     }
 
     BlockPos bp = *player->getPos();
-    int sc = (bp.y - source->getBuildDepth()) >> 4;
+    int sc = (bp.y - depth) >> 4;
     bool r = false;
-    tryProcessSub(r, ChunkPos(bp), sc);
+    tryProcessSub(r, chunkOf(pp), sc);
 
-    if (mScanDirty) {
-      uint64_t now = NOW;
-      if (now - mLastClusterUpdate > 2000) {
-        mScanDirty = false; // до вызова: updateClusters может вернуть true
-        updateClusters();
-        mLastClusterUpdate = now;
-      }
+    if (mScanDirty && now - mLastClusterUpdate > 2000) {
+      mScanDirty = false; // до вызова: updateClusters может вернуть true
+      updateClusters();
+      mLastClusterUpdate = now;
     }
   }
 
@@ -2160,11 +2411,11 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     return;
   }
 
-  const uint64_t now = static_cast<uint64_t>(NOW);
-
-  // Нажали Hop Key: дроп последнего блока уже проверен — переезжаем.
-  if (mHopRequested) {
-    startRelocation(player, "клавиша", now);
+  // В инвентарь ничего не падает (см. trackNoDropStreak) — переезжаем сразу.
+  if (!mRelocateNow.empty()) {
+    std::string why = std::move(mRelocateNow);
+    mRelocateNow.clear();
+    startRelocation(player, std::move(why), now);
     return;
   }
 
@@ -2226,6 +2477,8 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
 
     mState = MineState::Mining;
     mTickDelay = 1;
+    if (std::exchange(mDropSettle, false))
+      mTickDelay = (std::max)(mTickDelay, kDropSettleTicks);
     break;
   }
 
@@ -2274,6 +2527,8 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     mMinedPositions.insert(p); // помечаем в любом случае, чтобы не застрять
     mCurrentClusterIdx++;
     mTickDelay = static_cast<int>(mSpeed.mValue);
+    if (std::exchange(mDropSettle, false))
+      mTickDelay = (std::max)(mTickDelay, kDropSettleTicks);
 
     // VeinMiner: after mining, BFS from this pos to find more same-type ore
     if (mVeinMiner.mValue) {
@@ -2302,6 +2557,15 @@ void OreMinerV2::onPacketOutEvent(PacketOutEvent &event) {
     auto pkt = event.getPacket<MovePlayerPacket>();
     mRots = {pkt->mRot.x, pkt->mRot.y, pkt->mYHeadRot};
   }
+  // Ушёл /rtp (наш или набранный руками): следующий скачок позиции — его
+  // телепорт, сторож сразу спустится на y=10, а не пошлёт второй /rtp.
+  if (event.mPacket->getId() == PacketID::CommandRequest) {
+    auto pkt = event.getPacket<CommandRequestPacket>();
+    const std::string c = toLowerAscii(pkt->mCommand);
+    for (const char *k : {"/rtp", "/wild", "/randomtp"})
+      if (c.rfind(k, 0) == 0)
+        hiddenRtpSent(static_cast<uint64_t>(NOW));
+  }
 }
 
 // =============================================================
@@ -2324,10 +2588,14 @@ void OreMinerV2::onPacketInEvent(PacketInEvent &event) {
       // (некоторые серверы просто подтверждают телепорт).
       if (glm::distance(pkt->mPos, *player->getPos()) > 2.f)
         mHopCorrections.fetch_add(1);
-    } else if (mSilentAccept.mValue) {
+    } else if (mSilentAccept.mValue &&
+               glm::distance(pkt->mPos, *player->getPos()) <= kJumpDist) {
       event.cancel();
       ClientInstance::get()->getPacketSender()->sendToServer(pkt.get());
     }
+    // Дальше 100 блоков — не откат нашей цепочки (та не дальше 60), а сервер
+    // сам переставил игрока (спавн, /rtp, смерть): пускаем как есть, клиент
+    // должен оказаться там же, а сторож координат разберётся, что делать.
   }
 
   if (event.mPacket->getId() == PacketID::ChangeDimension) {
@@ -2399,7 +2667,7 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
 
   if (wantEsp || wantDump) {
     glm::ivec3 pp = *player->getPos();
-    float radSq = mRadius.mValue * mRadius.mValue;
+    const float radSq = kMineReach * kMineReach; // что модуль будет копать
     auto enVec = getEnabledBlockIds();
     std::unordered_set<int> enSet(enVec.begin(), enVec.end());
 
@@ -2521,35 +2789,50 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     std::string status;
 
     const bool paused = now < mPauseUntil;
+    const bool recovering = hiddenRecovering();
     // Auto Relocate ждёт Idle Time — показываем обратный отсчёт.
-    const bool idleWait = mAutoRelocate.mValue && mHopPhase == HopPhase::None &&
-                          mState == MineState::Idle && mScanComplete &&
-                          !paused && !mPending.active;
-    if (mHopPhase == HopPhase::Hopping) {
+    const bool idleWait = mAutoRelocate.mValue && !recovering &&
+                          mHopPhase == HopPhase::None &&
+                          mState == MineState::Idle && !paused &&
+                          !mPending.active;
+    if (recovering) {
+      status = hiddenStatus(now);
+    } else if (mHopPhase == HopPhase::Hopping) {
       status = "Relocating: hop " + std::to_string(mHopsDone) + "/" +
-               std::to_string(static_cast<int>(mHopCount.mValue));
+               std::to_string(kHopCount);
     } else if (mHopPhase == HopPhase::Settling) {
       status = "Relocating: waiting for chunks";
     } else {
       switch (mState) {
-      case MineState::Idle:
+      case MineState::Idle: {
         if (mFilteredBlocks.empty() && !paused && !idleWait)
           return;
-        status = mFilteredBlocks.empty()
-                     ? std::string("Nothing to mine")
-                     : "Scanning... [" +
-                           std::to_string(mFilteredBlocks.size()) + " ores]";
-        if (mOutOfReach > 0 && mMaxDistance.mValue > 0.f)
-          status += " | " + std::to_string(mOutOfReach) +
-                    " beyond Max Distance";
-        if (idleWait) {
-          const auto idleMs = static_cast<uint64_t>(mIdleTime.mValue * 1000.f);
-          const uint64_t idle = now > mLastBusyAt ? now - mLastBusyAt : 0;
-          const uint64_t left = idle < idleMs ? idleMs - idle : 0;
-          status += " | relocating in " + std::to_string((left + 999) / 1000) +
-                    "s";
+        const size_t reach =
+            mFilteredBlocks.size() > static_cast<size_t>(mOutOfReach)
+                ? mFilteredBlocks.size() - static_cast<size_t>(mOutOfReach)
+                : 0;
+        status = reach == 0 ? std::string("Nothing to mine")
+                            : "Scanning... [" + std::to_string(reach) +
+                                  " ores]";
+        if (mOutOfReach > 0)
+          status += " | " + std::to_string(mOutOfReach) + " out of reach (>" +
+                    std::to_string(static_cast<int>(kMineReach)) + ")";
+        if (idleWait && reach == 0) {
+          if (!mScanComplete) {
+            status += " | scanning area";
+          } else {
+            const auto idleMs = static_cast<uint64_t>(
+                std::clamp(mIdleTime.mValue, 0.f, 10.f) * 1000.f + 0.5f);
+            const uint64_t idle = since(now, mLastBusyAt);
+            const uint64_t left = idle < idleMs ? idleMs - idle : 0;
+            char buf[48];
+            snprintf(buf, sizeof(buf), " | hop in %.1fs",
+                     static_cast<double>(left) / 1000.0);
+            status += buf;
+          }
         }
         break;
+      }
       case MineState::Mining:
         if (mPending.active && mPending.decides)
           status = "Checking...";
@@ -2571,6 +2854,8 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     }
     if (mPatternFilter.mValue && !mPatternSkipped.empty())
       status += " | Pattern: " + std::to_string(mPatternSkipped.size());
+    if (mAutoDrop.mValue && mJunkDropped > 0)
+      status += " | Dropped: " + std::to_string(mJunkDropped);
     if (paused)
       status = "Paused: no drops (" +
                std::to_string((mPauseUntil - now + 999) / 1000) + "s) | " +
@@ -2583,50 +2868,26 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
     drawList->AddText(ImVec2(cx - ts.x * 0.5f, topY),
                       ImColor(1.f, 1.f, 1.f, alpha), status.c_str());
   }
+}
 
-    // ---------- BIND PANEL (слева снизу) ----------
-    {
-        ImVec2 ss   = ImGui::GetIO().DisplaySize;
-        float  panX = 20.f;
-        float  panY = ss.y - 80.f;
-
-        std::string btnLabel;
-        if (mIsBindingKey)
-            btnLabel = mBindWaitRelease ? "Release keys..." : "Press key... (ESC = cancel)";
-        else {
-            int vk = (int)mHopKey.mValue;
-            btnLabel = std::string("Hop key: [") + getKeyName(vk) + "]";
-        }
-
-        ImVec2 labelSize = ImGui::CalcTextSize(btnLabel.c_str());
-        float  btnW      = labelSize.x + 24.f;
-        float  btnH      = labelSize.y + 10.f;
-
-        ImVec2 btnMin{ panX,        panY };
-        ImVec2 btnMax{ panX + btnW, panY + btnH };
-
-        ImVec2 mouse   = ImGui::GetIO().MousePos;
-        bool   hovered = (mouse.x >= btnMin.x && mouse.x <= btnMax.x &&
-                          mouse.y >= btnMin.y && mouse.y <= btnMax.y);
-        bool   clicked = hovered && ImGui::GetIO().MouseClicked[0];
-
-        ImU32 bgColor = mIsBindingKey
-            ? IM_COL32(200, 100, 0, 220)
-            : (hovered ? IM_COL32(70, 70, 110, 220) : IM_COL32(30, 30, 50, 180));
-
-        drawList->AddRectFilled(btnMin, btnMax, bgColor, 6.f);
-        drawList->AddRect(btnMin, btnMax,
-            mIsBindingKey ? IM_COL32(255, 150, 50, 255) : IM_COL32(100, 100, 160, 200),
-            6.f, 0, 1.5f);
-        drawList->AddText(
-            { panX + (btnW - labelSize.x) * 0.5f, panY + (btnH - labelSize.y) * 0.5f },
-            IM_COL32(255, 255, 255, 255),
-            btnLabel.c_str()
-        );
-
-        if (clicked && !mIsBindingKey) {
-            mIsBindingKey    = true;
-            mBindWaitRelease = true;
-        }
-    }
+std::string OreMinerV2::getSettingDisplay() {
+  if (hiddenRecovering())
+    return "RTP";
+  if (mHopPhase == HopPhase::Hopping)
+    return "Hop " + std::to_string(mHopsDone) + "/" + std::to_string(kHopCount);
+  if (mHopPhase == HopPhase::Settling)
+    return "Hop: chunks";
+  std::string s;
+  switch (mState) {
+  case MineState::Idle:
+    s = "Idle";
+    break;
+  case MineState::Mining:
+    s = std::to_string(mCurrentClusterIdx) + "/" +
+        std::to_string(mCurrentCluster.size());
+    break;
+  }
+  if (!mFilteredBlocks.empty())
+    s += " [" + std::to_string(mFilteredBlocks.size()) + "]";
+  return s;
 }

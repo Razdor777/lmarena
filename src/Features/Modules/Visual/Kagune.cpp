@@ -63,6 +63,75 @@ static inline glm::vec3 kgBez(const glm::vec3& a, const glm::vec3& b,
     return a * (u * u * u) + b * (3.f * u * u * t) + c * (3.f * u * t * t) + d * (t * t * t);
 }
 static inline float kgMs(uint64_t since) { return float(int64_t(NOW - since)); }
+
+// Длина кубической Безье (ломаной по 24 точкам).
+static float kgBezLen(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& d)
+{
+    float L = 0.f; glm::vec3 prev = a;
+    for (int i = 1; i <= 24; i++) {
+        glm::vec3 p = kgBez(a, b, c, d, float(i) / 24.f);
+        L += glm::length(p - prev); prev = p;
+    }
+    return L;
+}
+
+// Щупальце не сжимается само по себе: кривая короче, чем нужно, — третья
+// опорная точка уходит вдоль bend, пока длина не станет нужной (выгиб, а не
+// гармошка). Длиннее — оставляем как есть (это вытягивание на выпаде).
+static void kgFitBend(const glm::vec3& a, const glm::vec3& b, glm::vec3& c, const glm::vec3& d,
+                      const glm::vec3& bend, float wantLen)
+{
+    if (kgBezLen(a, b, c, d) >= wantLen) return;
+    const glm::vec3 c0 = c;
+    float lo = 0.f, hi = wantLen * 1.5f;
+    for (int it = 0; it < 8; it++) {
+        const float mid = 0.5f * (lo + hi);
+        if (kgBezLen(a, b, c0 + bend * mid, d) < wantLen) lo = mid; else hi = mid;
+    }
+    c = c0 + bend * (0.5f * (lo + hi));
+}
+
+// n узлов на равном расстоянии ВДОЛЬ кривой: «кости» одинаковой длины, без
+// сгустков у изгибов и растянутых участков.
+static void kgResample(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& d,
+                       glm::vec3* out, int n)
+{
+    constexpr int S = 48;
+    glm::vec3 pts[S + 1];
+    float cum[S + 1];
+    pts[0] = a; cum[0] = 0.f;
+    for (int i = 1; i <= S; i++) {
+        pts[i] = kgBez(a, b, c, d, float(i) / float(S));
+        cum[i] = cum[i - 1] + glm::length(pts[i] - pts[i - 1]);
+    }
+    const float total = std::max(cum[S], 1e-5f);
+    int seg = 0;
+    for (int k = 0; k < n; k++) {
+        const float want = total * float(k) / float(n - 1);
+        while (seg < S - 1 && cum[seg + 1] < want) seg++;
+        const float l0 = cum[seg], l1 = cum[seg + 1];
+        const float t = l1 > l0 ? (want - l0) / (l1 - l0) : 0.f;
+        out[k] = kgMix(pts[seg], pts[seg + 1], std::clamp(t, 0.f, 1.f));
+    }
+}
+
+// Плавная интерполяция направлений (единичных векторов).
+static glm::vec3 kgSlerp(const glm::vec3& a, const glm::vec3& b, float t)
+{
+    float d = std::clamp(glm::dot(a, b), -1.f, 1.f);
+    if (d > 0.9995f) return kgVSafe(kgMix(a, b, t), a);
+    float th = acosf(d) * t;
+    glm::vec3 o = kgVSafe(b - a * d, glm::vec3(0.f, 1.f, 0.f));
+    return a * cosf(th) + o * sinf(th);
+}
+
+// Выход с небольшим перелётом (пружинистое возвращение в стойку).
+static inline float kgBackOut(float t)
+{
+    t = std::clamp(t, 0.f, 1.f) - 1.f;
+    constexpr float c1 = 1.4f, c3 = c1 + 1.f;
+    return 1.f + c3 * t * t * t + c1 * t * t;
+}
 static inline ImU32 kgCol(const glm::vec3& c, float a)
 {
     return ImGui::ColorConvertFloat4ToU32(ImVec4(c.x, c.y, c.z, a));
@@ -254,10 +323,14 @@ static const KStyle kStyles[8] = {
       {0.15f, 0.80f,-0.15f}, {0.60f, 0.55f,-0.40f}, {0.5f, 1.0f,-0.2f},  0.26f, 1.02f },
 };
 
-// Фазы атаки (доли длительности): замах -> выпад -> удержание -> возврат
-static constexpr float kTW = 0.30f;   // конец замаха
-static constexpr float kTI = 0.42f;   // момент удара
-static constexpr float kTH = 0.64f;   // конец удержания
+// Фазы атаки (доли длительности), как в аниме-ударе:
+//   замах (взвод над плечом, дрожь напряжения) -> выпад (взрывной, почти по
+//   прямой, насквозь) -> стоп-кадр в цели (вспышка, кровь, тряска) -> рывок
+//   обратно и пружинистый возврат в стойку.
+static constexpr float kPA = 0.34f;   // конец замаха = начало выпада
+static constexpr float kPS = 0.43f;   // удар (кончик в цели)
+static constexpr float kPH = 0.55f;   // конец стоп-кадра
+static constexpr float kGhostLife = 0.09f; // сек, «послеобраз» выпада
 
 static constexpr float kMaxStretch = 1.9f;   // максимум вытягивания (в длинах щупальца)
 static constexpr float kTrailLife  = 0.20f;  // сек, след кончика
@@ -651,7 +724,7 @@ void Kagune::onRenderEvent(RenderEvent& event)
         const auto& t = mTentacles[idx];
         if (!t.hasActive) return true;
         float np = kgMs(t.cur.hitTime) * 0.001f / t.cur.dur;
-        return np > kTH;                        // уже возвращается — можно перебить
+        return np > kPH + 0.1f;                 // уже возвращается — можно перебить
     };
 
     if (mPending.valid) {
@@ -718,21 +791,22 @@ void Kagune::onRenderEvent(RenderEvent& event)
             ? root + right * (side * sty.fpv.x) + up * sty.fpv.y
             : root + right * (side * sty.sh.x) + up * sty.sh.y + fwdBody * sty.sh.z;
 
-        // ── Огибающие атаки ───────────────────────────────────────────────
+        // ── Атака: фаза ───────────────────────────────────────────────────
         if (st.hasActive && kgMs(st.cur.hitTime) * 0.001f >= st.cur.dur) st.hasActive = false;
 
-        float amt = 0.f, ss = 0.f, ft = 0.f, coil = 0.f;
+        float np = 1.f, amt = 0.f, kin = 0.f;
         if (st.hasActive) {
-            float np = std::max(kgMs(st.cur.hitTime) * 0.001f / st.cur.dur, 0.f);
-            if      (np < 0.14f) amt = kgSS(np / 0.14f);
-            else if (np < kTH)   amt = 1.f;
-            else                 amt = 1.f - kgSS((np - kTH) / (1.f - kTH));
-
-            float q = std::clamp((np - kTW) / (kTI - kTW), 0.f, 1.f);
-            ss = st.cur.isSlap ? powf(q, 1.5f) : q * q;
-            ft = kgSS(std::clamp((np - kTI) / (kTH - kTI), 0.f, 1.f));
-            if (np < kTW) coil = kgSS(np / kTW);
+            np = std::max(kgMs(st.cur.hitTime) * 0.001f / st.cur.dur, 0.f);
+            // вес позы атаки: быстро набирается в начале замаха, спадает на возврате
+            if (np < kPH) amt = kgSS(np / (kPA * 0.6f));
+            else          amt = 1.f - kgSS3((np - kPH) / (1.f - kPH));
+            // выпад и стоп-кадр — узлы прямо в позу (пружины отстали бы и
+            // размазали удар); замах — наполовину; на возврате снова пружины
+            if (np >= kPA && np < kPH) kin = 1.f;
+            else if (np >= kPH)        kin = 1.f - kgSS((np - kPH) / ((1.f - kPH) * 0.35f));
+            else                       kin = 0.55f * kgSS(np / kPA);
         }
+        st.smear = 0.f;
 
         // ── Стойка: веер за спиной, бегущая волна, дрейф от скорости ──────
         glm::vec3 idle[N];
@@ -774,90 +848,131 @@ void Kagune::onRenderEvent(RenderEvent& event)
         }
 
         // ── Поза атаки ────────────────────────────────────────────────────
+        // Скелет щупальца в ударе — одна гладкая кривая от корня до кончика:
+        // корень выходит из спины туда же, куда в стойке, «локоть» идёт над
+        // плечом, кончик — по траектории удара. Длина кривой подгоняется под
+        // длину щупальца (выгиб вместо гармошки), узлы ставятся на равном
+        // расстоянии вдоль неё — кости одинаковые, без изломов и провалов
+        // сквозь тело.
         glm::vec3 goal[N];
         float thin = 1.f;
         if (amt > 0.001f) {
             const HitRecord& h = st.cur;
-            glm::vec3 toT  = h.target - shoulder;
-            float     dist = glm::length(toT);
-            glm::vec3 dirT = dist > 1e-4f ? toT / dist : fwdAim;
+            const glm::vec3 toT  = h.target - shoulder;
+            const float     dist = glm::length(toT);
+            const glm::vec3 dirT = dist > 1e-4f ? toT / dist : fwdAim;
+            const float maxReach = Leff * kMaxStretch;
+            const glm::vec3 idleTip = idle[N - 1];
+            const glm::vec3 emerge  = kgVSafe(loc(sty.c1), up);
+            // дрожь напряжения в конце замаха и вибрация в цели
+            const glm::vec3 shakeV = right * sinf(iT * 61.f + float(ti) * 1.7f) + up * cosf(iT * 73.f + float(ti));
 
-            // далеко — вытягиваемся; рядом — остаёмся компактными (дуга вместо растяжения)
-            float reach = std::clamp(dist + 0.05f, 0.4f, Leff * kMaxStretch);
-            glm::vec3 strikeTip = shoulder + dirT * reach;
+            glm::vec3 tip, elbow;
+            float wantLen = Leff;
+            bool  hitNow  = false;
 
-            // начальная точка: Sting — свёрнут над плечом, Slap — широко сбоку
-            glm::vec3 startTip = h.isSlap
-                ? shoulder + loc(sty.slap + h.jit * 0.6f) * Leff
-                : shoulder + loc(sty.wind + h.jit * 0.5f) * Leff;
-
-            // прицеливание: мелкая дрожь в конце замаха
-            startTip += (right * sinf(iT * 63.f + float(ti)) + up * cosf(iT * 71.f + float(ti) * 2.f))
-                      * (0.012f * Leff * coil * coil * (1.f - ss));
-
-            const glm::vec3 dS   = kgVSafe(startTip - shoulder, right);
-            const float     lenS = glm::length(startTip - shoulder);
-
-            auto tipAt = [&](float k) -> glm::vec3 {
-                float kc = std::clamp(k, 0.f, 1.f);
-                if (!h.isSlap) {
-                    // выпад по дуге: сверху (пикирование) или снизу (подъём)
-                    glm::vec3 p = kgMix(startTip, strikeTip, kc);
-                    p += up * (sty.lift * Leff * sinf(KPI * kc));
-                    return p;
+            if (!h.isSlap) {
+                // ── Укол: взвод над плечом -> выстрел насквозь ──
+                // Взвод — «хвост скорпиона»: верхние щупальца встают высоко
+                // над плечом, нижние разводятся в стороны; кончик смотрит
+                // вперёд, локоть уходит назад — тело изгибается буквой S.
+                const float hiK = std::max(sty.lift, 0.f), loK = std::max(-sty.lift, 0.f);
+                const glm::vec3 cocked = shoulder + (up * (0.55f + 0.95f * hiK)
+                                                   + right * (side * (0.30f + 0.9f * loK))
+                                                   + fwdBody * 0.10f + h.jit * 0.25f) * Leff;
+                const float pierce = std::min(0.35f * Leff, 0.55f);
+                glm::vec3 hitP = h.target + dirT * pierce;
+                if (glm::length(hitP - shoulder) > maxReach)
+                    hitP = shoulder + kgVSafe(hitP - shoulder, dirT) * maxReach;
+                const float reachLen = glm::length(hitP - shoulder);
+                const glm::vec3 elbowCocked = shoulder + (up * (0.45f + 0.5f * hiK) - fwdBody * 0.42f
+                                                        + right * (side * (0.18f + 0.4f * loK))) * Leff;
+                const glm::vec3 elbowStrike = shoulder + up * (0.18f * Leff) + dirT * (0.45f * reachLen);
+                float e = 0.f; // 0 — взведено, 1 — в цели
+                if (np < kPA) {
+                    const float a = kgSS(np / kPA);
+                    tip = kgMix(idleTip, cocked, 1.f - (1.f - a) * (1.f - a))
+                        + shakeV * (0.022f * Leff * kgSm(0.55f, 1.f, a));
+                } else if (np < kPS) {
+                    const float k = (np - kPA) / (kPS - kPA);
+                    e = k * k;                     // взрывной разгон: в цель — на полной скорости
+                    tip = kgMix(cocked, hitP, e);
+                    st.smear = 1.f;
+                    st.strikeDir = kgVSafe(hitP - cocked, dirT);
+                } else if (np < kPH) {
+                    e = 1.f;
+                    const float hold = (np - kPS) / (kPH - kPS);
+                    tip = hitP + shakeV * (0.016f * Leff * (1.f - hold));
+                } else {
+                    e = 1.f;
+                    const float r = (np - kPH) / (1.f - kPH);
+                    tip = hitP - dirT * (0.32f * Leff * kgSS(r / 0.22f));   // рывок назад из цели
                 }
-                // хлёст: дуга вокруг плеча, k > 1 = проводка дальше цели
-                glm::vec3 d = kgVSafe(kgMix(dS, dirT, k), dirT);
-                float len = kgLerp(lenS, reach, kc);
-                return shoulder + d * len;
-            };
-
-            const glm::vec3 bendW = loc(sty.bend);
-            auto arcPose = [&](const glm::vec3& tip, float bulgeMul, glm::vec3& c1, glm::vec3& c2) {
-                glm::vec3 d = tip - shoulder;
-                float c = glm::length(d);
-                glm::vec3 dn = c > 1e-4f ? d / c : fwdAim;
-                float extra = std::max(Leff * 0.98f - c, 0.f) * bulgeMul;
-                float hh = sqrtf(std::max(3.f * std::max(c, 0.05f) * extra / 8.f, 0.f));
-                hh = std::min(std::max(hh, 0.06f * c + 0.03f), Leff * 0.7f);
-                glm::vec3 bd = bendW - dn * glm::dot(bendW, dn);
-                bd = kgVSafe(bd, right);
-                c1 = shoulder + d * 0.28f + bd * (hh * 1.45f);
-                c2 = shoulder + d * 0.72f + bd * (hh * 0.95f);
-            };
-
-            const float slapExtra = h.isSlap ? 0.28f * ft : 0.f;
-            const float ssLag     = h.isSlap ? powf(ss, 2.2f) : powf(ss, 1.5f);
-            const float bulge     = kgLerp(1.f, h.isSlap ? 0.35f : 0.25f, ss);
-            glm::vec3 tipA = tipAt(ss + slapExtra);
-            glm::vec3 tipB = tipAt(ssLag + slapExtra);
-
-            // дрожь жала в цели
-            if (ss > 0.97f)
-                tipA += (right * sinf(iT * 90.f + float(ti)) + up * cosf(iT * 97.f)) * (0.012f * Leff * (1.f - ft));
-
-            glm::vec3 a1, a2, b1, b2;
-            arcPose(tipA, bulge, a1, a2);
-            arcPose(tipB, bulge, b1, b2);
-            glm::vec3 c1 = kgMix(a1, b1, 0.4f);
-            glm::vec3 c2 = b2;                     // середина отстаёт -> хлёст
-
-            for (int i = 0; i < N; i++) {
-                float u = float(i) / float(N - 1);
-                glm::vec3 ag = kgBez(shoulder, c1, c2, tipA, u);
-                goal[i] = kgMix(idle[i], ag, amt);
+                elbow   = kgMix(elbowCocked, elbowStrike, e);
+                wantLen = kgLerp(Leff, std::max(Leff, reachLen * 1.06f), e);
+                hitNow  = np >= kPS;
+            } else {
+                // ── Хлёст: широкий замах вбок -> дуга сквозь цель и дальше ──
+                const glm::vec3 start = shoulder + loc(sty.slap + glm::vec3(0.25f, 0.12f, -0.25f) + h.jit * 0.5f) * Leff;
+                const glm::vec3 d0 = kgVSafe(start - shoulder, right * side);
+                const glm::vec3 d1 = kgVSafe(dirT + (dirT - d0) * 0.65f, dirT);   // проводка за цель
+                const float r0 = glm::length(start - shoulder);
+                const float r1 = std::clamp(dist + 0.15f, 0.4f, maxReach);
+                constexpr float kMid = 0.62f;                                     // где кончик проходит цель
+                auto sweep = [&](float k) {
+                    return k < kMid ? kgSlerp(d0, dirT, k / kMid) : kgSlerp(dirT, d1, (k - kMid) / (1.f - kMid));
+                };
+                const float kEnd = kPS + 0.07f;
+                float rr = r0;
+                if (np < kPA) {
+                    const float a = kgSS(np / kPA);
+                    tip = kgMix(idleTip, start, 1.f - (1.f - a) * (1.f - a))
+                        + shakeV * (0.02f * Leff * kgSm(0.55f, 1.f, a));
+                    elbow = shoulder + kgSlerp(emerge, d0, 0.6f) * (0.45f * Leff) + up * (0.25f * Leff);
+                } else {
+                    const float k = np < kEnd ? kgSS((np - kPA) / (kEnd - kPA)) : 1.f;
+                    if (np < kEnd) {
+                        st.smear = 1.f;
+                        st.strikeDir = kgVSafe(sweep(std::min(k + 0.05f, 1.f)) - sweep(k), dirT);
+                    }
+                    rr = kgLerp(r0, r1, kgSS(std::min(k / kMid, 1.f)));
+                    tip = shoulder + sweep(k) * rr;
+                    // середина отстаёт от кончика — по щупальцу бежит волна хлыста
+                    elbow = shoulder + sweep(k * 0.5f) * (0.5f * rr) + up * (0.2f * Leff);
+                    if (np >= kEnd) {
+                        const float r = (np - kEnd) / std::max(1.f - kEnd, 0.01f);
+                        tip -= dirT * (0.25f * Leff * kgSS(r / 0.3f));
+                    }
+                    hitNow = k >= kMid;
+                }
+                wantLen = std::max(Leff, rr * 1.05f);
             }
 
-            // вытянулось -> тоньше (сохраняем объём)
-            float ratio = std::max(1.f, reach / std::max(Leff, 0.1f));
-            thin = kgLerp(1.f, 1.f / sqrtf(ratio), ss * amt);
+            glm::vec3 P1 = shoulder + emerge * (0.25f * wantLen);
+            glm::vec3 P2 = elbow;
+            const glm::vec3 chord = kgVSafe(tip - shoulder, dirT);
+            glm::vec3 bend = up * 0.8f + right * (side * 0.45f);
+            bend = kgVSafe(bend - chord * glm::dot(bend, chord), up);
+            kgFitBend(shoulder, P1, P2, tip, bend, wantLen);
 
-            // удар достиг цели
-            if (ss >= 0.97f && !st.impactDone) {
+            glm::vec3 atk[N];
+            kgResample(shoulder, P1, P2, tip, atk, N);
+            for (int i = 0; i < N; i++) goal[i] = kgMix(idle[i], atk[i], amt);
+
+            // вытянулось -> тоньше (объём сохраняется)
+            const float curLen = kgBezLen(shoulder, P1, P2, tip);
+            thin = kgLerp(1.f, 1.f / sqrtf(std::max(1.f, curLen / std::max(Leff, 0.1f))), amt);
+
+            // удар: вспышка, кровь насквозь и обратно, тряска камеры
+            if (hitNow && !st.impactDone) {
                 st.impactDone = true;
                 st.hardenTime = NOW;
-                spawnBurst(h.target, -dirT, std::max(3, int((8.f + rndU() * 8.f) * shakeScale)));
-                triggerShake((h.isSlap ? 0.7f : 1.0f) * shakeScale);
+                st.impactPos  = h.target;
+                st.impactT    = iT;
+                const int nB = std::max(3, int((8.f + rndU() * 8.f) * shakeScale));
+                spawnBurst(h.target, dirT, nB);
+                spawnBurst(h.target, kgVSafe(-dirT * 0.6f + up * 0.5f), std::max(2, nB / 2));
+                triggerShake((h.isSlap ? 0.8f : 1.0f) * shakeScale);
             }
         } else {
             for (int i = 0; i < N; i++) goal[i] = idle[i];
@@ -874,6 +989,9 @@ void Kagune::onRenderEvent(RenderEvent& event)
 
         if (kick != 0.f)
             for (int i = 1; i < N; i++) st.vel[i].y += kick * (float(i) / float(N - 1));
+
+        glm::vec3 prevP[N];
+        for (int i = 0; i < N; i++) prevP[i] = st.pos[i];
 
         // ── Физика: пружина на узел ───────────────────────────────────────
         float kN[N], cN[N];
@@ -910,6 +1028,19 @@ void Kagune::onRenderEvent(RenderEvent& event)
             if      (l > hi) st.pos[i] = st.pos[i - 1] + d * (hi / l);
             else if (l < lo) st.pos[i] = st.pos[i - 1] + d * (lo / l);
         }
+        // Выпад/стоп-кадр: узлы — прямо в позу, скорость — по факту движения,
+        // чтобы после отпускания пружины подхватили его без рывка.
+        if (kin > 0.001f) {
+            for (int i = 1; i < N; i++) {
+                const glm::vec3 p = kgMix(st.pos[i], goal[i], kin);
+                glm::vec3 v = (p - prevP[i]) / dt;
+                const float vl = glm::length(v);
+                if (vl > 60.f) v *= 60.f / vl;
+                st.vel[i] = kgMix(st.vel[i], v, kin);
+                st.pos[i] = p;
+            }
+        }
+
         // финальная коллизия с телом (после пружин, которые могли занести узел внутрь)
         for (int i = 2; i < N; i++) kgPushOut(body, st.pos[i], colMargin);
 
@@ -921,6 +1052,13 @@ void Kagune::onRenderEvent(RenderEvent& event)
         }
 
         if (detail && amt > 0.05f) st.pushTrail(st.pos[N - 1], iT);
+        // послеобраз выпада: прошлые позы для смаза
+        if (st.smear > 0.f && iT - st.lastGhostT > 0.012f) {
+            st.ghost[st.ghostHead] = st.pos;
+            st.ghostT[st.ghostHead] = iT;
+            st.ghostHead = (st.ghostHead + 1) % (int)st.ghost.size();
+            st.lastGhostT = iT;
+        }
 
         float he = kgMs(st.hardenTime) * 0.001f;
         float flash = (he >= 0.f && he < 0.35f) ? 1.f - he / 0.35f : 0.f;
@@ -950,6 +1088,65 @@ void Kagune::onRenderEvent(RenderEvent& event)
     {
         const auto& st = mTentacles[ac.ti];
         const KMat km{cBlade, cShade, cGlow, iT, ac.flash, pulseK, blocky ? 3.f : 0.f};
+
+        auto proj = [&](const glm::vec3& w, ImVec2& out) -> bool {
+            glm::vec2 sp;
+            if (!mat.OWorldToScreen(camPos, w, sp, MathUtils::fov, guiRes)) return false;
+            out = ImVec2(sp.x, sp.y);
+            return true;
+        };
+
+        // 0a. послеобраз выпада (смаз, как в аниме): прошлые позы —
+        // полупрозрачные ленты по всему телу, самые свежие ярче
+        for (int g = 0; g < (int)st.ghost.size(); g++) {
+            const float age = iT - st.ghostT[g];
+            if (age < 0.f || age > kGhostLife) continue;
+            const float f = 1.f - age / kGhostLife;
+            ImVec2 pts[kNodes];
+            int n = 0;
+            for (int i = 0; i < N; i++) {
+                if (!proj(st.ghost[g][i], pts[n])) { n = 0; break; }
+                n++;
+            }
+            if (n < 2) continue;
+            ImVec2 a, b;
+            float px = 6.f;
+            if (proj(st.ghost[g][N / 2], a) && proj(st.ghost[g][N / 2] + right * ac.R, b))
+                px = std::clamp(std::hypot(b.x - a.x, b.y - a.y), 1.5f, 40.f);
+            dl->AddPolyline(pts, n, kgCol(kgMix(cBlade, cGlow, 0.35f), 0.30f * f * f), 0, px * 1.7f * (0.6f + 0.4f * f));
+            dl->AddPolyline(pts, n, kgCol(cGlow, 0.40f * f * f), 0, std::max(1.f, px * 0.45f));
+        }
+
+        // 0b. линии скорости вдоль выпада — по тому, как кончик реально
+        // движется по экрану (от самого старого послеобраза), а не по 3D
+        // направлению: удар «в экран» иначе давал бы линии вбок.
+        if (st.smear > 0.f && detail) {
+            ImVec2 tipS, backS;
+            int oldest = -1;
+            float oldestAge = -1.f;
+            for (int g = 0; g < (int)st.ghost.size(); g++) {
+                const float age = iT - st.ghostT[g];
+                if (age >= 0.f && age <= kGhostLife && age > oldestAge) { oldestAge = age; oldest = g; }
+            }
+            const glm::vec3 tipW = st.pos[N - 1];
+            if (oldest >= 0 && proj(tipW, tipS) && proj(st.ghost[oldest][N - 1], backS)) {
+                float dx = tipS.x - backS.x, dy = tipS.y - backS.y;
+                const float l = std::hypot(dx, dy);
+                if (l > 6.f) {
+                    dx /= l; dy /= l;
+                    const float qx = -dy, qy = dx;
+                    for (int k = 0; k < 8; k++) {
+                        const float o   = float(((k * 37 + ac.ti * 11) % 13) - 6) / 6.f;  // -1..1, не в линию
+                        const float len = 45.f + float((k * 53 + ac.ti * 7) % 80);
+                        const float off = 10.f + float(k) * 4.f;
+                        const ImVec2 a0(tipS.x + qx * o * 26.f - dx * off, tipS.y + qy * o * 26.f - dy * off);
+                        const ImVec2 a1(a0.x - dx * len, a0.y - dy * len);
+                        const glm::vec3 lc = (k & 1) ? glm::vec3(1.f, 0.88f, 0.82f) : cGlow;
+                        dl->AddLine(a0, a1, kgCol(lc, (k & 1) ? 0.55f : 0.40f), (k % 3 == 0) ? 2.0f : 1.2f);
+                    }
+                }
+            }
+        }
 
         // 0. след кончика (под телом щупальца)
         if (detail) {
@@ -1296,6 +1493,31 @@ void Kagune::onRenderEvent(RenderEvent& event)
     std::sort(acts.begin(), acts.end(),
         [](const Act& a, const Act& b) { return a.depth > b.depth; });
     for (const auto& ac : acts) drawTentacle(ac);
+
+    // ═════════════════════════════════════════════════════════════════════
+    //  Вспышка удара (аниме): звезда лучей + белое ядро + кольцо
+    // ═════════════════════════════════════════════════════════════════════
+    for (int ti = 0; ti < cnt; ti++) {
+        const auto& st = mTentacles[ti];
+        const float age = iT - st.impactT;
+        if (age < 0.f || age > 0.16f) continue;
+        glm::vec2 c2;
+        if (!mat.OWorldToScreen(camPos, st.impactPos, c2, MathUtils::fov, guiRes)) continue;
+        const ImVec2 c(c2.x, c2.y);
+        const float f = age / 0.16f, grow = kgSS(std::min(f * 3.f, 1.f)), fade = 1.f - kgSS(f);
+        const float R = (22.f + 40.f * grow) * (isFPV ? 1.2f : 1.f);
+        const float rot = st.impactT * 7.f;
+        for (int r = 0; r < 12; r++) {
+            const float a = rot + float(r) * (K2PI / 12.f);
+            const float len = R * ((r & 1) ? 0.55f : 1.f);
+            const ImVec2 tipP(c.x + cosf(a) * len, c.y + sinf(a) * len);
+            const ImVec2 b1(c.x + cosf(a + 0.16f) * len * 0.16f, c.y + sinf(a + 0.16f) * len * 0.16f);
+            const ImVec2 b2(c.x + cosf(a - 0.16f) * len * 0.16f, c.y + sinf(a - 0.16f) * len * 0.16f);
+            dl->AddTriangleFilled(b1, tipP, b2, kgCol((r & 1) ? glm::vec3(1.f, 0.92f, 0.85f) : cGlow, 0.85f * fade));
+        }
+        dl->AddCircleFilled(c, R * 0.2f * (1.f + grow), IM_COL32(255, 246, 236, (int)(235.f * fade)), 20);
+        dl->AddCircle(c, R * (0.55f + 0.75f * grow), kgCol(cGlow, 0.55f * fade), 28, 2.2f);
+    }
 
     // ═════════════════════════════════════════════════════════════════════
     //  Частицы крови

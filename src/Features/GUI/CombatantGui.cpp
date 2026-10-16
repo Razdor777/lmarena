@@ -169,6 +169,7 @@ void CombatantGui::onOpen()
 
 void CombatantGui::onClose()
 {
+    mChatBinds.close();
     mBindModule = nullptr;
     mDragNumber = nullptr;
     for (auto& p : mPanels) p.dragging = false;
@@ -181,7 +182,7 @@ void CombatantGui::onWindowResizeEvent(WindowResizeEvent&)
 
 bool CombatantGui::onKey(int vk, bool pressed)
 {
-    if (!mBindModule) return false;
+    if (!mBindModule) return mChatBinds.onKey(vk, pressed);
     if (pressed)
     {
         mBindModule->mKey = (vk == VK_ESCAPE) ? 0 : vk;
@@ -455,9 +456,23 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         rects[i] = { p.x, p.y, p.x + S(kPanelW), p.y + S(kHeaderH) + listH };
     }
 
+    // Чат-бинды: кнопка по центру сверху, карточка — поверх панелей, поэтому
+    // её клики и колесо разбираются первыми.
+    {
+        const ImVec4 btn = T(ImVec4{ mCenter.x - S(80.f), S(12.f), mCenter.x + S(80.f), S(46.f) });
+        mChatBinds.layout(btn, mScale * mInScale, mAnim, ColorUtils::getThemedColor(0),
+                          mAnim > 0.5f && !mWaitRelease && !mBindModule && !mDragNumber);
+        mChatBinds.input();
+        if (mChatBinds.hovered() || mChatBinds.consumedClick())
+        {
+            clickL = clickR = clickM = false;
+            mWheel = 0.f;
+        }
+    }
+
     // Верхняя панель под курсором.
     mHoverPanel = -1;
-    for (auto it = mDrawOrder.rbegin(); it != mDrawOrder.rend(); ++it)
+    for (auto it = mDrawOrder.rbegin(); it != mDrawOrder.rend() && !mChatBinds.hovered(); ++it)
     {
         if (inside(rects[*it], mLayoutMouse))
         {
@@ -530,6 +545,7 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
     dl->AddRectFilled({ 0.f, 0.f }, mScreen, IM_COL32(0, 0, 0, static_cast<int>(90.f * mAnim)));
     for (size_t i : mDrawOrder)
         drawPanel(dl, i, rects[i], modRows[i], setRows[i]);
+    mChatBinds.draw(dl);
 
     // Подсказки: описание наведённого элемента и строка управления.
     const float hfs = S(kFontPx) * mInScale;
