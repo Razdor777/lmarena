@@ -50,18 +50,17 @@ public:
   // Включил -> КАЖДЫЙ сломанный блок проверяется по тому, что реально упало в
   // инвентарь (на сервере автоподбор): ждали алмаз и пришёл алмаз — "real",
   // пришло что-то другое (булыжник, глубинный сланец, ...) — "fake", не пришло
-  // ничего — "nodrop". Результат пишется в Juzdex\Dumps\:
-  //   OreMinerV2_<дата>_verified.csv — все проверенные блоки + что выпало;
-  //   OreMinerV2_<дата>_real.txt     — только настоящие руды, "x y z";
-  //   OreMinerV2_<дата>_fake.txt     — только фейки, "x y z".
-  // Файлы создаются при первой проверке и закрываются при выключении Debug
-  // или модуля.
+  // ничего — "nodrop". Всё пишется в ОДИН файл Juzdex\Dumps\OreMinerV2.txt,
+  // строка на блок: "x y z руда вердикт что_упало время". Файл общий для всех
+  // сессий: каждая новая дописывается в конец под своим заголовком с датой,
+  // в конце сессии — строка с итогом.
   BoolSetting mDebug = BoolSetting(
       "Debug",
       "Check every mined ore by its drop, save real/fake coords to Dumps",
       false);
   // Старый «сырой» дамп: всё, что модуль увидел (вместе с фейками), без
   // проверки. По умолчанию выключен — Debug теперь пишет отфильтрованное.
+  // Если включить — отдельный файл Juzdex\Dumps\OreMinerV2_seen.txt.
   BoolSetting mDumpSeen = BoolSetting(
       "Dump Seen", "Also dump every seen ore, unverified (old Debug)", false);
   // Сколько ждать, пока дроп долетит до инвентаря. Пришёл раньше — вердикт
@@ -124,11 +123,6 @@ public:
   static bool isSameOreType(int a, int b) {
     OreType ta = getOreType(a), tb = getOreType(b);
     return ta != OreType::None && ta == tb;
-  }
-
-  static bool isDeepslateOre(int id) {
-    return id == DEEPSLATE_COAL_ORE_ID || id == DEEPSLATE_DIAMOND_ORE_ID ||
-           id == DEEPSLATE_EMERALD_ORE_ID;
   }
 
   // Что должно упасть с настоящей руды. Ищется подстрокой в имени предмета,
@@ -244,10 +238,8 @@ public:
                           // остальные (так же, как раньше)
     BlockPos pos{};
     int oreId = 0;  // какой рудой числился блок -> что должно выпасть
-    int seenId = 0; // id блока на клиенте в момент удара
     int clusterNo = 0;
     int clusterSize = 0;
-    int clusterIdx = 0; // 1..clusterSize
     uint64_t minedAt = 0;
     uint64_t firstGainAt = 0; // когда в инвентаре впервые что-то прибавилось
     bool invFull = false;     // все 36 слотов заняты — дропу некуда лечь
@@ -280,42 +272,40 @@ public:
   struct DebugRow {
     BlockPos pos{};
     int      blockId  = 0;
-    bool     deepslate = false;
     float    distance = 0.f;
     bool     onScreen = false;
     float    screenX  = 0.f;
     float    screenY  = 0.f;
   };
 
-  // Одна сессия Debug = один набор файлов с общим префиксом
-  // Dumps\OreMinerV2_<дата>_<время>. Файлы открываются лениво, при первой
-  // записи: включил и выключил, ничего не сломав, — пустых файлов не будет.
-  std::string mDebugStamp;              // <дата>_<время>
-  std::string mDebugBase;               // полный путь без суффикса
-  std::ofstream mDbgVerified;           // _verified.csv
-  std::ofstream mDbgRealTxt;            // _real.txt  (x y z)
-  std::ofstream mDbgFakeTxt;            // _fake.txt  (x y z)
-  std::ofstream mDbgSeenCsv;            // _seen.csv  (Dump Seen)
-  std::ofstream mDbgSeenTxt;            // _seen.txt  (Dump Seen, x y z)
-  bool mDbgVerifiedFailed = false;      // не смогли открыть — не долбим диск
+  // Один общий файл на всё: сессия Debug = заголовок с датой + строки + итог.
+  // Файл открывается на дозапись лениво, при первой строке: включил и
+  // выключил, ничего не сломав, — в файл ничего не добавится.
+  std::string mDebugDir;                // ...\Juzdex\Dumps\ (папка)
+  std::string mDebugSession;            // "2026-10-16 14:03:22" — для заголовка
+  std::ofstream mDbgFile;               // OreMinerV2.txt      — проверенные блоки
+  std::ofstream mDbgSeenFile;           // OreMinerV2_seen.txt — Dump Seen
+  bool mDbgFileFailed = false;          // не смогли открыть — не долбим диск
   bool mDbgSeenFailed = false;
   std::unordered_set<BlockPos> mDebugWritten; // Dump Seen: координата — один раз
   int  mDebugRows    = 0;                     // Dump Seen: сколько строк
   int  mDbgReal = 0, mDbgFake = 0, mDbgNoDrop = 0, mDbgUnknown = 0,
        mDbgSkip = 0;
   bool mDebugWasOn   = false;
-  uint64_t mDebugStartedAt = 0;
 
   void syncDebugSession();  // Debug включили/выключили -> старт/стоп сессии
-  void debugStart();        // новая сессия (новый префикс файлов)
-  void debugStop();         // закрыть файлы + итог в чат
+  void debugStart();        // новая сессия
+  void debugStop();         // итог в файл и в чат, закрыть файлы
   void debugCloseFiles();
-  bool debugOpenVerified();
+  bool debugOpenFile();
   bool debugOpenSeen();
+  static bool openAppendLog(std::ofstream &f, const std::string &path,
+                            const char *legend, const std::string &session);
   void debugFlush(const std::vector<DebugRow> &rows); // Dump Seen: дописать
-  void debugWriteVerdict(const PendingCheck &pc, DropVerdict v, uint64_t now);
-  void debugWriteSkip(const BlockPos &pos, int blockId,
-                      const PendingCheck &first, int clusterIdx);
+  void debugWriteRow(const BlockPos &pos, int oreId, const char *verdict,
+                     const std::string &got, const char *note);
+  void debugWriteVerdict(const PendingCheck &pc, DropVerdict v);
+  void debugWriteSkip(const BlockPos &pos, const PendingCheck &first);
   static const char *oreTypeName(int blockId);
   static const char *verdictName(DropVerdict v);
   static std::string clockString();
@@ -366,7 +356,7 @@ public:
   static std::string formatGains(const DropList &gains);
 
   void startCheck(const BlockPos &pos, int seenId, bool decides,
-                  int clusterIdx, InvSnapshot before);
+                  InvSnapshot before);
   bool pollCheck();  // true — вердикт вынесен (или проверять было нечего)
   void finishCheck(DropVerdict v, uint64_t now);
   void abortCheck(); // прервать ожидание (выключение, смена мира)

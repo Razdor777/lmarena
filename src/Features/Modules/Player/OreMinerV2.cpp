@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 
@@ -507,43 +508,41 @@ void OreMinerV2::syncDebugSession() {
   mDebugWasOn = want;
 }
 
-// Новая сессия. Префикс содержит дату и время, поэтому старые дампы никогда
-// не затираются, а каждый запуск Debug — отдельный чистый набор файлов.
+// Новая сессия. Файл один и тот же (Dumps\OreMinerV2.txt), сессия — это
+// заголовок с датой внутри него; сам заголовок пишется при первой строке.
 void OreMinerV2::debugStart() {
   debugCloseFiles();
 
-  std::string dir = FileUtils::getJuzdexDir() + "Dumps\\";
+  mDebugDir = FileUtils::getJuzdexDir() + "Dumps\\";
   try {
-    FileUtils::createDirectory(dir);
+    FileUtils::createDirectory(mDebugDir);
   } catch (const std::exception &e) {
-    spdlog::error("[OreMinerV2][Debug] cannot create {}: {}", dir, e.what());
+    spdlog::error("[OreMinerV2][Debug] cannot create {}: {}", mDebugDir,
+                  e.what());
   }
 
   std::time_t t = std::time(nullptr);
   std::tm tmBuf{};
   localtime_s(&tmBuf, &t);
   char stamp[32] = {};
-  std::strftime(stamp, sizeof(stamp), "%Y-%m-%d_%H-%M-%S", &tmBuf);
+  std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &tmBuf);
 
-  mDebugStamp = stamp;
-  mDebugBase = dir + "OreMinerV2_" + mDebugStamp;
-  mDbgVerifiedFailed = false;
+  mDebugSession = stamp;
+  mDbgFileFailed = false;
   mDbgSeenFailed = false;
   mDebugWritten.clear();
   mDebugRows = 0;
   mDbgReal = mDbgFake = mDbgNoDrop = mDbgUnknown = mDbgSkip = 0;
-  mDebugStartedAt = NOW;
 
-  spdlog::info("[OreMinerV2][Debug] session started -> {}_*", mDebugBase);
+  spdlog::info("[OreMinerV2][Debug] session {} -> {}OreMinerV2.txt",
+               mDebugSession, mDebugDir);
   ChatUtils::displayClientMessage(
       "§7[OreMinerV2] §aDebug ON§7: каждый сломанный блок проверяется по "
-      "дропу -> §fDumps\\OreMinerV2_" +
-      mDebugStamp + "_verified.csv");
+      "дропу -> §fDumps\\OreMinerV2.txt");
 }
 
 void OreMinerV2::debugCloseFiles() {
-  for (std::ofstream *f :
-       {&mDbgVerified, &mDbgRealTxt, &mDbgFakeTxt, &mDbgSeenCsv, &mDbgSeenTxt}) {
+  for (std::ofstream *f : {&mDbgFile, &mDbgSeenFile}) {
     if (f->is_open()) {
       f->flush();
       f->close();
@@ -552,85 +551,112 @@ void OreMinerV2::debugCloseFiles() {
 }
 
 void OreMinerV2::debugStop() {
-  const bool wroteVerified = mDbgVerified.is_open();
-  const bool wroteSeen = mDbgSeenCsv.is_open();
+  const bool wrote = mDbgFile.is_open();
+  const bool wroteSeen = mDbgSeenFile.is_open();
+  if (wrote) {
+    mDbgFile << "# итог: " << mDbgReal << " real, " << mDbgFake << " fake, "
+             << mDbgNoDrop << " nodrop";
+    if (mDbgUnknown > 0)
+      mDbgFile << ", " << mDbgUnknown << " unknown";
+    if (mDbgSkip > 0)
+      mDbgFile << ", " << mDbgSkip << " skip";
+    mDbgFile << '\n';
+  }
+  if (wroteSeen)
+    spdlog::info("[OreMinerV2][Debug] {} seen blocks -> {}OreMinerV2_seen.txt",
+                 mDebugRows, mDebugDir);
   debugCloseFiles();
 
-  if (wroteVerified) {
-    spdlog::info("[OreMinerV2][Debug] verified: {} real, {} fake, {} nodrop, "
-                 "{} unknown, {} skipped -> {}_verified.csv",
+  if (wrote) {
+    spdlog::info("[OreMinerV2][Debug] {} real, {} fake, {} nodrop, {} unknown, "
+                 "{} skipped -> {}OreMinerV2.txt",
                  mDbgReal, mDbgFake, mDbgNoDrop, mDbgUnknown, mDbgSkip,
-                 mDebugBase);
+                 mDebugDir);
     const std::string unknown =
         mDbgUnknown > 0 ? fmt::format(", {} unknown", mDbgUnknown) : "";
     ChatUtils::displayClientMessage(fmt::format(
         "§7[OreMinerV2] §fDebug сохранён: §a{} real§7, §c{} fake§7, §e{} "
-        "nodrop§7{} -> §fDumps\\OreMinerV2_{}_real.txt",
-        mDbgReal, mDbgFake, mDbgNoDrop, unknown, mDebugStamp));
+        "nodrop§7{} -> §fDumps\\OreMinerV2.txt",
+        mDbgReal, mDbgFake, mDbgNoDrop, unknown));
+  } else if (wroteSeen) {
+    ChatUtils::displayClientMessage(
+        "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен (Dump Seen -> "
+        "§fDumps\\OreMinerV2_seen.txt§f)");
   } else {
     ChatUtils::displayClientMessage(
-        "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен, файлы не "
-        "созданы");
+        "§7[OreMinerV2] §fDebug OFF: ни один блок не проверен, в файл ничего "
+        "не записано");
   }
-  if (wroteSeen)
-    spdlog::info("[OreMinerV2][Debug] {} seen blocks dumped to {}_seen.csv",
-                 mDebugRows, mDebugBase);
 
   mDebugWritten.clear();
   mDebugRows = 0;
-  mDebugStartedAt = 0;
-  mDebugBase.clear();
-  mDebugStamp.clear();
+  mDebugDir.clear();
+  mDebugSession.clear();
 }
 
-bool OreMinerV2::debugOpenVerified() {
-  if (mDbgVerified.is_open())
-    return true;
-  if (mDebugBase.empty() || mDbgVerifiedFailed)
+// Открыть общий файл на дозапись. Файла нет (или он пустой) — сначала
+// легенда, что значат колонки; дальше каждый раз заголовок новой сессии.
+bool OreMinerV2::openAppendLog(std::ofstream &f, const std::string &path,
+                               const char *legend,
+                               const std::string &session) {
+  std::error_code ec;
+  const auto size = std::filesystem::file_size(path, ec);
+  const bool fresh = ec || size == 0;
+
+  f.open(path, std::ios::out | std::ios::app);
+  if (!f.is_open())
     return false;
 
-  const std::string csv = mDebugBase + "_verified.csv";
-  mDbgVerified.open(csv, std::ios::out | std::ios::trunc);
-  if (!mDbgVerified.is_open()) {
-    mDbgVerifiedFailed = true;
-    spdlog::error("[OreMinerV2][Debug] cannot open {}", csv);
+  if (fresh)
+    f << legend;
+  else
+    f << '\n'; // пустая строка между сессиями
+  f << "# ===== " << session << " =====\n";
+  f.flush();
+  return true;
+}
+
+bool OreMinerV2::debugOpenFile() {
+  if (mDbgFile.is_open())
+    return true;
+  if (mDebugDir.empty() || mDbgFileFailed)
+    return false;
+
+  const std::string path = mDebugDir + "OreMinerV2.txt";
+  if (!openAppendLog(
+          mDbgFile, path,
+          "# OreMinerV2 Debug: x y z | руда | вердикт | что упало | время\n"
+          "#   real    - упала руда, блок настоящий\n"
+          "#   fake    - упало другое (булыжник, сланец...), фейк анти-xray\n"
+          "#   nodrop  - не упало ничего (призрак или полный инвентарь)\n"
+          "#   skip    - не копали: первый блок этого кластера оказался "
+          "фейком\n"
+          "#   unknown - проверку прервали (выключил модуль, сменил мир)\n",
+          mDebugSession)) {
+    mDbgFileFailed = true;
+    spdlog::error("[OreMinerV2][Debug] cannot open {}", path);
     return false;
   }
-
-  // verdict: real / fake / nodrop / unknown / skip
-  // got:     что прибавилось в инвентаре, "имя:штук|имя:штук"
-  // wait_ms: от удара до прихода дропа (для nodrop — сколько прождали)
-  // cluster_index: 1 — первый блок кластера, именно он решает, копать ли
-  //                остальные; skip — блок не копали, потому что первый
-  //                блок его кластера оказался фейком
-  mDbgVerified << "world_x,world_y,world_z,ore,block_id,deepslate,verdict,got,"
-                  "wait_ms,cluster,cluster_size,cluster_index,inv_full,time,"
-                  "ms\n";
-  mDbgVerified.flush();
-
-  mDbgRealTxt.open(mDebugBase + "_real.txt", std::ios::out | std::ios::trunc);
-  mDbgFakeTxt.open(mDebugBase + "_fake.txt", std::ios::out | std::ios::trunc);
   return true;
 }
 
 bool OreMinerV2::debugOpenSeen() {
-  if (mDbgSeenCsv.is_open())
+  if (mDbgSeenFile.is_open())
     return true;
-  if (mDebugBase.empty() || mDbgSeenFailed)
+  if (mDebugDir.empty() || mDbgSeenFailed)
     return false;
 
-  const std::string csv = mDebugBase + "_seen.csv";
-  mDbgSeenCsv.open(csv, std::ios::out | std::ios::trunc);
-  if (!mDbgSeenCsv.is_open()) {
+  const std::string path = mDebugDir + "OreMinerV2_seen.txt";
+  if (!openAppendLog(
+          mDbgSeenFile, path,
+          "# OreMinerV2 Dump Seen: всё, что модуль увидел, БЕЗ проверки "
+          "(фейки тоже)\n"
+          "# x y z | руда | дистанция | экран x y (\"-\" - был за кадром)\n",
+          mDebugSession)) {
     mDbgSeenFailed = true;
-    spdlog::error("[OreMinerV2][Debug] cannot open {}", csv);
+    spdlog::error("[OreMinerV2][Debug] cannot open {}", path);
     return false;
   }
-
-  mDbgSeenCsv << "world_x,world_y,world_z,ore,block_id,deepslate,distance,"
-                 "on_screen,screen_x,screen_y,ms\n";
-  mDbgSeenCsv.flush();
-  mDbgSeenTxt.open(mDebugBase + "_seen.txt", std::ios::out | std::ios::trunc);
   return true;
 }
 
@@ -641,30 +667,41 @@ void OreMinerV2::debugFlush(const std::vector<DebugRow> &rows) {
   if (!debugOpenSeen())
     return;
 
-  const uint64_t now = NOW;
-
   for (const auto &r : rows) {
-    mDbgSeenCsv << r.pos.x << ',' << r.pos.y << ',' << r.pos.z << ','
-                << oreTypeName(r.blockId) << ',' << r.blockId << ','
-                << (r.deepslate ? 1 : 0) << ',' << std::fixed
-                << std::setprecision(2) << r.distance << ','
-                << (r.onScreen ? 1 : 0) << ',' << std::setprecision(1)
-                << r.screenX << ',' << r.screenY << ',' << now << '\n';
-
-    if (mDbgSeenTxt.is_open())
-      mDbgSeenTxt << r.pos.x << ' ' << r.pos.y << ' ' << r.pos.z << '\n';
+    mDbgSeenFile << r.pos.x << ' ' << r.pos.y << ' ' << r.pos.z << ' '
+                 << oreTypeName(r.blockId) << ' ' << std::fixed
+                 << std::setprecision(1) << r.distance;
+    if (r.onScreen)
+      mDbgSeenFile << ' ' << std::setprecision(0) << r.screenX << ' '
+                   << r.screenY;
+    else
+      mDbgSeenFile << " -";
+    mDbgSeenFile << '\n';
   }
-
-  mDbgSeenCsv.flush();
-  if (mDbgSeenTxt.is_open())
-    mDbgSeenTxt.flush();
+  mDbgSeenFile.flush();
 
   mDebugRows += static_cast<int>(rows.size());
 }
 
-// Проверенный блок: строка в _verified.csv + координата в _real/_fake.txt.
-void OreMinerV2::debugWriteVerdict(const PendingCheck &pc, DropVerdict v,
-                                   uint64_t now) {
+// Одна строка в OreMinerV2.txt: "x y z руда вердикт что_упало время [пометка]".
+// Первые три числа — координаты, так что файл можно и читать глазами, и
+// разбирать скриптом/фильтровать по слову (real/fake).
+void OreMinerV2::debugWriteRow(const BlockPos &pos, int oreId,
+                               const char *verdict, const std::string &got,
+                               const char *note) {
+  if (!debugOpenFile())
+    return;
+
+  mDbgFile << pos.x << ' ' << pos.y << ' ' << pos.z << ' '
+           << oreTypeName(oreId) << ' ' << verdict << ' '
+           << (got.empty() ? std::string("-") : got) << ' ' << clockString();
+  if (note && *note)
+    mDbgFile << ' ' << note;
+  mDbgFile << '\n';
+  mDbgFile.flush();
+}
+
+void OreMinerV2::debugWriteVerdict(const PendingCheck &pc, DropVerdict v) {
   switch (v) {
   case DropVerdict::Real:
     mDbgReal++;
@@ -680,45 +717,19 @@ void OreMinerV2::debugWriteVerdict(const PendingCheck &pc, DropVerdict v,
     break;
   }
 
-  if (!debugOpenVerified())
-    return;
-
-  const uint64_t gotAt = pc.firstGainAt ? pc.firstGainAt : now;
-  const uint64_t waitMs = gotAt > pc.minedAt ? gotAt - pc.minedAt : 0;
-
-  mDbgVerified << pc.pos.x << ',' << pc.pos.y << ',' << pc.pos.z << ','
-               << oreTypeName(pc.oreId) << ',' << pc.seenId << ','
-               << (isDeepslateOre(pc.seenId) ? 1 : 0) << ',' << verdictName(v)
-               << ',' << formatGains(pc.seen) << ',' << waitMs << ','
-               << pc.clusterNo << ',' << pc.clusterSize << ',' << pc.clusterIdx
-               << ',' << (pc.invFull ? 1 : 0) << ',' << clockString() << ','
-               << now << '\n';
-  mDbgVerified.flush();
-
-  std::ofstream *plain = v == DropVerdict::Real   ? &mDbgRealTxt
-                         : v == DropVerdict::Fake ? &mDbgFakeTxt
-                                                  : nullptr;
-  if (plain && plain->is_open()) {
-    *plain << pc.pos.x << ' ' << pc.pos.y << ' ' << pc.pos.z << '\n';
-    plain->flush();
-  }
+  const char *note = (v == DropVerdict::NoDrop && pc.invFull)
+                         ? "(инвентарь полон)"
+                         : nullptr;
+  debugWriteRow(pc.pos, pc.oreId, verdictName(v), formatGains(pc.seen), note);
 }
 
 // Блок фейкового кластера, который так и не копали: первый блок кластера не
 // дал нужного дропа, и весь кластер ушёл в чёрный список. Пишем, чтобы было
 // видно, что модуль его видел и почему пропустил.
-void OreMinerV2::debugWriteSkip(const BlockPos &pos, int blockId,
-                                const PendingCheck &first, int clusterIdx) {
+void OreMinerV2::debugWriteSkip(const BlockPos &pos,
+                                const PendingCheck &first) {
   mDbgSkip++;
-  if (!debugOpenVerified())
-    return;
-
-  mDbgVerified << pos.x << ',' << pos.y << ',' << pos.z << ','
-               << oreTypeName(first.oreId) << ',' << blockId << ','
-               << (isDeepslateOre(blockId) ? 1 : 0) << ",skip,,,"
-               << first.clusterNo << ',' << first.clusterSize << ','
-               << clusterIdx << ",0," << clockString() << ',' << NOW << '\n';
-  mDbgVerified.flush();
+  debugWriteRow(pos, first.oreId, "skip", "", nullptr);
 }
 
 void OreMinerV2::onEnable() {
@@ -1005,12 +1016,11 @@ std::string OreMinerV2::formatGains(const DropList &gains) {
 }
 
 void OreMinerV2::startCheck(const BlockPos &pos, int seenId, bool decides,
-                            int clusterIdx, InvSnapshot before) {
+                            InvSnapshot before) {
   mPending = PendingCheck{};
   mPending.active = true;
   mPending.decides = decides;
   mPending.pos = pos;
-  mPending.seenId = seenId;
   // Что должно выпасть — по типу кластера; если его почему-то нет, то по
   // блоку, который стоял в мире в момент удара.
   mPending.oreId = getOreType(mCurrentClusterOreId) != OreType::None
@@ -1018,7 +1028,6 @@ void OreMinerV2::startCheck(const BlockPos &pos, int seenId, bool decides,
                        : seenId;
   mPending.clusterNo = mClusterNo;
   mPending.clusterSize = static_cast<int>(mCurrentCluster.size());
-  mPending.clusterIdx = clusterIdx;
   mPending.minedAt = NOW;
   mPending.before = std::move(before);
 }
@@ -1076,7 +1085,7 @@ void OreMinerV2::recordCheck(const PendingCheck &pc, DropVerdict v,
                  pc.invFull ? " [inventory full]" : "");
 
   if (mDebug.mValue)
-    debugWriteVerdict(pc, v, now);
+    debugWriteVerdict(pc, v);
 }
 
 void OreMinerV2::finishCheck(DropVerdict v, uint64_t now) {
@@ -1104,15 +1113,8 @@ void OreMinerV2::finishCheck(DropVerdict v, uint64_t now) {
                mCurrentCluster.size());
 
   if (mDebug.mValue) {
-    for (size_t i = 1; i < mCurrentCluster.size(); i++) {
-      const BlockPos &cp = mCurrentCluster[i];
-      auto it = mFoundBlocks.find(cp);
-      const int id = (it != mFoundBlocks.end() && it->second.block &&
-                      it->second.block->mLegacy)
-                         ? it->second.block->mLegacy->getBlockId()
-                         : pc.oreId;
-      debugWriteSkip(cp, id, pc, static_cast<int>(i) + 1);
-    }
+    for (size_t i = 1; i < mCurrentCluster.size(); i++)
+      debugWriteSkip(mCurrentCluster[i], pc);
 
     const std::string got = formatGains(pc.seen);
     ChatUtils::displayClientMessage(fmt::format(
@@ -1411,7 +1413,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
     mClusterReal = mClusterFake = mClusterNoDrop = 0;
 
     // Первый блок решает судьбу всего кластера — его проверяем всегда.
-    startCheck(fp, seenId, true, 1, std::move(before));
+    startCheck(fp, seenId, true, std::move(before));
 
     mState = MineState::Mining;
     mTickDelay = 1;
@@ -1458,8 +1460,7 @@ void OreMinerV2::onBaseTickEvent(BaseTickEvent &event) {
       if (verify)
         before = getInventorySnapshot();
       if (mineBlockAtPos(p, player) && verify)
-        startCheck(p, seenId, false, mCurrentClusterIdx + 1,
-                   std::move(before));
+        startCheck(p, seenId, false, std::move(before));
     }
     mMinedPositions.insert(p); // помечаем в любом случае, чтобы не застрять
     mCurrentClusterIdx++;
@@ -1617,7 +1618,6 @@ void OreMinerV2::onRenderEvent(RenderEvent &event) {
         DebugRow row;
         row.pos = pos;
         row.blockId = blockId;
-        row.deepslate = isDeepslateOre(blockId);
         row.distance = glm::length(d);
         row.onScreen = onScreen;
         row.screenX = onScreen ? cs.x : 0.f;
