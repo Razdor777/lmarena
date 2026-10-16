@@ -26,10 +26,10 @@
 // ═══════════════════════════════════════════════════════════════
 namespace
 {
-    // Сколько времени голова едет к блоку. 90° за (90 / speed) мс.
-    float rotateInMs(float speed)
+    // Сколько градусов голова проходит за тик (Rotate Speed 1.6 -> ~29°).
+    float rotateStepDeg(float speed)
     {
-        return 90.f / std::max(speed, 0.2f);
+        return 18.f * std::clamp(speed, 0.2f, 5.f);
     }
 
     float normYawDeg(float yaw)
@@ -72,6 +72,32 @@ namespace
         return { from.x + (to.x - from.x) * t,
                  from.y + normYawDeg(to.y - from.y) * t };
     }
+
+    // Наибольшее расхождение по осям, градусы.
+    float angDiff(const glm::vec2& a, const glm::vec2& b)
+    {
+        return std::max(std::fabs(a.x - b.x), std::fabs(normYawDeg(a.y - b.y)));
+    }
+
+    // Направление взгляда по MC-ротации {pitch, yaw}.
+    glm::vec3 lookDir(const glm::vec2& r)
+    {
+        const float p = glm::radians(r.x), y = glm::radians(r.y);
+        return { -std::sin(y) * std::cos(p), -std::sin(p), std::cos(y) * std::cos(p) };
+    }
+
+    // Угол между двумя взглядами, градусы. Глядя почти вертикально вниз,
+    // yaw почти ничего не меняет — и этот угол тоже (в отличие от разницы
+    // самих yaw).
+    float viewAngle(const glm::vec2& a, const glm::vec2& b)
+    {
+        const float d = std::clamp(glm::dot(lookDir(a), lookDir(b)), -1.f, 1.f);
+        return glm::degrees(std::acos(d));
+    }
+
+    constexpr float kAlignTolerance = 10.f;    // «смотрит на блок», градусы
+    constexpr uint64_t kRotateTimeoutMs = 300; // дольше блок голову не ждёт
+    constexpr uint64_t kMinPlaceGapMs = 90;    // чаще живой игрок не ставит
 }
 
 Scaffold::BridgeProfile Scaffold::getBridgeProfile() const
@@ -120,9 +146,14 @@ void Scaffold::onEnable()
     gFeatureManager->mDispatcher->listen<LookInputEvent, &Scaffold::onLookInputEvent>(this);
 
     auto player = ClientInstance::get()->getLocalPlayer();
-    mFlickActive = false;
+    mHeadActive = false;
+    mWantUntil = 0;
+    mSentValid = false;
+    mNeedSince = 0;
     mOverrodeCamera = false;
     mLastApplied = { 0.f, 0.f };
+    mLastPlaceTime = 0;
+    mAheadCell = glm::ivec3(INT_MAX);
     mDidForceJump = false;
     if (!player) return;
 
@@ -144,7 +175,9 @@ void Scaffold::onDisable()
     mLastFace = 0;
     mLastSwitchTime = 0;
     mShouldRotate = false;
-    mFlickActive = false;
+    mHeadActive = false;
+    mWantUntil = 0;
+    mSentValid = false;
     mOverrodeCamera = false;
 
     // Пока мы включены, могли держать прыжок — снимаем, иначе игрок будет
@@ -363,7 +396,29 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
         }
     }
 
-    if (!BlockUtils::isAirBlock(blockPos) && !mIsTowering)
+    const uint64_t now = static_cast<uint64_t>(NOW);
+    const bool falling = player->getFallDistance() > 2.f;
+
+    if (mLegitPlace.mValue && !mIsTowering)
+    {
+        // Только то, что нужно прямо сейчас: блок под ногами или под точкой,
+        // куда ноги придут через ~2 тика. «Скоро понадобится» — голова уже
+        // поворачивается, блок поставим, когда дойдём.
+        bool soon = false;
+        blockPos = getLegitPlacePos(soon);
+        if (blockPos.x == FLT_MAX)
+        {
+            if (soon && rotationAllowed())
+            {
+                mHeadTarget = getTargetRots();
+                mWantUntil = std::max(mWantUntil, now + 250);
+            }
+            return false;
+        }
+        // живой игрок не ставит чаще ~10 раз в секунду (падение — исключение)
+        if (!falling && now - mLastPlaceTime < kMinPlaceGapMs) return false;
+    }
+    else if (!BlockUtils::isAirBlock(blockPos) && !mIsTowering)
     {
         for (float i = 0.f; i < maxExtend; i += 1.f)
         {
@@ -382,29 +437,23 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
     mLastFace = side;
 
     // ── Сначала голова, потом блок ───────────────────────────────────────
-    // Rotate First держит постановку, пока флик не довёл взгляд до блока
-    // (с жёстким таймаутом, чтобы модуль не встал колом).
-    const bool canRotate = mVisibleRotate.mValue && mRotateMode.mValue != RotateMode::None;
-    if (canRotate)
+    // Пакет постановки уходит раньше, чем PlayerAuthInput этого тика, — то
+    // есть сервер видит блок, поставленный с ПРОШЛОЙ ротацией. Поэтому голова
+    // поворачивается к блоку, а ставим его, только когда сервер уже получил
+    // этот взгляд (Rotate First). Не дольше kRotateTimeoutMs; при падении и
+    // в башне — сразу.
+    if (rotationAllowed())
     {
-        if (!mFlickActive)
+        mHeadTarget = getTargetRots();
+        mWantUntil = now + static_cast<uint64_t>(std::max(mRotateHold.mValue, 250.f));
+        if (mRotateFirst.mValue && !falling && !mIsTowering && !headAligned(mHeadTarget))
         {
-            if (auto* rot = player->getActorRotationComponent())
-                mUserRot = { rot->mPitch, rot->mYaw };
-            startFlick();
-        }
-        else
-        {
-            mFlickTarget = getTargetRots();
-        }
-
-        if (mRotateFirst.mValue
-            && !flickAligned(8.f)
-            && static_cast<uint64_t>(NOW) - mFlickStart < 220ull)
-        {
-            return false; // в этом тике только поворачиваемся
+            if (mNeedSince == 0) mNeedSince = now;
+            if (now - mNeedSince < kRotateTimeoutMs)
+                return false; // в этом тике только поворачиваемся
         }
     }
+    mNeedSince = 0;
 
     mLastSwitchTime = NOW;
 
@@ -430,6 +479,8 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
         player->setPosition(*player->getPos() + glm::vec3(0, 1.f * (mTowerSpeed.mValue / 10), 0));
 
     BlockUtils::placeBlock(blockPos, side);
+    mLastPlaceTime = now;
+    mAheadCell = glm::ivec3(INT_MAX); // следующий блок — свой разброс «когда ставить»
     if (mSwitchMode.mValue == SwitchMode::Spoof) {
         player->getSupplies()->mSelectedSlot = lastSlot;
         PacketUtils::spoofSlot(lastSlot);
@@ -453,38 +504,61 @@ glm::vec2 Scaffold::getTargetRots()
     const BridgeProfile prof = getBridgeProfile();
 
     // ── Человеческий разброс ──────────────────────────────────────────
-    // Живой игрок не бьёт в одну и ту же точку блока каждый раз.
-    // Разброс пересчитывается только когда меняется блок — иначе
-    // прицел дрожал бы на каждом тике.
-    if (mHumanize.mValue)
+    // Живой игрок не бьёт в одну и ту же точку и не держит один угол. Всё
+    // случайное выбирается один раз на блок — иначе цель дрожала бы каждый
+    // тик и голова никогда бы на неё не «садилась».
+    if (mLastBlock != mAimCell)
     {
-        if (mLastBlock != mAimCell)
+        mAimCell = mLastBlock;
+        if (mHumanize.mValue)
         {
-            mAimCell = mLastBlock;
-            const float j = 0.34f; // ±треть блока: луч всё ещё попадает в него
+            const float j = 0.3f; // по грани, луч всё ещё попадает в неё
             mAimJitter    = { MathUtils::randomFloat(-j, j),
                               MathUtils::randomFloat(-j, j),
                               MathUtils::randomFloat(-j, j) };
             mAimPitchBias = MathUtils::randomFloat(-2.2f, 2.2f);
             mAimYawBias   = MathUtils::randomFloat(-2.2f, 2.2f);
+            mAimMinPitch  = MathUtils::randomFloat(80.f, 87.f);
+            mAimDownPitch = MathUtils::randomFloat(87.f, 89.9f);
         }
+        else
+        {
+            mAimJitter = glm::vec3(0.f);
+            mAimPitchBias = mAimYawBias = 0.f;
+            mAimMinPitch = 82.f;
+            mAimDownPitch = 89.9f;
+        }
+    }
+
+    // Смотрим на грань опоры, к которой «кликаем» (между опорой и новым
+    // блоком), с разбросом по самой грани.
+    const glm::vec3 eyePos = *player->getPos();
+    const glm::vec3 cell = mLastBlock + glm::vec3(0.5f);
+    glm::vec3 face = cell;
+    if (mLastFace >= 0 && mLastFace < 6)
+    {
+        const glm::vec3 n = BlockUtils::blockFaceOffsets[mLastFace];
+        face += n * 0.5f;
+        face += mAimJitter * (glm::vec3(1.f) - glm::abs(n)); // только вдоль грани
+    }
+    glm::vec2 rotations = MathUtils::getRots(eyePos, face); // {pitch, yaw}
+
+    // Yaw. Взгляд почти вертикальный — atan2 на опору под ногами скачет на
+    // ±100° от тика к тику. Берём направление на сам новый блок, а если и он
+    // прямо под нами — направление движения (стоим — прежний yaw).
+    const float horiz = glm::length(glm::vec2(cell.x - eyePos.x, cell.z - eyePos.z));
+    if (horiz > 0.35f)
+    {
+        rotations.y = MathUtils::getRots(eyePos, cell).y;
     }
     else
     {
-        mAimJitter    = glm::vec3(0.f);
-        mAimPitchBias = 0.f;
-        mAimYawBias   = 0.f;
+        const glm::vec3 v = player->getStateVectorComponent()->mVelocity;
+        if (v.x * v.x + v.z * v.z > 0.0004f)
+            rotations.y = glm::degrees(std::atan2(v.z, v.x)) - 90.f;
+        else
+            rotations.y = mHeadActive ? mHeadRot.y : mUserRot.y;
     }
-
-    // Целимся в блок, по которому «кликаем» — это сосед целевой клетки,
-    // плюс разброс внутри его грани
-    glm::vec3 target = mLastBlock + glm::vec3(0.5f);
-    if (mLastFace >= 0) target += BlockUtils::blockFaceOffsets[mLastFace];
-    target += mAimJitter;
-
-    glm::vec3 eyePos = *player->getPos();
-
-    glm::vec2 rotations = MathUtils::getRots(eyePos, target); // {pitch, yaw}
 
     if (prof.pitchDeg >= 0.f)
     {
@@ -494,90 +568,148 @@ glm::vec2 Scaffold::getTargetRots()
     else
     {
         if (mRotateMode.mValue == RotateMode::Normal)
-        {
-            // Живой игрок не держит ровно один и тот же угол
-            float minPitch = mHumanize.mValue ? MathUtils::randomFloat(80.f, 87.f) : 82.f;
-            rotations.x = fmax(rotations.x, minPitch);
-        }
+            rotations.x = std::max(rotations.x, mAimMinPitch);
         if (mRotateMode.mValue == RotateMode::Down)
-            rotations.x = mHumanize.mValue ? MathUtils::randomFloat(87.f, 89.9f) : 89.9f;
+            rotations.x = mAimDownPitch;
         if (mRotateMode.mValue == RotateMode::Backwards)
             rotations.y += 180.f;
     }
 
-    if (mHumanize.mValue)
-    {
-        rotations.x += mAimPitchBias;
-        rotations.y += mAimYawBias;
-    }
+    rotations.x += mAimPitchBias;
+    rotations.y += mAimYawBias;
 
     rotations.x = MathUtils::clamp(rotations.x, -90.f, 90.f);
     rotations.y = normYawDeg(rotations.y);
     return rotations;
 }
 
-void Scaffold::startFlick()
+bool Scaffold::rotationAllowed() const
 {
-    const uint64_t now = static_cast<uint64_t>(NOW);
-
-    // Уже летим вниз — не перезапускаем фазу, только подтягиваем цель
-    // к новому блоку (иначе при непрерывном мосте голова не успевала бы опуститься).
-    if (mFlickActive && static_cast<float>(now - mFlickStart) < rotateInMs(mRotateSpeed.mValue))
-    {
-        mFlickTarget = getTargetRots();
-        return;
-    }
-
-    mFlickActive = true;
-    mFlickStart = now;
-    mFlickTarget = getTargetRots();
-    mFlickBase = mUserRot;
+    if (mRotateMode.mValue == RotateMode::None) return false;
+    // Аура ведёт цель и Flick Mode = None — её ротацию не перебиваем.
+    auto auraMod = gFeatureManager->mModuleManager->getModule<Aura>();
+    return !(auraMod && auraMod->sHasTarget && mFlickMode.mValue == FlickMode::None);
 }
 
-glm::vec2 Scaffold::sampleFlick(uint64_t now, bool& active)
+// Один шаг головы — раз в тик, из PlayerAuthInput. Пока строим мост
+// (mWantUntil), голова едет к блоку, потом обратно к тому, куда смотрит игрок;
+// дошла обратно — ротацию отпускаем. Большие повороты — на полной скорости,
+// последние градусы медленнее, как рука с мышкой.
+glm::vec2 Scaffold::stepHead(const glm::vec2& user, uint64_t now, bool& override)
 {
-    const float inMs = rotateInMs(mRotateSpeed.mValue);
-    const float holdMs = std::max(mRotateHold.mValue, 0.f);
-    const float outMs = inMs * 1.35f;
-    const float t = static_cast<float>(now - mFlickStart);
-
-    active = mFlickActive && t < inMs + holdMs + outMs;
-    if (!active) return mUserRot;
-
-    if (t < inMs)
+    const bool want = now < mWantUntil;
+    override = false;
+    if (!want && !mHeadActive) return user;
+    if (!mHeadActive)
     {
-        float u = std::clamp(t / inMs, 0.f, 1.f);
-        if (mHumanize.mValue)
-        {
-            // Живой игрок чуть перелетает цель и дорабатывает (overshoot)
-            constexpr float c1 = 1.70158f;
-            constexpr float c3 = 2.70158f;
-            const float f = u - 1.f;
-            u = std::clamp(1.f + c3 * f * f * f + c1 * f * f, 0.f, 1.16f);
-        }
-        else
-        {
-            u = smoothStep(u);
-        }
-        return lerpRots(mFlickBase, mFlickTarget, u);
+        mHeadActive = true;
+        mHeadRot = user;
+        mHeadPrev = user;
     }
-    if (t < inMs + holdMs)
-        return mFlickTarget;
-    return lerpRots(mFlickTarget, mFlickBase,
-                    smoothStep((t - inMs - holdMs) / std::max(outMs, 1.f)));
+
+    const glm::vec2 target = want ? mHeadTarget : user;
+    const float maxStep = rotateStepDeg(mRotateSpeed.mValue);
+    auto step = [&](float diff)
+    {
+        const float a = std::fabs(diff);
+        const float s = std::min(a, std::max(maxStep * std::clamp(a / 30.f + 0.25f, 0.25f, 1.f), 1.f));
+        return diff < 0.f ? -s : s;
+    };
+    mHeadPrev = mHeadRot;
+    mHeadStepAt = now;
+    mHeadRot.x = std::clamp(mHeadRot.x + step(target.x - mHeadRot.x), -90.f, 90.f);
+    mHeadRot.y = normYawDeg(mHeadRot.y + step(normYawDeg(target.y - mHeadRot.y)));
+
+    if (!want && angDiff(mHeadRot, user) < 1.5f)
+    {
+        // Вернулись к игроку — ротация снова его. Камера отстаёт на тик
+        // (плавность между тиками): даём ей доехать ровно до игрока.
+        mHeadActive = false;
+        mHeadRot = user;
+        mCamSettleUntil = now + 60;
+        return user;
+    }
+    override = true;
+    return mHeadRot;
 }
 
-bool Scaffold::flickAligned(float tolerance)
+bool Scaffold::headAligned(const glm::vec2& target) const
 {
-    if (!mFlickActive) return true;
+    return mSentValid && viewAngle(mSentRot, target) <= kAlignTolerance;
+}
 
-    bool active = false;
-    glm::vec2 current = sampleFlick(static_cast<uint64_t>(NOW), active);
-    if (!active) return true;
+// Legit Place. Что ставить прямо сейчас:
+//   - под ногами воздух (сошёл с края, падаешь) — этот блок;
+//   - иначе блок под точкой, где ноги будут через mPlaceAhead тиков (по
+//     реальной скорости), но не дальше одного блока; по диагонали без опоры
+//     сначала ставится боковой блок.
+// Ничего — FLT_MAX; soon = край близко (голова уже поворачивается).
+glm::vec3 Scaffold::getLegitPlacePos(bool& soon)
+{
+    soon = false;
+    constexpr glm::vec3 none = { FLT_MAX, FLT_MAX, FLT_MAX };
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return none;
+    const glm::vec3 pos = *player->getPos();
+    const glm::vec3 vel = player->getStateVectorComponent()->mVelocity;
+    const int y = static_cast<int>(std::floor(mStartY));
+    const glm::ivec3 cur = { static_cast<int>(std::floor(pos.x)), y, static_cast<int>(std::floor(pos.z)) };
 
-    const float dPitch = std::fabs(current.x - mFlickTarget.x);
-    const float dYaw = std::fabs(normYawDeg(current.y - mFlickTarget.y));
-    return dPitch + dYaw <= tolerance;
+    auto placeable = [](const glm::ivec3& c)
+    {
+        return BlockUtils::isAirBlock(c) && BlockUtils::isValidPlacePos(c) && BlockUtils::getBlockPlaceFace(c) != -1;
+    };
+
+    if (BlockUtils::isAirBlock(cur))
+    {
+        if (placeable(cur)) return glm::vec3(cur);
+        // под ногами не к чему прилепить — ближайшая опора рядом (как раньше)
+        glm::ivec3 c = BlockUtils::getClosestPlacePos(cur, 2.f);
+        if (c.x != INT_MAX && BlockUtils::getBlockPlaceFace(c) != -1) return glm::vec3(c);
+        return none;
+    }
+
+    glm::vec2 v = { vel.x, vel.z };
+    const float speed = glm::length(v);
+    if (speed < 0.02f || !Keyboard::isUsingMoveKeys()) return none;
+
+    // Когда ставить — у каждого блока свой момент (живые руки не метроном).
+    auto aheadCell = [&](float ticks, float maxDist)
+    {
+        glm::vec2 d = v * ticks;
+        const float l = glm::length(d);
+        if (l > maxDist) d *= maxDist / l;
+        return glm::ivec3(static_cast<int>(std::floor(pos.x + d.x)), y, static_cast<int>(std::floor(pos.z + d.y)));
+    };
+
+    const glm::ivec3 next = aheadCell(mHumanize.mValue ? mPlaceAhead : 1.8f, 0.95f);
+    if (next != cur && BlockUtils::isAirBlock(next))
+    {
+        if (next != mAheadCell)
+        {
+            mAheadCell = next;
+            mPlaceAhead = mHumanize.mValue ? MathUtils::randomFloat(1.3f, 2.3f) : 1.8f;
+        }
+        if (placeable(next)) return glm::vec3(next);
+        // по диагонали: сначала тот боковой, что ближе к направлению
+        const glm::ivec3 sideA = { next.x, y, cur.z }, sideB = { cur.x, y, next.z };
+        const bool aFirst = std::fabs(v.x) >= std::fabs(v.y);
+        for (const glm::ivec3& c : { aFirst ? sideA : sideB, aFirst ? sideB : sideA })
+            if (c != cur && placeable(c)) return glm::vec3(c);
+        return none;
+    }
+
+    // Край ещё не близко, но через ~7 тиков будет — пусть голова поворачивается
+    // заранее (иначе первый блок моста ждал бы её и опаздывал).
+    const glm::ivec3 later = aheadCell(7.f, 2.0f);
+    if (later != cur && BlockUtils::isAirBlock(later))
+    {
+        soon = true;
+        mLastBlock = glm::vec3(later);
+        mLastFace = BlockUtils::getBlockPlaceFace(later);
+        if (mLastFace < 0) mLastFace = 1;
+    }
+    return none;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -595,9 +727,8 @@ void Scaffold::onLookInputEvent(LookInputEvent& event)
     const glm::vec2 frameRot = radToMc(direct->mRotRads);
 
     // Игра применила мышь поверх того, что мы вписали в прошлом кадре.
-    // Вычитаем свой прошлый вклад — получаем «настоящую» ротацию игрока,
-    // даже пока идёт флик (иначе камера «прилипала» бы к блоку).
-    if (mFlickActive && mOverrodeCamera)
+    // Вычитаем свой прошлый вклад — получаем «настоящую» ротацию игрока.
+    if (mOverrodeCamera)
     {
         glm::vec2 delta = { frameRot.x - mLastApplied.x,
                             normYawDeg(frameRot.y - mLastApplied.y) };
@@ -609,32 +740,25 @@ void Scaffold::onLookInputEvent(LookInputEvent& event)
         mUserRot = frameRot;
     }
 
-    if (!mVisibleRotate.mValue || mRotateMode.mValue == RotateMode::None)
+    const bool camActive = mHeadActive || static_cast<uint64_t>(NOW) < mCamSettleUntil;
+    if (!mVisibleRotate.mValue || !camActive || !rotationAllowed())
     {
         mOverrodeCamera = false;
         return;
     }
 
-    // Аура ведёт цель и мы её не перебиваем — камеру не трогаем.
-    auto auraMod = gFeatureManager->mModuleManager->getModule<Aura>();
-    if (auraMod && auraMod->sHasTarget && mFlickMode.mValue == FlickMode::None)
-    {
-        mFlickActive = false;
-        mOverrodeCamera = false;
-        return;
-    }
+    // Между тиками — плавно, без ступенек. Камере отдаётся только наклон:
+    // повернуть её ещё и по yaw — W/A/S/D пошли бы в другую сторону (а в
+    // Backwards и вовсе назад). Полный поворот головы видят сервер и F5.
+    const float t = std::clamp(static_cast<float>(static_cast<uint64_t>(NOW) - mHeadStepAt) / 50.f, 0.f, 1.f);
+    const glm::vec2 head = lerpRots(mHeadPrev, mHeadRot, t);
+    const glm::vec2 cam = { head.x, mUserRot.y };
 
-    bool active = false;
-    glm::vec2 rots = sampleFlick(static_cast<uint64_t>(NOW), active);
-    if (!active)
-    {
-        if (mFlickActive) mFlickActive = false;
-        mOverrodeCamera = false;
-        return;
-    }
-
-    direct->mRotRads = mcToRad(rots);
-    mLastApplied = rots;
+    // Запоминаем ровно то, что камера сможет показать (наклон у неё
+    // обрезан до ±88.8°), иначе на следующем кадре разница выглядела бы как
+    // движение мыши и «настоящая» ротация игрока уползала бы.
+    direct->mRotRads = mcToRad(cam);
+    mLastApplied = radToMc(direct->mRotRads);
     mOverrodeCamera = true;
 }
 
@@ -787,28 +911,25 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
             paip->mPos.y = paip->mPos.y - 0.01f;
         }
 
-        if (mRotateMode.mValue == RotateMode::None || mLastFace < 0) return;
-
-        auto auraMod = gFeatureManager->mModuleManager->getModule<Aura>();
-        const bool auraBusy = auraMod && auraMod->sHasTarget;
-
-        // Аура ведёт цель и мы её не перебиваем — пакет не трогаем.
-        if (auraBusy && mFlickMode.mValue == FlickMode::None) return;
-
-        const uint64_t now = static_cast<uint64_t>(NOW);
-
-        // Ротация = то, что сейчас реально показывает голова (флик),
-        // иначе — цель постановки, пока не истёк таймаут после блока.
-        bool active = false;
-        glm::vec2 rotations = sampleFlick(now, active);
-        if (!active)
+        if (!rotationAllowed())
         {
-            if (now - mLastSwitchTime > 500ull) return;
-            rotations = getTargetRots();
+            mHeadActive = false;
+            mSentValid = false;
+            return;
         }
 
-        paip->mRot = rotations;      // {pitch, yaw} в MC-градусах
-        paip->mYHeadRot = rotations.y;
+        // Ротация игрока: с Visible Rotate камера наша, берём отслеженную.
+        const glm::vec2 user = (mVisibleRotate.mValue && mOverrodeCamera)
+            ? mUserRot : glm::vec2(paip->mRot.x, paip->mRot.y);
+        bool ovr = false;
+        const glm::vec2 rot = stepHead(user, static_cast<uint64_t>(NOW), ovr);
+        if (ovr)
+        {
+            paip->mRot = rot;            // {pitch, yaw} в MC-градусах
+            paip->mYHeadRot = rot.y;
+        }
+        mSentRot = ovr ? rot : user;     // это и видит сервер на следующем блоке
+        mSentValid = true;
     }
 }
 

@@ -24,6 +24,7 @@
 #include "Misc/AntiCheatDetector.hpp"
 #include "Misc/Anticheat.hpp"
 #include "Misc/ArmorSlotUnlock.hpp"
+#include "Misc/AutoContract.hpp"
 #include "Misc/AutoLoot.hpp"
 #include "Misc/AutoMessage.hpp"
 #include "Misc/DeviceSpoof.hpp"
@@ -245,6 +246,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<SkinStealer>());
   mModules.emplace_back(std::make_shared<TestModule>());
   mModules.emplace_back(std::make_shared<WhoisCollector>());
+  mModules.emplace_back(std::make_shared<AutoContract>());
 
   // Visual
   mModules.emplace_back(std::make_shared<Watermark>());

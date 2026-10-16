@@ -4,6 +4,7 @@
 
 #include "PacketUtils.hpp"
 
+#include <Hook/Hooks/ActorHooks/BaseTickHook.hpp>
 #include <Hook/Hooks/NetworkHooks/PacketReceiveHook.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
@@ -58,7 +59,7 @@ void PacketUtils::sendToSelf(const std::shared_ptr<Packet>& packet)
 
 void PacketUtils::queueSend(std::shared_ptr<Packet> packet, bool bypassHook)
 {
-    BaseTickHook::mQueuedPackets.emplace_back(packet, bypassHook);
+    BaseTickHook::queuePacket(std::move(packet), bypassHook);
 }
 
 void PacketUtils::sendChatMessage(const std::string& msg)
