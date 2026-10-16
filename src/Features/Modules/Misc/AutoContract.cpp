@@ -5,7 +5,11 @@
 // JSON: title / content / buttons). Узнаём своё меню по заголовку, решаем,
 // какую кнопку нажать, прячем меню (пакет не доходит до игры) и через паузу
 // отправляем серверу ответ ModalFormResponse с номером кнопки — ровно то же,
-// что уходит, когда кнопку нажимаешь сам.
+// что уходит, когда кнопку нажимаешь сам. Крестик — такой же ответ, только
+// без кнопки, с причиной UserClosed.
+//
+// Сообщение сервера «Контракт выполнен!» в чате (TextPacket) запускает прогон
+// сам: забрать награду и взять следующий контракт.
 //
 
 #include "AutoContract.hpp"
@@ -18,6 +22,7 @@
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
 #include <SDK/Minecraft/Network/PacketID.hpp>
 #include <SDK/Minecraft/Network/Packets/ModalFormResponsePacket.hpp>
+#include <SDK/Minecraft/Network/Packets/TextPacket.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Utils/MiscUtils/CommandUtils.hpp>
 
@@ -36,6 +41,8 @@ void AutoContract::onEnable()
         mClick = {};
         mStatus.clear();
         mStartPending = true;
+        mStartVerbose = true;
+        mStartNotBefore = 0;
         mLastRunEnd = now;
         // Уже в мире — проверяем сразу. Модуль включился ещё при запуске игры
         // (из конфига) — ждём, пока зайдёшь на сервер и мир прогрузится.
@@ -59,6 +66,7 @@ void AutoContract::onDisable()
 
     std::lock_guard lock(mMutex);
     mStartPending = false;
+    mStartNotBefore = 0;
     mRunActive = false;
     mExpect = Expect::Nothing;
     mClick = {};
@@ -140,6 +148,10 @@ void AutoContract::onBaseTickEvent(BaseTickEvent& event)
                     endRunLocked(now);
                 }
                 break;
+            case Expect::AfterClose:
+                // После «Закрыть» меню «Работы» не открылось — закрывать нечего.
+                if (waited > kAfterCloseMs) endRunLocked(now);
+                break;
             case Expect::Nothing:
                 endRunLocked(now);
                 break;
@@ -148,9 +160,11 @@ void AutoContract::onBaseTickEvent(BaseTickEvent& event)
 
         if (!mRunActive && !mClick.active && now - mInWorldSince >= kWorldSettleMs) {
             const uint64_t every = static_cast<uint64_t>(std::max(0.f, mRecheck.mValue)) * 60000ull;
-            if (mStartPending || (every > 0 && now - mLastRunEnd >= every)) {
-                beginRunLocked(now, mStartPending);
+            const bool due = mStartPending && now >= mStartNotBefore;
+            if (due || (every > 0 && now - mLastRunEnd >= every)) {
+                beginRunLocked(now, due && mStartVerbose);
                 mStartPending = false;
+                mStartNotBefore = 0;
                 out.command = true;
             }
         }
@@ -170,6 +184,27 @@ void AutoContract::onPacketInEvent(PacketInEvent& event)
         mInWorldSince = nowMs();
         return;
     }
+
+    // «<+> Контракт выполнен! Напишите - /job contracts чтобы забрать награду»:
+    // через 1–2 с (как человек) пишем /job contract — дальше обычный прогон:
+    // награда, новый тяжёлый контракт на алмазы, «Закрыть», крестик. Идёт
+    // прогон — новый начнётся сразу после него.
+    if (id == PacketID::Text) {
+        const auto text = event.getPacket<TextPacket>();
+        if (!text || !text->mAuthor.empty() || !isCompletedMessage(text->mMessage)) return;
+        std::lock_guard lock(mMutex);
+        std::uniform_int_distribution<int> wait(kChatDelayMinMs, kChatDelayMaxMs);
+        const uint64_t at = nowMs() + static_cast<uint64_t>(wait(mRng));
+        if (!mStartPending) {
+            mStartVerbose = false;
+            mStartNotBefore = at;
+        } else {
+            mStartNotBefore = std::max(mStartNotBefore, at);
+        }
+        mStartPending = true;
+        return;
+    }
+
     if (id != PacketID::ModalFormRequest) return;
 
     const auto packet = event.getPacket<ModalFormRequestPacket>();
@@ -192,7 +227,11 @@ void AutoContract::onPacketInEvent(PacketInEvent& event)
 
 bool AutoContract::decideLocked(Menu menu, const Form& form, unsigned int formId, uint64_t now, Actions& out)
 {
-    // Меню открыли руками (/job contract в чат) — это тоже прогон.
+    // «Работы» (главное меню /job) — только посреди своего прогона: после
+    // «Закрыть» сервер открывает его сам. Открыл /job ты — меню твоё.
+    if (menu == Menu::Jobs && !mRunActive) return false;
+
+    // Меню контрактов открыли руками (/job contract в чат) — это тоже прогон.
     if (!mRunActive) {
         beginRunLocked(now, true);
         mStartPending = false;
@@ -206,6 +245,21 @@ bool AutoContract::decideLocked(Menu menu, const Form& form, unsigned int formId
     }
 
     switch (menu) {
+    case Menu::Jobs: {
+        // Ждём меню контрактов, а пришло главное — заходим в «Контракты».
+        if (mExpect == Expect::AnyForm || mExpect == Expect::AfterClaim) {
+            const int contracts = findButton(form, "контракт");
+            if (contracts >= 0) {
+                scheduleLocked(formId, contracts, Expect::AnyForm, now);
+                return true;
+            }
+        }
+        // После «Закрыть» — крестик, и прогон закончен. Пришло посреди
+        // чего-то другого — тоже крестик, ждём дальше то же, что ждали.
+        scheduleLocked(formId, kCloseButton, mExpect == Expect::AfterClose ? Expect::Nothing : mExpect, now);
+        return true;
+    }
+
     case Menu::Reward: {
         int button = findButton(form, "забрать");
         if (button < 0 && form.buttons.size() == 1 && form.buttonsLower[0].find("отмен") == std::string::npos)
@@ -275,7 +329,10 @@ bool AutoContract::decideLocked(Menu menu, const Form& form, unsigned int formId
         else if (mVerbose)
             message = fmt::format("§7[AutoContract] §fТекущий контракт: {} §7| прогресс §f{}",
                                   goal.empty() ? "?" : goal, progress.empty() ? "?" : progress);
-        scheduleLocked(formId, button, Expect::Nothing, now, std::move(message));
+        // После «Закрыть» сервер открывает «Работы» — его закроем крестиком.
+        // Крестиком сам «Текущий контракт» не закрываем: на части серверов
+        // крестик путается с первой кнопкой, а первая тут «Отменить контракт».
+        scheduleLocked(formId, button, Expect::AfterClose, now, std::move(message));
         return true;
     }
 
@@ -334,7 +391,10 @@ std::string AutoContract::takenMessageLocked() const
 
 void AutoContract::perform(Actions& out)
 {
-    if (out.press) sendButton(out.formId, out.button);
+    if (out.press) {
+        if (out.button == kCloseButton) sendClose(out.formId);
+        else sendButton(out.formId, out.button);
+    }
     if (out.command) CommandUtils::executeCommand("/job contract");
     for (const auto& message : out.messages) ChatUtils::displayClientMessage(message);
 }
@@ -355,6 +415,32 @@ void AutoContract::sendButton(unsigned int formId, int button)
 
     ci->getPacketSender()->send(packet.get());
     spdlog::info("[AutoContract] form {} -> button {}", formId, button);
+}
+
+void AutoContract::sendClose(unsigned int formId)
+{
+    // Крестик: ответ без кнопки, причина UserClosed — то же, что шлёт игра.
+    auto ci = ClientInstance::get();
+    if (!ci || !ci->getLocalPlayer() || !ci->getPacketSender()) return;
+
+    auto packet = MinecraftPackets::createPacket<ModalFormResponsePacket>();
+    if (!packet) return;
+    packet->mFormId = formId;
+    packet->mFormCancelReason = ModalFormCancelReason::UserClosed;
+
+    ci->getPacketSender()->send(packet.get());
+    spdlog::info("[AutoContract] form {} -> closed", formId);
+}
+
+bool AutoContract::isCompletedMessage(const std::string& raw)
+{
+    // «<+> Контракт выполнен! Напишите - /job contracts чтобы забрать награду».
+    // Фраза должна стоять в самом начале (перед ней только «<+>»): так чьё-то
+    // сообщение в чате («Ник » контракт выполнен») прогон не запустит.
+    const std::string text = lower(display(raw));
+    const size_t at = text.find("контракт выполнен");
+    if (at == std::string::npos || at > 12) return false;
+    return text.substr(0, at).find("»") == std::string::npos;
 }
 
 uint64_t AutoContract::nowMs()
@@ -434,14 +520,22 @@ AutoContract::Menu AutoContract::classify(const Form& form)
                            [&](const std::string& b) { return has(b, needle); });
     };
 
-    // Только меню контрактов: «контракт» в заголовке или тексте. Иначе
-    // какое-нибудь меню аукциона с «Обновить список» приняли бы за своё.
     if (form.buttons.empty()) return Menu::None;
-    if (!has(form.titleLower, "контракт") && !has(form.contentLower, "контракт")) return Menu::None;
 
-    if (has(form.titleLower, "текущ") || anyButton("отменить контракт")) return Menu::Current;
-    if (has(form.titleLower, "выполнен") || anyButton("забрать наград")) return Menu::Reward;
-    if (has(form.titleLower, "доступн") || anyButton("обновить список")) return Menu::List;
+    // Меню контрактов: «контракт» в заголовке или тексте. Иначе какое-нибудь
+    // меню аукциона с «Обновить список» приняли бы за своё.
+    if (has(form.titleLower, "контракт") || has(form.contentLower, "контракт")) {
+        if (has(form.titleLower, "текущ") || anyButton("отменить контракт")) return Menu::Current;
+        if (has(form.titleLower, "выполнен") || anyButton("забрать наград")) return Menu::Reward;
+        if (has(form.titleLower, "доступн") || anyButton("обновить список")) return Menu::List;
+    }
+
+    // «Работы» — главное меню /job («Ваша работа Майнер | уровня 3 | ...»,
+    // кнопки «Контракты», «Уволиться», ...). Обязательно с кнопкой
+    // «Контракты»: какое-нибудь «Уволиться? Да/Нет» сюда не попадёт.
+    if (has(form.titleLower, "работ") && anyButton("контракт") &&
+        (has(form.contentLower, "ваша работа") || anyButton("уволиться")))
+        return Menu::Jobs;
     return Menu::None;
 }
 

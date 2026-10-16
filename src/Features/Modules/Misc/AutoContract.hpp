@@ -5,14 +5,19 @@
 //   «Доступные контракты» -> «Обновить список», пока не выпадет
 //                            «Тяжёлый | Алмазная руда ...», и берёт его;
 //   «Текущий контракт»    -> «Закрыть». «Отменить контракт» не нажимается
-//                            никогда.
-// Пока модуль включён, эти три меню не показываются: на них отвечает модуль,
+//                            никогда;
+//   «Работы»              -> крестик. Это главное меню /job, сервер сам
+//                            открывает его после «Закрыть». Закрывается только
+//                            посреди своего прогона: открыл /job ты — не трогаем.
+// Пока модуль включён, эти меню не показываются: на них отвечает модуль,
 // с паузой Click Delay перед каждым нажатием. Чужие меню не трогаются. Если
 // что-то пошло не так (нет нужной кнопки, лимит обновлений), меню просто
 // показывается — дальше решаешь сам.
 //
 // Когда запускается:
 //   - при включении модуля (сам пишет /job contract);
+//   - когда в чат приходит «<+> Контракт выполнен! Напишите - /job contracts
+//     чтобы забрать награду»: забирает награду и сразу берёт следующий;
 //   - когда /job contract пишешь ты (или чат-бинд);
 //   - раз в Recheck минут, если Recheck > 0: забрать выполненный контракт и
 //     взять новый, пока копаешь.
@@ -34,7 +39,7 @@ public:
     NumberSetting mMaxRefresh = NumberSetting("Max Refresh", "Stop refreshing after this many tries and show the menu", 100.f, 5.f, 500.f, 5.f);
     NumberSetting mRecheck = NumberSetting("Recheck", "Every N minutes run /job contract again: claim a finished contract and take a new one (0 = off)", 0.f, 0.f, 30.f, 1.f);
 
-    AutoContract() : ModuleBase("AutoContract", "/job contract: claims the reward, refreshes until a Heavy Diamond Ore contract, takes it and closes the menu", ModuleCategory::Misc, 0, false) {
+    AutoContract() : ModuleBase("AutoContract", "/job contract: claims the reward, refreshes until a Heavy Diamond Ore contract, takes it and closes the menus; reruns by itself when chat says the contract is done", ModuleCategory::Misc, 0, false) {
         addSetting(&mClickDelay);
         addSetting(&mMaxRefresh);
         addSetting(&mRecheck);
@@ -55,9 +60,12 @@ public:
     void onPacketInEvent(class PacketInEvent& event);
 
 private:
-    enum class Menu : uint8_t { None, Reward, List, Current };
+    enum class Menu : uint8_t { None, Reward, List, Current, Jobs };
     // Чего ждём после последнего нажатия.
-    enum class Expect : uint8_t { Nothing, AnyForm, AfterClaim, AfterRefresh, AfterTake };
+    enum class Expect : uint8_t { Nothing, AnyForm, AfterClaim, AfterRefresh, AfterTake, AfterClose };
+
+    // «Кнопка» крестика: ответ без кнопки, ModalFormCancelReason::UserClosed.
+    static constexpr int kCloseButton = -1;
 
     // Паузы и лимиты, мс.
     static constexpr uint64_t kWorldSettleMs = 3000; // после входа в мир — не сразу
@@ -67,6 +75,9 @@ private:
     static constexpr uint64_t kRefreshMs     = 5000; // после «Обновить список» нет нового списка
     static constexpr uint64_t kAfterTakeMs   = 4000; // после выбора нет «Текущий контракт»
     static constexpr uint64_t kSameListMs    = 3000; // список не изменился — сервер просит подождать
+    static constexpr uint64_t kAfterCloseMs  = 4000; // после «Закрыть» ждём «Работы», чтобы закрыть крестиком
+    static constexpr int      kChatDelayMinMs = 1200; // «Контракт выполнен!» в чате -> /job contract через 1.2–2.2 с
+    static constexpr int      kChatDelayMaxMs = 2200;
     static constexpr int      kMaxResends    = 3;
 
     // Меню после разбора: текст без §-кодов (для сообщений) и он же в нижнем
@@ -97,7 +108,9 @@ private:
     };
 
     mutable std::mutex mMutex;
-    bool mStartPending = false; // прогон по включению модуля
+    bool mStartPending = false; // прогон по включению модуля или по сообщению в чате
+    bool mStartVerbose = false;
+    uint64_t mStartNotBefore = 0;
     bool mRunActive = false;
     bool mVerbose = false;      // прогон запустил игрок -> прогресс в чат
     Expect mExpect = Expect::Nothing;
@@ -125,6 +138,8 @@ private:
     static void perform(Actions& out);
 
     static void sendButton(unsigned int formId, int button);
+    static void sendClose(unsigned int formId);
+    static bool isCompletedMessage(const std::string& raw);
     static uint64_t nowMs();
     static bool parseForm(const std::string& json, Form& form);
     static Menu classify(const Form& form);
