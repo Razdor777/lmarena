@@ -1401,6 +1401,7 @@ void OreMinerV2::onEnable() {
   mMinedPositions.clear();
   mPatternSkipped.clear();
   mNoDropStreak = mStreakLevel = 0;
+  mNodropGrace = 0;
   mPauseUntil = 0;
   mSinceLastDrop.clear();
   mRetriedOnce.clear();
@@ -1466,6 +1467,7 @@ void OreMinerV2::onDisable() {
   mBlacklistedPositions.clear();
   mPatternBlocks.clear();
   mNoDropStreak = mStreakLevel = 0;
+  mNodropGrace = 0;
   mPauseUntil = 0;
   mSinceLastDrop.clear();
   mRetriedOnce.clear();
@@ -1793,6 +1795,29 @@ void OreMinerV2::recordCheck(const PendingCheck &pc, DropVerdict v,
 void OreMinerV2::finishCheck(DropVerdict v, uint64_t now) {
   const PendingCheck pc = std::move(mPending);
   mPending = PendingCheck{};
+
+  // «Без дропа» на первом блоке жилы — это почти всегда опоздавший дроп (по
+  // дампу 43 nodrop из 482 блоков, и по тем же координатам после перепроверки
+  // приходит real). Раньше первый же nodrop отправлял в чёрный список ВСЮ
+  // жилу — вместе с настоящей рудой, и она ждала паузы. Теперь жила остаётся:
+  // просто идём к следующей, а эти блоки сканер найдёт снова. Поблажка одна
+  // на «дропы идут»: как только дроп перестал идти совсем (второй nodrop
+  // подряд), жила, как и раньше, в чёрный список.
+  if (v == DropVerdict::Real || v == DropVerdict::Fake)
+    mNodropGrace = 0; // что-то упало — дропы идут, поблажка снова доступна
+  if (v == DropVerdict::NoDrop && pc.decides && !pc.invFull &&
+      mNodropGrace == 0) {
+    mLastBusyAt = now;
+    ++mNodropGrace;
+    recordCheck(pc, v, now); // в дамп и счётчики — как обычно
+    mCurrentCluster.clear();
+    mCurrentClusterIdx = 0;
+    mCurrentTarget = {INT_MAX, INT_MAX, INT_MAX};
+    mState = MineState::Idle;
+    mTickDelay = 2;
+    return;
+  }
+
   mLastBusyAt = now;
   if (v == DropVerdict::Real || v == DropVerdict::Fake)
     mDropsSinceHop++; // что-то упало — переезд был не впустую
