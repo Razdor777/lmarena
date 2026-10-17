@@ -2,8 +2,8 @@
 //
 // AutoContract — меню «/job contract» проходит само:
 //   «Контракт выполнен»   -> «Забрать награду», потом снова /job contract;
-//   «Доступные контракты» -> «Обновить список», пока не выпадет
-//                            «Тяжёлый | Алмазная руда ...», и берёт его;
+//   «Доступные контракты» -> «Обновить список», пока не выпадет контракт
+//                            выбранной сложности на выбранную руду;
 //   «Текущий контракт»    -> «Закрыть». «Отменить контракт» не нажимается
 //                            никогда;
 //   «Работы»              -> крестик. Это главное меню /job, сервер сам
@@ -38,11 +38,20 @@ public:
     NumberSetting mClickDelay = NumberSetting("Click Delay", "Pause before each button press, ms (randomized +-25%)", 500.f, 150.f, 2000.f, 50.f);
     NumberSetting mMaxRefresh = NumberSetting("Max Refresh", "Stop refreshing after this many tries and show the menu", 100.f, 5.f, 500.f, 5.f);
     NumberSetting mRecheck = NumberSetting("Recheck", "Every N minutes run /job contract again: claim a finished contract and take a new one (0 = off)", 0.f, 0.f, 30.f, 1.f);
+    // Что брать из списка. Сложность и руда сравниваются со словами в кнопке
+    // («Лёгкий | Алмазная руда x26 | 145 монет + 5 опыта работы»).
+    EnumSetting mDifficulty = EnumSetting("Difficulty", "Which difficulty to take", 2,
+                                          "Лёгкий", "Средний", "Тяжёлый");
+    EnumSetting mOre = EnumSetting("Ore", "Which ore the contract must be for", 0,
+                                   "Алмазная руда", "Угольная руда", "Железная руда",
+                                   "Золотая руда", "Лазуритовая руда", "Редстоуновая руда");
 
-    AutoContract() : ModuleBase("AutoContract", "/job contract: claims the reward, refreshes until a Heavy Diamond Ore contract, takes it and closes the menus; reruns by itself when chat says the contract is done", ModuleCategory::Misc, 0, false) {
+    AutoContract() : ModuleBase("AutoContract", "/job contract: claims the reward, refreshes until a contract of the chosen difficulty and ore, takes it and closes the menus; reruns by itself when chat says the contract is done", ModuleCategory::Misc, 0, false) {
         addSetting(&mClickDelay);
         addSetting(&mMaxRefresh);
         addSetting(&mRecheck);
+        addSetting(&mDifficulty);
+        addSetting(&mOre);
 
         mNames = {
             {Lowercase, "autocontract"},
@@ -143,7 +152,8 @@ private:
     static uint64_t nowMs();
     static bool parseForm(const std::string& json, Form& form);
     static Menu classify(const Form& form);
-    static bool isWantedContract(const std::string& lowerText);
+    bool isWantedContract(const std::string& lowerText) const;
+    std::string wantedName() const;
     static int findButton(const Form& form, std::string_view needle);
     static std::string field(const std::string& text, const std::string& lowerText, std::string_view key);
     static std::string display(const std::string& raw);

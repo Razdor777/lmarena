@@ -187,7 +187,8 @@ void AutoContract::onPacketInEvent(PacketInEvent& event)
 
     // «<+> Контракт выполнен! Напишите - /job contracts чтобы забрать награду»:
     // через 1–2 с (как человек) пишем /job contract — дальше обычный прогон:
-    // награда, новый тяжёлый контракт на алмазы, «Закрыть», крестик. Идёт
+    // награда, новый контракт выбранной сложности на выбранную руду,
+    // «Закрыть», крестик. Идёт
     // прогон — новый начнётся сразу после него.
     if (id == PacketID::Text) {
         const auto text = event.getPacket<TextPacket>();
@@ -296,7 +297,7 @@ bool AutoContract::decideLocked(Menu menu, const Form& form, unsigned int formId
             return false;
         }
         if (mRefreshes >= static_cast<int>(mMaxRefresh.mValue)) {
-            giveUpLocked(now, fmt::format("за {} обновлений тяжёлый контракт на алмазную руду не выпал — выбери сам", mRefreshes), out);
+            giveUpLocked(now, fmt::format("за {} обновлений «{}» не выпало — выбери сам", mRefreshes, wantedName()), out);
             return false;
         }
         // Список тот же, что и в прошлый раз: обновление не сработало (у
@@ -539,22 +540,44 @@ AutoContract::Menu AutoContract::classify(const Form& form)
     return Menu::None;
 }
 
-bool AutoContract::isWantedContract(const std::string& b)
+bool AutoContract::isWantedContract(const std::string& b) const
 {
     // «Тяжёлый | Алмазная руда x197 | 1095 монет + 39 опыта работы»
     // (уже без цветов, в нижнем регистре, «ё» -> «е»).
     if (b.find("обновить") != std::string::npos || b.find("отмен") != std::string::npos) return false;
-    if (b.find("тяжел") == std::string::npos) return false;
+
+    // Настройки -> основы слов в кнопке. Индекс из EnumSetting всегда валиден,
+    // но границы проверяем на всякий случай.
+    static constexpr std::string_view kDifficulty[] = {"легк", "средн", "тяжел"};
+    static constexpr std::string_view kOres[] = {
+        "алмазная руда", "угольная руда", "железная руда", "золотая руда",
+        "лазуритовая руда", "редстоуновая руда"};
+    constexpr int kDifficultyCount = 3, kOreCount = 6;
+    int d = mDifficulty.mValue;
+    if (d < 0 || d >= kDifficultyCount) d = kDifficultyCount - 1;
+    int o = mOre.mValue;
+    if (o < 0 || o >= kOreCount) o = 0;
+
+    if (b.find(kDifficulty[d]) == std::string::npos) return false;
 
     // Именно «Алмазная руда», а не «Глубинносланцевая алмазная руда»: перед
     // названием — начало строки или разделитель «|».
-    constexpr std::string_view ore = "алмазная руда";
+    const std::string_view ore = kOres[o];
     for (size_t p = b.find(ore); p != std::string::npos; p = b.find(ore, p + 1)) {
         size_t q = p;
         while (q > 0 && b[q - 1] == ' ') --q;
         if (q == 0 || b[q - 1] == '|') return true;
     }
     return false;
+}
+
+std::string AutoContract::wantedName() const
+{
+    const int d = (mDifficulty.mValue >= 0 && mDifficulty.mValue < static_cast<int>(mDifficulty.mValues.size()))
+                      ? mDifficulty.mValue : 2;
+    const int o = (mOre.mValue >= 0 && mOre.mValue < static_cast<int>(mOre.mValues.size()))
+                      ? mOre.mValue : 0;
+    return mDifficulty.mValues[d] + " | " + mOre.mValues[o];
 }
 
 int AutoContract::findButton(const Form& form, std::string_view needle)
