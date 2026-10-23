@@ -162,6 +162,8 @@ static const std::unordered_set<std::string> gRemovedSettingNames = {
 #include "Visual/Tracers.hpp"
 #include "Visual/UpdateForm.hpp"
 #include "Visual/ViewModel.hpp"
+#include "Visual/Resolution.hpp"
+#include "Visual/Backtrack.hpp"
 #include "Visual/Watermark.hpp"
 #include "Visual/Zoom.hpp"
 
@@ -291,6 +293,8 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ReachCounter>());
   mModules.emplace_back(std::make_shared<OpponentReach>());
   mModules.emplace_back(std::make_shared<Tracers>());
+  mModules.emplace_back(std::make_shared<Backtrack>());
+  mModules.emplace_back(std::make_shared<Resolution>());
   mModules.emplace_back(std::make_shared<Zoom>());
   mModules.emplace_back(std::make_shared<Freelook>());
   mModules.emplace_back(std::make_shared<NoRender>());
