@@ -15,6 +15,7 @@
 #include "Commands/BuildInfoCommand.hpp"
 #include "Commands/ConfigCommand.hpp"
 #include "Commands/CopyNameCommand.hpp"
+#include "Commands/ConnectCommand.hpp"
 #include "Commands/FlingCommand.hpp"
 #include "Commands/FriendCommand.hpp"
 #include "Commands/HelpCommand.hpp"
@@ -54,6 +55,7 @@ void CommandManager::init()
     ADD_COMMAND(ConfigCommand);
     ADD_COMMAND(SpammerCommand);
     ADD_COMMAND(CopyNameCommand);
+    ADD_COMMAND(ConnectCommand);
     ADD_COMMAND(QueueCommand);
     ADD_COMMAND(SetCommand);
     ADD_COMMAND(ModuleCommand);

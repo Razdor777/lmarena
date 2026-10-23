@@ -49,6 +49,7 @@ static const std::unordered_set<std::string> gRemovedSettingNames = {
 #include "Misc/NoFilter.hpp"
 #include "Misc/NoPacket.hpp"
 #include "Misc/NoPause.hpp"
+#include "Misc/QuickConnect.hpp"
 #include "Misc/PacketLogger.hpp"
 #include "Misc/WhoisCollector.hpp"
 #include "Misc/JavaInventory.hpp"
@@ -241,6 +242,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<PacketLogger>());
   mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
   mModules.emplace_back(std::make_shared<DeviceSpoof>());
+  mModules.emplace_back(std::make_shared<QuickConnect>());
   mModules.emplace_back(std::make_shared<AdminPanel>());
   mModules.emplace_back(std::make_shared<KickSounds>());
   mModules.emplace_back(std::make_shared<AntiBot>());

@@ -197,6 +197,23 @@ public:
              "? ? 0F 29 ? ? ? ? ? ? 48 8B ? ? ? ? ? 48 33 ? 48 89 ? ? ? ? ? 49 "
              "8B ? 48 89 ? ? ? ? ? 48 89 ? ? 48 89",
              SigType::Sig, 0);
+  // --- Network: подключение к серверу (QuickConnect) ---
+  // bool __fastcall ClientNetworkSystem::connect(const GameConnectionInfo&,
+  //                                              const GameConnectionInfo&)
+  // sub_141B7FEF0. Аргументы: rcx = this, rdx = первое GameConnectionInfo
+  // (строка адреса на +0x08, uint32 порт на +0x48), r8 = второе.
+  DEFINE_SIG(ClientNetworkSystem_connect,
+             "48 89 5C 24 ? 55 56 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B "
+             "05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 48 8B D9",
+             SigType::Sig, 0);
+  // void __fastcall NetworkWorldJoinerFacet::_handleJoinExternalServer()
+  // sub_1404FBB40 — обработчик OreUI-события "joinExternalServer". Пока не
+  // используется, но это точка входа штатного «Добавить сервер»; держим
+  // сигнатуру, чтобы не искать заново.
+  DEFINE_SIG(NetworkWorldJoiner_joinExternalServer,
+             "48 89 5C 24 ? 48 89 7C 24 ? 55 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 "
+             "8B DA 83 79 ? ? 0F 84 ? ? ? ? C6 41 ? ? C7 41",
+             SigType::Sig, 0);
   DEFINE_SIG(
       CameraDirectLookSystemUtil_handleLookInput,
       "48 89 ? ? ? 57 48 83 EC ? F3 41 ? ? ? 49 8B ? F3 41 ? ? ? ? F3 0F",
