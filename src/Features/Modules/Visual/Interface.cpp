@@ -27,6 +27,7 @@
 #include <SDK/Minecraft/World/Level.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 #ifdef __DEBUG__
@@ -91,47 +92,100 @@ float pLerpedBodyYaw;
 
 bool usingPaip = false;
 
+// Первый пакет ещё не пришёл — показывать модели нули нельзя.
+bool gInterfaceRotReady = false;
+// Когда пришёл последний пакет с ротацией. На клиент-авторитетных серверах
+// MovePlayer идёт только во время движения, и без этой проверки голова
+// замирала бы, стоило остановиться.
+std::chrono::steady_clock::time_point gInterfacePktTp{};
+
 namespace
 {
-    // Сглаживание здесь решает ровно одну задачу: спрятать «ступеньки»
-    // пакетов 20 Гц (голова идёт рывками по 1–2°). Резкий поворот сглаживать
-    // нельзя — голова «догоняла» камеру несколько кадров, и это читалось как
-    // задержка. Правило простое: обычное изменение — плавно, скачок — сразу.
-    constexpr float kInterfaceLerpSpeed = 26.f; // 1/с, не зависит от FPS
-    constexpr float kInterfaceSnapDeg   = 45.f; // скачок больше — показываем как есть
-    constexpr float kInterfaceMaxLagDeg = 20.f; // насколько модель может отставать от правды
+    // Как это устроено (и почему раньше дёргалось).
+    //
+    // Модель рисуется из одного источника — ротации, которая уходит в пакет
+    // (её же правят Aura и Scaffold). Пакет идёт 20 Гц, поэтому между тиками
+    // голова двигалась «ступеньками» по 5–20° — их и гасит фильтр.
+    //
+    // Раньше рядом с этим значением брали ещё и «живое» значение компоненты и
+    // переключались между ними по порогу 20°, а сам фильтр снимался дважды за
+    // кадр. На быстрой камере фильтр постоянно отставал больше чем на 20° →
+    // выбор между двумя источниками щёлкал туда-сюда КАЖДЫЙ кадр: это и было
+    // дрожание головы и корпуса.
+    constexpr float kInterfaceLerpSpeed = 30.f; // 1/с, голова и наклон
+    constexpr float kInterfaceBodySpeed = 16.f; // 1/с, корпус — всегда тяжелее
 
     float interfaceWrap(float deg)
     {
         return MathUtils::wrap(deg, -180.f, 180.f);
     }
 
-    float interfaceFollow(float current, float target, float k, float snapDeg)
+    // Экспоненциальное приближение, не зависящее от FPS. Без порогов-скачков:
+    // любой скачок всё равно проходится за ~3 кадра, а порог только добавлял
+    // рывки в тот момент, когда камера его пересекала.
+    float interfaceFollow(float current, float target, float k)
     {
         const float diff = interfaceWrap(target - current);
         if (!std::isfinite(diff)) return interfaceWrap(target);
-        if (std::fabs(diff) >= snapDeg) return interfaceWrap(target);
         return interfaceWrap(current + diff * k);
     }
 
-    // Шаг сглаживания. Вызывается ДО того, как модель рисуется (см.
-    // ActorRenderEvent) — RenderEvent приходит уже после отрисовки мира.
-    void interfaceStepSmoothed()
+    // Привести угол к той же «ветке», что и reference (0..360 против -180..180).
+    float interfaceMatchBranch(float value, float reference)
     {
-        const float dt = std::clamp(ImGui::GetIO().DeltaTime, 0.0001f, 0.1f);
-        const float k  = 1.f - std::exp(-kInterfaceLerpSpeed * dt);
-
-        pLerpedYaw     = interfaceFollow(pLerpedYaw,     pYaw,     k, kInterfaceSnapDeg);
-        pLerpedHeadYaw = interfaceFollow(pLerpedHeadYaw, pHeadYaw, k, kInterfaceSnapDeg);
-        pLerpedPitch   = interfaceFollow(pLerpedPitch,   pPitch,   k, kInterfaceSnapDeg);
-        pLerpedBodyYaw = interfaceFollow(pLerpedBodyYaw, pBodyYaw, k, kInterfaceSnapDeg);
+        value = interfaceWrap(value);
+        while (value - reference > 180.f)  value -= 360.f;
+        while (value - reference < -180.f) value += 360.f;
+        return value;
     }
 
-    // Сглаженное значение, но не дальше maxLag от настоящего.
-    float interfacePickLive(float smoothed, float live, float maxLag)
+    // Сколько миллисекунд назад ушёл последний пакет с ротацией.
+    double pPktAgeMs()
     {
-        const float diff = interfaceWrap(live - smoothed);
-        return (std::isfinite(diff) && std::fabs(diff) > maxLag) ? live : smoothed;
+        const auto dt = std::chrono::steady_clock::now() - gInterfacePktTp;
+        return std::chrono::duration<double, std::milli>(dt).count();
+    }
+
+    // Шаг модели: ровно один за кадр, ДО отрисовки игрока. Время меряем сами:
+    // ImGui::GetIO().DeltaTime обновляется в NewFrame, а мир может рисоваться
+    // и до, и после него — шаг «плыл» бы вместе с порядком кадров.
+    void interfaceStepModel(Actor* player, float pitch, float headYaw)
+    {
+        static auto lastStep = std::chrono::steady_clock::now();
+        const auto nowTp = std::chrono::steady_clock::now();
+        const float rawDt = std::chrono::duration<float>(nowTp - lastStep).count();
+        if (rawDt < 0.001f) return;   // второй вызов в том же кадре
+        lastStep = nowTp;
+
+        const float dt = std::clamp(rawDt, 0.001f, 0.1f);
+        const float kHead = 1.f - std::exp(-kInterfaceLerpSpeed * dt);
+        const float kBody = 1.f - std::exp(-kInterfaceBodySpeed * dt);
+
+        pLerpedYaw     = interfaceFollow(pLerpedYaw,     headYaw, kHead);
+        pLerpedHeadYaw = interfaceFollow(pLerpedHeadYaw, headYaw, kHead);
+        pLerpedPitch   = interfaceFollow(pLerpedPitch,   pitch,   kHead);
+
+        // Корпус. Раньше он приходил из BodyYaw (20 Гц, из пакетной ротации)
+        // с клампом ±75° от головы: из-за клампа тело не могло развернуться,
+        // когда игрок идёт спиной вперёд, и вообще «не поворачивалось».
+        // Теперь корпус считается покадрово и смотрит туда, КУДА ИДЁМ:
+        //   • вперёд/по диагонали — почти как голова;
+        //   • вбок (A/D) — тело разворачивается по ходу, как в ваниле;
+        //   • назад (S) — тело разворачивается на 180°, голова остаётся на
+        //     камере: это и есть «поворот тела при ходьбе назад»;
+        //   • стоим — тело плавно догоняет голову.
+        float bodyTarget = pLerpedHeadYaw;
+        if (player)
+        {
+            if (auto* sv = player->getStateVectorComponent())
+            {
+                const glm::vec3& v = sv->mVelocity;
+                if (std::sqrt(v.x * v.x + v.z * v.z) > 0.12f)
+                    bodyTarget = glm::degrees(std::atan2(v.z, v.x)) - 90.f; // направление хода
+            }
+        }
+
+        pLerpedBodyYaw = interfaceFollow(pLerpedBodyYaw, bodyTarget, kBody);
     }
 }
 
@@ -281,14 +335,14 @@ void Interface::onRenderEvent(RenderEvent& event)
     }
 #endif
 
-    if (player && !lastPlayerState)
+    if (static_cast<bool>(player) != lastPlayerState)
     {
+        lastPlayerState = static_cast<bool>(player);
         usingPaip = false;
+        // Мир сменился — фильтр начинает с настоящих углов нового мира.
+        gInterfaceRotReady = false;
     }
 
-    // Один шаг сглаживания за кадр (на случай, когда своя модель не рисуется,
-    // например первый человек: ActorRenderEvent тогда не приходит).
-    interfaceStepSmoothed();
 }
 
 void Interface::onActorRenderEvent(ActorRenderEvent& event)
@@ -316,16 +370,32 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     float realBodyYaw = bodyRotations->yBodyRot;
     float realOldBodyYaw = bodyRotations->yOldBodyRot;
 
-    // Сглаживаем ИМЕННО ПЕРЕД отрисовкой: RenderEvent приходит уже после того,
-    // как мир нарисован, поэтому раньше модель всегда использовала значения
-    // прошлого кадра (+1 кадр задержки к тем, что давал сам фильтр).
-    interfaceStepSmoothed();
+    // Своей модели ещё нет (мир только загрузился) — не трогаем компоненты,
+    // иначе на один кадр она встанет в нули.
+    if (!gInterfaceRotReady) return;
 
-    // И не даём фильтру отставать от настоящей ротации больше чем на 20°:
-    // резкий поворот (Aura, Scaffold, мышь) показывается сразу.
-    const float shownPitch = interfacePickLive(pLerpedPitch,   realPitch,   kInterfaceMaxLagDeg);
-    const float shownHead  = interfacePickLive(pLerpedHeadYaw, realHeadRot, kInterfaceMaxLagDeg);
-    const float shownBody  = interfacePickLive(pLerpedBodyYaw, realBodyYaw, kInterfaceMaxLagDeg);
+    // Один шаг за кадр, прямо перед отрисовкой. RenderEvent приходит уже после
+    // того, как мир нарисован, поэтому раньше модель всегда показывала значения
+    // прошлого кадра — поверх задержки самого фильтра.
+    // Источник — РОТАЦИЯ ИЗ ПАКЕТА, а не компонента актора. Разница
+    // принципиальная: Aura и Scaffold правят именно пакет, и только так их
+    // доводка прицела видна на модели (раньше модель брала компоненту и
+    // показать поворот на цель не могла вообще).
+    //
+    // Если пакетов давно не было (стоим на клиент-авторитетном сервере),
+    // берём живые компоненты — иначе голова замирала бы на месте.
+    const bool fresh = pPktAgeMs() < 150.0;
+    const float srcPitch = fresh ? pPitch : realPitch;
+    const float srcHead  = fresh ? pHeadYaw : realHeadRot;
+
+    interfaceStepModel(player, srcPitch, srcHead);
+
+    // old = current: модель должна показывать РОВНО посчитанный угол. Старое
+    // значение здесь не нужно — угол уже сглажен покадрово, а «догоняющая»
+    // интерполяция игры поверх этого давала лишний шаг на каждом тике.
+    const float shownPitch = pLerpedPitch;
+    const float shownHead  = interfaceMatchBranch(pLerpedHeadYaw, srcHead);
+    const float shownBody  = interfaceMatchBranch(pLerpedBodyYaw, shownHead);
 
     actorRotations->mOldPitch = shownPitch;
     actorRotations->mPitch = shownPitch;
@@ -370,13 +440,6 @@ void Interface::onDrawImageEvent(DrawImageEvent& event)
 
 void Interface::onBaseTickEvent(BaseTickEvent& event)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;   // мир выгружается — BodyYaw::updateRenderAngles читает getPos()
-
-    BodyYaw::updateRenderAngles(player, pYaw);
-    pOldBodyYaw = pBodyYaw;
-    pBodyYaw = BodyYaw::bodyYaw;
-
     // Apply font setting on change
     static FontType lastFont = (FontType)-1;
     if (mFont.mValue != lastFont) {
@@ -422,6 +485,18 @@ void Interface::onPacketOutEvent(PacketOutEvent& event)
 
     if (!std::isfinite(rot.x) || !std::isfinite(rot.y) || !std::isfinite(headYaw))
         return;
+
+    gInterfacePktTp = std::chrono::steady_clock::now();
+
+    if (!gInterfaceRotReady)
+    {
+        // Первый пакет: фильтр стартует с настоящих углов, иначе модель
+        // «доезжала» бы к ним из нуля прямо на глазах.
+        gInterfaceRotReady = true;
+        pLerpedYaw = pLerpedHeadYaw = interfaceWrap(headYaw);
+        pLerpedPitch = pPitch = rot.x;
+        pLerpedBodyYaw = pBodyYaw = interfaceWrap(headYaw);
+    }
 
     pOldYaw = pYaw;
     pOldPitch = pPitch;

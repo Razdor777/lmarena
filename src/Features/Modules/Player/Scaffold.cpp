@@ -638,49 +638,56 @@ glm::vec2 Scaffold::stepHead(const glm::vec2& user, uint64_t now, bool& override
     const bool want = now < mWantUntil;
     override = false;
 
-    // Насколько игрок повернул голову САМ с прошлого шага. Резкий рывок мыши
-    // нельзя фильтровать шагом в 29°/тик: именно из-за него поворот за мышкой
-    // выглядел с задержкой.
+    // Насколько игрок повернул голову САМ с прошлого шага.
     const float userTurn = mUserRotValid ? angDiff(user, mLastUserRot) : 0.f;
     mLastUserRot = user;
     mUserRotValid = true;
 
-    if (!want && !mHeadActive) return user;
-    if (!mHeadActive)
+    auto step = [&](const glm::vec2& target)
     {
-        mHeadActive = true;
-        mHeadRot = user;
+        const float maxStep = rotateStepDeg(mRotateSpeed.mValue);
+        auto one = [&](float diff)
+        {
+            const float a = std::fabs(diff);
+            const float s = std::min(a, std::max(maxStep * std::clamp(a / 30.f + 0.25f, 0.25f, 1.f), 1.f));
+            return diff < 0.f ? -s : s;
+        };
+        mHeadRot.x = std::clamp(mHeadRot.x + one(target.x - mHeadRot.x), -90.f, 90.f);
+        mHeadRot.y = normYawDeg(mHeadRot.y + one(normYawDeg(target.y - mHeadRot.y)));
+    };
+
+    // ── Строим мост ────────────────────────────────────────────────────
+    // Пока идёт постановка, голова работает ТОЛЬКО по блоку. Раньше резкий
+    // поворот мыши на один тик отдавал голову игроку, а следующий тик она
+    // снова прыгала к блоку — на быстрой камере это и было «Scaffold дёргает
+    // модель сильнее всего»: голова ходила туда-сюда 20 раз в секунду.
+    if (want)
+    {
+        if (!mHeadActive)
+        {
+            mHeadActive = true;
+            mHeadRot = user;
+        }
+        step(mHeadTarget);
+        override = true;
+        return mHeadRot;
     }
+
+    // ── Мост не строим ─────────────────────────────────────────────────
+    if (!mHeadActive) return user;
 
     if (userTurn > kFlickDeg)
     {
+        // Игрок сам резко повернул — не «догоняем» его шагами, отдаём сразу.
         mHeadRot = user;
-        if (want)
-        {
-            // Мост ещё строим — ротацию держим, но она уже на голове игрока;
-            // к блоку она поедет со следующего пакета.
-            override = true;
-            return user;
-        }
         mHeadActive = false;
         return user;
     }
 
-    const glm::vec2 target = want ? mHeadTarget : user;
-    const float maxStep = rotateStepDeg(mRotateSpeed.mValue);
-    auto step = [&](float diff)
+    step(user);
+    if (angDiff(mHeadRot, user) < 1.5f)
     {
-        const float a = std::fabs(diff);
-        const float s = std::min(a, std::max(maxStep * std::clamp(a / 30.f + 0.25f, 0.25f, 1.f), 1.f));
-        return diff < 0.f ? -s : s;
-    };
-    mHeadRot.x = std::clamp(mHeadRot.x + step(target.x - mHeadRot.x), -90.f, 90.f);
-    mHeadRot.y = normYawDeg(mHeadRot.y + step(normYawDeg(target.y - mHeadRot.y)));
-
-    if (!want && angDiff(mHeadRot, user) < 1.5f)
-    {
-        // Вернулись к игроку — ротация снова его. Камера отстаёт на тик
-        // (плавность между тиками): даём ей доехать ровно до игрока.
+        // Вернулись к игроку — ротация снова его.
         mHeadActive = false;
         mHeadRot = user;
         return user;
@@ -969,9 +976,12 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
 }
 
 // Своя голова = то, что получил сервер. Камеру не трогаем вообще: наклон
-// видят сервер и другие игроки, а не ты. Тело — только если голова ушла от
-// него больше чем на 75°: иначе игра доворачивает корпус сама, а раньше мы
-// ставили телу тот же yaw, что и голове, и модель дёргалась в сторону.
+// видят сервер и другие игроки, а не ты.
+//
+// Тело здесь больше НЕ трогаем. Раньше, когда голова уходила от корпуса
+// больше чем на 75°, тело одним прыжком ставилось на прицел — на быстрой
+// камере это был рывок корпуса. Корпус теперь считает Interface: покадрово,
+// по направлению хода, и без клампов.
 void Scaffold::applyLocalModelRotation(Actor* player)
 {
     if (!player) return;
@@ -981,16 +991,6 @@ void Scaffold::applyLocalModelRotation(Actor* player)
     {
         head->mHeadRot = mSentRot.y;
         head->mOldHeadRot = mSentRot.y;
-    }
-
-    if (auto* body = player->getMobBodyRotationComponent())
-    {
-        const float d = normYawDeg(mSentRot.y - body->yBodyRot);
-        if (std::fabs(d) > 75.f)
-        {
-            body->yBodyRot = mSentRot.y;
-            body->yOldBodyRot = mSentRot.y;
-        }
     }
 }
 

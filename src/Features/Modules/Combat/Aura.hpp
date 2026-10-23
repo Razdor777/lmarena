@@ -38,7 +38,7 @@ public:
         RotateMode::Normal, "None", "Normal", "Flick");
     NumberSetting mAimY          = NumberSetting("Aim Y", "Vertical aim point (0=feet, 1=head)",      0.85f, 0.f, 1.f, 0.01f);
     NumberSetting mAimRandom     = NumberSetting("Aim Random",    "Randomize aim point in hitbox",    0.25f, 0.f, 1.f, 0.01f);
-    NumberSetting mRotSpeed      = NumberSetting("Rot Speed",     "Max deg/sec (0=instant)",          55.f,  0.f, 180.f, 1.f);
+    NumberSetting mRotSpeed      = NumberSetting("Rot Speed",     "Max deg/sec (0=instant)",         240.f,  0.f, 720.f, 5.f);
     NumberSetting mReactionDelay = NumberSetting("Reaction",      "Delay before aim ms",              80.f,  0.f, 500.f, 10.f);
 
     EnumSettingT<BypassMode> mBypassMode = EnumSettingT("Bypass Mode", "Attack bypass mode",
@@ -140,6 +140,7 @@ public:
     glm::vec3 mCurrentAimOffset = glm::vec3(0.f);
     glm::vec2 mCurrentRotations = glm::vec2(0.f);
     int64_t   mTargetLockTime   = 0;
+    uint64_t  mRotStepAt        = 0;   // время прошлого шага доводки (мс)
 
     struct TrailPoint {
         glm::vec3 pos;
@@ -162,6 +163,13 @@ public:
 
     int       getBestWeapon(Actor* target);
     glm::vec2 calcRotations(Actor* player);
+
+    // Доводка прицела к цели. Один шаг = реальное время, прошедшее с прошлого
+    // шага, поэтому её можно звать и из тика, и из отправки пакета — темп не
+    // зависит от того, сколько раз её позвали.
+    void      stepRotation(Actor* player);
+    // Текущая ротация игрока (то, что реально уходит в пакет по умолчанию).
+    glm::vec2 cameraRotations(Actor* player) const;
 
     void drawWireframe3D(Actor* target, Actor* player, ImColor color, float alpha);
     void drawTrail(Actor* target, ImColor color);

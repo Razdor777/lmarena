@@ -48,6 +48,18 @@ void Aura::onEnable() {
     gFeatureManager->mDispatcher->listen<BoneRenderEvent,  &Aura::onBoneRenderEvent,
         nes::event_priority::FIRST>(this);
 
+    // Совместимость со старым конфигом: раньше скорость доводки по умолчанию
+    // была 55°/с, и поворот на 180° занимал больше трёх секунд — прицел
+    // буквально «не поворачивался». Если в конфиге осталось ровно старое
+    // значение, поднимаем его до нового (240°/с) один раз за запуск.
+    static bool sRotSpeedMigrated = false;
+    if (!sRotSpeedMigrated)
+    {
+        sRotSpeedMigrated = true;
+        if (std::fabs(mRotSpeed.mValue - 55.f) < 0.01f)
+            mRotSpeed.mValue = 240.f;
+    }
+
     resetState();
 }
 
@@ -76,6 +88,7 @@ void Aura::resetTarget() {
     sLastTrailUpdate  = 0;
     mCurrentAimOffset = glm::vec3(0.f);
     mCurrentRotations = glm::vec2(0.f);
+    mRotStepAt = 0;
     mTargetLockTime   = 0;
 }
 
@@ -605,10 +618,8 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
                     mCurrentAimOffset = glm::vec3(0.f);
                 }
 
-                float curYaw = 0.f, curPitch = 0.f;
-                if (auto* head = player->getActorHeadRotationComponent()) curYaw   = head->mHeadRot;
-                if (auto* rot  = player->getActorRotationComponent())     curPitch = rot->mPitch;
-                mCurrentRotations = glm::vec2(curPitch, curYaw);
+                mCurrentRotations = cameraRotations(player);
+                mRotStepAt = static_cast<uint64_t>(NOW);
 
             } catch (...) {}
         }
@@ -633,10 +644,8 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
                     mAutoTargeted    = true;
                     mTargetLockTime  = NOW;
 
-                    float curYaw = 0.f, curPitch = 0.f;
-                    if (auto* head = player->getActorHeadRotationComponent()) curYaw   = head->mHeadRot;
-                    if (auto* rot  = player->getActorRotationComponent())     curPitch = rot->mPitch;
-                    mCurrentRotations = glm::vec2(curPitch, curYaw);
+                    mCurrentRotations = cameraRotations(player);
+                    mRotStepAt = static_cast<uint64_t>(NOW);
                 } catch (...) {
                     resetTarget();
                     return;
@@ -711,41 +720,75 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
     }
 
     // --- ROTATION ---
-    if (mRotating) {
-        glm::vec2 targetRots = calcRotations(player);
-        if (std::isfinite(targetRots.x) && std::isfinite(targetRots.y)) {
-            if (mRotSpeed.mValue > 0.f) {
-                float dt      = 0.05f;
-                float maxStep = mRotSpeed.mValue * dt;
+    // Компоненты головы/тела здесь больше НЕ трогаем. Их значение уходит в
+    // пакет следующим тиком и перебивало то, что мы только что посчитали, а
+    // тело, выставленное ровно по прицелу, дёргалось на каждом шаге. Ротация
+    // живёт в одном месте — в пакете (см. onPacketOutEvent), а модель рисует
+    // ровно то, что ушло на сервер.
+    if (mRotating)
+        stepRotation(player);
+}
 
-                float deltaYaw = targetRots.y - mCurrentRotations.y;
-                while (deltaYaw >  180.f) deltaYaw -= 360.f;
-                while (deltaYaw < -180.f) deltaYaw += 360.f;
+// Текущая ротация игрока. head->mHeadRot игровая нить может держать в другой
+// «ветке» (0..360) или ещё не обновить после поворота камеры, поэтому берём
+// yaw из компоненты ротации актора — это ровно то, что уходит в пакет.
+glm::vec2 Aura::cameraRotations(Actor* player) const
+{
+    glm::vec2 rots(0.f, 0.f);
+    if (!player) return rots;
 
-                float deltaPitch = targetRots.x - mCurrentRotations.x;
-
-                mCurrentRotations.y += MathUtils::clamp(deltaYaw,   -maxStep, maxStep);
-                mCurrentRotations.x += MathUtils::clamp(deltaPitch, -maxStep, maxStep);
-
-                while (mCurrentRotations.y >  180.f) mCurrentRotations.y -= 360.f;
-                while (mCurrentRotations.y < -180.f) mCurrentRotations.y += 360.f;
-                mCurrentRotations.x = MathUtils::clamp(mCurrentRotations.x, -90.f, 90.f);
-            } else {
-                mCurrentRotations = targetRots;
-            }
-
-            try {
-                if (auto* headRot = player->getActorHeadRotationComponent()) {
-                    headRot->mHeadRot    = mCurrentRotations.y;
-                    headRot->mOldHeadRot = mCurrentRotations.y;
-                }
-                if (auto* bodyRot = player->getMobBodyRotationComponent()) {
-                    bodyRot->yBodyRot    = mCurrentRotations.y;
-                    bodyRot->yOldBodyRot = mCurrentRotations.y;
-                }
-            } catch (...) {}
+    try {
+        if (auto* rot = player->getActorRotationComponent()) {
+            rots.x = rot->mPitch;
+            rots.y = rot->mYaw;
+        } else if (auto* head = player->getActorHeadRotationComponent()) {
+            rots.y = head->mHeadRot;
         }
+    } catch (...) {}
+
+    while (rots.y >  180.f) rots.y -= 360.f;
+    while (rots.y < -180.f) rots.y += 360.f;
+    rots.x = MathUtils::clamp(rots.x, -90.f, 90.f);
+    return rots;
+}
+
+void Aura::stepRotation(Actor* player)
+{
+    if (!player) return;
+
+    glm::vec2 want = calcRotations(player);
+    if (!std::isfinite(want.x) || !std::isfinite(want.y)) return;
+    if (want.x == 0.f && want.y == 0.f) return;   // цель не найдена
+
+    // Реальное время с прошлого шага: раньше здесь стояли жёсткие 0.05 с,
+    // и при 240°/с голова двигалась на 12° за тик независимо от того, сколько
+    // прошло на самом деле.
+    const uint64_t now = static_cast<uint64_t>(NOW);
+    float dt = mRotStepAt && now > mRotStepAt
+        ? static_cast<float>(now - mRotStepAt) / 1000.f
+        : 0.05f;
+    dt = std::clamp(dt, 0.001f, 0.1f);
+    mRotStepAt = now;
+
+    if (mRotSpeed.mValue <= 0.f) {
+        mCurrentRotations = want;
+        return;
     }
+
+    const float maxStep = mRotSpeed.mValue * dt;
+    float dYaw = MathUtils::wrap(want.y - mCurrentRotations.y, -180.f, 180.f);
+    float dPitch = want.x - mCurrentRotations.x;
+
+    // Дошли (шаг заведомо больше остатка) — ставим ровно цель. Без этого
+    // голова «качалась» вокруг прицела и не проходила проверку в 3°.
+    if (std::fabs(dYaw) <= maxStep + 0.05f)   mCurrentRotations.y = want.y;
+    else mCurrentRotations.y += MathUtils::clamp(dYaw, -maxStep, maxStep);
+
+    if (std::fabs(dPitch) <= maxStep + 0.05f) mCurrentRotations.x = want.x;
+    else mCurrentRotations.x += MathUtils::clamp(dPitch, -maxStep, maxStep);
+
+    mCurrentRotations.y = MathUtils::wrap(mCurrentRotations.y, -180.f, 180.f);
+    mCurrentRotations.x = MathUtils::clamp(mCurrentRotations.x, -90.f, 90.f);
 }
 
 // ==================== PACKET OUT ====================
@@ -762,6 +805,10 @@ void Aura::onPacketOutEvent(PacketOutEvent& event) {
     const PacketID id = event.mPacket->getId();
 
     if (id == PacketID::PlayerAuthInput || id == PacketID::MovePlayer) {
+        // Шагаем ПЕРЕД отправкой: тик и отправка пакета идут в разном порядке,
+        // и без этого в пакет уходил угол, посчитанный на кадр-два раньше.
+        stepRotation(player);
+
         glm::vec2 rots = mCurrentRotations;
 
         if (!std::isfinite(rots.x) || !std::isfinite(rots.y)) return;
