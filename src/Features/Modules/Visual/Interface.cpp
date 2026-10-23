@@ -26,6 +26,10 @@
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+
 #ifdef __DEBUG__
 std::vector<unsigned char> gFsBytes2 = { 0x0f, 0x85 };
 DEFINE_PATCH_FUNC(patchFullStack, SigManager::ResourcePackManager_composeFullStackBp, gFsBytes2);
@@ -87,6 +91,148 @@ float pLerpedPitch;
 float pLerpedBodyYaw;
 
 bool usingPaip = false;
+
+// Первый пакет ещё не пришёл — показывать модели нули нельзя.
+bool gInterfaceRotReady = false;
+// Когда пришёл последний пакет с ротацией. На клиент-авторитетных серверах
+// MovePlayer идёт только во время движения, и без этой проверки голова
+// замирала бы, стоило остановиться.
+std::chrono::steady_clock::time_point gInterfacePktTp{};
+
+namespace
+{
+    // Как это устроено (и почему раньше дёргалось).
+    //
+    // Модель рисуется из одного источника — ротации, которая уходит в пакет
+    // (её же правят Aura и Scaffold). Пакет идёт 20 Гц, поэтому между тиками
+    // голова двигалась «ступеньками» по 5–20° — их и гасит фильтр.
+    //
+    // Раньше рядом с этим значением брали ещё и «живое» значение компоненты и
+    // переключались между ними по порогу 20°, а сам фильтр снимался дважды за
+    // кадр. На быстрой камере фильтр постоянно отставал больше чем на 20° →
+    // выбор между двумя источниками щёлкал туда-сюда КАЖДЫЙ кадр: это и было
+    // дрожание головы и корпуса.
+    constexpr float kInterfaceLerpSpeed = 30.f; // 1/с, голова и наклон
+    constexpr float kInterfaceBodySpeed = 16.f; // 1/с, корпус — всегда тяжелее
+
+    float interfaceWrap(float deg)
+    {
+        return MathUtils::wrap(deg, -180.f, 180.f);
+    }
+
+    // Экспоненциальное приближение, не зависящее от FPS. Без порогов-скачков:
+    // любой скачок всё равно проходится за ~3 кадра, а порог только добавлял
+    // рывки в тот момент, когда камера его пересекала.
+    float interfaceFollow(float current, float target, float k)
+    {
+        const float diff = interfaceWrap(target - current);
+        if (!std::isfinite(diff)) return interfaceWrap(target);
+        return interfaceWrap(current + diff * k);
+    }
+
+    // Привести угол к той же «ветке», что и reference (0..360 против -180..180).
+    float interfaceMatchBranch(float value, float reference)
+    {
+        value = interfaceWrap(value);
+        while (value - reference > 180.f)  value -= 360.f;
+        while (value - reference < -180.f) value += 360.f;
+        return value;
+    }
+
+    // Сколько миллисекунд назад ушёл последний пакет с ротацией.
+    double pPktAgeMs()
+    {
+        const auto dt = std::chrono::steady_clock::now() - gInterfacePktTp;
+        return std::chrono::duration<double, std::milli>(dt).count();
+    }
+
+    // Шаг модели: ровно один за кадр, ДО отрисовки игрока. Время меряем сами:
+    // ImGui::GetIO().DeltaTime обновляется в NewFrame, а мир может рисоваться
+    // и до, и после него — шаг «плыл» бы вместе с порядком кадров.
+    void interfaceStepModel(Actor* player, float pitch, float headYaw, float camYaw)
+    {
+        static auto lastStep = std::chrono::steady_clock::now();
+        const auto nowTp = std::chrono::steady_clock::now();
+        const float rawDt = std::chrono::duration<float>(nowTp - lastStep).count();
+        if (rawDt < 0.001f) return;   // второй вызов в том же кадре
+        lastStep = nowTp;
+
+        const float dt = std::clamp(rawDt, 0.001f, 0.1f);
+        const float kHead = 1.f - std::exp(-kInterfaceLerpSpeed * dt);
+        const float kBody = 1.f - std::exp(-kInterfaceBodySpeed * dt);
+
+        pLerpedYaw     = interfaceFollow(pLerpedYaw,     headYaw, kHead);
+        pLerpedHeadYaw = interfaceFollow(pLerpedHeadYaw, headYaw, kHead);
+        pLerpedPitch   = interfaceFollow(pLerpedPitch,   pitch,   kHead);
+
+        // Корпус. Считается покадрово (раньше — 20 Гц из BodyYaw с клампом
+        // ±75° от головы, из-за клампа тело вообще не могло довернуться).
+        //
+        // Два разных случая:
+        //   1. Голову отвернул МОДУЛЬ (Scaffold в Backwards, Aura на цели):
+        //      голова ушла от камеры больше чем на 100° — корпус идёт за
+        //      головой, иначе «тело стоит как есть, а голова крутится сама».
+        //   2. Голова = камера: корпус смотрит туда, КУДА ИДЁМ (вперёд,
+        //      по диагонали, вбок по ходу, назад — разворот на 180°).
+        static bool bodyFollowsAim = false;
+        const float aimVsCam = std::fabs(interfaceWrap(headYaw - camYaw));
+        if (aimVsCam > 100.f)      bodyFollowsAim = true;
+        else if (aimVsCam < 75.f)  bodyFollowsAim = false;
+
+        // Направление хода запоминаем на 300 мс. Раньше корпус считался по
+        // МГНОВЕННОЙ скорости: на прыжке с зажатым S скорость на долю тика
+        // падала ниже порога, корпус возвращался к голове, на следующем тике
+        // снова уходил на 180° — модель мотало. Заодно в воздухе направление
+        // больше не пересчитывается (там скорость — это дуга прыжка, а не ход).
+        static float sLastMoveYaw = 0.f;
+        static bool  sHasMoveYaw  = false;
+        static auto  sLastMoveAt  = std::chrono::steady_clock::now();
+
+        float bodyTarget = pLerpedHeadYaw;
+        if (!bodyFollowsAim && player)
+        {
+            bool grounded = true;
+            try { grounded = player->isOnGround(); } catch (...) {}
+
+            if (auto* sv = player->getStateVectorComponent())
+            {
+                const glm::vec3& v = sv->mVelocity;
+                const float speed = std::sqrt(v.x * v.x + v.z * v.z);
+                if (grounded && speed > 0.12f)
+                {
+                    const float moveYaw = glm::degrees(std::atan2(v.z, v.x)) - 90.f;
+                    // Идём НАЗАД (S) — это не «корпус развернулся на 180°»,
+                    // а обычная ходьба спиной вперёд: тело остаётся на голове,
+                    // ноги просто шагают назад (так и в ванильном Bedrock).
+                    // Раньше корпус честно разворачивался на направление хода,
+                    // и при S+прыжке голова оказывалась вывернутой на 180°
+                    // относительно тела — модель и выглядела «оторванной».
+                    if (std::fabs(interfaceWrap(moveYaw - headYaw)) <= 90.f)
+                    {
+                        sLastMoveYaw = moveYaw;
+                        sHasMoveYaw  = true;
+                        sLastMoveAt  = nowTp;
+                    }
+                    else
+                    {
+                        sHasMoveYaw  = false;
+                    }
+                }
+            }
+
+            const float sinceMove = std::chrono::duration<float>(nowTp - sLastMoveAt).count();
+            if (sHasMoveYaw && sinceMove < 0.30f)
+                bodyTarget = sLastMoveYaw;
+        }
+        else
+        {
+            // За головой корпуса (Scaffold Backwards, Aura) — запоминать нечего.
+            sHasMoveYaw = false;
+        }
+
+        pLerpedBodyYaw = interfaceFollow(pLerpedBodyYaw, bodyTarget, kBody);
+    }
+}
 
 // Returns the FontHelper key string for the currently selected FontType.
 // Mntsb is the only text font the client ships with, so this is a fixed key.
@@ -234,32 +380,13 @@ void Interface::onRenderEvent(RenderEvent& event)
     }
 #endif
 
-    if (player && !lastPlayerState)
+    if (static_cast<bool>(player) != lastPlayerState)
     {
+        lastPlayerState = static_cast<bool>(player);
         usingPaip = false;
+        // Мир сменился — фильтр начинает с настоящих углов нового мира.
+        gInterfaceRotReady = false;
     }
-
-    static constexpr float LERP_SPEED = 20.f;
-    float deltaTime = ImGui::GetIO().DeltaTime;
-
-    float yaw = MathUtils::wrap(pLerpedYaw, pYaw - 180, pYaw + 180);
-    float headYaw = MathUtils::wrap(pLerpedHeadYaw, pHeadYaw - 180, pHeadYaw + 180);
-    float pitch = pLerpedPitch;
-    float bodyYaw = MathUtils::wrap(pLerpedBodyYaw, pBodyYaw - 180, pBodyYaw + 180);
-
-    float preLerpedYaw = MathUtils::lerp(yaw, pYaw, deltaTime * LERP_SPEED);
-    float preLerpedHeadYaw = MathUtils::lerp(headYaw, pHeadYaw, deltaTime * LERP_SPEED);
-    float preLerpedPitch = MathUtils::lerp(pitch, pPitch, deltaTime * LERP_SPEED);
-    float preLerpedBodyYaw = MathUtils::lerp(bodyYaw, pBodyYaw, deltaTime * LERP_SPEED);
-
-    pLerpedYaw = MathUtils::wrap(pLerpedYaw, preLerpedYaw - 180, preLerpedYaw + 180);
-    pLerpedHeadYaw = MathUtils::wrap(pLerpedHeadYaw, preLerpedHeadYaw - 180, preLerpedHeadYaw + 180);
-    pLerpedBodyYaw = MathUtils::wrap(pLerpedBodyYaw, preLerpedBodyYaw - 180, preLerpedBodyYaw + 180);
-
-    pLerpedYaw = MathUtils::lerp(preLerpedYaw, pLerpedYaw, deltaTime * LERP_SPEED);
-    pLerpedHeadYaw = MathUtils::lerp(preLerpedHeadYaw, pLerpedHeadYaw, deltaTime * LERP_SPEED);
-    pLerpedPitch = MathUtils::lerp(preLerpedPitch, pLerpedPitch, deltaTime * LERP_SPEED);
-    pLerpedBodyYaw = MathUtils::lerp(preLerpedBodyYaw, pLerpedBodyYaw, deltaTime * LERP_SPEED);
 
 }
 
@@ -288,12 +415,41 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     float realBodyYaw = bodyRotations->yBodyRot;
     float realOldBodyYaw = bodyRotations->yOldBodyRot;
 
-    actorRotations->mOldPitch = pLerpedPitch;
-    actorRotations->mPitch = pLerpedPitch;
-    headRotations->mHeadRot = pLerpedHeadYaw;
-    headRotations->mOldHeadRot = pLerpedHeadYaw;
-    bodyRotations->yBodyRot = pLerpedBodyYaw;
-    bodyRotations->yOldBodyRot = pLerpedBodyYaw;
+    // Своей модели ещё нет (мир только загрузился) — не трогаем компоненты,
+    // иначе на один кадр она встанет в нули.
+    if (!gInterfaceRotReady) return;
+
+    // Один шаг за кадр, прямо перед отрисовкой. RenderEvent приходит уже после
+    // того, как мир нарисован, поэтому раньше модель всегда показывала значения
+    // прошлого кадра — поверх задержки самого фильтра.
+    // Источник — РОТАЦИЯ ИЗ ПАКЕТА, а не компонента актора. Разница
+    // принципиальная: Aura и Scaffold правят именно пакет, и только так их
+    // доводка прицела видна на модели (раньше модель брала компоненту и
+    // показать поворот на цель не могла вообще).
+    //
+    // Если пакетов давно не было (стоим на клиент-авторитетном сервере),
+    // берём живые компоненты — иначе голова замирала бы на месте.
+    const bool fresh = pPktAgeMs() < 150.0;
+    const float srcPitch = fresh ? pPitch : realPitch;
+    const float srcHead  = fresh ? pHeadYaw : realHeadRot;
+
+    // camYaw — это НЕ голова: компоненту головы правят те же модули, что и
+    // пакет. Камера игрока живёт в mYaw компоненты ротации.
+    interfaceStepModel(player, srcPitch, srcHead, actorRotations->mYaw);
+
+    // old = current: модель должна показывать РОВНО посчитанный угол. Старое
+    // значение здесь не нужно — угол уже сглажен покадрово, а «догоняющая»
+    // интерполяция игры поверх этого давала лишний шаг на каждом тике.
+    const float shownPitch = pLerpedPitch;
+    const float shownHead  = interfaceMatchBranch(pLerpedHeadYaw, srcHead);
+    const float shownBody  = interfaceMatchBranch(pLerpedBodyYaw, shownHead);
+
+    actorRotations->mOldPitch = shownPitch;
+    actorRotations->mPitch = shownPitch;
+    headRotations->mHeadRot = shownHead;
+    headRotations->mOldHeadRot = shownHead;
+    bodyRotations->yBodyRot = shownBody;
+    bodyRotations->yOldBodyRot = shownBody;
 
     auto original = event.mDetour->getOriginal<&ActorRenderDispatcherHook::render>();
     original(event._this, event.mEntityRenderContext, event.mEntity, event.mCameraTargetPos, event.mPos, event.mRot, event.mIgnoreLighting);
@@ -331,12 +487,6 @@ void Interface::onDrawImageEvent(DrawImageEvent& event)
 
 void Interface::onBaseTickEvent(BaseTickEvent& event)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
-
-    BodyYaw::updateRenderAngles(player, pYaw);
-    pOldBodyYaw = pBodyYaw;
-    pBodyYaw = BodyYaw::bodyYaw;
-
     // Apply font setting on change
     static FontType lastFont = (FontType)-1;
     if (mFont.mValue != lastFont) {
@@ -347,35 +497,58 @@ void Interface::onBaseTickEvent(BaseTickEvent& event)
 
 void Interface::onPacketOutEvent(PacketOutEvent& event)
 {
-    if (event.mPacket->getId() == PacketID::PlayerAuthInput) usingPaip = true;
+    if (!event.mPacket) return;
 
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player) return;
-    auto level = player->getLevel();
-    if (!level) return;
-    auto moveSettings = level->getPlayerMovementSettings();
-    if (!moveSettings) return;
-    bool isServerAuthoritative = usingPaip;
+    const PacketID id = event.mPacket->getId();
+    if (id != PacketID::PlayerAuthInput && id != PacketID::MovePlayer) return;
 
-    if (event.mPacket->getId() == PacketID::PlayerAuthInput && isServerAuthoritative)
+    // Ротация приходит в том пакете, которым реально двигается игрок:
+    // PlayerAuthInput на server-authoritative серверах, MovePlayer на
+    // клиент-авторитетных. Раньше тип выбирался по флагу, который выставлялся
+    // при виде первого PAIP, — на части серверов флаг был неверным, и модель
+    // вообще не видела поворотов (голова замирала). Читаем оба пакета.
+    glm::vec2 rot{};
+    float headYaw = 0.f;
+
+    if (id == PacketID::PlayerAuthInput)
     {
         auto paip = event.getPacket<PlayerAuthInputPacket>();
-
-        pOldYaw = pYaw;
-        pOldPitch = pPitch;
-        pOldBodyYaw = pBodyYaw;
-        pYaw = paip->mRot.y;
-        pPitch = paip->mRot.x;
-        pHeadYaw = paip->mYHeadRot;
+        if (!paip) return;
+        usingPaip = true;
+        rot = paip->mRot;
+        headYaw = paip->mYHeadRot;
     }
-    else if (event.mPacket->getId() == PacketID::MovePlayer && !isServerAuthoritative)
+    else
     {
         auto mpp = event.getPacket<MovePlayerPacket>();
-        pOldYaw = pYaw;
-        pOldPitch = pPitch;
-        pOldBodyYaw = pBodyYaw;
-        pYaw = mpp->mRot.y;
-        pPitch = mpp->mRot.x;
-        pHeadYaw = mpp->mYHeadRot;
+        if (!mpp) return;
+        // Телепорт/респавн — служебная ротация, это не поворот игрока.
+        if (mpp->mResetPosition == PositionMode::Teleport ||
+            mpp->mResetPosition == PositionMode::Respawn)
+            return;
+        rot = mpp->mRot;
+        headYaw = mpp->mYHeadRot;
     }
+
+    if (!std::isfinite(rot.x) || !std::isfinite(rot.y) || !std::isfinite(headYaw))
+        return;
+
+    gInterfacePktTp = std::chrono::steady_clock::now();
+
+    if (!gInterfaceRotReady)
+    {
+        // Первый пакет: фильтр стартует с настоящих углов, иначе модель
+        // «доезжала» бы к ним из нуля прямо на глазах.
+        gInterfaceRotReady = true;
+        pLerpedYaw = pLerpedHeadYaw = interfaceWrap(headYaw);
+        pLerpedPitch = pPitch = rot.x;
+        pLerpedBodyYaw = pBodyYaw = interfaceWrap(headYaw);
+    }
+
+    pOldYaw = pYaw;
+    pOldPitch = pPitch;
+    pOldBodyYaw = pBodyYaw;
+    pYaw = rot.y;
+    pPitch = rot.x;
+    pHeadYaw = headYaw;
 }

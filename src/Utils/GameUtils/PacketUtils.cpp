@@ -4,6 +4,7 @@
 
 #include "PacketUtils.hpp"
 
+#include <Hook/Hooks/ActorHooks/BaseTickHook.hpp>
 #include <Hook/Hooks/NetworkHooks/PacketReceiveHook.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
@@ -58,19 +59,25 @@ void PacketUtils::sendToSelf(const std::shared_ptr<Packet>& packet)
 
 void PacketUtils::queueSend(std::shared_ptr<Packet> packet, bool bypassHook)
 {
-    BaseTickHook::mQueuedPackets.emplace_back(packet, bypassHook);
+    BaseTickHook::queuePacket(std::move(packet), bypassHook);
 }
 
 void PacketUtils::sendChatMessage(const std::string& msg)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
+    auto ci = ClientInstance::get();
+    if (!ci) return;
+    auto player = ci->getLocalPlayer();
     if (!player) return;
+    auto sender = ci->getPacketSender();
+    if (!sender) return;
+    if (msg.empty()) return;
     std::shared_ptr<TextPacket> textPacket = MinecraftPackets::createPacket<TextPacket>();
+    if (!textPacket) return;
     textPacket->mLocalize = false;
     textPacket->mMessage = msg;
     textPacket->mType = TextPacketType::Chat;
     textPacket->mAuthor = player->getRawName();
     //textPacket->mXuid = player->getXuid();
 
-    ClientInstance::get()->getPacketSender()->sendToServer(textPacket.get());
+    sender->sendToServer(textPacket.get());
 }

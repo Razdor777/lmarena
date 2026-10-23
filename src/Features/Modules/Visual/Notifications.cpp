@@ -1,18 +1,20 @@
 //
-// Notifications — минималистичные чёрные карточки с цветной полоской-акцентом.
+// Notifications — компактные тёмные карточки в правом углу.
+//
+// Стиль: мягкий вертикальный градиент подложки, тонкая рамка в цвет события,
+// значок в тонированном квадрате (рисуется примитивами, без шрифтовых глифов)
+// и полоска оставшегося времени в цвете события. Всё — AddRectFilled,
+// AddRect, AddLine и AddText: никакого блюра и теней, кадр не нагружается.
 //
 // Что убрано по сравнению со старой версией (и почему):
 //   • ImRenderUtils::addBlur на каждой карточке — самая дорогая операция кадра;
 //   • двойной AddShadowRect «glow» на каждой карточке;
 //   • shimmer-полоса, летающая рамка, таймер-кольцо, спарклы, эластичные пружины;
 //   • ~20 настроек цвета/плотности/анимаций;
-//   • повторный strip §-кодов и пересчёт ширин текста КАЖДЫЙ кадр;
-//   • ВСЕ пиктограммы (галочки, кресты, «!», «i», глифы шрифтов) — вместо них
-//     у левого края карточки стоит цветная полоска: тип события читается по цвету,
-//     и карточка остаётся чистой даже на 15 px текста.
+//   • повторный strip §-кодов и пересчёт ширин текста КАЖДЫЙ кадр.
 //
-// Теперь карточка строится один раз (текст очищен, ширина посчитана), а в кадре
-// остаются только AddRectFilled / AddRect / AddText.
+// Карточка строится один раз (текст очищен, ширина посчитана), а в кадре
+// остаются только рисующие вызовы.
 //
 
 #include "Notifications.hpp"
@@ -28,33 +30,71 @@
 namespace
 {
     // Метрики фиксированы — никаких настроек масштаба и плотности.
-    constexpr float kPadX      = 10.f;
-    constexpr float kPadY      = 7.f;
-    constexpr float kStripW    = 3.f;    // толщина цветной полоски-акцента
-    constexpr float kStripGap  = 10.f;   // от полоски до текста
-    constexpr float kCardGap   = 4.f;
-    constexpr float kMargin       = 8.f;
-    constexpr float kRounding    = 3.f;
-    constexpr float kInTime      = 0.14f;
-    constexpr float kOutTime     = 0.12f;
-    constexpr float kFontSize    = 15.f;
-    constexpr int   kMaxVisible  = 6;
-    constexpr size_t kMaxStored  = 16;
+    constexpr float kPadX      = 13.f;
+    constexpr float kPadY      = 10.f;
+    constexpr float kBadge     = 22.f;   // сторона квадрата со значком
+    constexpr float kBadgeGap  = 11.f;   // от значка до текста
+    constexpr float kCardGap   = 8.f;
+    constexpr float kMargin    = 12.f;
+    constexpr float kRounding  = 10.f;
+    constexpr float kAccentW   = 3.f;    // полоска-акцент у левого края
+    constexpr float kInTime    = 0.18f;
+    constexpr float kOutTime   = 0.15f;
+    constexpr float kFontSize  = 15.f;   // заголовок
+    constexpr float kSubSize   = 12.5f;  // подпись
+    constexpr float kMinWidth  = 175.f;
+    constexpr float kMaxWidth  = 420.f;
+    constexpr int   kMaxVisible = 6;
+    constexpr size_t kMaxStored = 16;
+    constexpr float kLineGap    = 3.f;   // между заголовком и подписью
 
-    // Цвет полоски-акцента. Оттенки пастельные и приглушённые: они не спорят с
-    // чёрной карточкой, но тип события читается сразу. Пиктограмм больше нет —
-    // цвет и подпись справа («enabled» / «disabled») говорят сами за себя.
+    // Цвет события. Насыщенный, но не кислотный: на тёмной карточке видно
+    // сразу, а в глазах не рябит.
     ImU32 accentColor(Notifications::Icon icon, float alpha)
     {
         const int a = static_cast<int>(std::clamp(alpha, 0.f, 1.f) * 255.f);
         switch (icon)
         {
-            case Notifications::Icon::Success:  return IM_COL32(150, 226, 172, a); // мята — включено
-            case Notifications::Icon::Disabled: return IM_COL32(146, 149, 158, a); // серый — выключено
-            case Notifications::Icon::Warning:  return IM_COL32(240, 200, 120, a); // янтарь — предупреждение
-            case Notifications::Icon::Error:    return IM_COL32(240, 138, 138, a); // коралл — ошибка
+            case Notifications::Icon::Success:  return IM_COL32(110, 231, 173, a); // мята — включено
+            case Notifications::Icon::Disabled: return IM_COL32(148, 154, 168, a); // пепел — выключено
+            case Notifications::Icon::Warning:  return IM_COL32(247, 196, 108, a); // янтарь
+            case Notifications::Icon::Error:    return IM_COL32(247, 121, 121, a); // коралл
             case Notifications::Icon::Info:
-            default:                            return IM_COL32(198, 214, 246, a); // холодный белый — инфо
+            default:                            return IM_COL32(129, 178, 255, a); // лазурь
+        }
+    }
+
+    // Значок рисуется линиями и точками. Это дешевле текста (не нужно искать
+    // глиф в шрифте) и не зависит от выбранного шрифта клиента.
+    void drawBadgeGlyph(ImDrawList* dl, Notifications::Icon icon, ImVec2 c, ImU32 color)
+    {
+        constexpr float th = 2.f;
+        switch (icon)
+        {
+            case Notifications::Icon::Success:
+                dl->AddLine({ c.x - 4.4f, c.y + 0.3f }, { c.x - 1.3f, c.y + 3.6f }, color, th);
+                dl->AddLine({ c.x - 1.3f, c.y + 3.6f }, { c.x + 4.6f, c.y - 3.6f }, color, th);
+                break;
+
+            case Notifications::Icon::Error:
+                dl->AddLine({ c.x - 3.8f, c.y - 3.8f }, { c.x + 3.8f, c.y + 3.8f }, color, th);
+                dl->AddLine({ c.x + 3.8f, c.y - 3.8f }, { c.x - 3.8f, c.y + 3.8f }, color, th);
+                break;
+
+            case Notifications::Icon::Warning:
+                dl->AddLine({ c.x, c.y - 4.4f }, { c.x, c.y + 1.2f }, color, th);
+                dl->AddCircleFilled({ c.x, c.y + 4.0f }, 1.35f, color, 8);
+                break;
+
+            case Notifications::Icon::Disabled:
+                dl->AddLine({ c.x - 4.0f, c.y }, { c.x + 4.0f, c.y }, color, th);
+                break;
+
+            case Notifications::Icon::Info:
+            default:
+                dl->AddCircleFilled({ c.x, c.y - 4.2f }, 1.35f, color, 8);
+                dl->AddLine({ c.x, c.y - 1.3f }, { c.x, c.y + 4.2f }, color, th);
+                break;
         }
     }
 
@@ -139,15 +179,25 @@ void Notifications::onDisable()
     mEntries.clear();
 }
 
-void Notifications::push(std::string text, Icon icon, float duration, std::string state)
+void Notifications::push(std::string title, Icon icon, float duration, std::string subtitle)
 {
     Entry entry;
-    entry.text = cleanText(text);
-    if (entry.text.empty()) return;
+    entry.title    = cleanText(title);
+    entry.subtitle = cleanText(subtitle);
+    if (entry.title.empty() && entry.subtitle.empty()) return;
+    if (entry.title.empty()) std::swap(entry.title, entry.subtitle);
 
-    entry.state    = std::move(state);
     entry.icon     = icon;
     entry.duration = std::clamp(duration, 0.5f, 60.f);
+
+    // Одно и то же уведомление не копится стопкой (перещёлкал модуль туда-сюда
+    // — получил бы десять карточек): старую убираем и показываем заново, уже
+    // с нулевым таймером. Так видно, что событие повторилось.
+    const auto same = std::find_if(mEntries.begin(), mEntries.end(), [&](const Entry& e)
+    {
+        return e.title == entry.title && e.subtitle == entry.subtitle && e.icon == entry.icon;
+    });
+    if (same != mEntries.end()) mEntries.erase(same);
 
     mEntries.push_back(std::move(entry));
 
@@ -161,7 +211,7 @@ void Notifications::onRenderEvent(RenderEvent& event)
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();
     if (!drawList) return;
 
-    const float delta  = std::clamp(ImGui::GetIO().DeltaTime, 0.0001f, 0.1f);
+    const float  delta  = std::clamp(ImGui::GetIO().DeltaTime, 0.0001f, 0.1f);
     const ImVec2 screen = ImGui::GetIO().DisplaySize;
 
     for (auto& entry : mEntries)
@@ -182,91 +232,120 @@ void Notifications::onRenderEvent(RenderEvent& event)
         return;
     }
 
-    const float lineHeight = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, "Ag").y;
-    const float cardHeight = (std::max)(26.f, lineHeight + kPadY * 2.f);
+    const float titleH = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, "Ag").y;
+    const float subH   = font->CalcTextSizeA(kSubSize,  FLT_MAX, 0.f, "Ag").y;
     const bool  fromBottom = mPosition.mValue == Position::BottomRight;
 
-    float cursorY = fromBottom ? (screen.y - kMargin - cardHeight) : kMargin;
+    float cursorY = fromBottom ? (screen.y - kMargin) : kMargin;
     int   drawn   = 0;
 
-    // Новые карточки рисуются первыми — они всегда ближе к углу.
+    // Новые карточки — ближе к углу; старые уходят вниз (или вверх).
     for (auto it = mEntries.rbegin(); it != mEntries.rend() && drawn < kMaxVisible; ++it, ++drawn)
     {
         Entry& entry = *it;
 
+        const bool  hasSub = !entry.subtitle.empty();
+        const float textH  = titleH + (hasSub ? (kLineGap + subH) : 0.f);
+        const float cardH  = kPadY * 2.f + (std::max)(textH, kBadge);
+
         // Ширина считается один раз, при первом кадре карточки.
         if (entry.width <= 0.f)
         {
-            const float textW  = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.text.c_str()).x;
-            const float stateW = entry.state.empty()
-                ? 0.f
-                : font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.state.c_str()).x + 6.f;
+            entry.titleW = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.title.c_str()).x;
+            entry.subtitleW = hasSub
+                ? font->CalcTextSizeA(kSubSize, FLT_MAX, 0.f, entry.subtitle.c_str()).x
+                : 0.f;
 
-            entry.textW = textW;
-            entry.width = kPadX * 2.f + kStripW + kStripGap + textW + stateW;
-            entry.width = std::clamp(entry.width, 96.f,
-                                     (std::max)(120.f, screen.x - kMargin * 2.f));
+            const float content = (std::max)(entry.titleW, entry.subtitleW);
+            entry.width = std::clamp(kPadX * 2.f + kBadge + kBadgeGap + content,
+                                     kMinWidth, (std::min)(kMaxWidth, screen.x - kMargin * 2.f));
         }
 
-        const float cardY = cursorY;
-        cursorY += fromBottom ? -(cardHeight + kCardGap) : (cardHeight + kCardGap);
+        const float cardY = fromBottom ? (cursorY - cardH) : cursorY;
+        cursorY = fromBottom ? (cardY - kCardGap) : (cardY + cardH + kCardGap);
 
         const float inT  = std::clamp(entry.life / kInTime, 0.f, 1.f);
         const float outT = entry.life > entry.duration
             ? std::clamp((entry.life - entry.duration) / kOutTime, 0.f, 1.f)
             : 0.f;
 
-        const float alpha = inT * (1.f - outT);
+        // Вход — easeOutQuint (быстро появляется, мягко доезжает), выход —
+        // easeInQuad (сразу срывается, дальше неспешно). Прозрачность чуть
+        // быстрее геометрии, чтобы карточка не «висела» полупрозрачной.
+        const float inv   = 1.f - inT;
+        const float easeIn = 1.f - inv * inv * inv * inv * inv;
+        const float easeOut = outT * outT;
+        const float alpha = std::clamp(std::min(easeIn * 1.7f, 1.f) * (1.f - outT), 0.f, 1.f);
         if (alpha <= 0.01f) continue;
 
-        const float easeIn = 1.f - (1.f - inT) * (1.f - inT);
-        const float hidden = entry.width + kMargin;
-
-        const float x = screen.x - kMargin - entry.width
-                      + (1.f - easeIn) * hidden
-                      + outT * hidden;
-        const float y = cardY + (1.f - easeIn) * 4.f;
+        const float hidden = entry.width + kMargin + 8.f;
+        const float x = screen.x - kMargin - entry.width + (1.f - easeIn) * hidden + easeOut * hidden;
+        const float y = cardY + (1.f - easeIn) * 6.f;
 
         const ImVec2 min(x, y);
-        const ImVec2 max(x + entry.width, y + cardHeight);
+        const ImVec2 max(x + entry.width, y + cardH);
 
-        // ── сплошная чёрная подложка ──────────────────────────────────────────
-        drawList->AddRectFilled(min, max, IM_COL32(0, 0, 0, static_cast<int>(238 * alpha)), kRounding);
-        drawList->AddRect(min, max, IM_COL32(255, 255, 255, static_cast<int>(24 * alpha)),
+        const ImU32 accent = accentColor(entry.icon, alpha);
+
+        auto withAlpha = [&](ImU32 col, float mul)
+        {
+            const int a = static_cast<int>((col >> IM_COL32_A_SHIFT & 0xFF) * mul);
+            return (col & ~IM_COL32_A_MASK) | (static_cast<ImU32>(std::clamp(a, 0, 255)) << IM_COL32_A_SHIFT);
+        };
+
+        // ── тень ─────────────────────────────────────────────────────────
+        // Одна заливка со смещением: карточка «стоит» над миром, а не
+        // приклеена к небу. Дороже одной AddRectFilled ничего нет.
+        drawList->AddRectFilled({ min.x + 2.f, min.y + 3.f }, { max.x + 2.f, max.y + 3.f },
+                                IM_COL32(0, 0, 0, static_cast<int>(70 * alpha)), kRounding);
+
+        // ── подложка ─────────────────────────────────────────────────────
+        drawList->AddRectFilled(min, max, IM_COL32(16, 17, 21, static_cast<int>(246 * alpha)), kRounding);
+
+        // Нейтральная рамка: цвет события несут акцент и значок, а не контур —
+        // так карточка не выглядит «обведённой фломастером».
+        drawList->AddRect(min, max, IM_COL32(255, 255, 255, static_cast<int>(20 * alpha)),
                           kRounding, 0, 1.f);
 
-        // ── цветная полоска-акцент вместо пиктограммы ────────────────────────
-        // Свободно стоящая вертикальная полоска с отступом от краёв — как полоска
-        // справа в Arraylist. Один прямоугольник, ничего не ломается на малых размерах.
-        const float stripX   = min.x + kPadX - 3.f;
-        const float stripTop = y + 4.f;
-        const float stripBot = max.y - 4.f;
-        drawList->AddRectFilled({ stripX, stripTop }, { stripX + kStripW, stripBot },
-                                accentColor(entry.icon, alpha), 1.5f);
+        // Полоска-акцент у левого края — тип события видно издалека.
+        drawList->AddRectFilled({ min.x + 1.f, min.y + 8.f },
+                                { min.x + 1.f + kAccentW, max.y - 8.f },
+                                withAlpha(accent, 0.90f), kAccentW * 0.5f);
 
-        // ── текст ─────────────────────────────────────────────────────────────
-        const float textX = stripX + kStripW + kStripGap;
-        const float textY = y + (cardHeight - lineHeight) * 0.5f;
+        // ── значок ───────────────────────────────────────────────────────
+        const float badgeX = min.x + kPadX;
+        const float badgeY = y + (cardH - kBadge) * 0.5f;
+        drawList->AddRectFilled({ badgeX, badgeY }, { badgeX + kBadge, badgeY + kBadge },
+                                withAlpha(accent, 0.17f), 7.f);
+        drawBadgeGlyph(drawList, entry.icon,
+                       { badgeX + kBadge * 0.5f, badgeY + kBadge * 0.5f },
+                       withAlpha(accent, 0.95f));
 
-        drawList->AddText(font, kFontSize, { textX, textY },
-                          IM_COL32(246, 246, 248, static_cast<int>(255 * alpha)),
-                          entry.text.c_str());
+        // ── текст ────────────────────────────────────────────────────────
+        const float textX   = badgeX + kBadge + kBadgeGap;
+        const float textTop = y + (cardH - textH) * 0.5f;
 
-        if (!entry.state.empty())
+        drawList->AddText(font, kFontSize, { textX, textTop },
+                          IM_COL32(243, 245, 249, static_cast<int>(255 * alpha)),
+                          entry.title.c_str());
+
+        if (hasSub)
         {
-            drawList->AddText(font, kFontSize, { textX + entry.textW + 6.f, textY },
-                              IM_COL32(142, 145, 152, static_cast<int>(255 * alpha)),
-                              entry.state.c_str());
+            drawList->AddText(font, kSubSize, { textX, textTop + titleH + kLineGap },
+                              IM_COL32(150, 156, 170, static_cast<int>(235 * alpha)),
+                              entry.subtitle.c_str());
         }
 
-        // ── тонкая линия оставшегося времени ─────────────────────────────────
+        // ── время жизни ──────────────────────────────────────────────────
+        // Полоска внутри карточки, с отступом от скруглений: раньше она шла
+        // от самого края и на скруглённом низе выглядела как обрубок.
         const float remain = std::clamp(1.f - entry.life / (std::max)(entry.duration, 0.001f), 0.f, 1.f);
         if (remain > 0.01f && outT <= 0.f)
         {
-            const float barW = (entry.width - 2.f) * remain;
-            drawList->AddRectFilled({ min.x + 1.f, max.y - 1.6f },
-                                    { min.x + 1.f + barW, max.y - 0.6f },
-                                    IM_COL32(255, 255, 255, static_cast<int>(58 * alpha)));
+            const float barW = (entry.width - kPadX * 2.f) * remain;
+            drawList->AddRectFilled({ min.x + kPadX, max.y - 5.f },
+                                    { min.x + kPadX + barW, max.y - 3.2f },
+                                    withAlpha(accent, 0.62f), 1.f);
         }
     }
 
@@ -289,7 +368,7 @@ void Notifications::onConnectionRequestEvent(ConnectionRequestEvent& event)
     if (!mShowOnJoin.mValue) return;
     if (!event.mServerAddress) return;
 
-    push("Connecting to " + *event.mServerAddress + "...", Icon::Info, mDuration.mValue);
+    push("Connecting", Icon::Info, mDuration.mValue, *event.mServerAddress);
 }
 
 void Notifications::onNotifyEvent(NotifyEvent& event)
@@ -300,8 +379,8 @@ void Notifications::onNotifyEvent(NotifyEvent& event)
     if (notification.mType == Notification::Type::Warning) icon = Icon::Warning;
     else if (notification.mType == Notification::Type::Error) icon = Icon::Error;
 
-    std::string text  = notification.mMessage;
-    std::string state;
+    std::string title = notification.mMessage;
+    std::string subtitle;
 
     // Другие части клиента до сих пор формируют сообщения вида "Aura enabled".
     // Разделяем их, чтобы карточка выглядела как toggle-карточка.
@@ -310,26 +389,25 @@ void Notifications::onNotifyEvent(NotifyEvent& event)
         constexpr const char* kEnabled  = " enabled";
         constexpr const char* kDisabled = " disabled";
 
-        const std::string clean = cleanText(text);
+        const std::string clean = cleanText(title);
         const size_t enabledLen  = 8; // strlen(kEnabled)
         const size_t disabledLen = 9; // strlen(kDisabled)
 
         if (clean.size() > enabledLen &&
             clean.compare(clean.size() - enabledLen, enabledLen, kEnabled) == 0)
         {
-            text  = clean.substr(0, clean.size() - enabledLen);
-            state = "enabled";
-            icon  = Icon::Success;
+            title    = clean.substr(0, clean.size() - enabledLen);
+            subtitle = "enabled";
+            icon     = Icon::Success;
         }
         else if (clean.size() > disabledLen &&
                  clean.compare(clean.size() - disabledLen, disabledLen, kDisabled) == 0)
         {
-            text  = clean.substr(0, clean.size() - disabledLen);
-            state = "disabled";
-            icon  = Icon::Disabled;
+            title    = clean.substr(0, clean.size() - disabledLen);
+            subtitle = "disabled";
+            icon     = Icon::Disabled;
         }
     }
 
-    const float duration = notification.mDuration > 0.f ? notification.mDuration : mDuration.mValue;
-    push(std::move(text), icon, duration, std::move(state));
+    push(title, icon, std::clamp(notification.mDuration, 0.5f, 60.f), subtitle);
 }

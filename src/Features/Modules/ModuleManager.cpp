@@ -7,6 +7,17 @@
 #include <Utils/OAuthUtils.hpp>
 #include <build_info.h>
 
+// Настройки, которые мы убрали из модулей. В старых конфигах они ещё лежат —
+// молча пропускаем: иначе при каждом запуске в чат прилетает пачка
+// «Setting APS not found».
+static const std::unordered_set<std::string> gRemovedSettingNames = {
+    "APS", "Randomize APS", "APS Min", "APS Max",
+    "Visible Rotate", "Lock Y",
+    "Hop Key", "Hop Direction", "Hop Distance", "Hops", "Hop Delay",
+    "Quick TP Dist", "Quick TP Key", "Max Distance", "Chunk Radius",
+    "Chunks/Tick", "Radius"
+};
+
 #include "Combat/Aimbot.hpp"
 #include "Combat/ArrowTP.hpp"
 #include "Combat/Aura.hpp"
@@ -24,6 +35,7 @@
 #include "Misc/AntiCheatDetector.hpp"
 #include "Misc/Anticheat.hpp"
 #include "Misc/ArmorSlotUnlock.hpp"
+#include "Misc/AutoContract.hpp"
 #include "Misc/AutoLoot.hpp"
 #include "Misc/AutoMessage.hpp"
 #include "Misc/DeviceSpoof.hpp"
@@ -37,6 +49,8 @@
 #include "Misc/NoFilter.hpp"
 #include "Misc/NoPacket.hpp"
 #include "Misc/NoPause.hpp"
+#include "Misc/AccountManager.hpp"
+#include "Misc/QuickConnect.hpp"
 #include "Misc/PacketLogger.hpp"
 #include "Misc/WhoisCollector.hpp"
 #include "Misc/JavaInventory.hpp"
@@ -150,6 +164,9 @@
 #include "Visual/Tracers.hpp"
 #include "Visual/UpdateForm.hpp"
 #include "Visual/ViewModel.hpp"
+#include "Visual/Glow.hpp"
+#include "Visual/Resolution.hpp"
+#include "Visual/Backtrack.hpp"
 #include "Visual/Watermark.hpp"
 #include "Visual/Zoom.hpp"
 
@@ -227,6 +244,9 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<PacketLogger>());
   mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
   mModules.emplace_back(std::make_shared<DeviceSpoof>());
+  mModules.emplace_back(std::make_shared<QuickConnect>());
+  mModules.emplace_back(std::make_shared<AccountManager>());
+  mModules.emplace_back(std::make_shared<Glow>());
   mModules.emplace_back(std::make_shared<AdminPanel>());
   mModules.emplace_back(std::make_shared<KickSounds>());
   mModules.emplace_back(std::make_shared<AntiBot>());
@@ -245,6 +265,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<SkinStealer>());
   mModules.emplace_back(std::make_shared<TestModule>());
   mModules.emplace_back(std::make_shared<WhoisCollector>());
+  mModules.emplace_back(std::make_shared<AutoContract>());
 
   // Visual
   mModules.emplace_back(std::make_shared<Watermark>());
@@ -278,6 +299,8 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ReachCounter>());
   mModules.emplace_back(std::make_shared<OpponentReach>());
   mModules.emplace_back(std::make_shared<Tracers>());
+  mModules.emplace_back(std::make_shared<Backtrack>());
+  mModules.emplace_back(std::make_shared<Resolution>());
   mModules.emplace_back(std::make_shared<Zoom>());
   mModules.emplace_back(std::make_shared<Freelook>());
   mModules.emplace_back(std::make_shared<NoRender>());
@@ -567,13 +590,10 @@ void ModuleManager::deserialize(const nlohmann::json &j, bool showMessages) {
               }
 
               settingsLoaded++;
-            } else {
-              spdlog::warn("Setting {} not found for module {}", settingName,
-                           name);
-              if (showMessages)
-                ChatUtils::displayClientMessage("§cSetting §6" + settingName +
-                                                "§c not found for module §6" +
-                                                name + "§c.");
+            } else if (!gRemovedSettingNames.contains(settingName)) {
+              // Удалённую нами настройку не ругаем; новую, которой в конфиге
+              // ещё нет, — тоже: значение по умолчанию не ошибка.
+              spdlog::warn("Setting {} not found for module {}", settingName, name);
             }
           } catch (const std::exception &e) {
             spdlog::warn("Failed to load setting {} for module {}: {}",
@@ -609,13 +629,9 @@ void ModuleManager::deserialize(const nlohmann::json &j, bool showMessages) {
       // =============================================================
 
       for (const auto &settingName : settingNames) {
-        spdlog::warn(
-            "Setting {} not found for module {}, default value will be used",
-            settingName, name);
-        if (showMessages)
-          ChatUtils::displayClientMessage("§cSetting §6" + settingName +
-                                          "§c not found for module §6" + name +
-                                          "§c, default value will be used.");
+        if (gRemovedSettingNames.contains(settingName)) continue;
+        spdlog::warn("Setting {} not found for module {}, default value will be used",
+                     settingName, name);
       }
     } else {
       spdlog::warn("Module {} not found", name);

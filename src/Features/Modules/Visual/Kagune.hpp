@@ -127,6 +127,16 @@ public:
 
         std::array<TrailPt, 24> trail{};
         int trailHead = 0;
+
+        // Аниме-смаз: прошлые позы во время выпада + линии скорости + вспышка
+        std::array<std::array<glm::vec3, kNodes>, 4> ghost{};
+        std::array<float, 4> ghostT{-100.f, -100.f, -100.f, -100.f};
+        int       ghostHead = 0;
+        float     lastGhostT = -100.f;
+        float     smear     = 0.f;          // 0..1, сила смаза в этом кадре
+        glm::vec3 strikeDir = {0.f, 0.f, 1.f};
+        glm::vec3 impactPos = {};
+        float     impactT   = -100.f;       // iT вспышки удара
         void pushTrail(const glm::vec3& p, float t)
         {
             TrailPt tp; tp.p = p; tp.t = t;

@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <Features/FeatureManager.hpp>
 #include <Features/Modules/Setting.hpp>
+#include <Features/GUI/ChatBindsPanel.hpp>
 
 class Module;
 class WindowResizeEvent;
@@ -95,6 +96,7 @@ private:
 
     TextEdit mText;
     Bind     mBind;
+    ChatBindsPanel mChatBinds; // кнопка "Chat Binds" справа от поиска
     Picker   mPicker;
     Drag     mDrag;
     Tooltip  mTooltip;

@@ -20,10 +20,6 @@ public:
 
     NumberSetting mAttackRange   = NumberSetting("Attack Range",  "Distance to attack target",        3.5f, 0.f, 10.f, 0.01f);
     NumberSetting mAimRange      = NumberSetting("Aim Range",     "Distance to start aiming",         5.f,  0.f, 15.f, 0.01f);
-    NumberSetting mAPS           = NumberSetting("APS",           "Attacks per second",               10.f, 1.f, 20.f, 0.01f);
-    BoolSetting   mRandomizeAPS  = BoolSetting  ("Randomize APS", "Randomize attacks per second",     false);
-    NumberSetting mAPSMin        = NumberSetting("APS Min",       "Minimum APS",                      8.f,  1.f, 20.f, 0.01f);
-    NumberSetting mAPSMax        = NumberSetting("APS Max",       "Maximum APS",                      12.f, 1.f, 20.f, 0.01f);
     EnumSettingT<AttackMode> mAttackMode = EnumSettingT("Attack Mode", "How to send attack",
         AttackMode::Earliest, "Earliest", "Synched");
     BoolSetting mThroughWalls    = BoolSetting("Through Walls",   "Attack through walls",             true);
@@ -38,7 +34,7 @@ public:
         RotateMode::Normal, "None", "Normal", "Flick");
     NumberSetting mAimY          = NumberSetting("Aim Y", "Vertical aim point (0=feet, 1=head)",      0.85f, 0.f, 1.f, 0.01f);
     NumberSetting mAimRandom     = NumberSetting("Aim Random",    "Randomize aim point in hitbox",    0.25f, 0.f, 1.f, 0.01f);
-    NumberSetting mRotSpeed      = NumberSetting("Rot Speed",     "Max deg/sec (0=instant)",          55.f,  0.f, 180.f, 1.f);
+    NumberSetting mRotSpeed      = NumberSetting("Rot Speed",     "Max deg/sec (0=instant)",         240.f,  0.f, 720.f, 5.f);
     NumberSetting mReactionDelay = NumberSetting("Reaction",      "Delay before aim ms",              80.f,  0.f, 500.f, 10.f);
 
     EnumSettingT<BypassMode> mBypassMode = EnumSettingT("Bypass Mode", "Attack bypass mode",
@@ -57,10 +53,6 @@ public:
         addSettings(
             &mAttackRange,
             &mAimRange,
-            &mAPS,
-            &mRandomizeAPS,
-            &mAPSMin,
-            &mAPSMax,
             &mAttackMode,
             &mThroughWalls,
             &mSwitchMode,
@@ -81,9 +73,6 @@ public:
             &mAutoDisable
         );
 
-        VISIBILITY_CONDITION(mAPSMin,         mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mAPSMax,         mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mAPS,            !mRandomizeAPS.mValue);
         VISIBILITY_CONDITION(mAimY,           mRotateMode.mValue != RotateMode::None);
         VISIBILITY_CONDITION(mAimRandom,      mRotateMode.mValue != RotateMode::None);
         VISIBILITY_CONDITION(mRotSpeed,       mRotateMode.mValue != RotateMode::None);
@@ -108,13 +97,38 @@ public:
     int64_t  mLastAttack      = 0;
     int      mLastSlot        = 0;
 
+    // ── Тайминг ударов ───────────────────────────────────────────────────
+    // У цели после попадания ~0.5 с неуязвимости (по логам InfiniteAura —
+    // 0.67 с между засчитанными ударами). Спам 10 CPS даёт 2 настоящих
+    // удара и 8 пакетов в пустоту, и выглядит как автомат. Поэтому бьём по
+    // подтверждению сервера (ActorEvent HURT), а APS остаётся потолком.
+    struct HitTiming
+    {
+        uint64_t lastSent = 0;
+        uint64_t lastConfirmed = 0;
+        uint64_t nextAt = 0;
+        float    confirmMs = 0.f;   // сглаженная задержка подтверждения
+        float    intervalMs = 0.f;  // сглаженный темп между ударами
+        int      sentSinceConfirm = 0;
+        bool     pending = false;   // удар отправлен, ответа ещё нет
+    };
+    HitTiming mTiming;
+
+    static constexpr float kHurtCooldownMs = 520.f; // ванильный иммунитет цели
+    static constexpr float kMaxIntervalMs  = 1200.f;
+    static constexpr float kAimToleranceDeg = 3.f; // «голова уже на цели»
+
+    bool canAttack(uint64_t now, uint64_t& waitMs);
+    bool rotationOnTarget(Actor* player);
+    void onHitConfirmed(int64_t targetId);
+
     static inline int64_t  sTargetRuntimeID = 0;
     static inline bool     sHasTarget       = false;
-    static inline Actor*   sTarget          = nullptr;
 
     glm::vec3 mCurrentAimOffset = glm::vec3(0.f);
     glm::vec2 mCurrentRotations = glm::vec2(0.f);
     int64_t   mTargetLockTime   = 0;
+    uint64_t  mRotStepAt        = 0;   // время прошлого шага доводки (мс)
 
     struct TrailPoint {
         glm::vec3 pos;
@@ -138,6 +152,13 @@ public:
     int       getBestWeapon(Actor* target);
     glm::vec2 calcRotations(Actor* player);
 
+    // Доводка прицела к цели. Один шаг = реальное время, прошедшее с прошлого
+    // шага, поэтому её можно звать и из тика, и из отправки пакета — темп не
+    // зависит от того, сколько раз её позвали.
+    void      stepRotation(Actor* player);
+    // Текущая ротация игрока (то, что реально уходит в пакет по умолчанию).
+    glm::vec2 cameraRotations(Actor* player) const;
+
     void drawWireframe3D(Actor* target, Actor* player, ImColor color, float alpha);
     void drawTrail(Actor* target, ImColor color);
     void drawChams(Actor* target, ImColor color, float alpha);
@@ -150,10 +171,15 @@ public:
     void onPacketOutEvent  (class PacketOutEvent&  event);
     void onPacketInEvent   (class PacketInEvent&   event);
     void onRenderEvent     (class RenderEvent&     event);
-    void onBobHurtEvent    (class BobHurtEvent&    event);
-    void onBoneRenderEvent (class BoneRenderEvent& event);
 
     std::string getSettingDisplay() override {
-        return mRotateMode.mValues[mRotateMode.as<int>()];
+        // Индекс приходит из конфига — за границу списка не выходим.
+        const int idx = std::clamp(mRotateMode.as<int>(), 0, static_cast<int>(mRotateMode.mValues.size()) - 1);
+        std::string out = mRotateMode.mValues.empty() ? std::string("Aura") : mRotateMode.mValues[idx];
+        // Показываем текущий темп ударов — видно, что он живой (≈520-700 мс),
+        // а не «10 CPS в пустоту».
+        if (sHasTarget && mTiming.intervalMs > 0.f)
+            out += " " + std::to_string(static_cast<int>(mTiming.intervalMs)) + "ms";
+        return out;
     }
 };
