@@ -49,6 +49,7 @@ static const std::unordered_set<std::string> gRemovedSettingNames = {
 #include "Misc/NoFilter.hpp"
 #include "Misc/NoPacket.hpp"
 #include "Misc/NoPause.hpp"
+#include "Misc/AccountManager.hpp"
 #include "Misc/QuickConnect.hpp"
 #include "Misc/PacketLogger.hpp"
 #include "Misc/WhoisCollector.hpp"
@@ -163,6 +164,7 @@ static const std::unordered_set<std::string> gRemovedSettingNames = {
 #include "Visual/Tracers.hpp"
 #include "Visual/UpdateForm.hpp"
 #include "Visual/ViewModel.hpp"
+#include "Visual/Glow.hpp"
 #include "Visual/Resolution.hpp"
 #include "Visual/Backtrack.hpp"
 #include "Visual/Watermark.hpp"
@@ -243,6 +245,8 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
   mModules.emplace_back(std::make_shared<DeviceSpoof>());
   mModules.emplace_back(std::make_shared<QuickConnect>());
+  mModules.emplace_back(std::make_shared<AccountManager>());
+  mModules.emplace_back(std::make_shared<Glow>());
   mModules.emplace_back(std::make_shared<AdminPanel>());
   mModules.emplace_back(std::make_shared<KickSounds>());
   mModules.emplace_back(std::make_shared<AntiBot>());

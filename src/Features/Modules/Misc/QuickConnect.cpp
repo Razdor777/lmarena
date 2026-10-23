@@ -141,6 +141,13 @@ bool QuickConnect::isReady()
     return gNetworkSystem != nullptr && gTemplateValid;
 }
 
+std::string QuickConnect::lastAddress()
+{
+    std::lock_guard lock(gMutex);
+    if (gTemplateHost.empty()) return {};
+    return gTemplateHost + ":" + std::to_string(gTemplatePort);
+}
+
 void QuickConnect::onNetworkConnect(void* networkSystem, const void* gameConnectionInfo)
 {
     if (!networkSystem || !gameConnectionInfo) return;

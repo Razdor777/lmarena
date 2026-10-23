@@ -55,4 +55,8 @@ public:
     static bool join(const std::string& address);
 
     static bool isReady();
+
+    // «host:port» последнего штатного подключения — по нему AccountManager
+    // переподключается после смены ника. Пустая строка, если ещё ничего не было.
+    static std::string lastAddress();
 };
