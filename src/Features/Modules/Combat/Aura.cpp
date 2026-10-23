@@ -359,27 +359,29 @@ glm::vec2 Aura::calcRotations(Actor* player) {
 void Aura::drawWireframe3D(Actor* target, Actor* player, ImColor color, float alpha) {
     if (!target || !player) return;
 
-    auto* shape = target->getAABBShapeComponent();
-    if (!shape) return;
+    // Бокс берём у самого актора: getAABB() уже переводит позицию в «ноги» для
+    // игроков, подставляет интерполированную позицию локального игрока и даёт
+    // ровно то же, что ESP. Раньше здесь считалось вручную от mPosition, из-за
+    // чего свой бокс отставал от чужого на кадр и дрожал при быстрой камере.
+    AABB box = target->getAABB();
+    glm::vec3 mn = box.mMin;
+    glm::vec3 mx = box.mMax;
 
-    auto* renderPos = target->getRenderPositionComponent();
-    if (!renderPos) return;
-
-    glm::vec3 center = renderPos->mPosition;
-    if (target->isPlayer()) center.y -= PLAYER_HEIGHT;
-
-    float w = shape->mWidth;
-    float h = shape->mHeight;
+    // NaN/Inf из физики (телепорт, смена мира) — worldToScreen вернёт мусор,
+    // отсекаем до проекции.
+    if (!std::isfinite(mn.x) || !std::isfinite(mn.y) || !std::isfinite(mn.z) ||
+        !std::isfinite(mx.x) || !std::isfinite(mx.y) || !std::isfinite(mx.z))
+        return;
 
     glm::vec3 pts[8] = {
-        center + glm::vec3(-w/2, 0, -w/2),
-        center + glm::vec3( w/2, 0, -w/2),
-        center + glm::vec3( w/2, 0,  w/2),
-        center + glm::vec3(-w/2, 0,  w/2),
-        center + glm::vec3(-w/2, h, -w/2),
-        center + glm::vec3( w/2, h, -w/2),
-        center + glm::vec3( w/2, h,  w/2),
-        center + glm::vec3(-w/2, h,  w/2),
+        { mn.x, mn.y, mn.z },
+        { mx.x, mn.y, mn.z },
+        { mx.x, mn.y, mx.z },
+        { mn.x, mn.y, mx.z },
+        { mn.x, mx.y, mn.z },
+        { mx.x, mx.y, mn.z },
+        { mx.x, mx.y, mx.z },
+        { mn.x, mx.y, mx.z },
     };
 
     ImVec2 screenPts[8];
@@ -461,30 +463,18 @@ void Aura::drawTrail(Actor* target, ImColor color) {
 void Aura::drawChams(Actor* target, ImColor color, float alpha) {
     if (!target) return;
 
-    auto* shape = target->getAABBShapeComponent();
-    if (!shape) return;
-
-    auto* renderPos = target->getRenderPositionComponent();
-    if (!renderPos) return;
-
-    glm::vec3 pos = renderPos->mPosition;
-    if (target->isPlayer()) pos.y -= PLAYER_HEIGHT;
-
-    float w = shape->mWidth;
-    float h = shape->mHeight;
+    AABB aabb = target->getAABB();
 
     // NaN/Inf из физики (телепорт, смена мира) роняет AddConvexPolyFilled в
     // ассерте — проверяем до проекции.
-    if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z) ||
-        !std::isfinite(w) || !std::isfinite(h) || w <= 0.f || h <= 0.f)
+    if (!std::isfinite(aabb.mMin.x) || !std::isfinite(aabb.mMin.y) || !std::isfinite(aabb.mMin.z) ||
+        !std::isfinite(aabb.mMax.x) || !std::isfinite(aabb.mMax.y) || !std::isfinite(aabb.mMax.z))
         return;
 
-    AABB aabb;
-    aabb.mMin = pos - glm::vec3(w/2, 0, w/2);
-    aabb.mMax = pos + glm::vec3(w/2, h, w/2);
-
+    // getImBoxPoints возвращает {} , если хотя бы один угол за камерой —
+    // частичный полигон заливать нельзя.
     auto pts = MathUtils::getImBoxPoints(aabb);
-    if (pts.size() < 4) return;
+    if (pts.size() < 3) return;
 
     auto* dl = ImGui::GetBackgroundDrawList();
     ImU32 fillCol = IM_COL32(
