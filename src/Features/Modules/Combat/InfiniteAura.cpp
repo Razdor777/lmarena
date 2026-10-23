@@ -141,6 +141,7 @@ void InfiniteAura::onEnable() {
   mBindWaitRelease = false;
   mRecentAttackers.clear();
   mLastAttacksByID.clear();
+  mHitTiming.clear();
   mLockKeyStates.clear();
   mLastPositions.clear();
   dbgReset();
@@ -175,6 +176,7 @@ void InfiniteAura::onDisable() {
   mBindWaitRelease = false;
   mRecentAttackers.clear();
   mLastAttacksByID.clear();
+  mHitTiming.clear();
   mLastPositions.clear();
 }
 
@@ -636,6 +638,13 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   for (auto it = mLastAttacksByID.begin(); it != mLastAttacksByID.end();)
     it = (NOW - it->second > 30000) ? mLastAttacksByID.erase(it) : ++it;
 
+  // Тайминг живёт столько же, сколько и история ударов по цели.
+  for (auto it = mHitTiming.begin(); it != mHitTiming.end();)
+  {
+    const uint64_t stamp = std::max(it->second.lastSent, it->second.lastConfirmed);
+    it = (stamp != 0 && NOW - stamp > 30000) ? mHitTiming.erase(it) : ++it;
+  }
+
   for (auto it = mLastPositions.begin(); it != mLastPositions.end();)
     it = (NOW - it->second.timestamp > 5000) ? mLastPositions.erase(it) : ++it;
 
@@ -724,6 +733,27 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
         continue;
     }
 
+    // ── Тайминг по подтверждениям ────────────────────────────────────
+    // Пока предыдущий удар по этой цели не подтверждён (или пока сервер
+    // ещё держит иммунитет после попадания) — не бьём. Раньше здесь был
+    // один общий таймер CPS: 20 ударов в секунду, из которых сервер
+    // засчитывал 3 (у остальных не было урона — они пришли в окно
+    // неуязвимости и были выброшены).
+    {
+      const uint64_t nowTick = static_cast<uint64_t>(NOW);
+      uint64_t waitMs = 0;
+      if (!canAttackTarget(actorID, nowTick, waitMs))
+      {
+        targetFound = true;   // цель есть, просто бить рано
+        if (mDebug.mValue)
+        {
+          std::lock_guard lock(mDebugMutex);
+          mDbgNextAt = nowTick + waitMs;
+        }
+        continue;
+      }
+    }
+
     int bestWeapon = getBestWeapon();
     int oldSlot = supplies->mSelectedSlot;
 
@@ -781,6 +811,10 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
         auto attackPkt = ActorUtils::createAttackTransaction(actor, bestWeapon != -1 ? bestWeapon : supplies->mSelectedSlot);
         if (attackPkt) {
           sender->sendToServer(attackPkt.get());
+          auto& timing = mHitTiming[actorID];
+          timing.lastSent = static_cast<uint64_t>(NOW);
+          timing.pending = true;
+          timing.sentSinceConfirm++;
           dbgRecordSent(actorID);
         }
       } catch (...) {}
@@ -843,13 +877,14 @@ void InfiniteAura::onPacketInEvent(PacketInEvent &event) {
   auto player = ClientInstance::get()->getLocalPlayer();
   if (!player) return;
 
-  // Обратная связь сервера: ActorEvent HURT приходит на того, кому реально
-  // засчитали урон. Именно по нему видно настоящую задержку между отправкой
-  // атаки и подтверждением — и то, что 20 CPS не превращаются в 100 ударов
-  // за 5 секунд.
-  if (mDebug.mValue && event.mPacket && event.mPacket->getId() == PacketID::ActorEvent) {
+  // HURT приходит на того, кому сервер реально засчитал урон. Это единственный
+  // честный сигнал «удар дошёл»: по нему и строится весь тайминг (а не по CPS).
+  if (event.mPacket && event.mPacket->getId() == PacketID::ActorEvent) {
     auto ev = event.getPacket<ActorEventPacket>();
-    if (ev && ev->mEvent == ActorEvent::HURT) dbgRecordHit(ev->mRuntimeID);
+    if (ev && ev->mEvent == ActorEvent::HURT) {
+      onHitConfirmed(ev->mRuntimeID);
+      if (mDebug.mValue) dbgRecordHit(ev->mRuntimeID);
+    }
   }
 
   if (mFullVelocity.mValue && event.mPacket->getId() == PacketID::SetActorMotion) {
@@ -883,6 +918,107 @@ void InfiniteAura::onPacketInEvent(PacketInEvent &event) {
 // среднюю / мин / макс) и интервал между подтверждениями; отдельно — histogram
 // задержек и реальный APS по подтверждённым ударам за последние 5 секунд.
 
+// Можно ли бить эту цель прямо сейчас.
+//   - удар отправлен и ещё не подтверждён → ждём (второй удар всё равно
+//     придёт в окно неуязвимости и будет выброшен);
+//   - сервер подтвердил попадание → ждём измеренный интервал до следующего.
+bool InfiniteAura::canAttackTarget(int64_t targetId, uint64_t now, uint64_t& waitMs)
+{
+  waitMs = 0;
+
+  auto it = mHitTiming.find(targetId);
+  if (it == mHitTiming.end()) return true;   // по этой цели ещё не били
+
+  HitTiming& t = it->second;
+
+  if (t.pending)
+  {
+    // Сколько ждать ответа: по измеренной задержке, а пока её нет —
+    // по темпу CPS (чтобы не зависнуть, если сервер молчит).
+    const float cap = t.confirmMs > 0.f
+        ? std::clamp(t.confirmMs * 2.2f, 250.f, 1500.f)
+        : std::max(120.f, 1000.f / std::max(1.f, mAPS.mValue));
+
+    const uint64_t age = now - t.lastSent;
+    if (age < static_cast<uint64_t>(cap))
+    {
+      waitMs = static_cast<uint64_t>(cap) - age;
+      return false;
+    }
+
+    // Ответа нет — удар потерян. Значит, рано: отодвигаем темп и пробуем снова.
+    t.pending = false;
+    t.intervalMs = std::min(kMaxHurtMs, std::max(t.intervalMs, kHurtCooldownMs) + 70.f);
+    t.nextAt = now + static_cast<uint64_t>(std::max(120.f, t.intervalMs));
+
+    if (mDebug.mValue)
+    {
+      std::lock_guard lock(mDebugMutex);
+      mDbgPaceMs = t.intervalMs;
+      mDbgNextAt = t.nextAt;
+    }
+    return false;
+  }
+
+  if (t.nextAt > now)
+  {
+    waitMs = t.nextAt - now;
+    return false;
+  }
+
+  return true;
+}
+
+// Сервер подтвердил урон по цели. Обновляем измеренный темп и ставим
+// следующий удар чуть раньше конца иммунитета — так он приходит ровно в
+// тот тик, когда цель снова можно бить (то, что делает скиловый игрок).
+void InfiniteAura::onHitConfirmed(int64_t targetId)
+{
+  auto it = mHitTiming.find(targetId);
+  if (it == mHitTiming.end() || !it->second.pending) return;   // не наше попадание
+
+  HitTiming& t = it->second;
+  const uint64_t now = static_cast<uint64_t>(NOW);
+
+  // Сглаживаем: одиночный выброс не должен ломать темп.
+  const float dt = static_cast<float>(now > t.lastSent ? now - t.lastSent : 0);
+  t.confirmMs = t.confirmMs > 0.f ? (t.confirmMs * 0.6f + dt * 0.4f) : dt;
+
+  // Темп между ударами — не константа, а то, что подстраивается по ответам
+  // сервера: попали с первого раза — можно на 20 мс раньше, потеряли удар —
+  // на 70 мс позже. Так он сам сходится к самому быстрому темпу, при котором
+  // КАЖДЫЙ удар засчитывается (у скилового игрока это ~2 удара в секунду).
+  if (t.intervalMs <= 0.f)
+  {
+    const float measured = (t.lastConfirmed != 0 && now > t.lastConfirmed)
+        ? static_cast<float>(now - t.lastConfirmed)
+        : kHurtCooldownMs;
+    t.intervalMs = std::clamp(measured, kHurtCooldownMs, kMaxHurtMs);
+  }
+  else if (t.sentSinceConfirm <= 1)
+  {
+    t.intervalMs = std::max(kHurtCooldownMs, t.intervalMs - 20.f);
+  }
+
+  t.lastConfirmed = now;
+  t.pending = false;
+  t.sentSinceConfirm = 0;
+
+  const float jitter = MathUtils::randomFloat(-35.f, 35.f);
+  float next = t.intervalMs + jitter;
+
+  // Настройка APS — это ПОТОЛОК, а не цель: чаще неё не бьём никогда.
+  next = std::max(next, 1000.f / std::max(1.f, mAPS.mValue));
+  t.nextAt = now + static_cast<uint64_t>(std::max(next, 120.f));
+
+  if (mDebug.mValue)
+  {
+    std::lock_guard lock(mDebugMutex);
+    mDbgPaceMs = t.intervalMs;
+    mDbgNextAt = t.nextAt;
+  }
+}
+
 void InfiniteAura::dbgReset()
 {
   std::lock_guard lock(mDebugMutex);
@@ -896,6 +1032,8 @@ void InfiniteAura::dbgReset()
   mDbgLastIntervalMs = mDbgAvgIntervalMs = 0.f;
   mDbgIntervalSum = 0;
   mDbgRealAps = 0.f;
+  mDbgPaceMs = 0.f;
+  mDbgNextAt = 0;
 }
 
 void InfiniteAura::dbgRecordSent(int64_t targetId)
@@ -979,12 +1117,16 @@ void InfiniteAura::dbgRender(ImDrawList* drawList)
 
   uint64_t sent = 0, confirmed = 0, lost = 0, foreign = 0;
   float last = 0.f, avg = 0.f, mn = 0.f, mx = 0.f, lastInt = 0.f, avgInt = 0.f, aps = 0.f;
+  float pace = 0.f;
+  uint64_t nextIn = 0;
   int hist[5]{};
   {
     std::lock_guard lock(mDebugMutex);
     sent = mDbgSent; confirmed = mDbgConfirmed; lost = mDbgLost; foreign = mDbgForeign;
     last = mDbgLastMs; avg = mDbgAvgMs; mn = mDbgMinMs; mx = mDbgMaxMs;
     lastInt = mDbgLastIntervalMs; avgInt = mDbgAvgIntervalMs; aps = mDbgRealAps;
+    pace = mDbgPaceMs;
+    nextIn = mDbgNextAt > static_cast<uint64_t>(NOW) ? mDbgNextAt - static_cast<uint64_t>(NOW) : 0;
     for (int i = 0; i < 5; i++) hist[i] = mDbgHist[i];
   }
 
@@ -995,8 +1137,8 @@ void InfiniteAura::dbgRender(ImDrawList* drawList)
   const float px = 13.f;
   const float pad = 10.f;
   const float lineH = px + 5.f;
-  const char* labels[9];
-  char text[9][128]{};
+  const char* labels[10];
+  char text[10][128]{};
 
   const float pct = sent ? (100.f * static_cast<float>(confirmed) / static_cast<float>(sent)) : 0.f;
   snprintf(text[0], sizeof(text[0]), "InfiniteAura delay");
@@ -1011,8 +1153,10 @@ void InfiniteAura::dbgRender(ImDrawList* drawList)
   snprintf(text[6], sizeof(text[6]), "50-100 %d", hist[1]);
   snprintf(text[7], sizeof(text[7]), "100-200 %d", hist[2]);
   snprintf(text[8], sizeof(text[8]), "200+   %d", hist[3] + hist[4]);
+  snprintf(text[9], sizeof(text[9]), "pace   %.0f ms   next hit in %llu ms",
+           pace, static_cast<unsigned long long>(nextIn));
 
-  const int lines = 9;
+  const int lines = 10;
   const float w = 268.f;
   const float h = pad * 2.f + lineH * lines;
 
