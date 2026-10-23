@@ -20,7 +20,7 @@ public:
 
     NumberSetting mAttackRange   = NumberSetting("Attack Range",  "Distance to attack target",        3.5f, 0.f, 10.f, 0.01f);
     NumberSetting mAimRange      = NumberSetting("Aim Range",     "Distance to start aiming",         5.f,  0.f, 15.f, 0.01f);
-    NumberSetting mAPS           = NumberSetting("APS",           "Attacks per second",               10.f, 1.f, 20.f, 0.01f);
+    NumberSetting mAPS           = NumberSetting("APS",           "CPS ceiling (hits are timed to the target's immunity)", 10.f, 1.f, 20.f, 0.01f);
     BoolSetting   mRandomizeAPS  = BoolSetting  ("Randomize APS", "Randomize attacks per second",     false);
     NumberSetting mAPSMin        = NumberSetting("APS Min",       "Minimum APS",                      8.f,  1.f, 20.f, 0.01f);
     NumberSetting mAPSMax        = NumberSetting("APS Max",       "Maximum APS",                      12.f, 1.f, 20.f, 0.01f);
@@ -108,6 +108,31 @@ public:
     int64_t  mLastAttack      = 0;
     int      mLastSlot        = 0;
 
+    // ── Тайминг ударов ───────────────────────────────────────────────────
+    // У цели после попадания ~0.5 с неуязвимости (по логам InfiniteAura —
+    // 0.67 с между засчитанными ударами). Спам 10 CPS даёт 2 настоящих
+    // удара и 8 пакетов в пустоту, и выглядит как автомат. Поэтому бьём по
+    // подтверждению сервера (ActorEvent HURT), а APS остаётся потолком.
+    struct HitTiming
+    {
+        uint64_t lastSent = 0;
+        uint64_t lastConfirmed = 0;
+        uint64_t nextAt = 0;
+        float    confirmMs = 0.f;   // сглаженная задержка подтверждения
+        float    intervalMs = 0.f;  // сглаженный темп между ударами
+        int      sentSinceConfirm = 0;
+        bool     pending = false;   // удар отправлен, ответа ещё нет
+    };
+    HitTiming mTiming;
+
+    static constexpr float kHurtCooldownMs = 520.f; // ванильный иммунитет цели
+    static constexpr float kMaxIntervalMs  = 1200.f;
+    static constexpr float kAimToleranceDeg = 3.f; // «голова уже на цели»
+
+    bool canAttack(uint64_t now, uint64_t capGapMs, uint64_t& waitMs);
+    bool rotationOnTarget(Actor* player);
+    void onHitConfirmed(int64_t targetId);
+
     static inline int64_t  sTargetRuntimeID = 0;
     static inline bool     sHasTarget       = false;
     static inline Actor*   sTarget          = nullptr;
@@ -154,6 +179,11 @@ public:
     void onBoneRenderEvent (class BoneRenderEvent& event);
 
     std::string getSettingDisplay() override {
-        return mRotateMode.mValues[mRotateMode.as<int>()];
+        std::string out = mRotateMode.mValues[mRotateMode.as<int>()];
+        // Показываем текущий темп ударов — видно, что он живой (≈520-700 мс),
+        // а не «10 CPS в пустоту».
+        if (sHasTarget && mTiming.intervalMs > 0.f)
+            out += " " + std::to_string(static_cast<int>(mTiming.intervalMs)) + "ms";
+        return out;
     }
 };

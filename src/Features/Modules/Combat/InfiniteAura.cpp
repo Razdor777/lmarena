@@ -946,9 +946,14 @@ bool InfiniteAura::canAttackTarget(int64_t targetId, uint64_t now, uint64_t& wai
       return false;
     }
 
-    // Ответа нет — удар потерян. Значит, рано: отодвигаем темп и пробуем снова.
+    // Ответа нет — удар потерян: значит, рано. Отодвигаем темп. Но если сервер
+    // вообще не присылает HURT, держим человеческий темп по APS — иначе на
+    // таком сервере аура замедлилась бы до 0.8 CPS.
     t.pending = false;
-    t.intervalMs = std::min(kMaxHurtMs, std::max(t.intervalMs, kHurtCooldownMs) + 70.f);
+    if (t.lastConfirmed == 0)
+        t.intervalMs = std::clamp(1000.f / std::max(1.f, mAPS.mValue), kHurtCooldownMs, kMaxHurtMs);
+    else
+        t.intervalMs = std::min(kMaxHurtMs, std::max(t.intervalMs, kHurtCooldownMs) + 70.f);
     t.nextAt = now + static_cast<uint64_t>(std::max(120.f, t.intervalMs));
 
     if (mDebug.mValue)

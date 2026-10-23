@@ -26,6 +26,7 @@
 #include <SDK/Minecraft/Actor/Components/RuntimeIDComponent.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/RemoveActorPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/ActorEventPacket.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/GameUtils/ActorUtils.hpp>
 #include <Utils/GameUtils/ItemUtils.hpp>
@@ -66,6 +67,7 @@ void Aura::resetTarget() {
     mTargetRuntimeID  = 0;
     mRotating         = false;
     mLastAttack       = 0;
+    mTiming           = HitTiming{};
     mLastSlot         = 0;
     sHasTarget        = false;
     sTargetRuntimeID  = 0;
@@ -658,14 +660,22 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
 
     // --- ATTACK ---
     if (isInAttackRange(target, player)) {
-        int64_t now = NOW;
+        const uint64_t now = static_cast<uint64_t>(NOW);
+
+        // APS — это ПОТОЛОК, а не цель. Реальный темп задаёт неуязвимость
+        // цели: пока предыдущий удар не подтверждён сервером, следующий всё
+        // равно уйдёт в пустоту (в логах InfiniteAura при 7.9 CPS засчиталось
+        // 0.6 CPS — остальные пришли в окно неуязвимости).
         float aps = mRandomizeAPS.mValue
             ? MathUtils::randomFloat(mAPSMin.mValue, mAPSMax.mValue)
             : mAPS.mValue;
         if (aps < 1.f) aps = 1.f;
-        int64_t delay = static_cast<int64_t>(1000.f / aps);
+        const uint64_t capGap = static_cast<uint64_t>(1000.f / aps);
 
-        if (now - mLastAttack >= delay) {
+        uint64_t waitMs = 0;
+        // И бьём только когда голова уже на цели: удар, отправленный
+        // одновременно с доворотом, сервер видит с ПРОШЛОЙ ротацией.
+        if (canAttack(now, capGap, waitMs) && rotationOnTarget(player)) {
             Actor* attackTarget = findObstructor(player, target);
             if (!attackTarget) attackTarget = target;
 
@@ -692,7 +702,11 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
                 } catch (...) {}
                 supplies->mSelectedSlot = oldSlot;
             }
-            mLastAttack = now;
+
+            mTiming.lastSent = now;
+            mTiming.pending = true;
+            mTiming.sentSinceConfirm++;
+            mLastAttack = static_cast<int64_t>(now);
         }
     }
 
@@ -778,10 +792,131 @@ void Aura::onPacketOutEvent(PacketOutEvent& event) {
     }
 }
 
+// ==================== HIT TIMING ====================
+
+// Можно ли бить прямо сейчас.
+//   - удар отправлен и не подтверждён → ждём (второй уйдёт в пустоту);
+//   - сервер подтвердил попадание → ждём измеренный интервал до следующего.
+bool Aura::canAttack(uint64_t now, uint64_t capGapMs, uint64_t& waitMs)
+{
+    waitMs = 0;
+
+    // APS — жёсткий потолок по частоте отправки.
+    if (capGapMs > 0 && mTiming.lastSent != 0 && now - mTiming.lastSent < capGapMs)
+    {
+        waitMs = capGapMs - (now - mTiming.lastSent);
+        return false;
+    }
+
+    if (mTiming.pending)
+    {
+        // Сколько ждать ответа: по измеренной задержке, а пока её нет — по
+        // потолку CPS (чтобы не зависнуть, если сервер молчит).
+        const float cap = mTiming.confirmMs > 0.f
+            ? std::clamp(mTiming.confirmMs * 2.2f, 250.f, 1500.f)
+            : std::max(120.f, static_cast<float>(capGapMs));
+
+        const uint64_t age = now - mTiming.lastSent;
+        if (age < static_cast<uint64_t>(cap))
+        {
+            waitMs = static_cast<uint64_t>(cap) - age;
+            return false;
+        }
+
+        // Ответа нет — удар потерян: значит, рано. Отодвигаем темп, но если
+        // сервер вообще не присылает HURT (ни одного подтверждения), верим,
+        // что удар прошёл, и держим человеческий темп по настройке APS, иначе
+        // на таком сервере аура замедлилась бы до 0.8 CPS.
+        mTiming.pending = false;
+        if (mTiming.lastConfirmed == 0)
+        {
+            const float apsFromCap = capGapMs > 0 ? 1000.f / static_cast<float>(capGapMs) : 2.f;
+            mTiming.intervalMs = std::clamp(1000.f / std::max(1.f, apsFromCap),
+                                            kHurtCooldownMs, kMaxIntervalMs);
+        }
+        else
+        {
+            mTiming.intervalMs = std::min(kMaxIntervalMs,
+                                          std::max(mTiming.intervalMs, kHurtCooldownMs) + 70.f);
+        }
+        mTiming.nextAt = now + static_cast<uint64_t>(mTiming.intervalMs);
+        waitMs = static_cast<uint64_t>(mTiming.intervalMs);
+        return false;
+    }
+
+    if (mTiming.nextAt > now)
+    {
+        waitMs = mTiming.nextAt - now;
+        return false;
+    }
+
+    return true;
+}
+
+// Голова уже смотрит в цель (по прошлому тику)? Значит сервер видел её на
+// цели хотя бы один тик — удар не выглядит как выстрел в воздух.
+bool Aura::rotationOnTarget(Actor* player) {
+    if (mRotateMode.mValue == RotateMode::None) return true;
+    if (!player) return false;
+
+    glm::vec2 want = calcRotations(player);
+    if (!std::isfinite(want.x) || !std::isfinite(want.y)) return false;
+
+    float dYaw = mCurrentRotations.y - want.y;
+    while (dYaw > 180.f)  dYaw -= 360.f;
+    while (dYaw < -180.f) dYaw += 360.f;
+
+    return std::fabs(mCurrentRotations.x - want.x) <= kAimToleranceDeg &&
+           std::fabs(dYaw) <= kAimToleranceDeg;
+}
+
+// Сервер подтвердил урон по нашей цели: обновляем измеренный темп и ставим
+// следующий удар чуть раньше конца неуязвимости — так он приходит ровно в
+// тот тик, когда цель снова можно бить (как бьёт скиловый игрок).
+void Aura::onHitConfirmed(int64_t targetId)
+{
+    if (targetId == 0 || targetId != mTargetRuntimeID) return;   // не наша цель
+    if (!mTiming.pending) return;
+
+    const uint64_t now = static_cast<uint64_t>(NOW);
+    const float dt = static_cast<float>(now > mTiming.lastSent ? now - mTiming.lastSent : 0);
+    mTiming.confirmMs = mTiming.confirmMs > 0.f ? (mTiming.confirmMs * 0.6f + dt * 0.4f) : dt;
+
+    if (mTiming.intervalMs <= 0.f)
+    {
+        const float measured = (mTiming.lastConfirmed != 0 && now > mTiming.lastConfirmed)
+            ? static_cast<float>(now - mTiming.lastConfirmed)
+            : kHurtCooldownMs;
+        mTiming.intervalMs = std::clamp(measured, kHurtCooldownMs, kMaxIntervalMs);
+    }
+    else if (mTiming.sentSinceConfirm <= 1)
+    {
+        // Попали с первого раза — можно на 20 мс раньше.
+        mTiming.intervalMs = std::max(kHurtCooldownMs, mTiming.intervalMs - 20.f);
+    }
+
+    mTiming.lastConfirmed = now;
+    mTiming.pending = false;
+    mTiming.sentSinceConfirm = 0;
+
+    const float jitter = MathUtils::randomFloat(-35.f, 35.f);
+    const float next = std::max(kHurtCooldownMs, mTiming.intervalMs + jitter);
+    mTiming.nextAt = now + static_cast<uint64_t>(std::max(next, 120.f));
+}
+
 // ==================== PACKET IN ====================
 
 void Aura::onPacketInEvent(PacketInEvent& event) {
     if (!event.mPacket) return;
+
+    // ActorEvent HURT приходит на того, кому сервер реально засчитал урон —
+    // это единственный честный признак «удар дошёл». По нему и строится темп.
+    if (event.mPacket->getId() == PacketID::ActorEvent) {
+        auto ev = event.getPacket<ActorEventPacket>();
+        if (ev && ev->mEvent == ActorEvent::HURT)
+            onHitConfirmed(ev->mRuntimeID);
+        return;
+    }
 
     if (event.mPacket->getId() == PacketID::RemoveActor) {
         auto packet = event.getPacket<RemoveActorPacket>();
