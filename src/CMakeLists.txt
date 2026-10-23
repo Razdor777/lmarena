@@ -177,7 +177,11 @@ set_source_files_properties(${includeFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
 # Krazy resource embedding code
 
-file(GLOB_RECURSE resource_files_list "resources/*")
+# CONFIGURE_DEPENDS: добавили/удалили файл в resources/ — CMake сам перезапустит
+# конфигурацию на следующей сборке и перегенерирует Resources.hpp/.cpp и .o
+# файлы для ld -r -b binary. Без этого список ресурсов «замерзает» до ручной
+# реконфигурации, а Resources.cpp продолжает ссылаться на символы, которых нет.
+file(GLOB_RECURSE resource_files_list CONFIGURE_DEPENDS "resources/*")
 
 function(add_resources out_var)
     set(result)
