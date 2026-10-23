@@ -179,15 +179,55 @@ namespace
         if (aimVsCam > 100.f)      bodyFollowsAim = true;
         else if (aimVsCam < 75.f)  bodyFollowsAim = false;
 
+        // Направление хода запоминаем на 300 мс. Раньше корпус считался по
+        // МГНОВЕННОЙ скорости: на прыжке с зажатым S скорость на долю тика
+        // падала ниже порога, корпус возвращался к голове, на следующем тике
+        // снова уходил на 180° — модель мотало. Заодно в воздухе направление
+        // больше не пересчитывается (там скорость — это дуга прыжка, а не ход).
+        static float sLastMoveYaw = 0.f;
+        static bool  sHasMoveYaw  = false;
+        static auto  sLastMoveAt  = std::chrono::steady_clock::now();
+
         float bodyTarget = pLerpedHeadYaw;
         if (!bodyFollowsAim && player)
         {
+            bool grounded = true;
+            try { grounded = player->isOnGround(); } catch (...) {}
+
             if (auto* sv = player->getStateVectorComponent())
             {
                 const glm::vec3& v = sv->mVelocity;
-                if (std::sqrt(v.x * v.x + v.z * v.z) > 0.12f)
-                    bodyTarget = glm::degrees(std::atan2(v.z, v.x)) - 90.f; // направление хода
+                const float speed = std::sqrt(v.x * v.x + v.z * v.z);
+                if (grounded && speed > 0.12f)
+                {
+                    const float moveYaw = glm::degrees(std::atan2(v.z, v.x)) - 90.f;
+                    // Идём НАЗАД (S) — это не «корпус развернулся на 180°»,
+                    // а обычная ходьба спиной вперёд: тело остаётся на голове,
+                    // ноги просто шагают назад (так и в ванильном Bedrock).
+                    // Раньше корпус честно разворачивался на направление хода,
+                    // и при S+прыжке голова оказывалась вывернутой на 180°
+                    // относительно тела — модель и выглядела «оторванной».
+                    if (std::fabs(interfaceWrap(moveYaw - headYaw)) <= 90.f)
+                    {
+                        sLastMoveYaw = moveYaw;
+                        sHasMoveYaw  = true;
+                        sLastMoveAt  = nowTp;
+                    }
+                    else
+                    {
+                        sHasMoveYaw  = false;
+                    }
+                }
             }
+
+            const float sinceMove = std::chrono::duration<float>(nowTp - sLastMoveAt).count();
+            if (sHasMoveYaw && sinceMove < 0.30f)
+                bodyTarget = sLastMoveYaw;
+        }
+        else
+        {
+            // За головой корпуса (Scaffold Backwards, Aura) — запоминать нечего.
+            sHasMoveYaw = false;
         }
 
         pLerpedBodyYaw = interfaceFollow(pLerpedBodyYaw, bodyTarget, kBody);

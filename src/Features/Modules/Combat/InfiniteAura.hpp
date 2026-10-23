@@ -23,6 +23,7 @@ public:
     EnumSettingT<Priority> mPriority      = EnumSettingT("Priority", "Target priority", Priority::Closest, "Closest", "Armor", "HurtBy");
     NumberSetting          mRange         = NumberSetting("Range", "The range of the aura.", 70.f, 3.f, 200.f, 0.01f);
     BoolSetting            mInfiniteRange = BoolSetting("Infinite Range", "No range limit", false);
+    NumberSetting          mAPS           = NumberSetting("APS", "CPS ceiling (real hits are timed to server confirmations)", 20.f, 1.f, 20.f, 0.01f);
     NumberSetting          mStepDistance  = NumberSetting("Step Distance", "Blocks per packet.", 8.f, 0.1f, 12.f, 0.01f);
     NumberSetting          mSwitchDelay   = NumberSetting("Switch Delay", "Delay between switches (ms)", 0, 0, 2000, 50);
 
@@ -82,7 +83,7 @@ public:
         ModuleCategory::Combat, 0, false)
     {
         addSettings(
-            &mMode, &mPriority, &mRange, &mInfiniteRange, &mStepDistance, &mSwitchDelay,
+            &mMode, &mPriority, &mRange, &mInfiniteRange, &mAPS, &mStepDistance, &mSwitchDelay,
             &mAutoUnlock, &mMaxLockDistance, &mLockFOV, &mShowBindPanel,
             &mCriticals,
             &mFullVelocity,

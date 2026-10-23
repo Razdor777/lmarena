@@ -700,12 +700,10 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
   }
 
   // --------------------------------------------------
-  // МИНИМАЛЬНЫЙ ИНТЕРВАЛ МЕЖДУ УДАРАМИ
+  // APS DELAY
   // --------------------------------------------------
-  // Настройки APS здесь больше нет: темп и так задаёт неуязвимость цели
-  // после попадания (kHurtCooldownMs), а настройка только давала вторую,
-  // противоречивую «правду» о том, как часто бьёт модуль.
-  if (NOW - mLastAttack < static_cast<int64_t>(kHurtCooldownMs)) return;
+  uint64_t delay = static_cast<uint64_t>(1000.f / mAPS.mValue);
+  if (NOW - mLastAttack < delay) return;
 
   if (actors.empty()) {
     // призрак НЕ гасим — он должен дорисовать свой эффект (см. onRenderEvent)
@@ -936,10 +934,10 @@ bool InfiniteAura::canAttackTarget(int64_t targetId, uint64_t now, uint64_t& wai
   if (t.pending)
   {
     // Сколько ждать ответа: по измеренной задержке, а пока её нет —
-    // человеческие ~600 мс (чтобы не зависнуть, если сервер молчит).
+    // по темпу CPS (чтобы не зависнуть, если сервер молчит).
     const float cap = t.confirmMs > 0.f
         ? std::clamp(t.confirmMs * 2.2f, 250.f, 1500.f)
-        : 600.f;
+        : std::max(120.f, 1000.f / std::max(1.f, mAPS.mValue));
 
     const uint64_t age = now - t.lastSent;
     if (age < static_cast<uint64_t>(cap))
@@ -949,11 +947,11 @@ bool InfiniteAura::canAttackTarget(int64_t targetId, uint64_t now, uint64_t& wai
     }
 
     // Ответа нет — удар потерян: значит, рано. Отодвигаем темп. Но если сервер
-    // вообще не присылает HURT, держим ванильный иммунитет цели — иначе на
+    // вообще не присылает HURT, держим человеческий темп по APS — иначе на
     // таком сервере аура замедлилась бы до 0.8 CPS.
     t.pending = false;
     if (t.lastConfirmed == 0)
-        t.intervalMs = kHurtCooldownMs;
+        t.intervalMs = std::clamp(1000.f / std::max(1.f, mAPS.mValue), kHurtCooldownMs, kMaxHurtMs);
     else
         t.intervalMs = std::min(kMaxHurtMs, std::max(t.intervalMs, kHurtCooldownMs) + 70.f);
     t.nextAt = now + static_cast<uint64_t>(std::max(120.f, t.intervalMs));
@@ -1012,8 +1010,11 @@ void InfiniteAura::onHitConfirmed(int64_t targetId)
   t.sentSinceConfirm = 0;
 
   const float jitter = MathUtils::randomFloat(-35.f, 35.f);
-  const float next = t.intervalMs + jitter;
-  t.nextAt = now + static_cast<uint64_t>(std::max(next, kHurtCooldownMs));
+  float next = t.intervalMs + jitter;
+
+  // Настройка APS — это ПОТОЛОК, а не цель: чаще неё не бьём никогда.
+  next = std::max(next, 1000.f / std::max(1.f, mAPS.mValue));
+  t.nextAt = now + static_cast<uint64_t>(std::max(next, 120.f));
 
   if (mDebug.mValue)
   {
@@ -1152,7 +1153,7 @@ void InfiniteAura::dbgRender(ImDrawList* drawList)
   snprintf(text[2], sizeof(text[2]), "delay  last %.0f  avg %.0f  min %.0f  max %.0f ms",
            last, avg, mn, mx);
   snprintf(text[3], sizeof(text[3]), "interval  last %.0f  avg %.0f ms", lastInt, avgInt);
-  snprintf(text[4], sizeof(text[4]), "real APS %.1f", aps);
+  snprintf(text[4], sizeof(text[4]), "real APS %.1f   (requested %.1f)", aps, mAPS.mValue);
   snprintf(text[5], sizeof(text[5]), "0-50   %d", hist[0]);
   snprintf(text[6], sizeof(text[6]), "50-100 %d", hist[1]);
   snprintf(text[7], sizeof(text[7]), "100-200 %d", hist[2]);
