@@ -20,10 +20,6 @@ public:
 
     NumberSetting mAttackRange   = NumberSetting("Attack Range",  "Distance to attack target",        3.5f, 0.f, 10.f, 0.01f);
     NumberSetting mAimRange      = NumberSetting("Aim Range",     "Distance to start aiming",         5.f,  0.f, 15.f, 0.01f);
-    NumberSetting mAPS           = NumberSetting("APS",           "CPS ceiling (hits are timed to the target's immunity)", 10.f, 1.f, 20.f, 0.01f);
-    BoolSetting   mRandomizeAPS  = BoolSetting  ("Randomize APS", "Randomize attacks per second",     false);
-    NumberSetting mAPSMin        = NumberSetting("APS Min",       "Minimum APS",                      8.f,  1.f, 20.f, 0.01f);
-    NumberSetting mAPSMax        = NumberSetting("APS Max",       "Maximum APS",                      12.f, 1.f, 20.f, 0.01f);
     EnumSettingT<AttackMode> mAttackMode = EnumSettingT("Attack Mode", "How to send attack",
         AttackMode::Earliest, "Earliest", "Synched");
     BoolSetting mThroughWalls    = BoolSetting("Through Walls",   "Attack through walls",             true);
@@ -57,10 +53,6 @@ public:
         addSettings(
             &mAttackRange,
             &mAimRange,
-            &mAPS,
-            &mRandomizeAPS,
-            &mAPSMin,
-            &mAPSMax,
             &mAttackMode,
             &mThroughWalls,
             &mSwitchMode,
@@ -81,9 +73,6 @@ public:
             &mAutoDisable
         );
 
-        VISIBILITY_CONDITION(mAPSMin,         mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mAPSMax,         mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mAPS,            !mRandomizeAPS.mValue);
         VISIBILITY_CONDITION(mAimY,           mRotateMode.mValue != RotateMode::None);
         VISIBILITY_CONDITION(mAimRandom,      mRotateMode.mValue != RotateMode::None);
         VISIBILITY_CONDITION(mRotSpeed,       mRotateMode.mValue != RotateMode::None);
@@ -129,13 +118,12 @@ public:
     static constexpr float kMaxIntervalMs  = 1200.f;
     static constexpr float kAimToleranceDeg = 3.f; // «голова уже на цели»
 
-    bool canAttack(uint64_t now, uint64_t capGapMs, uint64_t& waitMs);
+    bool canAttack(uint64_t now, uint64_t& waitMs);
     bool rotationOnTarget(Actor* player);
     void onHitConfirmed(int64_t targetId);
 
     static inline int64_t  sTargetRuntimeID = 0;
     static inline bool     sHasTarget       = false;
-    static inline Actor*   sTarget          = nullptr;
 
     glm::vec3 mCurrentAimOffset = glm::vec3(0.f);
     glm::vec2 mCurrentRotations = glm::vec2(0.f);
@@ -183,11 +171,11 @@ public:
     void onPacketOutEvent  (class PacketOutEvent&  event);
     void onPacketInEvent   (class PacketInEvent&   event);
     void onRenderEvent     (class RenderEvent&     event);
-    void onBobHurtEvent    (class BobHurtEvent&    event);
-    void onBoneRenderEvent (class BoneRenderEvent& event);
 
     std::string getSettingDisplay() override {
-        std::string out = mRotateMode.mValues[mRotateMode.as<int>()];
+        // Индекс приходит из конфига — за границу списка не выходим.
+        const int idx = std::clamp(mRotateMode.as<int>(), 0, static_cast<int>(mRotateMode.mValues.size()) - 1);
+        std::string out = mRotateMode.mValues.empty() ? std::string("Aura") : mRotateMode.mValues[idx];
         // Показываем текущий темп ударов — видно, что он живой (≈520-700 мс),
         // а не «10 CPS в пустоту».
         if (sHasTarget && mTiming.intervalMs > 0.f)

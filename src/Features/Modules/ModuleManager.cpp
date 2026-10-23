@@ -7,6 +7,17 @@
 #include <Utils/OAuthUtils.hpp>
 #include <build_info.h>
 
+// Настройки, которые мы убрали из модулей. В старых конфигах они ещё лежат —
+// молча пропускаем: иначе при каждом запуске в чат прилетает пачка
+// «Setting APS not found».
+static const std::unordered_set<std::string> gRemovedSettingNames = {
+    "APS", "Randomize APS", "APS Min", "APS Max",
+    "Visible Rotate", "Lock Y",
+    "Hop Key", "Hop Direction", "Hop Distance", "Hops", "Hop Delay",
+    "Quick TP Dist", "Quick TP Key", "Max Distance", "Chunk Radius",
+    "Chunks/Tick", "Radius"
+};
+
 #include "Combat/Aimbot.hpp"
 #include "Combat/ArrowTP.hpp"
 #include "Combat/Aura.hpp"
@@ -569,13 +580,10 @@ void ModuleManager::deserialize(const nlohmann::json &j, bool showMessages) {
               }
 
               settingsLoaded++;
-            } else {
-              spdlog::warn("Setting {} not found for module {}", settingName,
-                           name);
-              if (showMessages)
-                ChatUtils::displayClientMessage("§cSetting §6" + settingName +
-                                                "§c not found for module §6" +
-                                                name + "§c.");
+            } else if (!gRemovedSettingNames.contains(settingName)) {
+              // Удалённую нами настройку не ругаем; новую, которой в конфиге
+              // ещё нет, — тоже: значение по умолчанию не ошибка.
+              spdlog::warn("Setting {} not found for module {}", settingName, name);
             }
           } catch (const std::exception &e) {
             spdlog::warn("Failed to load setting {} for module {}: {}",
@@ -611,13 +619,9 @@ void ModuleManager::deserialize(const nlohmann::json &j, bool showMessages) {
       // =============================================================
 
       for (const auto &settingName : settingNames) {
-        spdlog::warn(
-            "Setting {} not found for module {}, default value will be used",
-            settingName, name);
-        if (showMessages)
-          ChatUtils::displayClientMessage("§cSetting §6" + settingName +
-                                          "§c not found for module §6" + name +
-                                          "§c, default value will be used.");
+        if (gRemovedSettingNames.contains(settingName)) continue;
+        spdlog::warn("Setting {} not found for module {}, default value will be used",
+                     settingName, name);
       }
     } else {
       spdlog::warn("Module {} not found", name);

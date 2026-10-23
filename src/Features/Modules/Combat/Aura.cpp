@@ -7,8 +7,6 @@
 #include <Windows.h>
 #include <Features/FeatureManager.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
-#include <Features/Events/BobHurtEvent.hpp>
-#include <Features/Events/BoneRenderEvent.hpp>
 #include <Features/Events/MouseEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
@@ -43,10 +41,6 @@ void Aura::onEnable() {
     gFeatureManager->mDispatcher->listen<PacketOutEvent,   &Aura::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->listen<PacketInEvent,    &Aura::onPacketInEvent>(this);
     gFeatureManager->mDispatcher->listen<RenderEvent,      &Aura::onRenderEvent>(this);
-    gFeatureManager->mDispatcher->listen<BobHurtEvent,     &Aura::onBobHurtEvent,
-        nes::event_priority::FIRST>(this);
-    gFeatureManager->mDispatcher->listen<BoneRenderEvent,  &Aura::onBoneRenderEvent,
-        nes::event_priority::FIRST>(this);
 
     // Совместимость со старым конфигом: раньше скорость доводки по умолчанию
     // была 55°/с, и поворот на 180° занимал больше трёх секунд — прицел
@@ -69,8 +63,6 @@ void Aura::onDisable() {
     gFeatureManager->mDispatcher->deafen<PacketOutEvent,   &Aura::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->deafen<PacketInEvent,    &Aura::onPacketInEvent>(this);
     gFeatureManager->mDispatcher->deafen<RenderEvent,      &Aura::onRenderEvent>(this);
-    gFeatureManager->mDispatcher->deafen<BobHurtEvent,     &Aura::onBobHurtEvent>(this);
-    gFeatureManager->mDispatcher->deafen<BoneRenderEvent,  &Aura::onBoneRenderEvent>(this);
 
     resetState();
 }
@@ -83,7 +75,6 @@ void Aura::resetTarget() {
     mLastSlot         = 0;
     sHasTarget        = false;
     sTargetRuntimeID  = 0;
-    sTarget           = nullptr;
     sTrailHistory.clear();
     sLastTrailUpdate  = 0;
     mCurrentAimOffset = glm::vec3(0.f);
@@ -279,8 +270,10 @@ Actor* Aura::findObstructor(Actor* player, Actor* target) {
 // ==================== WEAPON ====================
 
 int Aura::getBestWeapon(Actor* target) {
-    auto* player = ClientInstance::get()->getLocalPlayer();
-    if (!player || !target) return 0;
+    auto* ci = ClientInstance::get();
+    if (!ci || !target) return 0;
+    auto* player = ci->getLocalPlayer();
+    if (!player) return 0;
 
     auto* supplies = player->getSupplies();
     if (!supplies) return 0;
@@ -307,25 +300,30 @@ int Aura::getBestWeapon(Actor* target) {
 
 // ==================== ROTATION ====================
 
+namespace {
+constexpr glm::vec2 kNoRotation{ std::numeric_limits<float>::quiet_NaN(),
+                                 std::numeric_limits<float>::quiet_NaN() };
+}
+
 glm::vec2 Aura::calcRotations(Actor* player) {
-    if (!player) return {0.f, 0.f};
+    if (!player) return kNoRotation;
 
     glm::vec3 eyePos;
     try {
         auto* pPos = player->getPos();
-        if (!pPos) return {0.f, 0.f};
+        if (!pPos) return kNoRotation;
         eyePos = *pPos + glm::vec3(0.f, PLAYER_HEIGHT, 0.f);
     } catch (...) {
-        return {0.f, 0.f};
+        return kNoRotation;
     }
 
     glm::vec3 targetPoint;
     try {
         Actor* target = ActorUtils::getActorFromRuntimeID(mTargetRuntimeID);
-        if (!target) return {0.f, 0.f};
+        if (!target) return kNoRotation;
 
         auto* tPos = target->getPos();
-        if (!tPos) return {0.f, 0.f};
+        if (!tPos) return kNoRotation;
         targetPoint = *tPos;
 
         float height = 1.8f;
@@ -335,18 +333,21 @@ glm::vec2 Aura::calcRotations(Actor* player) {
         targetPoint.y += height * mAimY.mValue;
         targetPoint   += mCurrentAimOffset;
     } catch (...) {
-        return {0.f, 0.f};
+        return kNoRotation;
     }
 
     glm::vec3 delta = targetPoint - eyePos;
     float horizontalDist = std::sqrt(delta.x * delta.x + delta.z * delta.z);
-    if (!std::isfinite(horizontalDist) || horizontalDist < 0.001f) return {0.f, 0.f};
+    if (!std::isfinite(horizontalDist) || horizontalDist < 0.001f) return kNoRotation;
 
     float pitch = -std::atan2(delta.y, horizontalDist) * (180.f / glm::pi<float>());
-    float yaw   =  std::atan2(delta.z, delta.x)        * (180.f / glm::pi<float>()) - 90.f;
+    // atan2 даёт -180..180, а после «-90» получалось -270..90: yaw выходил за
+    // диапазон пакета и на части углов доводка шла длинным путём.
+    float yaw   = MathUtils::wrap(
+        std::atan2(delta.z, delta.x) * (180.f / glm::pi<float>()) - 90.f, -180.f, 180.f);
 
     if (!std::isfinite(pitch) || !std::isfinite(yaw))
-        return {0.f, 0.f};
+        return kNoRotation;
 
     pitch = std::clamp(pitch, -90.f, 90.f);
 
@@ -472,6 +473,12 @@ void Aura::drawChams(Actor* target, ImColor color, float alpha) {
     float w = shape->mWidth;
     float h = shape->mHeight;
 
+    // NaN/Inf из физики (телепорт, смена мира) роняет AddConvexPolyFilled в
+    // ассерте — проверяем до проекции.
+    if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z) ||
+        !std::isfinite(w) || !std::isfinite(h) || w <= 0.f || h <= 0.f)
+        return;
+
     AABB aabb;
     aabb.mMin = pos - glm::vec3(w/2, 0, w/2);
     aabb.mMax = pos + glm::vec3(w/2, h, w/2);
@@ -512,8 +519,10 @@ void Aura::onMouseEvent(MouseEvent& event) {
 void Aura::onBaseTickEvent(BaseTickEvent& event) {
     auto* player = event.mActor;
     if (!player) return;
+    if (!ClientInstance::get() || ClientInstance::get()->getLocalPlayer() != player) return;
 
-    auto targetStrafe = gFeatureManager->mModuleManager->getModule<TargetStrafe>();
+    auto targetStrafe = gFeatureManager->mModuleManager
+        ? gFeatureManager->mModuleManager->getModule<TargetStrafe>() : nullptr;
     if (targetStrafe) {
         if (mTargetStrafe.mValue  && !targetStrafe->mEnabled) targetStrafe->setEnabled(true);
         if (!mTargetStrafe.mValue &&  targetStrafe->mEnabled) targetStrafe->setEnabled(false);
@@ -530,7 +539,12 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
 
     auto* supplies = player->getSupplies();
     if (!supplies) return;
+    // Без уровня/реестра дальше идти нельзя: всё остальное ходит по актёрам.
+    if (!player->getLevel()) return;
 
+    // Всё остальное — за одним try/catch: любое исключение из SDK (битый
+    // компонент, нулевой контейнер) не должно ронять игру целиком.
+    try {
     if (mRmbClicked) {
         mRmbClicked = false;
 
@@ -604,7 +618,6 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
                 mTargetRuntimeID = newTarget->getRuntimeID();
                 sTargetRuntimeID = mTargetRuntimeID;
                 sHasTarget       = true;
-                sTarget          = newTarget;
                 mAutoTargeted    = true;
                 mTargetLockTime  = NOW;
 
@@ -640,7 +653,6 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
                     mTargetRuntimeID = target->getRuntimeID();
                     sTargetRuntimeID = mTargetRuntimeID;
                     sHasTarget       = true;
-                    sTarget          = target;
                     mAutoTargeted    = true;
                     mTargetLockTime  = NOW;
 
@@ -660,7 +672,6 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
 
     sTargetRuntimeID = mTargetRuntimeID;
     sHasTarget       = true;
-    sTarget          = target;
 
     if (NOW - mTargetLockTime < static_cast<int64_t>(mReactionDelay.mValue))
         return;
@@ -671,20 +682,15 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
     if (isInAttackRange(target, player)) {
         const uint64_t now = static_cast<uint64_t>(NOW);
 
-        // APS — это ПОТОЛОК, а не цель. Реальный темп задаёт неуязвимость
-        // цели: пока предыдущий удар не подтверждён сервером, следующий всё
-        // равно уйдёт в пустоту (в логах InfiniteAura при 7.9 CPS засчиталось
-        // 0.6 CPS — остальные пришли в окно неуязвимости).
-        float aps = mRandomizeAPS.mValue
-            ? MathUtils::randomFloat(mAPSMin.mValue, mAPSMax.mValue)
-            : mAPS.mValue;
-        if (aps < 1.f) aps = 1.f;
-        const uint64_t capGap = static_cast<uint64_t>(1000.f / aps);
-
+        // Темп задаёт НЕ настройка CPS, а неуязвимость цели: пока предыдущий
+        // удар не подтверждён сервером, следующий всё равно уйдёт в пустоту
+        // (в логах при 7.9 CPS засчиталось 0.6 — остальные пришли в окно
+        // неуязвимости). APS-настройки убраны: они только противоречили
+        // измеренному интервалу и давали «две правды» в одном модуле.
         uint64_t waitMs = 0;
-        // И бьём только когда голова уже на цели: удар, отправленный
+        // Бьём только когда голова уже на цели: удар, отправленный
         // одновременно с доворотом, сервер видит с ПРОШЛОЙ ротацией.
-        if (canAttack(now, capGap, waitMs) && rotationOnTarget(player)) {
+        if (canAttack(now, waitMs) && rotationOnTarget(player)) {
             Actor* attackTarget = findObstructor(player, target);
             if (!attackTarget) attackTarget = target;
 
@@ -693,6 +699,10 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
             }
 
             int bestSlot = getBestWeapon(target);
+            // Слот хотбара — это 0..8. Раньше сюда мог прилететь мусор из
+            // getBestItem (или -1), и игра падала на индексации инвентаря.
+            if (bestSlot < 0 || bestSlot > 8)
+                bestSlot = std::clamp(supplies->mSelectedSlot, 0, 8);
 
             if (mSwitchMode.mValue == SwitchMode::Full)
                 supplies->mSelectedSlot = bestSlot;
@@ -727,6 +737,10 @@ void Aura::onBaseTickEvent(BaseTickEvent& event) {
     // ровно то, что ушло на сервер.
     if (mRotating)
         stepRotation(player);
+    } catch (...) {
+        // Тихо сбрасываем цель: лучше один пропущенный тик, чем краш.
+        resetTarget();
+    }
 }
 
 // Текущая ротация игрока. head->mHeadRot игровая нить может держать в другой
@@ -757,8 +771,7 @@ void Aura::stepRotation(Actor* player)
     if (!player) return;
 
     glm::vec2 want = calcRotations(player);
-    if (!std::isfinite(want.x) || !std::isfinite(want.y)) return;
-    if (want.x == 0.f && want.y == 0.f) return;   // цель не найдена
+    if (!std::isfinite(want.x) || !std::isfinite(want.y)) return;   // цели нет
 
     // Реальное время с прошлого шага: раньше здесь стояли жёсткие 0.05 с,
     // и при 240°/с голова двигалась на 12° за тик независимо от того, сколько
@@ -794,28 +807,23 @@ void Aura::stepRotation(Actor* player)
 // ==================== PACKET OUT ====================
 
 void Aura::onPacketOutEvent(PacketOutEvent& event) {
-    if (!mRotating)          return;
-    if (mTargetRuntimeID == 0) return;
-    if (NOW - mTargetLockTime < static_cast<int64_t>(mReactionDelay.mValue)) return;
-
-    auto* player = ClientInstance::get()->getLocalPlayer();
-    if (!player)        return;
     if (!event.mPacket) return;
 
+    // ВАЖНО: здесь нельзя трогать ничего, кроме самого пакета и простых чисел.
+    // Этот код вызывается из пути отправки (LoopbackPacketSender::send) — в том
+    // числе из середины тика уровня. Любой поход в реестр актёров оттуда
+    // (getActorFromRuntimeID, calcRotations, getLocalPlayer()->getLevel()) —
+    // итерация по реестру в момент, когда игра его меняет. Раньше здесь стоял
+    // шаг доводки прицела (stepRotation) — именно он и ронял игру.
     const PacketID id = event.mPacket->getId();
 
     if (id == PacketID::PlayerAuthInput || id == PacketID::MovePlayer) {
-        // Шагаем ПЕРЕД отправкой: тик и отправка пакета идут в разном порядке,
-        // и без этого в пакет уходил угол, посчитанный на кадр-два раньше.
-        stepRotation(player);
+        if (!mRotating || mTargetRuntimeID == 0) return;
+        if (NOW - mTargetLockTime < static_cast<int64_t>(mReactionDelay.mValue)) return;
 
-        glm::vec2 rots = mCurrentRotations;
-
+        const glm::vec2 rots = mCurrentRotations;   // просто копия, посчитанная в тике
         if (!std::isfinite(rots.x) || !std::isfinite(rots.y)) return;
-        if (rots.x == 0.f && rots.y == 0.f) {
-            rots = calcRotations(player);
-            if (rots.x == 0.f && rots.y == 0.f) return;
-        }
+        if (rots.x == 0.f && rots.y == 0.f) return;  // ещё не наводились
 
         if (id == PacketID::PlayerAuthInput) {
             auto* pkt = event.getPacket<PlayerAuthInputPacket>();
@@ -844,24 +852,17 @@ void Aura::onPacketOutEvent(PacketOutEvent& event) {
 // Можно ли бить прямо сейчас.
 //   - удар отправлен и не подтверждён → ждём (второй уйдёт в пустоту);
 //   - сервер подтвердил попадание → ждём измеренный интервал до следующего.
-bool Aura::canAttack(uint64_t now, uint64_t capGapMs, uint64_t& waitMs)
+bool Aura::canAttack(uint64_t now, uint64_t& waitMs)
 {
     waitMs = 0;
 
-    // APS — жёсткий потолок по частоте отправки.
-    if (capGapMs > 0 && mTiming.lastSent != 0 && now - mTiming.lastSent < capGapMs)
-    {
-        waitMs = capGapMs - (now - mTiming.lastSent);
-        return false;
-    }
-
     if (mTiming.pending)
     {
-        // Сколько ждать ответа: по измеренной задержке, а пока её нет — по
-        // потолку CPS (чтобы не зависнуть, если сервер молчит).
+        // Сколько ждать ответа: по измеренной задержке, а пока её нет —
+        // человеческие ~600 мс (не «молчим бесконечно»).
         const float cap = mTiming.confirmMs > 0.f
             ? std::clamp(mTiming.confirmMs * 2.2f, 250.f, 1500.f)
-            : std::max(120.f, static_cast<float>(capGapMs));
+            : 600.f;
 
         const uint64_t age = now - mTiming.lastSent;
         if (age < static_cast<uint64_t>(cap))
@@ -877,9 +878,8 @@ bool Aura::canAttack(uint64_t now, uint64_t capGapMs, uint64_t& waitMs)
         mTiming.pending = false;
         if (mTiming.lastConfirmed == 0)
         {
-            const float apsFromCap = capGapMs > 0 ? 1000.f / static_cast<float>(capGapMs) : 2.f;
-            mTiming.intervalMs = std::clamp(1000.f / std::max(1.f, apsFromCap),
-                                            kHurtCooldownMs, kMaxIntervalMs);
+            // Сервер вообще не присылает HURT — держим человеческий темп.
+            mTiming.intervalMs = kHurtCooldownMs;
         }
         else
         {
@@ -955,6 +955,7 @@ void Aura::onHitConfirmed(int64_t targetId)
 
 void Aura::onPacketInEvent(PacketInEvent& event) {
     if (!event.mPacket) return;
+    if (!ClientInstance::get()) return;
 
     // ActorEvent HURT приходит на того, кому сервер реально засчитал урон —
     // это единственный честный признак «удар дошёл». По нему и строится темп.
@@ -985,6 +986,8 @@ void Aura::onRenderEvent(RenderEvent& event) {
     if (!mShowESP.mValue)      return;
     if (!sHasTarget)           return;
     if (sTargetRuntimeID == 0) return;
+    if (!ImGui::GetCurrentContext()) return;
+    if (!ClientInstance::get()) return;
 
     auto* player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
@@ -1011,6 +1014,7 @@ void Aura::onRenderEvent(RenderEvent& event) {
         return;
     }
 
+    try {
     ImColor theme = ColorUtils::getThemedColor(0);
     float   alpha = mESPAlpha.mValue;
 
@@ -1024,44 +1028,46 @@ void Aura::onRenderEvent(RenderEvent& event) {
     std::string name;
     float dist = 0.f;
     try {
-        name = resolvedTarget->getNameTag();
+        // Тот же стриппер, что у остальных модулей: старый локальный цикл
+        // бежал «i += 3» и на однобайтовой кириллице съедал лишний символ,
+        // а на границе строки читал за её концом.
+        name = ColorUtils::removeColorCodes(resolvedTarget->getNameTag());
         dist = resolvedTarget->distanceTo(player);
     } catch (...) {
         return;
     }
 
-    {
-        std::string cleaned;
-        cleaned.reserve(name.size());
-        for (size_t i = 0; i < name.size(); ) {
-            unsigned char c0 = static_cast<unsigned char>(name[i]);
-            if (c0 == 0xC2 && i + 1 < name.size() &&
-                static_cast<unsigned char>(name[i + 1]) == 0xA7 &&
-                i + 2 < name.size())
-            {
-                i += 3;
-                continue;
-            }
-            cleaned += name[i++];
-        }
-        name = std::move(cleaned);
+    if (name.empty() || !std::isfinite(dist)) return;
+
+    // Якорь подписи — верх хитбокса, как у ESP/Nametags. Раньше подпись
+    // висела на «глаза + 2.2», то есть почти на блок выше макушки, и не
+    // совпадала с рамкой — отсюда и ощущение, что Aura рисует не туда.
+    ImVec2 screen;
+    try {
+        AABB aabb = resolvedTarget->getAABB();
+        if (!std::isfinite(aabb.mMax.y)) return;
+
+        glm::vec3 labelPos(
+            (aabb.mMin.x + aabb.mMax.x) * 0.5f,
+            aabb.mMax.y + 0.45f,
+            (aabb.mMin.z + aabb.mMax.z) * 0.5f);
+
+        if (!RenderUtils::worldToScreen(labelPos, screen)) return;
+    } catch (...) {
+        return;
     }
 
-    if (name.empty()) return;
-
-    auto* renderPos = resolvedTarget->getRenderPositionComponent();
-    if (!renderPos) return;
-
-    glm::vec3 labelPos = renderPos->mPosition;
-    labelPos.y += 2.2f;
-
-    ImVec2 screen;
-    if (!RenderUtils::worldToScreen(labelPos, screen)) return;
-
-    std::string label = fmt::format("{} [{:.1f}m]", name, dist);
-    ImVec2 ts = ImGui::CalcTextSize(label.c_str());
+    if (!std::isfinite(screen.x) || !std::isfinite(screen.y)) return;
 
     auto* dl = ImGui::GetBackgroundDrawList();
+    if (!dl) return;
+
+    std::string label = fmt::format("{} [{:.1f}m]", name, dist);
+
+    ImFont* font = FontHelper::getFont(true);
+    if (font) ImGui::PushFont(font);
+    ImVec2 ts = ImGui::CalcTextSize(label.c_str());
+
     ImU32 shadow  = IM_COL32(0, 0, 0, (int)(alpha * 200));
     ImU32 textCol = IM_COL32(
         (int)(theme.Value.x * 255),
@@ -1070,16 +1076,14 @@ void Aura::onRenderEvent(RenderEvent& event) {
         (int)(alpha * 255)
     );
 
-    dl->AddText({screen.x - ts.x/2 + 1, screen.y - ts.y/2 + 1}, shadow,   label.c_str());
-    dl->AddText({screen.x - ts.x/2,     screen.y - ts.y/2},      textCol,  label.c_str());
+    const ImVec2 textPos(screen.x - ts.x / 2.f, screen.y - ts.y);
+    dl->AddText({textPos.x + 1.f, textPos.y + 1.f}, shadow,  label.c_str());
+    dl->AddText(textPos,                             textCol, label.c_str());
+
+    if (font) ImGui::PopFont();
+    } catch (...) {
+        sHasTarget       = false;
+        sTargetRuntimeID = 0;
+    }
 }
 
-// ==================== BOB / BONE ====================
-
-void Aura::onBobHurtEvent(BobHurtEvent& event) {
-    if (sHasTarget) event.mDoBlockAnimation = true;
-}
-
-void Aura::onBoneRenderEvent(BoneRenderEvent& event) {
-    if (sHasTarget) event.mDoBlockAnimation = true;
-}
