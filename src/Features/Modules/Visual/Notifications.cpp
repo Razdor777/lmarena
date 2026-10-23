@@ -28,18 +28,22 @@
 namespace
 {
     // Метрики фиксированы — никаких настроек масштаба и плотности.
-    constexpr float kPadX      = 10.f;
-    constexpr float kPadY      = 7.f;
+    constexpr float kPadX      = 12.f;
+    constexpr float kPadY      = 9.f;
     constexpr float kStripW    = 3.f;    // толщина цветной полоски-акцента
-    constexpr float kStripGap  = 10.f;   // от полоски до текста
-    constexpr float kCardGap   = 4.f;
-    constexpr float kMargin       = 8.f;
-    constexpr float kRounding    = 3.f;
-    constexpr float kInTime      = 0.14f;
-    constexpr float kOutTime     = 0.12f;
-    constexpr float kFontSize    = 15.f;
-    constexpr int   kMaxVisible  = 6;
-    constexpr size_t kMaxStored  = 16;
+    constexpr float kStripGap  = 11.f;   // от полоски до текста
+    constexpr float kCardGap   = 5.f;
+    constexpr float kMargin    = 10.f;
+    constexpr float kRounding  = 6.f;
+    constexpr float kInTime    = 0.16f;
+    constexpr float kOutTime   = 0.13f;
+    constexpr float kFontSize  = 15.f;   // заголовок
+    constexpr float kSubSize   = 12.5f;  // подпись
+    constexpr float kMinWidth  = 150.f;
+    constexpr float kMaxWidth  = 420.f;
+    constexpr int   kMaxVisible = 6;
+    constexpr size_t kMaxStored = 16;
+    constexpr float kLineGap    = 2.f;   // между заголовком и подписью
 
     // Цвет полоски-акцента. Оттенки пастельные и приглушённые: они не спорят с
     // чёрной карточкой, но тип события читается сразу. Пиктограмм больше нет —
@@ -139,15 +143,25 @@ void Notifications::onDisable()
     mEntries.clear();
 }
 
-void Notifications::push(std::string text, Icon icon, float duration, std::string state)
+void Notifications::push(std::string title, Icon icon, float duration, std::string subtitle)
 {
     Entry entry;
-    entry.text = cleanText(text);
-    if (entry.text.empty()) return;
+    entry.title    = cleanText(title);
+    entry.subtitle = cleanText(subtitle);
+    if (entry.title.empty() && entry.subtitle.empty()) return;
+    if (entry.title.empty()) std::swap(entry.title, entry.subtitle);
 
-    entry.state    = std::move(state);
     entry.icon     = icon;
     entry.duration = std::clamp(duration, 0.5f, 60.f);
+
+    // Одно и то же уведомление не копится стопкой (перещёлкал модуль туда-сюда
+    // — получил бы десять карточек): старую убираем и показываем заново, уже
+    // с нулевым таймером. Так видно, что событие повторилось.
+    const auto same = std::find_if(mEntries.begin(), mEntries.end(), [&](const Entry& e)
+    {
+        return e.title == entry.title && e.subtitle == entry.subtitle && e.icon == entry.icon;
+    });
+    if (same != mEntries.end()) mEntries.erase(same);
 
     mEntries.push_back(std::move(entry));
 
@@ -182,34 +196,36 @@ void Notifications::onRenderEvent(RenderEvent& event)
         return;
     }
 
-    const float lineHeight = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, "Ag").y;
-    const float cardHeight = (std::max)(26.f, lineHeight + kPadY * 2.f);
+    const float titleH = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, "Ag").y;
+    const float subH   = font->CalcTextSizeA(kSubSize,  FLT_MAX, 0.f, "Ag").y;
     const bool  fromBottom = mPosition.mValue == Position::BottomRight;
 
-    float cursorY = fromBottom ? (screen.y - kMargin - cardHeight) : kMargin;
+    float cursorY = fromBottom ? (screen.y - kMargin) : kMargin;
     int   drawn   = 0;
 
-    // Новые карточки рисуются первыми — они всегда ближе к углу.
+    // Новые карточки — ближе к углу; старые уходят вниз (или вверх).
     for (auto it = mEntries.rbegin(); it != mEntries.rend() && drawn < kMaxVisible; ++it, ++drawn)
     {
         Entry& entry = *it;
 
+        const bool hasSub = !entry.subtitle.empty();
+        const float cardH = kPadY * 2.f + titleH + (hasSub ? (kLineGap + subH) : 0.f);
+
         // Ширина считается один раз, при первом кадре карточки.
         if (entry.width <= 0.f)
         {
-            const float textW  = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.text.c_str()).x;
-            const float stateW = entry.state.empty()
-                ? 0.f
-                : font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.state.c_str()).x + 6.f;
+            entry.titleW = font->CalcTextSizeA(kFontSize, FLT_MAX, 0.f, entry.title.c_str()).x;
+            entry.subtitleW = hasSub
+                ? font->CalcTextSizeA(kSubSize, FLT_MAX, 0.f, entry.subtitle.c_str()).x
+                : 0.f;
 
-            entry.textW = textW;
-            entry.width = kPadX * 2.f + kStripW + kStripGap + textW + stateW;
-            entry.width = std::clamp(entry.width, 96.f,
-                                     (std::max)(120.f, screen.x - kMargin * 2.f));
+            const float content = (std::max)(entry.titleW, entry.subtitleW);
+            entry.width = std::clamp(kPadX * 2.f + kStripW + kStripGap + content,
+                                     kMinWidth, (std::min)(kMaxWidth, screen.x - kMargin * 2.f));
         }
 
-        const float cardY = cursorY;
-        cursorY += fromBottom ? -(cardHeight + kCardGap) : (cardHeight + kCardGap);
+        const float cardY = fromBottom ? (cursorY - cardH) : cursorY;
+        cursorY = fromBottom ? (cardY - kCardGap) : (cardY + cardH + kCardGap);
 
         const float inT  = std::clamp(entry.life / kInTime, 0.f, 1.f);
         const float outT = entry.life > entry.duration
@@ -219,54 +235,55 @@ void Notifications::onRenderEvent(RenderEvent& event)
         const float alpha = inT * (1.f - outT);
         if (alpha <= 0.01f) continue;
 
-        const float easeIn = 1.f - (1.f - inT) * (1.f - inT);
-        const float hidden = entry.width + kMargin;
+        // Выезд справа: easeOutCubic на входе, easeInCubic на выходе.
+        const float easeIn  = 1.f - (1.f - inT) * (1.f - inT) * (1.f - inT);
+        const float easeOut = outT * outT * outT;
+        const float hidden  = entry.width + kMargin + 6.f;
 
-        const float x = screen.x - kMargin - entry.width
-                      + (1.f - easeIn) * hidden
-                      + outT * hidden;
-        const float y = cardY + (1.f - easeIn) * 4.f;
+        const float x = screen.x - kMargin - entry.width + (1.f - easeIn) * hidden + easeOut * hidden;
+        const float y = cardY + (1.f - easeIn) * 5.f;
 
         const ImVec2 min(x, y);
-        const ImVec2 max(x + entry.width, y + cardHeight);
+        const ImVec2 max(x + entry.width, y + cardH);
 
-        // ── сплошная чёрная подложка ──────────────────────────────────────────
-        drawList->AddRectFilled(min, max, IM_COL32(0, 0, 0, static_cast<int>(238 * alpha)), kRounding);
-        drawList->AddRect(min, max, IM_COL32(255, 255, 255, static_cast<int>(24 * alpha)),
+        // ── подложка ──────────────────────────────────────────────────────
+        drawList->AddRectFilled(min, max, IM_COL32(0, 0, 0, static_cast<int>(240 * alpha)), kRounding);
+        drawList->AddRect(min, max, IM_COL32(255, 255, 255, static_cast<int>(26 * alpha)),
                           kRounding, 0, 1.f);
 
-        // ── цветная полоска-акцент вместо пиктограммы ────────────────────────
-        // Свободно стоящая вертикальная полоска с отступом от краёв — как полоска
-        // справа в Arraylist. Один прямоугольник, ничего не ломается на малых размерах.
-        const float stripX   = min.x + kPadX - 3.f;
-        const float stripTop = y + 4.f;
-        const float stripBot = max.y - 4.f;
-        drawList->AddRectFilled({ stripX, stripTop }, { stripX + kStripW, stripBot },
+        // Тонкая светлая кромка сверху — карточка не сливается с чёрным фоном.
+        drawList->AddRectFilledMultiColor({ min.x + kRounding, min.y + 1.f }, { max.x - kRounding, min.y + 2.f },
+                                          IM_COL32(255, 255, 255, 0), IM_COL32(255, 255, 255, static_cast<int>(18 * alpha)),
+                                          IM_COL32(255, 255, 255, static_cast<int>(18 * alpha)), IM_COL32(255, 255, 255, 0));
+
+        // ── полоска-акцент ────────────────────────────────────────────────
+        const float stripX = min.x + kPadX - 4.f;
+        drawList->AddRectFilled({ stripX, y + 6.f }, { stripX + kStripW, max.y - 6.f },
                                 accentColor(entry.icon, alpha), 1.5f);
 
-        // ── текст ─────────────────────────────────────────────────────────────
+        // ── текст ─────────────────────────────────────────────────────────
         const float textX = stripX + kStripW + kStripGap;
-        const float textY = y + (cardHeight - lineHeight) * 0.5f;
+        const float textTop = y + (cardH - (titleH + (hasSub ? (kLineGap + subH) : 0.f))) * 0.5f;
 
-        drawList->AddText(font, kFontSize, { textX, textY },
-                          IM_COL32(246, 246, 248, static_cast<int>(255 * alpha)),
-                          entry.text.c_str());
+        drawList->AddText(font, kFontSize, { textX, textTop },
+                          IM_COL32(246, 247, 250, static_cast<int>(255 * alpha)),
+                          entry.title.c_str());
 
-        if (!entry.state.empty())
+        if (hasSub)
         {
-            drawList->AddText(font, kFontSize, { textX + entry.textW + 6.f, textY },
-                              IM_COL32(142, 145, 152, static_cast<int>(255 * alpha)),
-                              entry.state.c_str());
+            drawList->AddText(font, kSubSize, { textX, textTop + titleH + kLineGap },
+                              IM_COL32(146, 149, 160, static_cast<int>(235 * alpha)),
+                              entry.subtitle.c_str());
         }
 
-        // ── тонкая линия оставшегося времени ─────────────────────────────────
+        // ── тонкая линия оставшегося времени ──────────────────────────────
         const float remain = std::clamp(1.f - entry.life / (std::max)(entry.duration, 0.001f), 0.f, 1.f);
         if (remain > 0.01f && outT <= 0.f)
         {
             const float barW = (entry.width - 2.f) * remain;
             drawList->AddRectFilled({ min.x + 1.f, max.y - 1.6f },
                                     { min.x + 1.f + barW, max.y - 0.6f },
-                                    IM_COL32(255, 255, 255, static_cast<int>(58 * alpha)));
+                                    IM_COL32(255, 255, 255, static_cast<int>(52 * alpha)));
         }
     }
 
@@ -289,7 +306,7 @@ void Notifications::onConnectionRequestEvent(ConnectionRequestEvent& event)
     if (!mShowOnJoin.mValue) return;
     if (!event.mServerAddress) return;
 
-    push("Connecting to " + *event.mServerAddress + "...", Icon::Info, mDuration.mValue);
+    push("Connecting", Icon::Info, mDuration.mValue, *event.mServerAddress);
 }
 
 void Notifications::onNotifyEvent(NotifyEvent& event)
@@ -300,8 +317,8 @@ void Notifications::onNotifyEvent(NotifyEvent& event)
     if (notification.mType == Notification::Type::Warning) icon = Icon::Warning;
     else if (notification.mType == Notification::Type::Error) icon = Icon::Error;
 
-    std::string text  = notification.mMessage;
-    std::string state;
+    std::string title = notification.mMessage;
+    std::string subtitle;
 
     // Другие части клиента до сих пор формируют сообщения вида "Aura enabled".
     // Разделяем их, чтобы карточка выглядела как toggle-карточка.
@@ -310,26 +327,25 @@ void Notifications::onNotifyEvent(NotifyEvent& event)
         constexpr const char* kEnabled  = " enabled";
         constexpr const char* kDisabled = " disabled";
 
-        const std::string clean = cleanText(text);
+        const std::string clean = cleanText(title);
         const size_t enabledLen  = 8; // strlen(kEnabled)
         const size_t disabledLen = 9; // strlen(kDisabled)
 
         if (clean.size() > enabledLen &&
             clean.compare(clean.size() - enabledLen, enabledLen, kEnabled) == 0)
         {
-            text  = clean.substr(0, clean.size() - enabledLen);
-            state = "enabled";
-            icon  = Icon::Success;
+            title    = clean.substr(0, clean.size() - enabledLen);
+            subtitle = "enabled";
+            icon     = Icon::Success;
         }
         else if (clean.size() > disabledLen &&
                  clean.compare(clean.size() - disabledLen, disabledLen, kDisabled) == 0)
         {
-            text  = clean.substr(0, clean.size() - disabledLen);
-            state = "disabled";
-            icon  = Icon::Disabled;
+            title    = clean.substr(0, clean.size() - disabledLen);
+            subtitle = "disabled";
+            icon     = Icon::Disabled;
         }
     }
 
-    const float duration = notification.mDuration > 0.f ? notification.mDuration : mDuration.mValue;
-    push(std::move(text), icon, duration, std::move(state));
+    push(title, icon, std::clamp(notification.mDuration, 0.5f, 60.f), subtitle);
 }

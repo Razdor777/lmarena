@@ -61,17 +61,23 @@ private:
     // One card. Everything that can be precomputed is precomputed ONCE, when the
     // card is created — the render loop must not allocate strings or re-parse
     // colour codes every frame (that was a big part of the stutter).
+    //
+    // Карточка двухстрочная: заголовок (что случилось) и подпись (в каком
+    // состоянии / адрес сервера). Так же выглядят уведомления в дорогих
+    // клиентах, но здесь нет ни блюра, ни тени, ни иконок-глифов — только два
+    // прямоугольника, полоска-акцент и текст.
     struct Entry {
-        std::string text;       // already stripped of § codes
-        std::string state;      // "enabled" / "disabled" / "" — drawn dimmed
+        std::string title;      // already stripped of § codes
+        std::string subtitle;   // "enabled" / "disabled" / адрес сервера / ""
         Icon        icon = Icon::Info;
         float       duration = 3.f;
-        float       life = 0.f;  // seconds on screen
-        float       width = 0.f; // measured lazily on the first frame
-        float       textW = 0.f; // width of text (without the dimmed state word)
+        float       life = 0.f;   // seconds on screen
+        float       width = 0.f;  // measured lazily on the first frame
+        float       titleW = 0.f;
+        float       subtitleW = 0.f;
     };
 
     std::vector<Entry> mEntries;
 
-    void push(std::string text, Icon icon, float duration, std::string state = {});
+    void push(std::string title, Icon icon, float duration, std::string subtitle = {});
 };

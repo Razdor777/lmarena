@@ -11,6 +11,7 @@
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
+#include <SDK/Minecraft/Network/Packets/ActorEventPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/MobEquipmentPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
@@ -142,6 +143,7 @@ void InfiniteAura::onEnable() {
   mLastAttacksByID.clear();
   mLockKeyStates.clear();
   mLastPositions.clear();
+  dbgReset();
 
   auto player = ClientInstance::get()->getLocalPlayer();
   if (player) {
@@ -777,7 +779,10 @@ void InfiniteAura::onBaseTickEvent(BaseTickEvent &event) {
       try {
         player->swing();
         auto attackPkt = ActorUtils::createAttackTransaction(actor, bestWeapon != -1 ? bestWeapon : supplies->mSelectedSlot);
-        if (attackPkt) sender->sendToServer(attackPkt.get());
+        if (attackPkt) {
+          sender->sendToServer(attackPkt.get());
+          dbgRecordSent(actorID);
+        }
       } catch (...) {}
     }
 
@@ -838,6 +843,15 @@ void InfiniteAura::onPacketInEvent(PacketInEvent &event) {
   auto player = ClientInstance::get()->getLocalPlayer();
   if (!player) return;
 
+  // Обратная связь сервера: ActorEvent HURT приходит на того, кому реально
+  // засчитали урон. Именно по нему видно настоящую задержку между отправкой
+  // атаки и подтверждением — и то, что 20 CPS не превращаются в 100 ударов
+  // за 5 секунд.
+  if (mDebug.mValue && event.mPacket && event.mPacket->getId() == PacketID::ActorEvent) {
+    auto ev = event.getPacket<ActorEventPacket>();
+    if (ev && ev->mEvent == ActorEvent::HURT) dbgRecordHit(ev->mRuntimeID);
+  }
+
   if (mFullVelocity.mValue && event.mPacket->getId() == PacketID::SetActorMotion) {
     auto motionPkt = std::reinterpret_pointer_cast<SetActorMotionPacket>(event.mPacket);
     if (motionPkt && motionPkt->mRuntimeID == player->getRuntimeID()) {
@@ -854,6 +868,165 @@ void InfiniteAura::onPacketInEvent(PacketInEvent &event) {
 
   event.cancel();
   ClientInstance::get()->getPacketSender()->sendToServer(packet.get());
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DEBUG: РЕАЛЬНАЯ ЗАДЕРЖКА УДАРОВ (Task 16)
+// ═══════════════════════════════════════════════════════════════
+//
+// Нажатие (ActorUtils::createAttackTransaction) — это ещё не удар: сервер может
+// его проглотить (не тот тик, дистанция, античит, дебафф). Подтверждение —
+// ActorEventPacket HURT по той же цели. Между ними лежит настоящая задержка,
+// и именно она объясняет, почему 20 CPS за 5 секунд — не 100 ударов.
+//
+// Считаем: сколько отправлено, сколько подтверждено, задержку (последнюю /
+// среднюю / мин / макс) и интервал между подтверждениями; отдельно — histogram
+// задержек и реальный APS по подтверждённым ударам за последние 5 секунд.
+
+void InfiniteAura::dbgReset()
+{
+  std::lock_guard lock(mDebugMutex);
+  mDebugQueueCount = 0;
+  mDbgSent = mDbgConfirmed = mDbgLost = mDbgForeign = 0;
+  mDbgLatSum = 0;
+  mDbgLastMs = mDbgAvgMs = mDbgMinMs = mDbgMaxMs = 0.f;
+  for (int& h : mDbgHist) h = 0;
+  mDbgConfirmCount = 0;
+  mDbgLastConfirmAt = 0;
+  mDbgLastIntervalMs = mDbgAvgIntervalMs = 0.f;
+  mDbgIntervalSum = 0;
+  mDbgRealAps = 0.f;
+}
+
+void InfiniteAura::dbgRecordSent(int64_t targetId)
+{
+  std::lock_guard lock(mDebugMutex);
+  if (mDebugQueueCount >= kDebugQueueSize)
+  {
+    // Старому нажатию уже нечего ждать — оно потерялось в очереди.
+    for (int i = 1; i < mDebugQueueCount; i++) mDebugQueue[i - 1] = mDebugQueue[i];
+    mDebugQueueCount--;
+    mDbgLost++;
+  }
+  mDebugQueue[mDebugQueueCount++] = { static_cast<uint64_t>(NOW), targetId };
+  mDbgSent++;
+}
+
+void InfiniteAura::dbgRecordHit(int64_t targetId)
+{
+  std::lock_guard lock(mDebugMutex);
+
+  int found = -1;
+  for (int i = 0; i < mDebugQueueCount; i++)
+  {
+    if (mDebugQueue[i].target == targetId) { found = i; break; }
+  }
+  if (found < 0)
+  {
+    mDbgForeign++;   // урон не от наших нажатий (или по другой цели)
+    return;
+  }
+
+  const uint64_t at = mDebugQueue[found].at;
+  for (int i = found + 1; i < mDebugQueueCount; i++) mDebugQueue[i - 1] = mDebugQueue[i];
+  mDebugQueueCount--;
+
+  const uint64_t now = static_cast<uint64_t>(NOW);
+  const uint64_t dt = now > at ? now - at : 0;
+  if (dt > 1500)
+  {
+    mDbgLost++;      // ответ на давнее нажатие — это не «наш» удар
+    return;
+  }
+
+  mDbgConfirmed++;
+  mDbgLatSum += dt;
+  mDbgLastMs = static_cast<float>(dt);
+  mDbgAvgMs = static_cast<float>(mDbgLatSum / mDbgConfirmed);
+  if (mDbgMinMs == 0.f || mDbgLastMs < mDbgMinMs) mDbgMinMs = mDbgLastMs;
+  if (mDbgLastMs > mDbgMaxMs) mDbgMaxMs = mDbgLastMs;
+
+  const int bucket = dt < 50 ? 0 : dt < 100 ? 1 : dt < 200 ? 2 : dt < 500 ? 3 : 4;
+  mDbgHist[bucket]++;
+
+  // Интервал между подтверждёнными ударами — самый честный показатель
+  // «сколько ударов в секунду реально засчитывает сервер».
+  if (mDbgLastConfirmAt != 0 && now > mDbgLastConfirmAt)
+  {
+    mDbgLastIntervalMs = static_cast<float>(now - mDbgLastConfirmAt);
+    mDbgIntervalSum += static_cast<uint64_t>(mDbgLastIntervalMs);
+    mDbgAvgIntervalMs = static_cast<float>(mDbgIntervalSum / (mDbgConfirmed - 1));
+  }
+  mDbgLastConfirmAt = now;
+
+  if (mDbgConfirmCount < kDebugConfirmWindow) mDbgConfirmTimes[mDbgConfirmCount++] = now;
+  else
+  {
+    for (int i = 1; i < kDebugConfirmWindow; i++) mDbgConfirmTimes[i - 1] = mDbgConfirmTimes[i];
+    mDbgConfirmTimes[kDebugConfirmWindow - 1] = now;
+  }
+
+  int last5s = 0;
+  for (int i = 0; i < mDbgConfirmCount; i++)
+    if (now - mDbgConfirmTimes[i] <= 5000) last5s++;
+  mDbgRealAps = static_cast<float>(last5s) / 5.f;
+}
+
+void InfiniteAura::dbgRender(ImDrawList* drawList)
+{
+  if (!drawList) return;
+  if (!ImGui::GetCurrentContext()) return;
+
+  uint64_t sent = 0, confirmed = 0, lost = 0, foreign = 0;
+  float last = 0.f, avg = 0.f, mn = 0.f, mx = 0.f, lastInt = 0.f, avgInt = 0.f, aps = 0.f;
+  int hist[5]{};
+  {
+    std::lock_guard lock(mDebugMutex);
+    sent = mDbgSent; confirmed = mDbgConfirmed; lost = mDbgLost; foreign = mDbgForeign;
+    last = mDbgLastMs; avg = mDbgAvgMs; mn = mDbgMinMs; mx = mDbgMaxMs;
+    lastInt = mDbgLastIntervalMs; avgInt = mDbgAvgIntervalMs; aps = mDbgRealAps;
+    for (int i = 0; i < 5; i++) hist[i] = mDbgHist[i];
+  }
+
+  ImGuiIO& io = ImGui::GetIO();
+  ImFont* font = ImGui::GetFont();
+  if (!font) return;
+
+  const float px = 13.f;
+  const float pad = 10.f;
+  const float lineH = px + 5.f;
+  const char* labels[9];
+  char text[9][128]{};
+
+  const float pct = sent ? (100.f * static_cast<float>(confirmed) / static_cast<float>(sent)) : 0.f;
+  snprintf(text[0], sizeof(text[0]), "InfiniteAura delay");
+  snprintf(text[1], sizeof(text[1]), "sent %llu   hit %llu (%.0f%%)   lost %llu",
+           static_cast<unsigned long long>(sent), static_cast<unsigned long long>(confirmed), pct,
+           static_cast<unsigned long long>(lost));
+  snprintf(text[2], sizeof(text[2]), "delay  last %.0f  avg %.0f  min %.0f  max %.0f ms",
+           last, avg, mn, mx);
+  snprintf(text[3], sizeof(text[3]), "interval  last %.0f  avg %.0f ms", lastInt, avgInt);
+  snprintf(text[4], sizeof(text[4]), "real APS %.1f   (requested %.1f)", aps, mAPS.mValue);
+  snprintf(text[5], sizeof(text[5]), "0-50   %d", hist[0]);
+  snprintf(text[6], sizeof(text[6]), "50-100 %d", hist[1]);
+  snprintf(text[7], sizeof(text[7]), "100-200 %d", hist[2]);
+  snprintf(text[8], sizeof(text[8]), "200+   %d", hist[3] + hist[4]);
+
+  const int lines = 9;
+  const float w = 268.f;
+  const float h = pad * 2.f + lineH * lines;
+
+  ImVec2 p = { 12.f, io.DisplaySize.y - h - 12.f };
+  drawList->AddRectFilled(p, { p.x + w, p.y + h }, IM_COL32(10, 11, 17, 225), 6.f);
+  drawList->AddRect(p, { p.x + w, p.y + h }, IM_COL32(255, 255, 255, 26), 6.f);
+
+  for (int i = 0; i < lines; i++)
+  {
+    const ImU32 col = i == 0 ? IM_COL32(150, 226, 172, 255)
+                    : i == 4 ? IM_COL32(240, 200, 120, 255)
+                             : IM_COL32(226, 229, 236, 235);
+    drawList->AddText(font, px, { p.x + pad, p.y + pad + lineH * static_cast<float>(i) }, col, text[i]);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1282,4 +1455,7 @@ void InfiniteAura::onRenderEvent(RenderEvent &event) {
       mBindWaitRelease = true;
     }
   }
+
+  // DEBUG: реальная задержка ударов (см. dbgRender выше).
+  if (mDebug.mValue) dbgRender(drawList);
 }

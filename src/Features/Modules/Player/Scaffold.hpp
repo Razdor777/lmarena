@@ -191,6 +191,8 @@ public:
     bool      mSentValid  = false;
     uint64_t  mNeedSince  = 0;                // блок ждёт поворота головы с ...
     glm::vec2 mUserRot = { 0.f, 0.f };        // «настоящая» ротация игрока (MC-градусы)
+    glm::vec2 mLastUserRot = { 0.f, 0.f };    // ротация игрока на прошлом шаге (ловим рывок мыши)
+    bool      mUserRotValid = false;
     glm::vec2 mLastApplied = { 0.f, 0.f };    // что мы вписали в камеру в прошлом кадре
     bool mOverrodeCamera = false;
 
@@ -220,6 +222,7 @@ public:
     void onRenderEvent(class RenderEvent& event);
     void onPacketOutEvent(class PacketOutEvent& event);
     void onLookInputEvent(class LookInputEvent& event);
+    void applyLocalModelRotation(class Actor* player); // своя голова/тело = то, что ушло на сервер
 
     BridgeProfile getBridgeProfile() const;
     glm::vec2 getTargetRots();                 // {pitch, yaw} в MC-градусах

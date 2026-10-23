@@ -14,12 +14,24 @@
 
 void CommandUtils::executeCommand(const std::string& command)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
+    // Сюда приходят чат-бинды и AutoContract — в том числе в момент, когда мир
+    // ещё грузится или уже выгружается. Раньше здесь не проверялись ни
+    // ClientInstance, ни getPacketSender(): вызов в такой момент — нулевой
+    // указатель и краш без сообщения.
+    auto ci = ClientInstance::get();
+    if (!ci) return;
+
+    auto player = ci->getLocalPlayer();
     if (!player) return;
 
+    auto sender = ci->getPacketSender();
+    if (!sender) return;
+
     auto crq = MinecraftPackets::createPacket<CommandRequestPacket>();
+    if (!crq) return;
+
     crq->mCommand = command;
     crq->mOrigin.mPlayerId = player->getRuntimeID();
-    ClientInstance::get()->getPacketSender()->send(crq.get());
+    sender->send(crq.get());
     spdlog::info("Sent command: {}", command);
 }

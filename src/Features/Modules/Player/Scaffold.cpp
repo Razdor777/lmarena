@@ -18,7 +18,10 @@
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
 #include <SDK/Minecraft/Network/PacketID.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
+#include <SDK/Minecraft/Actor/Components/ActorHeadRotationComponent.hpp>
+#include <SDK/Minecraft/Actor/Components/MobBodyRotationComponent.hpp>
 #include <SDK/Minecraft/KeyboardMouseSettings.hpp>
 
 // ═══════════════════════════════════════════════════════════════
@@ -98,6 +101,9 @@ namespace
     constexpr float kAlignTolerance = 10.f;    // «смотрит на блок», градусы
     constexpr uint64_t kRotateTimeoutMs = 300; // дольше блок голову не ждёт
     constexpr uint64_t kMinPlaceGapMs = 90;    // чаще живой игрок не ставит
+    // Рывок мыши: столько градусов за один пакет (50 мс) = ~500°/с и быстрее.
+    // Такой поворот голова не «догоняет» шагами — она встаёт на него сразу.
+    constexpr float kFlickDeg = 25.f;
 }
 
 Scaffold::BridgeProfile Scaffold::getBridgeProfile() const
@@ -152,6 +158,7 @@ void Scaffold::onEnable()
     mNeedSince = 0;
     mOverrodeCamera = false;
     mLastApplied = { 0.f, 0.f };
+    mUserRotValid = false;
     mLastPlaceTime = 0;
     mAheadCell = glm::ivec3(INT_MAX);
     mDidForceJump = false;
@@ -179,6 +186,7 @@ void Scaffold::onDisable()
     mWantUntil = 0;
     mSentValid = false;
     mOverrodeCamera = false;
+    mUserRotValid = false;
 
     // Пока мы включены, могли держать прыжок — снимаем, иначе игрок будет
     // прыгать сам по себе уже после выключения модуля.
@@ -248,6 +256,11 @@ void Scaffold::onBaseTickEvent(BaseTickEvent& event)
     mShouldClip = false;
     auto player = event.mActor;
     if (!player || !player->isValid()) return;
+
+    // Своя модель (F5, тени, записи): голова и тело — ровно то, что сейчас
+    // уходит на сервер. Без этого Interface рисовал голову по сглаженным
+    // пакетам, и в третьем лице она отставала от камеры.
+    applyLocalModelRotation(player);
 
     const BridgeProfile prof = getBridgeProfile();
 
@@ -599,12 +612,37 @@ glm::vec2 Scaffold::stepHead(const glm::vec2& user, uint64_t now, bool& override
 {
     const bool want = now < mWantUntil;
     override = false;
+
+    // Насколько игрок повернул голову САМ с прошлого шага. Резкий рывок мыши
+    // нельзя фильтровать шагом в 29°/тик: именно из-за него поворот за мышкой
+    // выглядел с задержкой.
+    const float userTurn = mUserRotValid ? angDiff(user, mLastUserRot) : 0.f;
+    mLastUserRot = user;
+    mUserRotValid = true;
+
     if (!want && !mHeadActive) return user;
     if (!mHeadActive)
     {
         mHeadActive = true;
         mHeadRot = user;
         mHeadPrev = user;
+    }
+
+    if (userTurn > kFlickDeg)
+    {
+        mHeadPrev = user;
+        mHeadRot = user;
+        mHeadStepAt = now;
+        if (want)
+        {
+            // Мост ещё строим — ротацию держим, но она уже на голове игрока;
+            // к блоку она поедет со следующего пакета.
+            override = true;
+            return user;
+        }
+        mHeadActive = false;
+        mCamSettleUntil = now + 60;
+        return user;
     }
 
     const glm::vec2 target = want ? mHeadTarget : user;
@@ -881,6 +919,7 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
+    if (!event.mPacket) return;   // пакет мог быть уже отменён другим модулем
 
     if (event.mPacket->getId() == PacketID::InventoryTransaction)
     {
@@ -902,34 +941,84 @@ void Scaffold::onPacketOutEvent(PacketOutEvent& event)
         }
     }
 
-    if (event.mPacket->getId() == PacketID::PlayerAuthInput)
+    const PacketID id = event.mPacket->getId();
+
+    // Ротация несёт не только PlayerAuthInput. На серверах, где движение
+    // клиент-авторитетное (AuthorityMode = ClientAuthoritative), поворот уходит
+    // в MovePlayer — раньше мы туда не писали вообще, и скэффолд «не поворачивал
+    // голову». Пишем ровно в тот пакет, который реально несёт ротацию (как Aura).
+    if (id != PacketID::PlayerAuthInput && id != PacketID::MovePlayer) return;
+
+    if (!rotationAllowed())
     {
-        auto paip = event.getPacket<PlayerAuthInputPacket>();
+        mHeadActive = false;
+        mSentValid = false;
+        return;
+    }
 
-        if (mTest.mValue)
-        {
-            paip->mPos.y = paip->mPos.y - 0.01f;
-        }
+    PlayerAuthInputPacket* paip = nullptr;
+    MovePlayerPacket* mpp = nullptr;
+    glm::vec2 packetRot = { 0.f, 0.f };
 
-        if (!rotationAllowed())
+    if (id == PacketID::PlayerAuthInput)
+    {
+        paip = event.getPacket<PlayerAuthInputPacket>();
+        if (!paip) return;
+        if (mTest.mValue) paip->mPos.y = paip->mPos.y - 0.01f;
+        packetRot = { paip->mRot.x, paip->mRot.y };
+    }
+    else
+    {
+        mpp = event.getPacket<MovePlayerPacket>();
+        if (!mpp) return;
+        // Телепорт/респавн несёт служебную ротацию — её не перебиваем.
+        if (mpp->mResetPosition == PositionMode::Teleport ||
+            mpp->mResetPosition == PositionMode::Respawn)
         {
-            mHeadActive = false;
             mSentValid = false;
             return;
         }
+        packetRot = { mpp->mRot.x, mpp->mRot.y };
+    }
 
-        // Ротация игрока: с Visible Rotate камера наша, берём отслеженную.
-        const glm::vec2 user = (mVisibleRotate.mValue && mOverrodeCamera)
-            ? mUserRot : glm::vec2(paip->mRot.x, paip->mRot.y);
-        bool ovr = false;
-        const glm::vec2 rot = stepHead(user, static_cast<uint64_t>(NOW), ovr);
-        if (ovr)
+    // Ротация игрока: с Visible Rotate камера наша, берём отслеженную.
+    const glm::vec2 user = (mVisibleRotate.mValue && mOverrodeCamera) ? mUserRot : packetRot;
+    bool ovr = false;
+    const glm::vec2 rot = stepHead(user, static_cast<uint64_t>(NOW), ovr);
+    if (ovr)
+    {
+        if (paip)
         {
             paip->mRot = rot;            // {pitch, yaw} в MC-градусах
             paip->mYHeadRot = rot.y;
         }
-        mSentRot = ovr ? rot : user;     // это и видит сервер на следующем блоке
-        mSentValid = true;
+        else if (mpp)
+        {
+            mpp->mRot = rot;
+            mpp->mYHeadRot = rot.y;
+        }
+    }
+    mSentRot = ovr ? rot : user;     // это и видит сервер на следующем блоке
+    mSentValid = true;
+}
+
+// Своя голова и тело = то, что получил сервер. Пишется в тике (как в Aura),
+// после того как игра разложила свои компоненты, — иначе следующий тик их
+// перезапишет. Пока голова наша, только мы и решаем, куда она смотрит.
+void Scaffold::applyLocalModelRotation(Actor* player)
+{
+    if (!player) return;
+    if (!mHeadActive || !mSentValid || !rotationAllowed()) return;
+
+    if (auto* head = player->getActorHeadRotationComponent())
+    {
+        head->mHeadRot = mSentRot.y;
+        head->mOldHeadRot = mSentRot.y;
+    }
+    if (auto* body = player->getMobBodyRotationComponent())
+    {
+        body->yBodyRot = mSentRot.y;
+        body->yOldBodyRot = mSentRot.y;
     }
 }
 

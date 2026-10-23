@@ -427,7 +427,11 @@ void ChatBindsPanel::draw(ImDrawList* dl)
         const std::string e = "No binds yet - add one below";
         text(dl, { (mList.x + mList.z - textW(e, rpx)) * 0.5f, (mList.y + mList.w - rpx) * 0.5f }, e, white(0.4f * a), rpx);
     }
-    for (int i = 0; i < n; i++)
+    // mRows обновляются в input() (добавили/удалили строку), а mRowRects — в
+    // layout(). Между ними draw() успевал прочитать mRowRects[i] за концом
+    // вектора: «+» в панели -> чтение мусора/краш. Держим обе границы.
+    const int rows = std::min(n, (int)mRowRects.size());
+    for (int i = 0; i < rows; i++)
     {
         const RowRects& r = mRowRects[i];
         if (r.row.w < mList.y || r.row.y > mList.w) continue;
