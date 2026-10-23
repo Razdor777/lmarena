@@ -65,9 +65,11 @@ public:
     // который ставится (фиксированные 84° у GodBridge смотрели мимо грани,
     // сервер отклонял постановку — и игрок падал).
     struct BridgeProfile {
-        float lookAhead = 0.f;   // за сколько блоков до края ставить (0 → 0.9)
+        float lookAhead = 0.f;   // устарело, оставлено для совместимости
         float extendDir = 1.f;   // +1 вперёд, -1 за спину
-        int places = 0;          // 0 → берём mPlaces
+        int   aheadCells = 1;    // НА СКОЛЬКО КЛЕТОК вперёд растёт мост
+        int   places = 0;        // 0 → берём mPlaces
+        int   gapMs = 0;         // 0 → kMinPlaceGapMs; свой ритм у каждого режима
         bool airOnly = false;    // ставить только в воздухе
         bool autoJump = false;
         bool sprint = false;
@@ -99,6 +101,10 @@ public:
     BoolSetting mTest = BoolSetting("Diagonal bypass", "Test", false);
 
     EnumSettingT<BridgeMode> mBridgeMode = EnumSettingT<BridgeMode>("Bridge Mode", "Bridging style: where the block goes and the rhythm", BridgeMode::Normal, "Normal", "GodBridge", "Breezily", "Moonwalk", "Telly");
+    // Раньше уровень моста (Y) держался жёстко: в воздухе он не менялся ни при
+    // каком раскладе. Теперь это настройка: выключишь — мост пойдёт ступенькой
+    // за игроком (вверх на прыжке и вниз на просадке), включишь — ровная линия.
+    BoolSetting mSameY = BoolSetting("Same Y", "Keep the bridge on one Y level (off = follow the player up/down)", true);
     NumberSetting mRotateSpeed = NumberSetting("Rotate Speed", "How fast the head turns to the block (x18 degrees per tick)", 1.6, 0.2, 5, 0.05);
     NumberSetting mRotateHold = NumberSetting("Rotate Hold", "How long the head keeps looking at the bridge after the last block (ms, min 250)", 300, 0, 1500, 10);
     // Новое имя (было "Rotate First", по умолчанию выключено): старые конфиги
@@ -133,6 +139,7 @@ public:
             &mSwing,
             &mTest,
             &mBridgeMode,
+            &mSameY,
             &mRotateSpeed,
             &mRotateHold,
             &mRotateFirst,

@@ -76,34 +76,41 @@ Scaffold::BridgeProfile Scaffold::getBridgeProfile() const
     // Мост задаёт только геометрию и ритм: за сколько блоков до края ставить,
     // вперёд или за спину, сколько клеток за тик имеет смысл и надо ли прыгать.
     // Угол головы больше не задаётся числом — она смотрит В блок.
+    // Ключевое отличие режимов — НА СКОЛЬКО КЛЕТОК вперёд ставится блок и
+    // каким ритмом. Раньше разница была только в lookAhead (0.85…1.10): пол-
+    // блока в ту или другую сторону почти всегда попадает в ТУ ЖЕ клетку,
+    // поэтому все режимы и выглядели одинаково.
     BridgeProfile p{};
     switch (mBridgeMode.mValue)
     {
     case BridgeMode::GodBridge:
-        p.lookAhead = 0.95f;   // вплотную: блок появляется прямо перед ногой
-        p.places    = 1;
-        p.autoJump  = true;
-        p.sprint    = true;
+        p.aheadCells = 1;      // блок встаёт прямо перед ногой
+        p.places     = 1;
+        p.gapMs      = 90;     // самый плотный ритм
+        p.autoJump   = true;   // прыжок только на краю (mNeedJump)
+        p.sprint     = true;
         break;
     case BridgeMode::Breezily:
-        p.lookAhead = 0.85f;
-        p.places    = 2;       // по диагонали — две клетки за тик
-        p.sprint    = true;
+        p.aheadCells = 2;      // мост уходит на две клетки вперёд
+        p.places     = 2;      // и за тик можно поставить обе
+        p.gapMs      = 150;    // размереннее GodBridge
+        p.sprint     = true;
         break;
     case BridgeMode::Moonwalk:
         // Блоки уходят ЗА спину: идёшь вперёд — мост растёт за тобой.
-        p.lookAhead = 0.90f;
-        p.extendDir = -1.f;
-        p.places    = 1;
+        p.aheadCells = 1;
+        p.extendDir  = -1.f;
+        p.places     = 1;
+        p.gapMs      = 120;
         break;
     case BridgeMode::Telly:
-        // Прыжок → ставим только в воздухе и чуть дальше, чтобы приземлиться
-        // уже на мост.
-        p.lookAhead = 1.10f;
-        p.places    = 2;
-        p.airOnly   = true;
-        p.autoJump  = true;
-        p.sprint    = true;
+        // Только в воздухе, блоки на три клетки вперёд: приземляешься уже на мост.
+        p.aheadCells = 3;
+        p.places     = 2;
+        p.gapMs      = 90;
+        p.airOnly    = true;
+        p.autoJump   = true;
+        p.sprint     = true;
         break;
     default:
         break;
@@ -212,6 +219,12 @@ void Scaffold::updatePlacementFrame(Actor* player)
         // На земле уровень — это блок под ногами (может и подняться, и опуститься).
         mBridgeY = support;
     }
+    else if (!mSameY.mValue)
+    {
+        // Same Y выключен: уровень идёт за игроком и в воздухе — мост
+        // получается ступенькой (вверх на прыжке, вниз на просадке).
+        mBridgeY = support;
+    }
     else if (support < mBridgeY)
     {
         // Падаем ниже моста — уровень едет вниз, чтобы успеть поставить под себя.
@@ -245,9 +258,14 @@ void Scaffold::updatePlacementFrame(Actor* player)
     mDir = dir;
     mHasDir = true;
 
-    const float ahead = prof.lookAhead > 0.f ? prof.lookAhead : 0.9f;
-    mAheadCell = { static_cast<int>(std::floor(pos.x + dir.x * ahead)), mBridgeY,
-                   static_cast<int>(std::floor(pos.z + dir.y * ahead)) };
+    // Клетка по ходу: шаг целыми клетками (1 — GodBridge/Moonwalk, 2 — Breezily,
+    // 3 — Telly). Раньше здесь был дробный lookAhead, и любой режим попадал
+    // в соседнюю клетку — визуально они были неотличимы.
+    const int ahead = std::clamp(prof.aheadCells, 1, 4);
+    glm::ivec2 step = { static_cast<int>(std::lround(dir.x)), static_cast<int>(std::lround(dir.y)) };
+    if (step.x == 0 && step.y == 0) step = { 0, 1 };
+    mAheadCell = { static_cast<int>(std::floor(pos.x)) + step.x * ahead, mBridgeY,
+                   static_cast<int>(std::floor(pos.z)) + step.y * ahead };
 }
 
 void Scaffold::updateAutoJump(BaseTickEvent& event)
@@ -347,7 +365,8 @@ void Scaffold::onBaseTickEvent(BaseTickEvent& event)
     // Под ногами пусто — это не «залп», а спасение: ставим сразу.
     const uint64_t now = static_cast<uint64_t>(NOW);
     const bool underIsAir = BlockUtils::isAirBlock(mUnderCell);
-    if (!underIsAir && now - mLastPlaceTime < kMinPlaceGapMs) return;
+    const uint64_t gap = prof.gapMs > 0 ? static_cast<uint64_t>(prof.gapMs) : kMinPlaceGapMs;
+    if (!underIsAir && now - mLastPlaceTime < gap) return;
 
     for (int i = 0; i < places; i++)
     {
@@ -749,11 +768,31 @@ void Scaffold::collectPlaceCells(Actor* player, std::vector<glm::ivec3>& out, in
 
     if (!Keyboard::isUsingMoveKeys() || !mHasDir) return;
 
-    const glm::ivec3 ahead = mAheadCell;
-    if (ahead != mUnderCell && usable(ahead)) out.push_back(ahead);
+    // Мост растёт по линии: клетки идут от ближней к дальней, иначе дальняя
+    // не к чему лепить. Сколько клеток — задаёт режим (1/2/3).
+    const BridgeProfile prof = getBridgeProfile();
+    const int aheadCells = std::clamp(prof.aheadCells, 1, 4);
+
+    glm::ivec2 step = { static_cast<int>(std::lround(mDir.x)), static_cast<int>(std::lround(mDir.y)) };
+    if (step.x == 0 && step.y == 0) step = { 0, 1 };
+
+    for (int k = 1; k <= aheadCells && static_cast<int>(out.size()) < maxCells; ++k)
+    {
+        const glm::ivec3 c = { mUnderCell.x + step.x * k, mBridgeY, mUnderCell.z + step.y * k };
+        if (c == mUnderCell) continue;
+        if (!BlockUtils::isAirBlock(c)) continue;                   // уже стоит — идём дальше
+        if (BlockUtils::getBlockPlaceFace(c) == -1) break;          // не к чему лепить — дальше некуда
+        if (cellBlocksPlayer(c)) continue;
+        if (c.y > mBridgeY) break;
+        out.push_back(c);
+    }
     if (static_cast<int>(out.size()) >= maxCells) return;
 
-    if (ahead.x != mUnderCell.x && ahead.z != mUnderCell.z)
+    // Диагональ: только для ближней клетки — иначе «боковые» улетят на
+    // несколько клеток в сторону.
+    const glm::ivec3 ahead = mAheadCell;
+    if (aheadCells == 1 && ahead != mUnderCell &&
+        ahead.x != mUnderCell.x && ahead.z != mUnderCell.z)
     {
         const glm::ivec3 sideA = { ahead.x, mBridgeY, mUnderCell.z };
         const glm::ivec3 sideB = { mUnderCell.x, mBridgeY, ahead.z };

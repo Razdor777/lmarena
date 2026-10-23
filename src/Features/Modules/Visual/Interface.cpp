@@ -149,7 +149,7 @@ namespace
     // Шаг модели: ровно один за кадр, ДО отрисовки игрока. Время меряем сами:
     // ImGui::GetIO().DeltaTime обновляется в NewFrame, а мир может рисоваться
     // и до, и после него — шаг «плыл» бы вместе с порядком кадров.
-    void interfaceStepModel(Actor* player, float pitch, float headYaw)
+    void interfaceStepModel(Actor* player, float pitch, float headYaw, float camYaw)
     {
         static auto lastStep = std::chrono::steady_clock::now();
         const auto nowTp = std::chrono::steady_clock::now();
@@ -165,17 +165,22 @@ namespace
         pLerpedHeadYaw = interfaceFollow(pLerpedHeadYaw, headYaw, kHead);
         pLerpedPitch   = interfaceFollow(pLerpedPitch,   pitch,   kHead);
 
-        // Корпус. Раньше он приходил из BodyYaw (20 Гц, из пакетной ротации)
-        // с клампом ±75° от головы: из-за клампа тело не могло развернуться,
-        // когда игрок идёт спиной вперёд, и вообще «не поворачивалось».
-        // Теперь корпус считается покадрово и смотрит туда, КУДА ИДЁМ:
-        //   • вперёд/по диагонали — почти как голова;
-        //   • вбок (A/D) — тело разворачивается по ходу, как в ваниле;
-        //   • назад (S) — тело разворачивается на 180°, голова остаётся на
-        //     камере: это и есть «поворот тела при ходьбе назад»;
-        //   • стоим — тело плавно догоняет голову.
+        // Корпус. Считается покадрово (раньше — 20 Гц из BodyYaw с клампом
+        // ±75° от головы, из-за клампа тело вообще не могло довернуться).
+        //
+        // Два разных случая:
+        //   1. Голову отвернул МОДУЛЬ (Scaffold в Backwards, Aura на цели):
+        //      голова ушла от камеры больше чем на 100° — корпус идёт за
+        //      головой, иначе «тело стоит как есть, а голова крутится сама».
+        //   2. Голова = камера: корпус смотрит туда, КУДА ИДЁМ (вперёд,
+        //      по диагонали, вбок по ходу, назад — разворот на 180°).
+        static bool bodyFollowsAim = false;
+        const float aimVsCam = std::fabs(interfaceWrap(headYaw - camYaw));
+        if (aimVsCam > 100.f)      bodyFollowsAim = true;
+        else if (aimVsCam < 75.f)  bodyFollowsAim = false;
+
         float bodyTarget = pLerpedHeadYaw;
-        if (player)
+        if (!bodyFollowsAim && player)
         {
             if (auto* sv = player->getStateVectorComponent())
             {
@@ -388,7 +393,9 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     const float srcPitch = fresh ? pPitch : realPitch;
     const float srcHead  = fresh ? pHeadYaw : realHeadRot;
 
-    interfaceStepModel(player, srcPitch, srcHead);
+    // camYaw — это НЕ голова: компоненту головы правят те же модули, что и
+    // пакет. Камера игрока живёт в mYaw компоненты ротации.
+    interfaceStepModel(player, srcPitch, srcHead, actorRotations->mYaw);
 
     // old = current: модель должна показывать РОВНО посчитанный угол. Старое
     // значение здесь не нужно — угол уже сглажен покадрово, а «догоняющая»

@@ -30,18 +30,19 @@
 namespace
 {
     // Метрики фиксированы — никаких настроек масштаба и плотности.
-    constexpr float kPadX      = 12.f;
+    constexpr float kPadX      = 13.f;
     constexpr float kPadY      = 10.f;
-    constexpr float kBadge     = 20.f;   // сторона квадрата со значком
-    constexpr float kBadgeGap  = 10.f;   // от значка до текста
-    constexpr float kCardGap   = 7.f;
+    constexpr float kBadge     = 22.f;   // сторона квадрата со значком
+    constexpr float kBadgeGap  = 11.f;   // от значка до текста
+    constexpr float kCardGap   = 8.f;
     constexpr float kMargin    = 12.f;
-    constexpr float kRounding  = 8.f;
+    constexpr float kRounding  = 10.f;
+    constexpr float kAccentW   = 3.f;    // полоска-акцент у левого края
     constexpr float kInTime    = 0.18f;
     constexpr float kOutTime   = 0.15f;
     constexpr float kFontSize  = 15.f;   // заголовок
     constexpr float kSubSize   = 12.5f;  // подпись
-    constexpr float kMinWidth  = 168.f;
+    constexpr float kMinWidth  = 175.f;
     constexpr float kMaxWidth  = 420.f;
     constexpr int   kMaxVisible = 6;
     constexpr size_t kMaxStored = 16;
@@ -292,23 +293,30 @@ void Notifications::onRenderEvent(RenderEvent& event)
             return (col & ~IM_COL32_A_MASK) | (static_cast<ImU32>(std::clamp(a, 0, 255)) << IM_COL32_A_SHIFT);
         };
 
-        // ── подложка ──────────────────────────────────────────────────────
-        // Плотный почти-чёрный фон: карточка читается на любом небе и не
-        // требует блюра под собой.
-        drawList->AddRectFilled(min, max, IM_COL32(17, 18, 22, static_cast<int>(245 * alpha)), kRounding);
+        // ── тень ─────────────────────────────────────────────────────────
+        // Одна заливка со смещением: карточка «стоит» над миром, а не
+        // приклеена к небу. Дороже одной AddRectFilled ничего нет.
+        drawList->AddRectFilled({ min.x + 2.f, min.y + 3.f }, { max.x + 2.f, max.y + 3.f },
+                                IM_COL32(0, 0, 0, static_cast<int>(70 * alpha)), kRounding);
 
-        // Тонкая световая кромка сверху — объём без градиентного меша.
-        drawList->AddLine({ min.x + kRounding, min.y + 0.5f }, { max.x - kRounding, min.y + 0.5f },
-                          IM_COL32(255, 255, 255, static_cast<int>(16 * alpha)), 1.f);
+        // ── подложка ─────────────────────────────────────────────────────
+        drawList->AddRectFilled(min, max, IM_COL32(16, 17, 21, static_cast<int>(246 * alpha)), kRounding);
 
-        // Рамка в цвете события — тип читается по контуру, а не по тексту.
-        drawList->AddRect(min, max, withAlpha(accent, 0.42f), kRounding, 0, 1.f);
+        // Нейтральная рамка: цвет события несут акцент и значок, а не контур —
+        // так карточка не выглядит «обведённой фломастером».
+        drawList->AddRect(min, max, IM_COL32(255, 255, 255, static_cast<int>(20 * alpha)),
+                          kRounding, 0, 1.f);
+
+        // Полоска-акцент у левого края — тип события видно издалека.
+        drawList->AddRectFilled({ min.x + 1.f, min.y + 8.f },
+                                { min.x + 1.f + kAccentW, max.y - 8.f },
+                                withAlpha(accent, 0.90f), kAccentW * 0.5f);
 
         // ── значок ───────────────────────────────────────────────────────
         const float badgeX = min.x + kPadX;
         const float badgeY = y + (cardH - kBadge) * 0.5f;
         drawList->AddRectFilled({ badgeX, badgeY }, { badgeX + kBadge, badgeY + kBadge },
-                                withAlpha(accent, 0.20f), 6.f);
+                                withAlpha(accent, 0.17f), 7.f);
         drawBadgeGlyph(drawList, entry.icon,
                        { badgeX + kBadge * 0.5f, badgeY + kBadge * 0.5f },
                        withAlpha(accent, 0.95f));
@@ -318,7 +326,7 @@ void Notifications::onRenderEvent(RenderEvent& event)
         const float textTop = y + (cardH - textH) * 0.5f;
 
         drawList->AddText(font, kFontSize, { textX, textTop },
-                          IM_COL32(244, 246, 250, static_cast<int>(255 * alpha)),
+                          IM_COL32(243, 245, 249, static_cast<int>(255 * alpha)),
                           entry.title.c_str());
 
         if (hasSub)
@@ -329,14 +337,15 @@ void Notifications::onRenderEvent(RenderEvent& event)
         }
 
         // ── время жизни ──────────────────────────────────────────────────
+        // Полоска внутри карточки, с отступом от скруглений: раньше она шла
+        // от самого края и на скруглённом низе выглядела как обрубок.
         const float remain = std::clamp(1.f - entry.life / (std::max)(entry.duration, 0.001f), 0.f, 1.f);
         if (remain > 0.01f && outT <= 0.f)
         {
-            const float inset = 1.f;
-            const float barW  = (entry.width - inset * 2.f) * remain;
-            drawList->AddRectFilled({ min.x + inset, max.y - 2.6f },
-                                    { min.x + inset + barW, max.y - 1.0f },
-                                    withAlpha(accent, 0.55f), 1.f);
+            const float barW = (entry.width - kPadX * 2.f) * remain;
+            drawList->AddRectFilled({ min.x + kPadX, max.y - 5.f },
+                                    { min.x + kPadX + barW, max.y - 3.2f },
+                                    withAlpha(accent, 0.62f), 1.f);
         }
     }
 
