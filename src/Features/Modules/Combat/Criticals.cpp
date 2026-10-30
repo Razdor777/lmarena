@@ -69,8 +69,9 @@ void Criticals::applyNative()
     if (!critpatch::find(reinterpret_cast<const uint8_t*>(text.data()), text.size(), base, plan, why))
     {
         ChatUtils::displayClientMessage(
-            "§c[Criticals] §fВ этом билде игры нет ожидаемой цепочки проверок критов (" + why + "). "
-            "Оставь режим PocketMine или AuthInput.");
+            "§c[Criticals] §fАвтопоиск проверок критов не сработал (" + why + "). "
+            "Глянь, что есть в этой сборке: §6.crit scan§f. "
+            "Если там пусто — оставь режим PocketMine или AuthInput.");
         setEnabled(false);
         return;
     }

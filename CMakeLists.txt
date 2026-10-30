@@ -183,6 +183,7 @@ set_source_files_properties(
         src/Features/ChatBinds/ChatBinds.cpp
         src/Features/GUI/ChatBindsPanel.cpp
         src/Features/Command/Commands/ConnectCommand.cpp
+        src/Features/Command/Commands/CritCommand.cpp
         src/Features/Modules/Misc/AccountManager.cpp
         src/Features/Modules/Misc/AutoContract.cpp
         src/Features/Modules/Misc/QuickConnect.cpp
