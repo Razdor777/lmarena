@@ -42,6 +42,7 @@ ANCHOR_STRINGS = [
     "game.player.attack.nodamage",
     "critical_hit_emitter",
     "critical_hit",
+    "critical",
     "entity_attack",
     # самый живучий якорь: путь исходника в assert'ах Player::*
     "player\\player.cpp",
@@ -215,8 +216,12 @@ def main():
         func = ida_funcs.get_func(ea)
         f_rva = (func.start_ea - imagebase) if func else -1
         f_size = (func.end_ea - func.start_ea) if func else 0
+        base_ea = start + hit["anchor"]
+        rel = [site_ea - base_ea for site_ea in hit["sites"]]
         print("  #%d  anchor_rva=%X  переходов в «не крит»: %d  цель крита: +0x%X"
               % (idx, ea - imagebase, len(hit["sites"]), hit["crit"] - (start + hit["anchor"])))
+        print("      отпечаток (смещения сайтов от anchor): %s"
+              % " ".join("-0x%X" % (-r) if r < 0 else "+0x%X" % r for r in rel))
         print("      функция: rva=%X size=0x%X name=%s"
               % (f_rva, f_size, idc.get_func_name(func.start_ea) if func else "?"))
 
