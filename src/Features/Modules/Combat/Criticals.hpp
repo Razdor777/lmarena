@@ -6,10 +6,13 @@ class PacketOutEvent;
 
 class Criticals : public ModuleBase<Criticals> {
 public:
-    enum class Mode { PocketMine, AuthInput };
+    // Native — не фейковые пакеты, а патч самой игры: ванильные проверки
+    // «можно ли крит» перестают отсекать удар. Работает только если в бинарнике
+    // нашлась ожидаемая цепочка переходов (см. Utils/MiscUtils/CritPatchUtils.hpp).
+    enum class Mode { PocketMine, AuthInput, Native };
 
     EnumSettingT<Mode> mMode = EnumSettingT<Mode>(
-        "Mode", "How to fake the fall", Mode::PocketMine, "PocketMine", "AuthInput");
+        "Mode", "How to get criticals", Mode::PocketMine, "PocketMine", "AuthInput", "Native");
     NumberSetting mHeight = NumberSetting(
         "Height", "Fake jump height (PMMP ~0.1, AuthInput try 0.1-0.42)", 0.1f, 0.01f, 0.5f, 0.01f);
     BoolSetting mOnlyOnGround = BoolSetting(
@@ -24,6 +27,10 @@ public:
         })
     {
         addSettings(&mMode, &mHeight, &mOnlyOnGround);
+
+        // В нативном режиме высота прыжка и «только на земле» не используются.
+        VISIBILITY_CONDITION(mHeight, mMode.mValue != Mode::Native);
+        VISIBILITY_CONDITION(mOnlyOnGround, mMode.mValue != Mode::Native);
     }
 
     void onEnable() override;
@@ -50,4 +57,5 @@ private:
     int64_t mLastFakeTick = -1;    // чтобы не слать фейки несколько раз за один тик
 
     void sendFake(float yOffset, float yDelta, AuthInputAction flags);
+    void applyNative();
 };
