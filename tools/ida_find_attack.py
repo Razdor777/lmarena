@@ -36,13 +36,16 @@ except ImportError:
     HAVE_IDA = False
 
 ANCHOR_STRINGS = [
+    # звуки удара — есть не во всех билдах
     "game.player.attack.strong",
     "game.player.attack.weak",
     "game.player.attack.nodamage",
     "critical_hit_emitter",
     "critical_hit",
-    "minecraft:critical",
     "entity_attack",
+    # самый живучий якорь: путь исходника в assert'ах Player::*
+    "player\\player.cpp",
+    "player.cpp",
 ]
 
 MAX_BACK = 0x400        # насколько вверх смотрим соседей (в 1.26.51 хватало 0x169)
@@ -173,22 +176,7 @@ def main():
     print("[*] .text: %X..%X (%d МБ), imagebase %X"
           % (start, end, len(data) // (1024 * 1024), imagebase))
 
-    # ── A
-    print("\n=== A. ПО СТРУКТУРЕ ===")
-    hits = find_structural(data, start)
-    if not hits:
-        print("  цепочек не найдено")
-    for idx, hit in enumerate(hits[:6], 1):
-        ea = start + hit["anchor"]
-        func = ida_funcs.get_func(ea)
-        f_rva = (func.start_ea - imagebase) if func else -1
-        f_size = (func.end_ea - func.start_ea) if func else 0
-        print("  #%d  anchor_rva=%X  переходов в «не крит»: %d  цель крита: +0x%X"
-              % (idx, ea - imagebase, len(hit["sites"]), hit["crit"] - (start + hit["anchor"])))
-        print("      функция: rva=%X size=0x%X name=%s"
-              % (f_rva, f_size, idc.get_func_name(func.start_ea) if func else "?"))
-
-    # ── B
+    # ── B сначала: он даёт маленький список кандидатов, и структуру ищем уже в них
     print("\n=== B. ПО СТРОКАМ ===")
     by_string, funcs = find_by_strings(ANCHOR_STRINGS)
     if not by_string:
@@ -200,6 +188,37 @@ def main():
             size = (func.end_ea - func.start_ea) if func else 0
             print("  %-28s -> rva=%X size=0x%X %s"
                   % (needle, ea - imagebase, size, idc.get_func_name(ea)))
+
+    # ── A
+    print("\n=== A. ПО СТРУКТУРЕ ===")
+    hits = []
+    if funcs:
+        print("  ищем только внутри функций-кандидатов (%d шт.)" % len(funcs))
+        for fstart in sorted(funcs):
+            func = ida_funcs.get_func(fstart)
+            if func is None:
+                continue
+            body = ida_bytes.get_bytes(func.start_ea, func.end_ea - func.start_ea) or b""
+            if not body:
+                continue
+            for hit in find_structural(body, func.start_ea)[:2]:
+                hits.append(hit)
+        hits.sort(key=lambda h: (-len(h["sites"]), h["anchor"]))
+    else:
+        print("  кандидатов по строкам нет — сканируем весь .text (это дольше)")
+        hits = find_structural(data, start)
+
+    if not hits:
+        print("  цепочек не найдено")
+    for idx, hit in enumerate(hits[:6], 1):
+        ea = start + hit["anchor"]
+        func = ida_funcs.get_func(ea)
+        f_rva = (func.start_ea - imagebase) if func else -1
+        f_size = (func.end_ea - func.start_ea) if func else 0
+        print("  #%d  anchor_rva=%X  переходов в «не крит»: %d  цель крита: +0x%X"
+              % (idx, ea - imagebase, len(hit["sites"]), hit["crit"] - (start + hit["anchor"])))
+        print("      функция: rva=%X size=0x%X name=%s"
+              % (f_rva, f_size, idc.get_func_name(func.start_ea) if func else "?"))
 
     # ── C
     print("\n=== C. ВЕРДИКТ ===")
