@@ -8,6 +8,8 @@
 #include <fstream>
 #include <Features/FeatureManager.hpp>
 #include <Features/Modules/Misc/DeviceSpoof.hpp>
+#include <Features/Modules/Misc/Diagnostics.hpp>
+#include <Features/Modules/ModuleToggle.hpp>
 #include <Features/Configs/ConfigManager.hpp>
 #include <Hook/HookManager.hpp>
 #include <Hook/Hooks/RenderHooks/D3DHook.hpp>
@@ -236,6 +238,8 @@ void Solstice::init(HMODULE hModule)
 
 void Solstice::shutdownThread()
 {
+    ExceptionHandler::markThread(ExceptionHandler::Background);
+
     // Wait for the user to press END
     bool firstCall = true;
     bool isLpValid = false;
@@ -296,12 +300,20 @@ void Solstice::shutdownThread()
             // the loaded default config previously had it disabled.
             auto deviceSpoof = gFeatureManager->mModuleManager->getModule<DeviceSpoof>();
             if (deviceSpoof) deviceSpoof->setEnabled(true);
+
+            // Diagnostics тоже включаем принудительно: конфиг мог прийти из
+            // сборки, где такого модуля не было, и тогда .diag покажет нули по
+            // событиям просто потому, что модуль выключен.
+            auto diagnostics = gFeatureManager->mModuleManager->getModule<Diagnostics>();
+            if (diagnostics) diagnostics->setEnabled(true);
         }
 
         patchInHandSlot(ClientInstance::get()->getLocalPlayer() != nullptr);
 
         mLastTick = NOW;
-        gFeatureManager->mModuleManager->onClientTick();
+        // onEnable/onDisable модулей: пока игра тикает — в её потоке
+        // (BaseTickHook), отсюда — только в меню (см. ModuleToggle.hpp).
+        ModuleToggle::fromBackgroundThread();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
@@ -344,6 +356,10 @@ void Solstice::shutdownThread()
     Sleep(1000); // Give the user time to read the message
 
     Logger::deinitialize();
+
+    // Обработчик крашей — вернуть прежний: после выгрузки DLL наш код уже не в
+    // памяти, и следующий краш процесса прыгнул бы в пустоту.
+    ExceptionHandler::shutdown();
 
     // ---- unload ---------------------------------------------------------
     //

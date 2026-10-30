@@ -63,6 +63,7 @@ static void serverTeleport(glm::vec3 from, glm::vec3 to, float stepDist = 8.0f)
 
 void TeleportCommand::execute(const std::vector<std::string>& args)
 {
+    sLastUse.store(static_cast<uint64_t>(NOW));
     auto player = ClientInstance::get()->getLocalPlayer();
 
     if (args.size() < 2)

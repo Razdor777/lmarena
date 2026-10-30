@@ -320,6 +320,7 @@ void ModernGui::onOpen()
 void ModernGui::onClose()
 {
     if (mText.active) finishText(false);
+    mChatBinds.close();
     mBind = {}; mPicker.open = false; mDrag.set = nullptr; mDragPanel = -1;
     mSearch.clear(); mFilterDirty = true; mTooltip = {};
     mCursorTrail.clear();
@@ -556,6 +557,7 @@ void ModernGui::resolveHover()
     if (mDragPanel >= 0) { mHoveredCat = mDragPanel; return; }
     if (mPicker.open && in(mPicker.rect, mMouse)) return;
     if (in(mSearchRect, mMouse)) return;
+    if (mChatBinds.hovered()) return; // кнопка/карточка чат-биндов поверх панелей
     for (auto it = mDrawOrder.rbegin(); it != mDrawOrder.rend(); ++it)
         if (panelVisible(*it) && in(mPanels[*it].window, mMouse)) { mHoveredCat = (int)*it; return; }
 }
@@ -713,6 +715,8 @@ bool ModernGui::onKey(int vk, bool pressed)
 {
     if (!mIsEnabled) return false;
     if (mBind.active) { if (pressed) setBindKey(vk); return true; }
+    // Чат-бинды: ввод текста / захват клавиши / ESC закрывает карточку.
+    if (mChatBinds.onKey(vk, pressed)) return true;
     if (!pressed) return false;
     bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
 
@@ -1477,11 +1481,20 @@ void ModernGui::render(float animation, float inScale, float blur, float midclic
         float W = S(kCatW) * 1.25f;
         mSearchRect  = tf({ mCenter.x - W * 0.5f, S(12), mCenter.x + W * 0.5f, S(12) + S(36) });
         mSearchClear = { mSearchRect.z - P(30), mSearchRect.y, mSearchRect.z, mSearchRect.w };
+        // Чат-бинды — кнопка той же высоты справа от поиска.
+        const ImVec4 binds = { mSearchRect.z + P(10), mSearchRect.y, mSearchRect.z + P(10) + P(158), mSearchRect.w };
+        mChatBinds.layout(binds, mScale * mInScale, mAnim, ColorUtils::getThemedColor(0),
+                          mIsEnabled && mAnim > 0.5f && !mPicker.open && !mBind.active && mDragPanel < 0 && !mDrag.set);
     }
     layoutPicker();
     resolveHover();
 
     if (mIsEnabled && mAnim > 0.001f) {
+        // Первыми — чат-бинды: карточка лежит поверх панелей.
+        mChatBinds.input();
+        if (mChatBinds.consumedClick()) mClickConsumed = true;
+        if (mChatBinds.hovered()) mWheelConsumed = true;
+        if (mChatBinds.isCapturing() && mText.active) finishText(mText.kind != TextEdit::Search);
         inputPicker();
         inputSearch();
         for (auto it = mDrawOrder.rbegin(); it != mDrawOrder.rend(); ++it)
@@ -1494,6 +1507,7 @@ void ModernGui::render(float animation, float inScale, float blur, float midclic
     drawSearch();
     for (size_t i : mDrawOrder)
         drawPanel(i);
+    mChatBinds.draw(mDl);
     drawPicker();
     if (hints) drawHints();
     drawTooltip();

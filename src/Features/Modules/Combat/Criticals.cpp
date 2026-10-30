@@ -1,5 +1,7 @@
 #include "Criticals.hpp"
 
+#include <cstdio>
+
 #include <Features/FeatureManager.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
@@ -9,19 +11,83 @@
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 
+#include <Utils/GameUtils/ChatUtils.hpp>
+#include <Utils/MiscUtils/CritPatchUtils.hpp>
+#include <libhat.hpp>
+
 void Criticals::onEnable()
 {
-    gFeatureManager->mDispatcher->listen<PacketOutEvent, &Criticals::onPacketOutEvent,
-        nes::event_priority::VERY_LAST>(this);
     mSnap = {};
     mSending = false;
     mLastFakeTick = -1;
+
+    if (mMode.mValue == Mode::Native)
+    {
+        applyNative();
+        return;
+    }
+
+    gFeatureManager->mDispatcher->listen<PacketOutEvent, &Criticals::onPacketOutEvent,
+        nes::event_priority::VERY_LAST>(this);
 }
 
 void Criticals::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Criticals::onPacketOutEvent>(this);
     mSnap = {};
+
+    if (critpatch::isApplied())
+    {
+        critpatch::restore();
+        ChatUtils::displayClientMessage("§e[Criticals] §fНативный патч снят, проверки критов возвращены как было.");
+    }
+}
+
+// Нативный режим: ищем в .text цепочку проверок и глушим её.
+// Ничего не делаем, если структура не совпала — молча патчить незнакомый код
+// хуже, чем не работать вообще.
+void Criticals::applyNative()
+{
+    if (critpatch::isApplied())
+    {
+        ChatUtils::displayClientMessage("§a[Criticals] §fНативный патч уже применён.");
+        return;
+    }
+
+    auto text = hat::process::get_process_module().get_section_data(".text");
+    if (text.empty())
+    {
+        ChatUtils::displayClientMessage("§c[Criticals] §fНе смог прочитать .text игры.");
+        setEnabled(false);
+        return;
+    }
+
+    critpatch::Plan plan;
+    std::string why;
+
+    const uintptr_t base = reinterpret_cast<uintptr_t>(text.data());
+    if (!critpatch::find(reinterpret_cast<const uint8_t*>(text.data()), text.size(), base, plan, why))
+    {
+        ChatUtils::displayClientMessage(
+            "§c[Criticals] §fАвтопоиск проверок критов не сработал (" + why + "). "
+            "Глянь, что есть в этой сборке: §6.crit scan§f. "
+            "Если там пусто — оставь режим PocketMine или AuthInput.");
+        setEnabled(false);
+        return;
+    }
+
+    if (!critpatch::apply(plan))
+    {
+        ChatUtils::displayClientMessage("§c[Criticals] §fЦепочка найдена, но записать патч не удалось.");
+        setEnabled(false);
+        return;
+    }
+
+    char buffer[192];
+    snprintf(buffer, sizeof(buffer),
+             "§a[Criticals] §fНативный патч применён: §6%zu§f переходов, крит-блок +0x%llX.",
+             plan.sites.size(), static_cast<unsigned long long>(plan.critBlock - base));
+    ChatUtils::displayClientMessage(buffer);
 }
 
 void Criticals::sendFake(float yOffset, float yDelta, AuthInputAction flags)

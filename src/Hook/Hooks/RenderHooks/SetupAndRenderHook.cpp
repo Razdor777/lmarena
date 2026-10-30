@@ -39,7 +39,18 @@ void* SetupAndRenderHook::onSetupAndRender(void* screenView, void* mcuirc)
         playerPos = player->getRenderPositionComponent()->mPosition;
     }
 
-    if (D3DHook::FrameTransforms) D3DHook::FrameTransforms->push({ ci->getViewMatrix(), origin, playerPos, ci->getFov() });
+    {
+        // Забирает кадр Present в потоке рендера — очередь только под
+        // блокировкой (см. D3DHook::FrameTransformsMutex).
+        FrameTransform transform{ ci->getViewMatrix(), origin, playerPos, ci->getFov() };
+        std::lock_guard<std::mutex> lock(D3DHook::FrameTransformsMutex);
+        if (D3DHook::FrameTransforms)
+        {
+            D3DHook::FrameTransforms->push(transform);
+            // Present не вызывается (окно свёрнуто) — не копим бесконечно.
+            while (D3DHook::FrameTransforms->size() > 64) D3DHook::FrameTransforms->pop();
+        }
+    }
 
     // Ванильный экран чата здесь НЕ прячем: внутри setupAndRender живёт не только
     // рисование, но и весь ввод экрана (набор, Enter-отправка, Esc-закрытие), и без

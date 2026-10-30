@@ -5,6 +5,9 @@
 #include <SDK/SigManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/Structs.hpp>
+
+#include <mutex>
+#include <queue>
 //
 // Created by vastrakai on 6/29/2024.
 //
@@ -20,6 +23,14 @@ public:
     }
 
     static inline std::unique_ptr<std::queue<FrameTransform>> FrameTransforms = nullptr;
+    // Очередь пополняет поток игры (ScreenView::setupAndRender), а разбирает
+    // поток рендера (Present). Без блокировки одновременные push/pop портили
+    // std::deque внутри — случайный краш где угодно, с любыми модулями.
+    static inline std::mutex FrameTransformsMutex;
+    // Ввод ImGui: Keyboard::feed / MouseDevice::feed (поток ввода) добавляют
+    // события в io, а ImGui::NewFrame (поток рендера) их разбирает — тоже
+    // только под блокировкой (ImGui не потокобезопасен).
+    static inline std::mutex ImGuiInputMutex;
     static inline int transformDelay = 3;
     static inline bool forceFallback = false;
 

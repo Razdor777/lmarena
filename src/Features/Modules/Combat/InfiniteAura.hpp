@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <mutex>
 
+struct ImDrawList;
+
 class InfiniteAura : public ModuleBase<InfiniteAura>
 {
 public:
@@ -21,7 +23,7 @@ public:
     EnumSettingT<Priority> mPriority      = EnumSettingT("Priority", "Target priority", Priority::Closest, "Closest", "Armor", "HurtBy");
     NumberSetting          mRange         = NumberSetting("Range", "The range of the aura.", 70.f, 3.f, 200.f, 0.01f);
     BoolSetting            mInfiniteRange = BoolSetting("Infinite Range", "No range limit", false);
-    NumberSetting          mAPS           = NumberSetting("APS", "Attacks per second.", 20.f, 1.f, 20.f, 0.01f);
+    NumberSetting          mAPS           = NumberSetting("APS", "CPS ceiling (real hits are timed to server confirmations)", 20.f, 1.f, 20.f, 0.01f);
     NumberSetting          mStepDistance  = NumberSetting("Step Distance", "Blocks per packet.", 8.f, 0.1f, 12.f, 0.01f);
     NumberSetting          mSwitchDelay   = NumberSetting("Switch Delay", "Delay between switches (ms)", 0, 0, 2000, 50);
 
@@ -72,6 +74,11 @@ public:
     BoolSetting              mPathFlow       = BoolSetting("Path Flow", "Animated dots running along the teleport path", true);
     NumberSetting            mPathWidth      = NumberSetting("Path Width", "Teleport path line thickness", 2.f, 1.f, 6.f, 0.5f);
 
+    // --- Debug ---
+    // Одна настройка: показывает, что реально происходит с ударами. Нужна,
+    // чтобы измерить настоящую задержку сервера, а не гадать по CPS.
+    BoolSetting              mDebug          = BoolSetting("Debug", "Sent vs confirmed hits: real delay, real APS, interval history", false);
+
     InfiniteAura() : ModuleBase("InfiniteAura", "Attack players at any distance via chain TP",
         ModuleCategory::Combat, 0, false)
     {
@@ -87,7 +94,8 @@ public:
             &mAutoShield,
             &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked,
             &mTargetInfo, &mHitTrail, &mTrailPoints, &mHitSparks,
-            &mPathFlow, &mPathWidth
+            &mPathFlow, &mPathWidth,
+            &mDebug
         );
 
         VISIBILITY_CONDITION(mTrailPoints, mHitTrail.mValue);
@@ -135,6 +143,31 @@ public:
     std::unordered_map<int64_t, uint64_t> mLastAttacksByID;
     std::unordered_map<int64_t, uint64_t> mRecentAttackers;
 
+    // ── Тайминг ударов: по подтверждённым попаданиям, а не по CPS ────────
+    // Сервер подтверждает удар ActorEvent HURT. Между двумя подтверждениями
+    // лежит «иммунитет» цели (~0.5 с в ванилле, по логам — ~0.67 с). Спам
+    // 20 CPS бессмысленен: почти все удары приходят в это окно и просто
+    // выбрасываются (в логе — 31 отправлен, 3 засчитано). Поэтому следующий
+    // удар уходит не по таймеру CPS, а через ИЗМЕРЕННЫЙ интервал после
+    // подтверждения, с небольшим разбросом, — так бьёт скиловый игрок.
+    struct HitTiming
+    {
+        uint64_t lastSent = 0;
+        uint64_t lastConfirmed = 0;
+        uint64_t nextAt = 0;
+        float    confirmMs = 0.f;   // сглаженная задержка подтверждения
+        float    intervalMs = 0.f;  // сглаженный интервал между хитами
+        int      sentSinceConfirm = 0;
+        bool     pending = false;   // удар отправлен, ответа ещё нет
+    };
+    std::unordered_map<int64_t, HitTiming> mHitTiming;
+
+    static constexpr float kHurtCooldownMs = 520.f; // ванильный иммунитет цели
+    static constexpr float kMaxHurtMs      = 1200.f;
+
+    bool canAttackTarget(int64_t targetId, uint64_t now, uint64_t& waitMs);
+    void onHitConfirmed(int64_t targetId);
+
     struct PositionEntry {
         glm::vec3 position;
         uint64_t timestamp;
@@ -145,6 +178,29 @@ public:
     int64_t     mLockedTargetRuntimeID = -1;
     std::string mLockedTargetName;
     int         mLockTargetKey     = VK_CAPITAL;
+
+    // ── Debug: отправлено vs подтверждено ────────────────────────────────
+    // Каждое нажатие кладём в очередь; подтверждением считаем ActorEvent HURT
+    // по этой же цели. Разница = настоящая задержка сервера. Очередь маленькая
+    // и фиксированная: рендер-поток читает её под своим мьютексом.
+    struct DebugAttack { uint64_t at; int64_t target; };
+    static constexpr int kDebugQueueSize = 64;
+    static constexpr int kDebugConfirmWindow = 32;
+    std::mutex  mDebugMutex;
+    DebugAttack mDebugQueue[kDebugQueueSize]{};
+    int         mDebugQueueCount = 0;
+    uint64_t    mDbgSent = 0, mDbgConfirmed = 0, mDbgLost = 0, mDbgForeign = 0;
+    uint64_t    mDbgLatSum = 0;
+    float       mDbgLastMs = 0.f, mDbgAvgMs = 0.f, mDbgMinMs = 0.f, mDbgMaxMs = 0.f;
+    int         mDbgHist[5] = { 0, 0, 0, 0, 0 };       // 0-50 / 50-100 / 100-200 / 200-500 / 500+
+    uint64_t    mDbgConfirmTimes[kDebugConfirmWindow]{};
+    int         mDbgConfirmCount = 0;
+    uint64_t    mDbgLastConfirmAt = 0;
+    float       mDbgLastIntervalMs = 0.f, mDbgAvgIntervalMs = 0.f;
+    uint64_t    mDbgIntervalSum = 0;
+    float       mDbgRealAps = 0.f;
+    float       mDbgPaceMs = 0.f;      // текущий интервал между ударами
+    uint64_t    mDbgNextAt = 0;        // когда разрешён следующий удар
 
     std::unordered_map<int, bool> mLockKeyStates;
     bool mIsBindingLockKey = false;
@@ -184,6 +240,12 @@ public:
     void onPacketOutEvent(PacketOutEvent& event);
     void onPacketInEvent(PacketInEvent& event);
     void onRenderEvent(RenderEvent& event);
+
+    // Debug (Task 16): измеряем реальную задержку ударов
+    void dbgRecordSent(int64_t targetId);
+    void dbgRecordHit(int64_t targetId);
+    void dbgReset();
+    void dbgRender(ImDrawList* drawList);
 
     std::string getSettingDisplay() override
     {

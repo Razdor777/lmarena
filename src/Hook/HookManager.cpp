@@ -16,6 +16,7 @@
 #include "Hooks/MiscHooks/MouseHook.hpp"
 #include "Hooks/MiscHooks/PreGameHook.hpp"
 #include "Hooks/NetworkHooks/ConnectionRequestHook.hpp"
+#include "Hooks/NetworkHooks/NetworkConnectHook.hpp"
 #include "Hooks/NetworkHooks/PacketReceiveHook.hpp"
 #include "Hooks/NetworkHooks/PacketSendHook.hpp"
 #include "Hooks/NetworkHooks/RakPeerHooks.hpp"
@@ -55,6 +56,7 @@ void HookManager::init(bool initLp)
         ADD_HOOK(ContainerScreenControllerHook);
         ADD_HOOK(MouseHook);
         ADD_HOOK(ConnectionRequestHook);
+        ADD_HOOK(NetworkConnectHook);
         ADD_HOOK(PacketReceiveHook);
         ADD_HOOK(PacketSendHook);
         ADD_HOOK(RakPeerHooks);

@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <shared_mutex>
+#include <string_view>
 #include <vector>
 
 /*
@@ -29,7 +30,45 @@ namespace nes {
             NORMAL,
             LAST
         };
+
+        // Crash breadcrumbs: which listener is running on this thread right now
+        // (innermost last). The crash handler runs on the crashed thread and
+        // reads them, so crash.log can say "BaseTickEvent -> OreMinerV2" even
+        // when there are no symbols. Two stores per handler call - free.
+        struct trigger_crumb {
+            const void* instance;   // object the handler belongs to (a module), nullptr for lambdas
+            const char* event;      // event type name, static storage, NOT NUL-terminated
+            unsigned    event_len;
+        };
+        inline constexpr int max_trigger_crumbs = 8;
+        struct trigger_crumbs {
+            trigger_crumb items[max_trigger_crumbs];
+            int depth;
+        };
+        inline thread_local trigger_crumbs t_trigger_crumbs{};
+
+        struct crumb_scope {
+            crumb_scope(const void* instance, std::string_view event) noexcept {
+                auto& t = t_trigger_crumbs;
+                if (t.depth >= 0 && t.depth < max_trigger_crumbs)
+                    t.items[t.depth] = trigger_crumb{instance, event.data(), static_cast<unsigned>(event.size())};
+                ++t.depth;
+            }
+            ~crumb_scope() { --t_trigger_crumbs.depth; }
+            crumb_scope(const crumb_scope&) = delete;
+            crumb_scope& operator=(const crumb_scope&) = delete;
+        };
+
+        template<typename event_t>
+        std::string_view event_name() noexcept {
+            return entt::type_name<event_t>::value();
+        }
     } // namespace detail
+
+    // Breadcrumbs of the calling thread (see detail::trigger_crumbs).
+    inline const detail::trigger_crumbs& current_trigger_crumbs() noexcept {
+        return detail::t_trigger_crumbs;
+    }
 
     template<typename priority_t> 
     struct event_priority_traits { using priority_type = priority_t; };
@@ -194,9 +233,26 @@ namespace nes {
         }
 
         void trigger(holder_t& holder) {
-            std::shared_lock lock(mMutex);
+            // The same thread is already inside trigger() of this event type (the
+            // event was fired from one of its own handlers, e.g. a PacketOutEvent
+            // handler sending a packet): do not take the shared lock a second
+            // time. std::shared_mutex is an SRW lock on Windows, and a recursive
+            // shared acquire deadlocks (the game freezes) as soon as another
+            // thread is waiting for the exclusive lock - listen()/deafen() from a
+            // module being toggled at that moment. The outer call still holds it.
+            static thread_local int t_depth = 0;
+            std::shared_lock<std::shared_mutex> lock(mMutex, std::defer_lock);
+            if (t_depth == 0) lock.lock();
+            struct depth_guard {
+                int& d;
+                explicit depth_guard(int& v) : d(v) { ++d; }
+                ~depth_guard() { --d; }
+            } guard(t_depth);
+
+            static const std::string_view name = detail::event_name<event_t>(); // once per event type
             for (auto& [priority, listeners] : mListeners) {
                 for (const auto& listener : listeners) {
+                    detail::crumb_scope crumb(listener.mInstance, name);
                     listener.invoke(holder);
                 }
             }

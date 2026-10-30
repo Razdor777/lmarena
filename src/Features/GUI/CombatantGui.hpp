@@ -17,6 +17,8 @@
 
 #include <imgui.h>
 
+#include <Features/GUI/ChatBindsPanel.hpp>
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -69,6 +71,7 @@ private:
     int    mHoverPanel = -1;
     std::string mHoverInfo;                // описание наведённой строки (за кадр)
 
+    ChatBindsPanel mChatBinds;             // кнопка "Chat Binds" по центру сверху
     Module*        mBindModule = nullptr;  // модуль, для которого ждём клавишу
     NumberSetting* mDragNumber = nullptr;  // слайдер, который сейчас тянем
     ImVec4         mDragTrack{};

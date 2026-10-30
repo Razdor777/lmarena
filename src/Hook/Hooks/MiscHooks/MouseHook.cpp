@@ -6,6 +6,7 @@
 
 
 #include "Features/Events/MouseEvent.hpp"
+#include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 
 struct ImGuiWindow;
 std::unique_ptr<Detour> MouseHook::mDetour = nullptr;
@@ -16,6 +17,7 @@ void MouseHook::onMouse(void* _this, char actionButtonId, int buttonData, short 
     uint8_t forceMotionlessPointer)
 {
     auto oFunc = mDetour->getOriginal<&onMouse>();
+    ExceptionHandler::markThread(ExceptionHandler::Input);
 
     thisMouse = _this;
 
@@ -35,6 +37,9 @@ void MouseHook::onMouse(void* _this, char actionButtonId, int buttonData, short 
     if (ImGui::GetCurrentContext() != nullptr) {
         ImGuiIO& io = ImGui::GetIO();
 
+        // ImGui::NewFrame (поток рендера) читает то же самое — пишем под
+        // блокировкой, см. D3DHook::ImGuiInputMutex.
+        std::unique_lock<std::mutex> imguiLock(D3DHook::ImGuiInputMutex);
         if (x != 0 && y != 0) {
             io.MousePos = ImVec2(x, y);
         }
@@ -69,6 +74,7 @@ void MouseHook::onMouse(void* _this, char actionButtonId, int buttonData, short 
         default:
             break;
         }
+        imguiLock.unlock();
         // check if we are hovering over an imgui window and cancel left click
         ImGuiWindow* window = ImGui::GetCurrentContext()->HoveredWindow;
 

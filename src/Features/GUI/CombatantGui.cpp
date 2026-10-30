@@ -120,7 +120,11 @@ namespace CombatantGuiImpl
     }
 }
 
-using namespace CombatantGuiImpl;
+// Не `using namespace CombatantGuiImpl;` на весь файл: в unity-сборке
+// (CMAKE_UNITY_BUILD) соседние .cpp склеиваются в один, и директива протекала
+// в следующие файлы (ModernDropdown: keyName/fmtValue — «неоднозначный
+// символ»). Методы ниже подключают пространство у себя, а keyName/fmtValue
+// (такие же есть в ModernDropdown) зовут с префиксом CombatantGuiImpl::.
 
 // ---------------------------------------------------------------------------
 // Преобразования координат
@@ -152,6 +156,7 @@ ImVec4 CombatantGui::numberTrack(const ImVec4& rr) const
 
 float CombatantGui::viewOffset(const PanelState& p, bool settingsView) const
 {
+    using namespace CombatantGuiImpl;
     return settingsView ? (1.f - p.swap) * S(kSlide) : -p.swap * S(kSlide);
 }
 
@@ -169,6 +174,7 @@ void CombatantGui::onOpen()
 
 void CombatantGui::onClose()
 {
+    mChatBinds.close();
     mBindModule = nullptr;
     mDragNumber = nullptr;
     for (auto& p : mPanels) p.dragging = false;
@@ -181,7 +187,7 @@ void CombatantGui::onWindowResizeEvent(WindowResizeEvent&)
 
 bool CombatantGui::onKey(int vk, bool pressed)
 {
-    if (!mBindModule) return false;
+    if (!mBindModule) return mChatBinds.onKey(vk, pressed);
     if (pressed)
     {
         mBindModule->mKey = (vk == VK_ESCAPE) ? 0 : vk;
@@ -192,6 +198,7 @@ bool CombatantGui::onKey(int vk, bool pressed)
 
 void CombatantGui::initPanels(size_t n)
 {
+    using namespace CombatantGuiImpl;
     if (mPanels.size() == n) return;
 
     mPanels.assign(n, PanelState{});
@@ -217,6 +224,7 @@ void CombatantGui::bringToFront(size_t i)
 
 std::vector<CombatantGui::Row> CombatantGui::buildModuleRows(size_t cat) const
 {
+    using namespace CombatantGuiImpl;
     std::vector<Row> rows;
     for (auto& m : gFeatureManager->mModuleManager->getModulesInCategory(static_cast<int>(cat)))
         rows.push_back({ RowKind::Module, m.get(), nullptr, S(kRowH) });
@@ -225,6 +233,7 @@ std::vector<CombatantGui::Row> CombatantGui::buildModuleRows(size_t cat) const
 
 std::vector<CombatantGui::Row> CombatantGui::buildSettingRows(Module* m) const
 {
+    using namespace CombatantGuiImpl;
     std::vector<Row> rows;
     rows.push_back({ RowKind::Back, m, nullptr, S(kRowH) });
     rows.push_back({ RowKind::Bind, m, nullptr, S(kRowH) });
@@ -245,6 +254,7 @@ std::vector<CombatantGui::Row> CombatantGui::buildSettingRows(Module* m) const
 void CombatantGui::handleRowClick(size_t i, const Row& row, const ImVec4& rr,
                                   bool left, bool right, bool middle)
 {
+    using namespace CombatantGuiImpl;
     PanelState& p = mPanels[i];
     switch (row.kind)
     {
@@ -328,6 +338,7 @@ void CombatantGui::handleRowClick(size_t i, const Row& row, const ImVec4& rr,
 
 void CombatantGui::render(float animation, float inScale, float uiScale)
 {
+    using namespace CombatantGuiImpl;
     const size_t n = ModuleCategoryNames.size();
     if (n == 0 || animation <= 0.f) return;
 
@@ -455,9 +466,23 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
         rects[i] = { p.x, p.y, p.x + S(kPanelW), p.y + S(kHeaderH) + listH };
     }
 
+    // Чат-бинды: кнопка по центру сверху, карточка — поверх панелей, поэтому
+    // её клики и колесо разбираются первыми.
+    {
+        const ImVec4 btn = T(ImVec4{ mCenter.x - S(80.f), S(12.f), mCenter.x + S(80.f), S(46.f) });
+        mChatBinds.layout(btn, mScale * mInScale, mAnim, ColorUtils::getThemedColor(0),
+                          mAnim > 0.5f && !mWaitRelease && !mBindModule && !mDragNumber);
+        mChatBinds.input();
+        if (mChatBinds.hovered() || mChatBinds.consumedClick())
+        {
+            clickL = clickR = clickM = false;
+            mWheel = 0.f;
+        }
+    }
+
     // Верхняя панель под курсором.
     mHoverPanel = -1;
-    for (auto it = mDrawOrder.rbegin(); it != mDrawOrder.rend(); ++it)
+    for (auto it = mDrawOrder.rbegin(); it != mDrawOrder.rend() && !mChatBinds.hovered(); ++it)
     {
         if (inside(rects[*it], mLayoutMouse))
         {
@@ -530,6 +555,7 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
     dl->AddRectFilled({ 0.f, 0.f }, mScreen, IM_COL32(0, 0, 0, static_cast<int>(90.f * mAnim)));
     for (size_t i : mDrawOrder)
         drawPanel(dl, i, rects[i], modRows[i], setRows[i]);
+    mChatBinds.draw(dl);
 
     // Подсказки: описание наведённого элемента и строка управления.
     const float hfs = S(kFontPx) * mInScale;
@@ -551,6 +577,7 @@ void CombatantGui::render(float animation, float inScale, float uiScale)
 void CombatantGui::drawPanel(ImDrawList* dl, size_t i, const ImVec4& r,
                              const std::vector<Row>& modRows, const std::vector<Row>& setRows)
 {
+    using namespace CombatantGuiImpl;
     const PanelState& p = mPanels[i];
     const float a = mAnim;
     const ImVec4 R = T(r);
@@ -616,6 +643,7 @@ void CombatantGui::drawPanel(ImDrawList* dl, size_t i, const ImVec4& r,
 void CombatantGui::drawRow(ImDrawList* dl, const Row& row, const ImVec4& rr,
                            bool selected, bool canHover, float alpha)
 {
+    using namespace CombatantGuiImpl;
     const float a = mAnim * alpha;
     const float fs = S(kFontPx) * mInScale;
     const float rnd = S(6.f) * mInScale;
@@ -663,7 +691,7 @@ void CombatantGui::drawRow(ImDrawList* dl, const Row& row, const ImVec4& rr,
     case RowKind::Bind:
     {
         drawText(dl, { tx, ty }, "Bind", argb(kMuted, a), fs);
-        const std::string v = mBindModule == row.mod ? std::string("press key...") : keyName(row.mod->mKey);
+        const std::string v = mBindModule == row.mod ? std::string("press key...") : CombatantGuiImpl::keyName(row.mod->mKey);
         drawText(dl, { rx - textWidth(v, fs), ty }, v, accent(a), fs);
         break;
     }
@@ -703,7 +731,7 @@ void CombatantGui::drawRow(ImDrawList* dl, const Row& row, const ImVec4& rr,
             auto* ns = static_cast<NumberSetting*>(s);
             const float span = ns->mMax - ns->mMin;
             const float t = span > 0.f ? std::clamp((ns->mValue - ns->mMin) / span, 0.f, 1.f) : 0.f;
-            const std::string v = fmtValue(ns->mValue, ns->mStep);
+            const std::string v = CombatantGuiImpl::fmtValue(ns->mValue, ns->mStep);
             drawText(dl, { rx - textWidth(v, fs), labelY }, v, accent(a), fs);
 
             const ImVec4 tr = T(numberTrack(rr));

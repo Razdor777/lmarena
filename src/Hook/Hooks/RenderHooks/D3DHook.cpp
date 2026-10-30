@@ -247,6 +247,7 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
         return oPresent(swapChain, syncInterval, flags);
     }
     gSwapChain = swapChain;
+    ExceptionHandler::markThread(ExceptionHandler::Render);
     static bool once = false;
     if (!once)
     {
@@ -331,15 +332,20 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
         return oPresent(swapChain, syncInterval, flags);
     }
 
-    if (FrameTransforms)
-        while(FrameTransforms->size() > transformDelay)
-        {
-            RenderUtils::transform = FrameTransforms->front();
-            FrameTransforms->pop();
-        }
-    else
     {
-        spdlog::error("FrameTransforms is null");
+        // Очередь пополняет поток игры (SetupAndRenderHook) — только под
+        // блокировкой.
+        std::lock_guard<std::mutex> lock(FrameTransformsMutex);
+        if (FrameTransforms)
+            while (FrameTransforms->size() > static_cast<size_t>(transformDelay))
+            {
+                RenderUtils::transform = FrameTransforms->front();
+                FrameTransforms->pop();
+            }
+        else
+        {
+            spdlog::error("FrameTransforms is null");
+        }
     }
 
     int count = alreadyRunningD3D11 ? 1 : BUFFER_COUNT;
@@ -427,7 +433,12 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     mBackBuffer11Tex.at(index).try_as(surface);
     D2D::beginRender(surface.get(), dpi);
 
-    igNewFrame();
+    {
+        // NewFrame разбирает очередь ввода, которую KeyHook/MouseHook
+        // пополняют из своего потока.
+        std::lock_guard<std::mutex> lock(ImGuiInputMutex);
+        igNewFrame();
+    }
 
     auto holder = nes::make_holder<RenderEvent>();
     gFeatureManager->mDispatcher->trigger(holder);
@@ -597,7 +608,10 @@ void D3DHook::shutdown()
 void D3DHook::s_shutdown()
 {
     Solstice::console->info("Shutting down D3DHook");
-    FrameTransforms.reset();
+    {
+        std::lock_guard<std::mutex> lock(FrameTransformsMutex);
+        FrameTransforms.reset();
+    }
     kiero::unbind(8);
     kiero::unbind(13);
     kiero::unbind(140);
