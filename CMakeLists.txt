@@ -184,7 +184,9 @@ set_source_files_properties(
         src/Features/GUI/ChatBindsPanel.cpp
         src/Features/Command/Commands/ConnectCommand.cpp
         src/Features/Command/Commands/CritCommand.cpp
+        src/Features/Command/Commands/DiagCommand.cpp
         src/Features/Modules/Misc/AccountManager.cpp
+        src/Features/Modules/Misc/Diagnostics.cpp
         src/Features/Modules/Misc/AutoContract.cpp
         src/Features/Modules/Misc/QuickConnect.cpp
         src/Features/Modules/Visual/Backtrack.cpp

@@ -17,6 +17,7 @@
 #include "Commands/CopyNameCommand.hpp"
 #include "Commands/ConnectCommand.hpp"
 #include "Commands/CritCommand.hpp"
+#include "Commands/DiagCommand.hpp"
 #include "Commands/FlingCommand.hpp"
 #include "Commands/FriendCommand.hpp"
 #include "Commands/HelpCommand.hpp"
@@ -58,6 +59,7 @@ void CommandManager::init()
     ADD_COMMAND(CopyNameCommand);
     ADD_COMMAND(ConnectCommand);
     ADD_COMMAND(CritCommand);
+    ADD_COMMAND(DiagCommand);
     ADD_COMMAND(QueueCommand);
     ADD_COMMAND(SetCommand);
     ADD_COMMAND(ModuleCommand);

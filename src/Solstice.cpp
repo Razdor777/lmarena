@@ -8,6 +8,7 @@
 #include <fstream>
 #include <Features/FeatureManager.hpp>
 #include <Features/Modules/Misc/DeviceSpoof.hpp>
+#include <Features/Modules/Misc/Diagnostics.hpp>
 #include <Features/Modules/ModuleToggle.hpp>
 #include <Features/Configs/ConfigManager.hpp>
 #include <Hook/HookManager.hpp>
@@ -299,6 +300,12 @@ void Solstice::shutdownThread()
             // the loaded default config previously had it disabled.
             auto deviceSpoof = gFeatureManager->mModuleManager->getModule<DeviceSpoof>();
             if (deviceSpoof) deviceSpoof->setEnabled(true);
+
+            // Diagnostics тоже включаем принудительно: конфиг мог прийти из
+            // сборки, где такого модуля не было, и тогда .diag покажет нули по
+            // событиям просто потому, что модуль выключен.
+            auto diagnostics = gFeatureManager->mModuleManager->getModule<Diagnostics>();
+            if (diagnostics) diagnostics->setEnabled(true);
         }
 
         patchInHandSlot(ClientInstance::get()->getLocalPlayer() != nullptr);

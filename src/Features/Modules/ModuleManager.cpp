@@ -50,6 +50,7 @@ static const std::unordered_set<std::string> gRemovedSettingNames = {
 #include "Misc/NoPacket.hpp"
 #include "Misc/NoPause.hpp"
 #include "Misc/AccountManager.hpp"
+#include "Misc/Diagnostics.hpp"
 #include "Misc/QuickConnect.hpp"
 #include "Misc/PacketLogger.hpp"
 #include "Misc/WhoisCollector.hpp"
@@ -244,6 +245,11 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<PacketLogger>());
   mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
   mModules.emplace_back(std::make_shared<DeviceSpoof>());
+  // Diagnostics — всегда включён и не трогает игру: он слушает события и
+  // умеет рассказать, что в этом билде живо. Создаётся первым, чтобы
+  // считать события с самого начала.
+  mModules.emplace_back(std::make_shared<Diagnostics>());
+
   mModules.emplace_back(std::make_shared<QuickConnect>());
   mModules.emplace_back(std::make_shared<AccountManager>());
   mModules.emplace_back(std::make_shared<Glow>());
