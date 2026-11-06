@@ -7,9 +7,13 @@
 
 void AirSpeed::onInit() {
     uintptr_t addr = SigManager::GetSpeedInAirWithSprint;
+    if (!addr) return;
+    int32_t rel = 0;
+    memcpy(&rel, (void*)(addr + 0x13), 4);
+    uintptr_t tb = (addr + 0x17) + rel;
 
-    mSpeedInAirWithoutSprintPtr = reinterpret_cast<float*>(addr + 4);
-    mSpeedInAirWithSprintPtr = reinterpret_cast<float*>(addr + 17);
+    mSpeedInAirWithoutSprintPtr = reinterpret_cast<float*>(tb + 4);
+    mSpeedInAirWithSprintPtr = reinterpret_cast<float*>(tb + 0);
 }
 
 void AirSpeed::onEnable() {
@@ -18,11 +22,11 @@ void AirSpeed::onEnable() {
 
 void AirSpeed::onDisable() {
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &AirSpeed::onBaseTickEvent>(this);
-    MemUtils::Write((uintptr_t) mSpeedInAirWithoutSprintPtr, mSpeedInAirWithoutSprintValue);
-    MemUtils::Write((uintptr_t) mSpeedInAirWithSprintPtr, mSpeedInAirWithSprintValue);
+    if (mSpeedInAirWithoutSprintPtr) MemUtils::Write((uintptr_t)mSpeedInAirWithoutSprintPtr, mSpeedInAirWithoutSprintValue);
+    if (mSpeedInAirWithSprintPtr) MemUtils::Write((uintptr_t)mSpeedInAirWithSprintPtr, mSpeedInAirWithSprintValue);
 }
 
-void AirSpeed::onBaseTickEvent(BaseTickEvent &event) {
-    MemUtils::Write((uintptr_t) mSpeedInAirWithoutSprintPtr, mSpeedInAirWithoutSprintValue * mNoSprintSpeed.mValue);
-    MemUtils::Write((uintptr_t) mSpeedInAirWithSprintPtr, mSpeedInAirWithSprintValue * mSprintSpeed.mValue);
+void AirSpeed::onBaseTickEvent(BaseTickEvent& event) {
+    if (mSpeedInAirWithoutSprintPtr) MemUtils::Write((uintptr_t)mSpeedInAirWithoutSprintPtr, mSpeedInAirWithoutSprintValue * mNoSprintSpeed.mValue);
+    if (mSpeedInAirWithSprintPtr) MemUtils::Write((uintptr_t)mSpeedInAirWithSprintPtr, mSpeedInAirWithSprintValue * mSprintSpeed.mValue);
 }

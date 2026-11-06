@@ -4,6 +4,8 @@
 
 #include "AutoQueue.hpp"
 
+#include <Features/Modules/Movement/Fly.hpp>
+
 #include <Features/FeatureManager.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/PacketInEvent.hpp>
@@ -80,12 +82,26 @@ void AutoQueue::onPacketInEvent(PacketInEvent& event)
             lastCommandOutput = NOW;
         }
 
+        if (mDisableFly.mValue) {
+            static auto flyModule = gFeatureManager->mModuleManager->getModule<Fly>();
+            if (flyModule) {
+                flyModule->setEnabled(false);
+            }
+        }
+
         return;
     }
 
     if (event.mPacket->getId() == PacketID::Text) {
         auto tp = event.getPacket<TextPacket>();
-        if (tp->mMessage == "§c§l» §r§c§lGame OVER!" && mQueueOnGameEnd) {
+        if (tp->getMessage() == "§c§l» §r§c§lGame OVER!" && mQueueOnGameEnd) {
+            if (mFlyOnGameEnd.mValue) {
+                static auto flyModule = gFeatureManager->mModuleManager->getModule<Fly>();
+                if (flyModule) {
+                    flyModule->setEnabled(true);
+                }
+            }
+
             mQueueForGame = true;
             mLastQueueTime = NOW;
             NotifyUtils::notify("Queuing for " + mLastGame + "!", 1.f + (mQueueDelay.mValue), Notification::Type::Info);
@@ -93,17 +109,15 @@ void AutoQueue::onPacketInEvent(PacketInEvent& event)
         }
 
         std::string playerName = player->getNameTag();
-        if (playerName != "") {
-            if (playerName.find("§r") != std::string::npos) playerName.erase(playerName.find("§r"), 2);
-            if (playerName.find("§l") != std::string::npos) playerName.erase(playerName.find("§l"), 2);
+        if (playerName.find("§r") != std::string::npos) playerName.erase(playerName.find("§r"), 2);
+        if (playerName.find("§l") != std::string::npos) playerName.erase(playerName.find("§l"), 2);
 
-            std::string playerTeam = "§" + playerName.substr(playerName.find("§") + 2, 1);
+        std::string playerTeam = "§" + playerName.substr(playerName.find("§") + 2, 1);
 
-            if (StringUtils::containsIgnoreCase(tp->mMessage, "§7has been §cELIMINATED§7!") && StringUtils::startsWith(tp->mMessage, playerTeam + "§l»") && mQueueOnDeath) {
-                mQueueForGame = true;
-                mLastQueueTime = NOW;
-                NotifyUtils::notify("Queuing for " + mLastGame + "!", 1.f + (mQueueDelay.mValue), Notification::Type::Info);
-            }
+        if (StringUtils::containsIgnoreCase(tp->getMessage(), "§7has been §cELIMINATED§7!") && StringUtils::startsWith(tp->getMessage(), playerTeam + "§l»") && mQueueOnDeath) {
+            mQueueForGame = true;
+            mLastQueueTime = NOW;
+            NotifyUtils::notify("Queuing for " + mLastGame + "!", 1.f + (mQueueDelay.mValue), Notification::Type::Info);
         }
 
         static std::vector<std::string> ignored = {
@@ -112,15 +126,15 @@ void AutoQueue::onPacketInEvent(PacketInEvent& event)
             "You are connected to proxy"
         };
 
-        if (StringUtils::containsAnyIgnoreCase(tp->mMessage, ignored)) {
+        if (StringUtils::containsAnyIgnoreCase(tp->getMessage(), ignored)) {
             event.mCancelled = true;
             return;
         }
 
-        if (StringUtils::containsIgnoreCase(tp->mMessage, "You are connected to server "))
+        if (StringUtils::containsIgnoreCase(tp->getMessage(), "You are connected to server "))
         {
             // You are connected to server name HUB-SKY9
-            std::string game = tp->mMessage.substr(tp->mMessage.find("server name ") + 12, tp->mMessage.length() - 1);
+            std::string game = tp->getMessage().substr(tp->getMessage().find("server name ") + 12, tp->getMessage().length() - 1);
             if (std::ranges::count_if(game, ::isdigit) > 3)
             {
                 event.mCancelled = true;

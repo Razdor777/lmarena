@@ -7,6 +7,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include <Solstice.hpp>
 #include <kiero.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Events/WindowResizeEvent.hpp>
@@ -21,40 +22,30 @@
 #include <Utils/MiscUtils/RenderUtils.hpp>
 #include <winrt/base.h>
 
-// skidded (i do not care :trollcat:)
-
 using winrt::com_ptr;
 
-typedef HRESULT(__thiscall* presentD3D)(IDXGISwapChain3*, UINT, UINT);
-presentD3D oPresent;
-typedef HRESULT(__thiscall* resizeBuffers)(IDXGISwapChain3*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
-resizeBuffers oResizeBuffers;
+static decltype(&D3DHook::present) oPresent = nullptr;
+static decltype(&D3DHook::resizeBuffers) oResizeBuffers = nullptr;
+static decltype(&D3DHook::resizeBuffers1) oResizeBuffers1 = nullptr;
 
 static com_ptr<ID3D11Device> gDevice11;
 static com_ptr<ID3D11DeviceContext> gContext11;
-static com_ptr<ID3D12Device> gDevice12;
-static std::vector<com_ptr<ID3D11Texture2D>> mBackBuffer11Tex = std::vector<com_ptr<ID3D11Texture2D>>();
-static std::vector<com_ptr<ID3D11RenderTargetView>> mBackBuffer11Rtv =
-        std::vector<com_ptr<ID3D11RenderTargetView>>();
-
 static com_ptr<ID3D11DeviceContext> gDevice_context11;
+static com_ptr<ID3D12Device> gDevice12;
 static com_ptr<ID3D11On12Device> gDevice11on12;
+static std::vector<com_ptr<ID3D11Resource>> mBackBuffer11Tex;
+static std::vector<com_ptr<ID3D11RenderTargetView>> mBackBuffer11Rtv;
 
 static bool imGuiInitialized = false;
+static ID3D12CommandQueue* realQueue = nullptr;
 
 static HWND wnd = NULL;
-static WNDPROC oWndProc;
-
-static IDXGISwapChain3* gSwapChain = nullptr;
+static IDXGISwapChain* gSwapChain = nullptr;
 
 #define CHECK_HR(hr) if (FAILED(hr)) { spdlog::error("HRESULT failed: {0}", hr); return hr; }
 
 static bool alreadyRunningD3D11 = false;
 static bool d3dInitImGui = false;
-
-#define BUFFER_COUNT 3
-
-
 
 struct LoadedResource {
     ID3D11ShaderResourceView* srv;
@@ -62,13 +53,15 @@ struct LoadedResource {
     int height;
 };
 
+static std::unordered_map<std::string, LoadedResource> gLoadedResources;
+
 bool D3DHook::loadTextureFromEmbeddedResource(const char* resourceName, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height)
 {
+    if (!gDevice11) return false;
 
-    static std::unordered_map<std::string, LoadedResource> loadedResources;
-    if (loadedResources.contains(resourceName))
+    if (gLoadedResources.contains(resourceName))
     {
-        LoadedResource& resource = loadedResources[resourceName];
+        LoadedResource& resource = gLoadedResources[resourceName];
         *out_srv = resource.srv;
         *out_width = resource.width;
         *out_height = resource.height;
@@ -82,8 +75,6 @@ bool D3DHook::loadTextureFromEmbeddedResource(const char* resourceName, ID3D11Sh
         return false;
     }
 
-
-    // The texture WILL be in a .png format, so we can just load it directly
     int image_width = 0;
     int image_height = 0;
     unsigned char* image_data = stbi_load_from_memory(static_cast<stbi_uc const*>(resource.data2()), resource.size(), &image_width, &image_height, nullptr, 4);
@@ -91,9 +82,8 @@ bool D3DHook::loadTextureFromEmbeddedResource(const char* resourceName, ID3D11Sh
     {
         spdlog::error("Failed to load embedded image: {0}", resourceName);
         return false;
-    };
+    }
 
-    // Create texture
     D3D11_TEXTURE2D_DESC desc;
     ZeroMemory(&desc, sizeof(desc));
     desc.Width = image_width;
@@ -106,14 +96,18 @@ bool D3DHook::loadTextureFromEmbeddedResource(const char* resourceName, ID3D11Sh
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     desc.CPUAccessFlags = 0;
 
-    ID3D11Texture2D *pTexture = NULL;
+    ID3D11Texture2D* pTexture = NULL;
     D3D11_SUBRESOURCE_DATA subResource;
     subResource.pSysMem = image_data;
     subResource.SysMemPitch = desc.Width * 4;
     subResource.SysMemSlicePitch = 0;
-    gDevice11->CreateTexture2D(&desc, &subResource, &pTexture);
+    HRESULT hr = gDevice11->CreateTexture2D(&desc, &subResource, &pTexture);
+    if (FAILED(hr) || !pTexture)
+    {
+        stbi_image_free(image_data);
+        return false;
+    }
 
-    // Create texture view
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     ZeroMemory(&srvDesc, sizeof(srvDesc));
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -127,58 +121,38 @@ bool D3DHook::loadTextureFromEmbeddedResource(const char* resourceName, ID3D11Sh
     *out_height = image_height;
     stbi_image_free(image_data);
 
-    loadedResources[resourceName] = { *out_srv, image_width, image_height };
+    gLoadedResources[resourceName] = { *out_srv, image_width, image_height };
 
     return true;
 }
 
-/*ID3D11ShaderResourceView** createTextureFromData(ID3D11Device* device, const uint8_t* data, int width, int height) {
-	if (!device || !data || width <= 0 || height <= 0) {
-		return nullptr;
-		throw std::invalid_argument("Invalid argument(s) provided to CreateTextureFromData.");
-	}
+bool D3DHook::createTextureFromFile(const char* filename, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height)
+{
+    if (!filename || !out_srv || !out_width || !out_height) {
+        spdlog::error("Invalid argument(s) provided to CreateTextureFromFile.");
+        return false;
+    }
 
-	// Define the texture description
-	D3D11_TEXTURE2D_DESC textureDesc = {}; // OLD
-	textureDesc.Width = static_cast<UINT>(width);
-	textureDesc.Height = static_cast<UINT>(height);
-	textureDesc.MipLevels = 1;
-	textureDesc.ArraySize = 1;
-	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // assuming it's 32-bit RGBA format
-	textureDesc.SampleDesc.Count = 1;
-	textureDesc.Usage = D3D11_USAGE_DEFAULT;
-	textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	textureDesc.CPUAccessFlags = 0;
-	textureDesc.MiscFlags = 0;
+    int width, height, channels;
+    uint8_t* data = stbi_load(filename, &width, &height, &channels, STBI_rgb_alpha);
+    if (!data) {
+        spdlog::error("Failed to load image from file: {0}", filename);
+        return false;
+    }
 
-	// Define the subresource data
-	D3D11_SUBRESOURCE_DATA initData = {};
-	initData.pSysMem = data;
-	initData.SysMemPitch = static_cast<UINT>(width * 4); // assuming it's 32-bit RGBA format
-	initData.SysMemSlicePitch = 0;
+    if (!createTextureFromData(data, width, height, out_srv)) {
+        spdlog::error("Failed to create texture from data.");
+        stbi_image_free(data);
+        return false;
+    }
 
-	// Create the texture
-	ID3D11Texture2D* texture = nullptr;
-	HRESULT hr = device->CreateTexture2D(&textureDesc, &initData, &texture);
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to create texture from data.");
-	}
+    stbi_image_free(data);
 
-	// Create the shader resource view
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = textureDesc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = 1;
+    *out_width = width;
+    *out_height = height;
 
-	ID3D11ShaderResourceView** shaderResourceView;
-	hr = device->CreateShaderResourceView(texture, &srvDesc, shaderResourceView);
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to create shader resource view.");
-	}
-
-	return shaderResourceView;
-}*/
+    return true;
+}
 
 bool D3DHook::createTextureFromData(const uint8_t* data, int width, int height, ID3D11ShaderResourceView** out_srv)
 {
@@ -189,46 +163,38 @@ bool D3DHook::createTextureFromData(const uint8_t* data, int width, int height, 
         return false;
     }
 
-    // use nearest neighbor filtering
-
-    // Define the texture description
-    D3D11_TEXTURE2D_DESC textureDesc = {}; // OLD
+    D3D11_TEXTURE2D_DESC textureDesc = {};
     textureDesc.Width = static_cast<UINT>(width);
-
     textureDesc.Height = static_cast<UINT>(height);
     textureDesc.MipLevels = 1;
     textureDesc.ArraySize = 1;
-    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // assuming it's 32-bit RGBA format
+    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     textureDesc.SampleDesc.Count = 1;
     textureDesc.Usage = D3D11_USAGE_DEFAULT;
     textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     textureDesc.CPUAccessFlags = 0;
     textureDesc.MiscFlags = 0;
 
-    // Define the subresource data
     D3D11_SUBRESOURCE_DATA initData = {};
-
     initData.pSysMem = data;
-    initData.SysMemPitch = static_cast<UINT>(width * 4); // assuming it's 32-bit RGBA format
+    initData.SysMemPitch = static_cast<UINT>(width * 4);
     initData.SysMemSlicePitch = 0;
 
-    // Create the texture
     ID3D11Texture2D* texture = nullptr;
     HRESULT hr = device->CreateTexture2D(&textureDesc, &initData, &texture);
-    if (FAILED(hr)) {
+    if (FAILED(hr) || !texture) {
         spdlog::error("Failed to create texture from data.");
         return false;
     }
 
-    // Create the shader resource view
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-
     srvDesc.Format = textureDesc.Format;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MostDetailedMip = 0;
     srvDesc.Texture2D.MipLevels = 1;
 
     hr = device->CreateShaderResourceView(texture, &srvDesc, out_srv);
+    texture->Release();
     if (FAILED(hr)) {
         spdlog::error("Failed to create shader resource view.");
         return false;
@@ -237,64 +203,91 @@ bool D3DHook::createTextureFromData(const uint8_t* data, int width, int height, 
     return true;
 }
 
-HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT flags)
+static void releaseSwapChainTargets()
 {
-    // Ejecting (or already ejected): never run another line of our code on the
-    // render thread, otherwise the module can be unmapped while this thread is
-    // still inside it.
+    if (!d3dInitImGui) return;
+
+    if (gContext11)
+    {
+        ID3D11RenderTargetView* nullTargets[1] = { nullptr };
+        gContext11->OMSetRenderTargets(1, nullTargets, nullptr);
+        gContext11->Flush();
+    }
+
+    D2D::shutdown();
+    D3DHook::shutdownImGui();
+
+    mBackBuffer11Rtv.clear();
+    mBackBuffer11Tex.clear();
+
+    d3dInitImGui = false;
+}
+
+HRESULT D3DHook::present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
+{
     if (Solstice::mRequestEject || Solstice::mUnloading.load())
     {
         return oPresent(swapChain, syncInterval, flags);
     }
+
     gSwapChain = swapChain;
+
     static bool once = false;
-    if (!once)
-    {
-        if (swapChain->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void **>(&gDevice11)) == S_OK) {
+    if (!once) {
+        if (swapChain->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void**>(&gDevice11)) == S_OK) {
             spdlog::info("[D3D] D3D11 Device acquired");
             alreadyRunningD3D11 = true;
+
             static bool msgwarn = false;
             if (!msgwarn)
             {
-                NotifyUtils::notify("WARNING! Solstice is currently running in D3D11 mode. \nThis is NOT recommended and may cause instability.\nI strongly advise you to use D3D12 for the time being.", 15.f, Notification::Type::Warning);
+                NotifyUtils::notify("WARNING! Running in D3D11 mode.\nD3D12 is recommended for best stability.", 10.f, Notification::Type::Warning);
                 msgwarn = true;
             }
         }
 
-        if (swapChain->GetDevice(__uuidof(ID3D12Device), reinterpret_cast<void **>(&gDevice12)) == S_OK) {
+        if (swapChain->GetDevice(__uuidof(ID3D12Device), reinterpret_cast<void**>(&gDevice12)) == S_OK) {
             spdlog::info("[D3D] D3D12 Device acquired");
 
-            if (Solstice::Prefs->mFallbackToD3D11)
+            if (Solstice::Prefs && Solstice::Prefs->mFallbackToD3D11)
             {
-                ID3D12Device* bad_device;
+                ID3D12Device* bad_device = nullptr;
                 if (SUCCEEDED(swapChain->GetDevice(IID_PPV_ARGS(&bad_device))))
                 {
-                    spdlog::warn("Removing D3D12 device [preferred fallback]");
-                    reinterpret_cast<ID3D12Device5*>(bad_device)->RemoveDevice();
+                    ID3D12Device5* dev5 = nullptr;
+                    if (SUCCEEDED(bad_device->QueryInterface(IID_PPV_ARGS(&dev5))))
+                    {
+                        dev5->RemoveDevice();
+                        dev5->Release();
+                    }
+                    bad_device->Release();
                     return oPresent(swapChain, syncInterval, flags);
                 }
-
             }
 
             UINT deviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_SINGLETHREADED;
+            auto* bgfxCtx = bgfx_context::get();
+            ID3D12CommandQueue* pacq = (bgfxCtx && bgfxCtx->getRenderContext())
+                ? reinterpret_cast<bgfx_d3d12_RendererContextD3D12*>(bgfxCtx->getRenderContext())->getCommandQueue()
+                : nullptr;
 
-            ID3D12CommandQueue* pacq = reinterpret_cast<bgfx_d3d12_RendererContextD3D12*>(bgfx_context::get()->getRenderContext())->getCommandQueue();
-            ID3D12CommandQueue* realQueue = {};
+            if (pacq)
+            {
+                CHECK_HR(pacq->QueryInterface(IID_PPV_ARGS(&realQueue)));
 
-            CHECK_HR(pacq->QueryInterface(IID_PPV_ARGS(&realQueue)));
-
-            CHECK_HR(D3D11On12CreateDevice(
-                    gDevice12.get(), // the D3D12 device
-                    deviceFlags, // flags for the D3D11 device
-                    nullptr, // array of feature levels (null is default, which is what the game uses i assume)
-                    0, // number of feature levels in that array
-                    reinterpret_cast<IUnknown **>(&pacq), // array of command queues (we only have one)
-                    1, // number of command queues in that array
-                    0, // node mask (0 is a magic number i actually don't know what it does)
-                    gDevice11.put(), // the D3D11 device we get back
-                    gDevice_context11.put(), // the D3D11 device context we get back
-                    nullptr // the feature level we get back (we don't care)
-            ));
+                CHECK_HR(D3D11On12CreateDevice(
+                    gDevice12.get(),
+                    deviceFlags,
+                    nullptr,
+                    0,
+                    reinterpret_cast<IUnknown**>(&pacq),
+                    1,
+                    0,
+                    gDevice11.put(),
+                    gDevice_context11.put(),
+                    nullptr
+                ));
+            }
         }
 
         once = true;
@@ -303,125 +296,117 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     if (forceFallback && !alreadyRunningD3D11)
     {
         spdlog::warn("Forcing fallback to D3D11");
+        releaseSwapChainTargets();
 
-        // Same rule as the resize path: the back buffers are about to be
-        // recreated, so the "already built" flag has to go with them. It used to
-        // be left true, and the very next frame indexed the just-cleared
-        // vectors (mBackBuffer11Tex.at(index)) -> std::out_of_range.
-        mBackBuffer11Rtv.clear();
-        mBackBuffer11Tex.clear();
-        gContext11->Flush();
+        if (gDevice11on12)
+        {
+            gDevice11on12->Release();
+            gDevice11on12 = nullptr;
+        }
 
-        gDevice11on12->Release();
-        gDevice11on12 = nullptr;
-        d3dInitImGui = false;
-
-        ID3D12Device* bad_device;
+        ID3D12Device* bad_device = nullptr;
         if (SUCCEEDED(swapChain->GetDevice(IID_PPV_ARGS(&bad_device))))
         {
-            spdlog::warn("Removing D3D12 device [user requested fallback]");
-            reinterpret_cast<ID3D12Device5*>(bad_device)->RemoveDevice();
-        } else {
-            spdlog::error("Failed to get D3D12 device");
+            ID3D12Device5* dev5 = nullptr;
+            if (SUCCEEDED(bad_device->QueryInterface(IID_PPV_ARGS(&dev5))))
+            {
+                dev5->RemoveDevice();
+                dev5->Release();
+            }
+            bad_device->Release();
+            forceFallback = false;
+            once = false;
+            return oPresent(swapChain, syncInterval, flags);
         }
-
         forceFallback = false;
-        once = false;
-
-        return oPresent(swapChain, syncInterval, flags);
     }
 
-    if (FrameTransforms)
-        while(FrameTransforms->size() > transformDelay)
-        {
-            RenderUtils::transform = FrameTransforms->front();
-            FrameTransforms->pop();
-        }
-    else
+    while (FrameTransforms && FrameTransforms->size() > static_cast<size_t>(transformDelay)) {
+        RenderUtils::transform = FrameTransforms->front();
+        FrameTransforms->pop();
+    }
+
+    if (!d3dInitImGui)
     {
-        spdlog::error("FrameTransforms is null");
-    }
+        if (!gDevice11) return oPresent(swapChain, syncInterval, flags);
 
-    int count = alreadyRunningD3D11 ? 1 : BUFFER_COUNT;
+        DXGI_SWAP_CHAIN_DESC sdesc{};
+        swapChain->GetDesc(&sdesc);
+        if (sdesc.OutputWindow && !Solstice::GameWindow)
+            Solstice::GameWindow = sdesc.OutputWindow;
+        wnd = sdesc.OutputWindow ? sdesc.OutputWindow : ProcUtils::getMinecraftWindow();
 
-    if (!d3dInitImGui) {
+        int count = alreadyRunningD3D11 ? 1 : (sdesc.BufferCount > 0 ? static_cast<int>(sdesc.BufferCount) : 3);
         mBackBuffer11Tex.resize(count);
         mBackBuffer11Rtv.resize(count);
+
         if (alreadyRunningD3D11) {
             gDevice11->GetImmediateContext(gContext11.put());
-            DXGI_SWAP_CHAIN_DESC sd;
-            swapChain->GetDesc(&sd);
-            swapChain->GetBuffer(0, IID_PPV_ARGS(mBackBuffer11Tex.at(0).put()));
-            gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(0).get(), NULL, mBackBuffer11Rtv.at(0).put());
+            CHECK_HR(swapChain->GetBuffer(0, IID_PPV_ARGS(mBackBuffer11Tex.at(0).put())));
+            CHECK_HR(gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(0).get(), NULL, mBackBuffer11Rtv.at(0).put()));
         } else {
-            gDevice11->GetImmediateContext(gContext11.put());
-            DXGI_SWAP_CHAIN_DESC sd;
-            CHECK_HR(swapChain->GetDesc(&sd));
-            wnd = sd.OutputWindow;
+            gContext11 = gDevice_context11;
 
             D3D11_RESOURCE_FLAGS backBuffer11Flags = {};
             backBuffer11Flags.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-            for (int i = 0; i < BUFFER_COUNT; i++) {
-
-                CHECK_HR(gDevice11->QueryInterface(IID_PPV_ARGS(&gDevice11on12)));
-                winrt::com_ptr<ID3D12Resource> buffer = nullptr;
-
-                CHECK_HR(swapChain->GetBuffer(i, IID_PPV_ARGS(buffer.put())));
-
-                CHECK_HR(gDevice11on12->CreateWrappedResource(buffer.get(), &backBuffer11Flags,
-                                                        D3D12_RESOURCE_STATE_PRESENT,
-                                                        D3D12_RESOURCE_STATE_PRESENT,
-                                                        IID_PPV_ARGS(mBackBuffer11Tex.at(i).put())));
+            CHECK_HR(gDevice11.try_as(gDevice11on12));
+            for (int i = 0; i < count; i++) {
+                com_ptr<ID3D12Resource> backBuffer12;
+                CHECK_HR(swapChain->GetBuffer(i, IID_PPV_ARGS(backBuffer12.put())));
+                CHECK_HR(gDevice11on12->CreateWrappedResource(
+                    backBuffer12.get(), &backBuffer11Flags,
+                    D3D12_RESOURCE_STATE_PRESENT,
+                    D3D12_RESOURCE_STATE_PRESENT,
+                    IID_PPV_ARGS(mBackBuffer11Tex.at(i).put())));
 
                 D3D11_TEXTURE2D_DESC texDesc;
-                mBackBuffer11Tex.at(i)->GetDesc(&texDesc);
+                reinterpret_cast<ID3D11Texture2D*>(mBackBuffer11Tex.at(i).get())->GetDesc(&texDesc);
+
                 D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
-                rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-                rtvDesc.Format = texDesc.Format;
+                rtvDesc.ViewDimension = texDesc.SampleDesc.Count > 1 ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D;
+                rtvDesc.Format = sdesc.BufferDesc.Format;
                 rtvDesc.Texture2D.MipSlice = 0;
 
-                CHECK_HR(gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(i).get(), nullptr,
-                                                     mBackBuffer11Rtv.at(i).put()));
+                CHECK_HR(gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(i).get(), nullptr, mBackBuffer11Rtv.at(i).put()));
             }
-            oWndProc = (WNDPROC)SetWindowLongPtr(wnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
         }
         d3dInitImGui = true;
     }
 
-    float dpi = GetDpiForWindow(wnd);
-    UINT index = reinterpret_cast<IDXGISwapChain3 *>(swapChain)->GetCurrentBackBufferIndex();
+    float dpi = wnd ? static_cast<float>(GetDpiForWindow(wnd)) : 96.0f;
 
-    index = alreadyRunningD3D11 ? 0 : index;
-
+    UINT index = 0;
+    if (!alreadyRunningD3D11)
+    {
+        winrt::com_ptr<IDXGISwapChain3> swapChain3;
+        HRESULT hr = swapChain->QueryInterface(IID_PPV_ARGS(swapChain3.put()));
+        if (FAILED(hr)) {
+            return oPresent(swapChain, syncInterval, flags);
+        }
+        index = swapChain3->GetCurrentBackBufferIndex();
+        if (index >= mBackBuffer11Tex.size()) {
+            return oPresent(swapChain, syncInterval, flags);
+        }
+    }
 
     initImGui(gDevice11.get(), gContext11.get());
-
-    // No ImGui this frame (GuiData is not there yet, or the window is mid
-    // resize). Hand the frame straight back to the game instead of touching an
-    // uninitialised context — this is the path that crashed on F11 and on
-    // window resizing.
     if (!imGuiInitialized)
         return oPresent(swapChain, syncInterval, flags);
 
     D2D::init(swapChain, gDevice11.get());
 
     static ImVec2 lastWindowSize = ImGui::GetIO().DisplaySize;
-
     auto* ci = ClientInstance::get();
     auto* guiData = ci ? ci->getGuiData() : nullptr;
-    ImVec2 windowSize = guiData
-        ? ImVec2(guiData->mResolution.x, guiData->mResolution.y)
-        : lastWindowSize;
-
-    if (lastWindowSize.x != windowSize.x || lastWindowSize.y != windowSize.y) {
-        // This event existed but nothing ever fired it, so ClickGui's resize
-        // handler (which rescales the panel layout) was dead code — the gui kept
-        // its stale layout after F11 until it was reopened.
-        auto holder = nes::make_holder<WindowResizeEvent>((int)windowSize.x, (int)windowSize.y);
-        gFeatureManager->mDispatcher->trigger(holder);
+    if (guiData)
+    {
+        ImVec2 windowSize = ImVec2(guiData->mResolution.x, guiData->mResolution.y);
+        if (lastWindowSize.x != windowSize.x || lastWindowSize.y != windowSize.y) {
+            auto holder = nes::make_holder<WindowResizeEvent>(windowSize.x, windowSize.y);
+            gFeatureManager->mDispatcher->trigger(holder);
+        }
+        lastWindowSize = windowSize;
     }
-
-    lastWindowSize = windowSize;
 
     winrt::com_ptr<IDXGISurface> surface;
     mBackBuffer11Tex.at(index).try_as(surface);
@@ -435,10 +420,9 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     igEndFrame();
 
     if (!alreadyRunningD3D11) {
-        ID3D11Resource *resource = mBackBuffer11Tex.at(index).get();
+        ID3D11Resource* resource = mBackBuffer11Tex.at(index).get();
         gDevice11on12->AcquireWrappedResources(&resource, 1);
     }
-
 
     auto thing = mBackBuffer11Rtv.at(index).get();
     gContext11->OMSetRenderTargets(1, &thing, NULL);
@@ -448,56 +432,46 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     D2D::endRender();
 
     if (!alreadyRunningD3D11) {
-        ID3D11Resource *resource = mBackBuffer11Tex.at(index).get();
+        ID3D11Resource* resource = mBackBuffer11Tex.at(index).get();
         gDevice11on12->ReleaseWrappedResources(&resource, 1);
-
         gContext11->Flush();
     }
-
 
     return oPresent(swapChain, syncInterval, flags);
 }
 
-HRESULT D3DHook::resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height,
+HRESULT D3DHook::resizeBuffers(IDXGISwapChain* swapChain, UINT bufferCount, UINT width, UINT height,
     DXGI_FORMAT newFormat, UINT swapChainFlags)
 {
-    // Ejecting: never touch our state from the render thread again.
     if (Solstice::mUnloading.load())
         return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
 
-    if (d3dInitImGui)
-    {
-        // EVERY reference to the back buffer has to be gone before ResizeBuffers,
-        // otherwise DXGI fails the call and every later GetBuffer() hands back a
-        // buffer that no longer matches the swap chain (visual corruption, then
-        // crashes). The one that was always missed was the render target still
-        // bound on the immediate context.
-        if (gContext11)
-        {
-            ID3D11RenderTargetView* nullTargets[1] = { nullptr };
-            gContext11->OMSetRenderTargets(1, nullTargets, nullptr);
-            gContext11->Flush();
-        }
-
-        D2D::shutdown();
-        shutdownImGui();
-
-        mBackBuffer11Rtv.clear();
-        mBackBuffer11Tex.clear();
-
-        d3dInitImGui = false;
-    }
+    releaseSwapChainTargets();
 
     return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
+}
+
+HRESULT D3DHook::resizeBuffers1(
+    IDXGISwapChain3* swapChain,
+    UINT bufferCount, UINT width, UINT height,
+    DXGI_FORMAT format, UINT flags,
+    const UINT* creationNodeMask,
+    IUnknown* const* presentQueue)
+{
+    if (Solstice::mUnloading.load())
+        return oResizeBuffers1(swapChain, bufferCount, width, height, format, flags, creationNodeMask, presentQueue);
+
+    releaseSwapChainTargets();
+
+    return oResizeBuffers1(
+        swapChain, bufferCount, width, height, format, flags,
+        creationNodeMask, presentQueue);
 }
 
 void D3DHook::initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext)
 {
     if (imGuiInitialized) return;
 
-    // GuiData vanishes for a moment on every swap chain resize and while a world
-    // is loading. Bailing out leaves imGuiInitialized false, and present() then
-    // skips the whole frame instead of dereferencing a null resolution.
     auto* ci = ClientInstance::get();
     auto* guiData = ci ? ci->getGuiData() : nullptr;
     if (!guiData) return;
@@ -508,14 +482,16 @@ void D3DHook::initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext
     static bool onc = false;
     if (!onc)
     {
-        auto res = &ResourceLoader::Resources["skinblinker.txt"];
-
-        FileUtils::writeResourceToFile(res, FileUtils::getSolsticeDir() + "BlinkerSkins\\README.txt");
-
+        if (ResourceLoader::Resources.contains("skinblinker.txt"))
+        {
+            auto res = &ResourceLoader::Resources["skinblinker.txt"];
+            FileUtils::writeResourceToFile(res, FileUtils::getSolsticeDir() + "BlinkerSkins\\README.txt");
+        }
         onc = true;
     }
 
-    ImGui_ImplWin32_Init(ProcUtils::getMinecraftWindow());
+    HWND targetWnd = wnd ? wnd : ProcUtils::getMinecraftWindow();
+    ImGui_ImplWin32_Init(targetWnd);
     ImGui_ImplDX11_Init(device, deviceContext);
 
     ImGuiIO& io = ImGui::GetIO();
@@ -541,8 +517,6 @@ void D3DHook::igNewFrame()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    // Keep the previous display size when GuiData is momentarily gone; a stale
-    // size for one frame is harmless, a null dereference is not.
     auto* ci = ClientInstance::get();
     auto* guiData = ci ? ci->getGuiData() : nullptr;
     if (!guiData) return;
@@ -559,7 +533,7 @@ void D3DHook::igEndFrame()
 {
     ImGui::EndFrame();
     ImGui::Render();
-};
+}
 
 void D3DHook::init()
 {
@@ -570,21 +544,59 @@ void D3DHook::init()
 void D3DHook::s_init()
 {
     Solstice::console->info("Initializing D3DHook");
-    // Attempt to init on D3D12
     if (kiero::init(kiero::RenderType::D3D12) == kiero::Status::Success)
     {
         Solstice::console->info("Initialized kiero [D3D12]");
-        kiero::bind(140, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
-        kiero::bind(145, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
-        return;
-        // Else, attempt to init on D3D11
-    } else if (kiero::init(kiero::RenderType::D3D11) == kiero::Status::Success)
-    {
-        Solstice::console->info("Initialized kiero [D3D11]");
-        kiero::bind(8, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
-        kiero::bind(13, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
+        void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>();
+        void* _resize = kiero::getMethod<&IDXGISwapChain::ResizeBuffers, void*>();
+        void* _resize1 = kiero::getMethod<&IDXGISwapChain3::ResizeBuffers1, void*>();
+        void* _oPresent = nullptr;
+        void* _oResize = nullptr;
+        void* _oResize1 = nullptr;
+
+        if (MH_CreateHook(_present, reinterpret_cast<void*>(&D3DHook::present), &_oPresent) != MH_OK) {
+            Solstice::console->critical("Present hook fail");
+            return;
+        }
+        oPresent = reinterpret_cast<decltype(oPresent)>(_oPresent);
+        MH_EnableHook(_present);
+
+        if (_resize && MH_CreateHook(_resize, reinterpret_cast<void*>(&D3DHook::resizeBuffers), &_oResize) == MH_OK) {
+            oResizeBuffers = reinterpret_cast<decltype(oResizeBuffers)>(_oResize);
+            MH_EnableHook(_resize);
+        }
+        if (_resize1 && MH_CreateHook(_resize1, reinterpret_cast<void*>(&D3DHook::resizeBuffers1), &_oResize1) == MH_OK) {
+            oResizeBuffers1 = reinterpret_cast<decltype(oResizeBuffers1)>(_oResize1);
+            MH_EnableHook(_resize1);
+        }
         return;
     }
+    else if (kiero::init(kiero::RenderType::D3D11) == kiero::Status::Success)
+    {
+        Solstice::console->info("Initialized kiero [D3D11]");
+        void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>();
+        void* _resize = kiero::getMethod<&IDXGISwapChain::ResizeBuffers, void*>();
+        void* _oPresent = nullptr;
+        void* _oResize = nullptr;
+
+        if (MH_CreateHook(_present, reinterpret_cast<void*>(&D3DHook::present), &_oPresent) != MH_OK) {
+            Solstice::console->critical("Present hook fail");
+            return;
+        }
+        if (MH_CreateHook(_resize, reinterpret_cast<void*>(&D3DHook::resizeBuffers), &_oResize) != MH_OK) {
+            Solstice::console->critical("ResizeBuffers hook fail");
+            MH_RemoveHook(_present);
+            return;
+        }
+
+        oPresent = reinterpret_cast<decltype(oPresent)>(_oPresent);
+        oResizeBuffers = reinterpret_cast<decltype(oResizeBuffers)>(_oResize);
+
+        MH_EnableHook(_present);
+        MH_EnableHook(_resize);
+        return;
+    }
+
     Solstice::console->error("Failed to initialize kiero");
     MessageBoxA(NULL, "Failed to initialize kiero", "Solstice", MB_OK | MB_ICONERROR);
 }
@@ -598,21 +610,20 @@ void D3DHook::s_shutdown()
 {
     Solstice::console->info("Shutting down D3DHook");
     FrameTransforms.reset();
-    kiero::unbind(8);
-    kiero::unbind(13);
-    kiero::unbind(140);
-    kiero::unbind(145);
+    void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>();
+    void* _resize1 = kiero::getMethod<&IDXGISwapChain3::ResizeBuffers1, void*>();
+    void* _resize = kiero::getMethod<&IDXGISwapChain::ResizeBuffers, void*>();
+    if (_resize) {
+        MH_DisableHook(_resize);
+        MH_RemoveHook(_resize);
+    }
+    if (_present) {
+        MH_DisableHook(_present);
+        MH_RemoveHook(_present);
+    }
+    if (_resize1) {
+        MH_DisableHook(_resize1);
+        MH_RemoveHook(_resize1);
+    }
     kiero::shutdown();
-
-    //if (imGuiInitialized) shutdownImGui();
-
-    mBackBuffer11Rtv.clear();
-    mBackBuffer11Tex.clear();
-    gContext11->Flush();
-
-    alreadyRunningD3D11 = false;
-    d3dInitImGui = false;
-    imGuiInitialized = false;
-
-
 }

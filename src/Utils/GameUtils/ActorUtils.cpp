@@ -9,6 +9,7 @@
 #include <SDK/Minecraft/Actor/Components/AABBShapeComponent.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <entity/registry.hpp>
+#include <SDK/heap_rd.hpp>
 
 #include "ActorUtils.hpp"
 
@@ -154,15 +155,15 @@ std::shared_ptr<InventoryTransactionPacket> ActorUtils::createAttackTransaction(
     if (!container) return nullptr;
 
     if (slot == -1) slot = supplies->mSelectedSlot;
-    // Слот вне хотбара или пустой слот — раньше здесь разыменовывался nullptr.
     if (slot < 0 || slot > 8) return nullptr;
     auto* stack = container->getItem(slot);
-    if (!stack || !stack->mItem) return nullptr;
+    if (!stack) return nullptr;
 
     auto pkt = MinecraftPackets::createPacket<InventoryTransactionPacket>();
 
     auto cit = std::make_unique<ItemUseOnActorInventoryTransaction>();
     cit->mSlot = slot;
+    cit->mHand = 0;
     cit->mItemInHand = NetworkItemStackDescriptor(*stack);
     auto unique = actor->getActorUniqueIDComponent();
     cit->mActorId = unique ? unique->mUniqueID : -1;

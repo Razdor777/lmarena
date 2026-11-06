@@ -68,7 +68,7 @@ void SkinSpoofer::onConnectionRequestEvent(ConnectionRequestEvent& event)
 {
     if (!event.mSkin) return;
     
-    SerializedSkin* skin = event.mSkin;
+    SerializedSkinImpl* skin = event.mSkin;
     
     // === Apply TrustedSkin flag ===
     if (mTrustedSkin.mValue) {
@@ -106,7 +106,6 @@ void SkinSpoofer::onConnectionRequestEvent(ConnectionRequestEvent& event)
         }
         if (!capeId.empty()) {
             skin->mCapeId = capeId;
-            if (event.mCapeId) *event.mCapeId = capeId;
         }
     }
     

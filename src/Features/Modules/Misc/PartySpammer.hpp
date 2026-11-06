@@ -8,11 +8,12 @@ class PartySpammer : public ModuleBase<PartySpammer> {
 public:
     enum class Mode {
         Form,
-        Command
+        Command,
+        Aura
     };
     EnumSettingT<Mode> mMode = EnumSettingT<Mode>("Mode", "The mode of the party spammer", Mode::Form, "Form"
 #ifdef __PRIVATE_BUILD__
-        , "Command"
+        , "Command", "Aura"
 #endif
     );
     BoolSetting mActive = BoolSetting("Active", "Whether the party spammer is active", false);
@@ -29,7 +30,7 @@ public:
 
         VISIBILITY_CONDITION(mActive, mMode.mValue == Mode::Form);
         VISIBILITY_CONDITION(mDelay, mMode.mValue == Mode::Form);
-        VISIBILITY_CONDITION(mHideInviteMessage, mMode.mValue == Mode::Command);
+        VISIBILITY_CONDITION(mHideInviteMessage, mMode.mValue == Mode::Command || mMode.mValue == Mode::Aura);
 
         mNames = {
             {Lowercase, "partyspammer"},

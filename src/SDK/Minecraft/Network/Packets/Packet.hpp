@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 6/28/2024.
 //
 
 
@@ -55,11 +54,8 @@ public:
 
     virtual ~Packet();
     virtual PacketID getId() { return PacketID::Unknown; }
-    virtual std::string getName();
-    virtual void write(class BinaryStream&);
-    virtual void read(class BinaryStream&);
-    virtual void readExtended(class ReadOnlyBinaryStream&);
-    virtual void disallowBatching();
+    virtual std::string_view getName(); //who did std::string
+
 
 
 };

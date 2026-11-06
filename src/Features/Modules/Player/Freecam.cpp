@@ -111,7 +111,6 @@ void Freecam::onEnable()
 
     for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
     {
-        player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, false);
         player->mContext.mRegistry->set_flag<ExtendPlayerRenderingComponent>(id, true);
 
         auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
@@ -371,11 +370,15 @@ void Freecam::onLookInputEvent(LookInputEvent& event)
         {
             for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
             {
-                player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, true);
                 auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
-                if (storage && !storage->contains(id))
+                if (storage)
                 {
-                    storage->emplace(id, UpdatePlayerFromCameraComponent(mCameras[id]));
+                    auto* base = reinterpret_cast<entt::basic_storage<UpdatePlayerFromCameraComponent, EntityId>*>(storage);
+                    if (!base->contains(id))
+                    {
+                        base->emplace(id);
+                        base->get(id).mUpdateMode = mCameras[id];
+                    }
                 }
 
                 if (cameraComponent.getMode() == CameraMode::FirstPerson)
@@ -407,7 +410,7 @@ void Freecam::onLookInputEvent(LookInputEvent& event)
     if (!player) return;
 
     if (auto options = ClientInstance::get()->getOptions())
-        if (options->mThirdPerson) options->mThirdPerson->value = 0;
+        if (options->mThirdPerson) options->mThirdPerson->mValue = 0;
 
     if (mMode.mValue == Mode::Detached)
     {

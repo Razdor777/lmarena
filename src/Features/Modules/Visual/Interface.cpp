@@ -31,7 +31,7 @@
 #include <cmath>
 
 #ifdef __DEBUG__
-std::vector<unsigned char> gFsBytes2 = { 0x0f, 0x85 };
+std::vector<unsigned char> gFsBytes2 = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 DEFINE_PATCH_FUNC(patchFullStack, SigManager::ResourcePackManager_composeFullStackBp, gFsBytes2);
 #endif
 
@@ -359,7 +359,7 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     if (event.mEntity != player) return;
     if (*event.mPos == glm::vec3(0.f, 0.f, 0.f) && *event.mRot == glm::vec2(0.f, 0.f)) return;
 
-    bool firstPerson = ClientInstance::get()->getOptions()->mThirdPerson->value == 0;
+    bool firstPerson = ClientInstance::get()->getOptions()->mThirdPerson->mValue == 0;
     if (firstPerson && !player->getFlag<RenderCameraComponent>()) return;
 
 

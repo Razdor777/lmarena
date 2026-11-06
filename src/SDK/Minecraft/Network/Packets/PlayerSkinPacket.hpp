@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <SDK/Minecraft/Actor/SerializedSkin.hpp>
-
 class PlayerSkinPacket : public Packet {
 public:
     static inline PacketID ID = PacketID::PlayerSkin;
@@ -18,7 +16,7 @@ public:
     std::string toString() {
         std::stringstream ss;
         ss << "UUID: " << mUUID.toString();
-        ss << ", Skin: " << mSkin.toString();
+
         return ss.str();
     }
 };

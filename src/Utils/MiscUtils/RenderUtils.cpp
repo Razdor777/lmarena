@@ -4,11 +4,46 @@
 
 #include "RenderUtils.hpp"
 
+#include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 
 #include "ColorUtils.hpp"
 #include "MathUtils.hpp"
+
+ImTexture* ImTextureCache::tryGet(const std::string& path)
+{
+    std::lock_guard<std::mutex> lock(textureMutex);
+    return textures.contains(path) ? &textures[path] : nullptr;
+}
+
+ImTexture* ImTextureCache::cacheOrGet(const std::string& path)
+{
+    std::lock_guard<std::mutex> lock(textureMutex);
+
+    if (!textures.contains(path))
+    {
+        ID3D11ShaderResourceView* texture = nullptr;
+        int width = 0, height = 0;
+        D3DHook::createTextureFromFile(path.c_str(), &texture, &width, &height);
+        textures[path] = {texture, width, height};
+    }
+
+    return &textures[path];
+}
+
+void ImTextureCache::freeCachedTextures()
+{
+    std::lock_guard<std::mutex> lock(textureMutex);
+
+    for (auto& [path, texture] : textures)
+    {
+        if (texture.texture)
+            texture.texture->Release();
+    }
+
+    textures.clear();
+}
 
 void RenderUtils::drawOutlinedAABB(const AABB& aabb, bool filled, const ImColor& color)
 {
@@ -22,12 +57,6 @@ void RenderUtils::drawOutlinedAABB(const AABB& aabb, bool filled, const ImColor&
 
 bool RenderUtils::worldToScreen(glm::vec3 pos, ImVec2& screenPos)
 {
-    // This is the single per-frame entry point of every visual module, and it
-    // used to dereference both ClientInstance and GuiData raw. During a swap
-    // chain resize (F11, dragging the window, minimise/restore) and while a
-    // world is loading, GuiData is briefly gone — that is the crash that
-    // happened when you resized the window. Returning false is safe: every
-    // caller already treats a failed projection as "do not draw".
     auto* ci = ClientInstance::get();
     if (!ci) return false;
 

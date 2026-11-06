@@ -7,22 +7,22 @@
 
 class LevelChunk {
 public:
-    char                    pad_0000[120];           // this+0x0000
-    int32_t                 chunkPosX;               // this+0x0078
-    int32_t                 chunkPosY;               // this+0x007C
-    char                    pad_0080[88];            // this+0x0080
-    int8_t                  loadingStage;            // this+0x00D8
-    char                    pad_00D9[71];            // this+0x00D9
+    PAD(0x78);
+    int32_t                 mPositionX;               // this+0x0078
+    int32_t                 mPositionY;               // this+0x007C
+    PAD(0x70);
+    std::atomic<unsigned char> mLoadState;
+    PAD(0x37);
     int32_t                 mLastTick;               // this+0x0120
-    char                    pad_0124[20];            // this+0x0124
+    PAD(0x10);
     std::vector<SubChunk>   subChunks;               // this+0x0138
-    char                    pad_0150[3220];          // this+0x0150
-    int32_t                 loadCompleted;           // this+0x0DE4
-    char                    pad_0DE8[979];           // this+0x0DE8
+    PAD(0xF84);
+    int32_t                 mFinalized;
+    PAD(0x401);
     bool                    isLoading;               // this+0x11BB
-    char                    pad_11BC[20];            // this+0x11BC
+    PAD(0x3C8);
 
-    std::vector<SubChunk>* getSubChunks() {
-        return &hat::member_at<std::vector<SubChunk>>(this, OffsetProvider::LevelChunk_mSubChunks);
+    std::vector<SubChunk> const& getSubChunks() {
+        return hat::member_at<std::vector<SubChunk>>(this, OffsetProvider::LevelChunk_mSubChunks);
     }
 };

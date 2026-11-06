@@ -25,9 +25,9 @@ public:
     class ScreenContext *mScreenContext;                                  //0x0028
     class BlockActorRenderDispatcher *mBlockEntityRenderDispatcher;       //0x0030
     class std::shared_ptr<class ActorRenderDispatcher> mEntityRenderDispatcher; //0x0038
-    class ActorBlockRenderer *mEntityBlockRenderer;                       //0x0048
-    class ItemInHandRenderer *mItemInHandRenderer;                        //0x0050
-    class ItemRenderer *mItemRenderer;                                    //0x0058
+    class ActorBlockRenderer*mEntityBlockRenderer;                       //0x0048
+    class ItemInHandRenderer* mItemInHandRenderer;                        //0x0050
+    class ItemRenderer* mItemRenderer;                                    //0x0058
     class ParticleSystemEngine *mParticleSystemEngine;                    //0x0060
     class std::optional<int64_t> mRenderUniqueIdOverride;                 //0x0068
     glm::vec3 mCameraTargetPosition;                                        //0x0078

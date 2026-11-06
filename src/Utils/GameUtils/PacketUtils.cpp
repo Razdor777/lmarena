@@ -73,11 +73,7 @@ void PacketUtils::sendChatMessage(const std::string& msg)
     if (msg.empty()) return;
     std::shared_ptr<TextPacket> textPacket = MinecraftPackets::createPacket<TextPacket>();
     if (!textPacket) return;
-    textPacket->mLocalize = false;
-    textPacket->mMessage = msg;
-    textPacket->mType = TextPacketType::Chat;
-    textPacket->mAuthor = player->getRawName();
-    //textPacket->mXuid = player->getXuid();
+    textPacket->Messeage(player, msg);
 
     sender->sendToServer(textPacket.get());
 }

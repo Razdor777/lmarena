@@ -21,6 +21,8 @@ public:
     static bool isUsableBlock(ItemStack* stack);
     static int getSwiftnessSpellbook(bool hotbarOnly = true);
     static int getBoombox(bool hotbarOnly = true, bool tnt = false);
+    static int getNonSolidBlock(bool hotbarOnly = true);
+    static int getBlocks(bool hotbarOnly = true, bool crumblingCobblestone = false);
     static int getEmptyHotbarSlot();
     static void useItem(int slot);
     static int getHardestBlock(int slot, bool hotbarOnly = false);

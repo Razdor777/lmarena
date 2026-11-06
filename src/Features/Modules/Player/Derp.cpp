@@ -37,16 +37,18 @@ void Derp::onPacketOutEvent(PacketOutEvent& event)
         if (mMode.mValue == Mode::Spin)
         {
             auto player = ClientInstance::get()->getLocalPlayer();
-            if (player->isDestroying()) return;
+            if (player->isDestroying() || (mOffGroundOnly.mValue && player->isOnGround() && player->wasOnGround())) return;
 
             int64_t now = NOW;
             float maxYaw = 179.9f;
             float minYaw = -179.9f;
             // Determine the yaw from (-180, 180) based on the current time and mSpeed
             const auto yaw = (float)(static_cast<uint64_t>(static_cast<double>(NOW) * mSpeed.as<double>()) % static_cast<int>(maxYaw - minYaw) + minYaw);
-            paip->mRot.y = yaw;
+            if (!mHeadOnly.mValue) {
+                paip->mRot.y = yaw;
+                paip->mRot.x = 89.99f; // Max look down angle
+            }
             paip->mYHeadRot = yaw;
-            paip->mRot.x = 89.99f; // Max look down angle
         } else if (mMode.mValue == Mode::Random)
         {
             // pitch: -90 to 90, yaw: -180 to 180

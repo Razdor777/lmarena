@@ -14,13 +14,13 @@ DEFINE_PATCH_FUNC(NoSlowDown::patchSlowdown, SigManager::tickEntity_ItemUseSlowd
 void NoSlowDown::onEnable()
 {
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &NoSlowDown::onBaseTickEvent>(this);
-    patchSlowdown(true);
+    if (SigManager::tickEntity_ItemUseSlowdownModifierComponent) patchSlowdown(true);
 }
 
 void NoSlowDown::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &NoSlowDown::onBaseTickEvent>(this);
-    patchSlowdown(false);
+    if (SigManager::tickEntity_ItemUseSlowdownModifierComponent) patchSlowdown(false);
 }
 
 void NoSlowDown::onBaseTickEvent(BaseTickEvent& event)

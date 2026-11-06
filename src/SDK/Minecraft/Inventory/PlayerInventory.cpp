@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/5/2024.
 //
 
 #include "PlayerInventory.hpp"
@@ -23,7 +22,7 @@ void Inventory::dropSlot(int slot)
 {
     ItemStack* itemStack = getItem(slot);
 
-    if (!itemStack->mItem) return;
+    if (!itemStack->getItem()) return;
 
     static ItemStack blankStack = ItemStack();
 
@@ -79,11 +78,11 @@ void Inventory::equipArmor(int slot)
 
     ItemStack* itemStack = getItem(slot);
 
-    if (!itemStack->mItem) return;
+    if (!itemStack->getItem()) return;
 
     static ItemStack blankStack = ItemStack();
 
-    Item* item = *itemStack->mItem;
+    Item* item = itemStack->getItem();
     // Get the current item stack in the armor slot
     ItemStack* armorStack = player->getArmorContainer()->getItem(item->getArmorSlot());
 
@@ -134,8 +133,12 @@ void Inventory::releaseUsingItem(int slot)
     player->getGameMode()->releaseUsingItem();
     player->getSupplies()->mSelectedSlot = oldSlot;
 }
-
+/*
 Inventory* PlayerInventory::getContainer()
 {
-    return hat::member_at<Inventory*>(this, OffsetProvider::PlayerInventory_mContainer);
+    return hat::member_at<Inventory*>(this, OffsetProvider::PlayerInventory_mContainer); //its 0xb8
+}*/
+Inventory* PlayerInventory::getContainer()
+{
+    return *reinterpret_cast<Inventory**>(reinterpret_cast<uintptr_t>(this) + 0xB8);
 }

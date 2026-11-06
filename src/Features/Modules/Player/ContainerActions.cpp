@@ -274,7 +274,7 @@ void ContainerActions::processDropAll(Actor* player) {
                 pkt->mTransaction = std::move(cit);
                 sender->sendToServer(pkt.get());
                 armor->mItem=nullptr; armor->mCount=0; armor->mAuxValue=0;
-                armor->mBlock=nullptr; armor->mCompoundTag=nullptr; armor->valid=false;
+                armor->mBlock=nullptr; armor->mCompoundTag=nullptr; armor->mValid_DeprecatedSeeComment=false;
             }
             mActionSlot++;
         }

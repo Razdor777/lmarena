@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/12/2024.
 //
 
 #pragma once
@@ -141,21 +140,54 @@ namespace MinecraftJson
             return result;
         }
 
-        std::string toStyledString(std::string* output) {
-            /*static uintptr_t func = SigManager::JSON_toStyledString;
-            MemUtils::callFastcall<void, void*, std::string*>(func, this, output);
-            return *output;*/
+        nlohmann::json toNlohmannJson() const {
+            switch (mType)
+            {
+            case ValueType::Null:
+                return nullptr;
+            case ValueType::Int:
+                return mValue.mInt;
+            case ValueType::Uint:
+                return mValue.mUInt64;
+            case ValueType::Real:
+                return static_cast<double>(mValue.mReal);
+            case ValueType::String:
+                return mValue.mString ? std::string(mValue.mString) : std::string();
+            case ValueType::Boolean:
+                return mValue.mBool;
+            case ValueType::Array: {
+                nlohmann::json arr = nlohmann::json::array();
+                if (mValue.mMap) {
+                    for (const auto& [k, v] : *mValue.mMap) {
+                        arr.push_back(v.toNlohmannJson());
+                    }
+                }
+                return arr;
+            }
+            case ValueType::Object: {
+                nlohmann::json obj = nlohmann::json::object();
+                if (mValue.mMap) {
+                    for (const auto& [k, v] : *mValue.mMap) {
+                        std::string key = k.c_str() ? std::string(k.c_str(), k.storage_.length_) : std::to_string(k.index());
+                        obj[key] = v.toNlohmannJson();
+                    }
+                }
+                return obj;
+            }
+            default:
+                return nullptr;
+            }
         }
 
-        nlohmann::json toNlohmannJson() {
-            /*std::string styledString;
-            this->toStyledString(&styledString);
-            return nlohmann::json::parse(styledString);*/
+        std::string toStyledString(std::string* output) {
+            std::string dumped = toNlohmannJson().dump(2);
+            if (output) *output = dumped;
+            return dumped;
         }
 
         static inline MinecraftJson::Value fromNlohmannJson(nlohmann::json const &json)
         {
-
+            return Value{};
         }
         Value() {
             memset(this, 0, sizeof(*this));

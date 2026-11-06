@@ -4,53 +4,93 @@
 
 #include "ConnectionRequestHook.hpp"
 #include <Features/Events/ConnectionRequestEvent.hpp>
+#include <Features/Modules/Misc/EditionFaker.hpp>
+#include <SDK/Minecraft/Actor/SerializedSkin.hpp>
 
 std::unique_ptr<Detour> ConnectionRequestHook::mDetour;
 
-void* ConnectionRequestHook::createRequestDetourFunc(ConnectionRequest* result, PrivateKeyManager* privKeyManager,
-    Certificate* cert, std::string* selfSignedId, std::string* serverAddress, int64_t clientRandomId,
-    std::string* skinId, const char* skinData, const char* capeData, SerializedSkin* skin, std::string* deviceId,
-    int inputMode, int uiProfile, int guiScale, std::string* languageCode, bool isEditorMode, bool IsEduMode,
-    std::string* tenantId, int8_t adRole, std::string* platformUserId, std::string* thirdPartyName,
-    bool thirdPartyNameOnly, std::string* platformOnlineID, std::string* platformOfflineID, std::string* capeId,
-    bool CompatibleWithClientSideChunkGen)
-{
-    auto oFunc = mDetour->getOriginal<&createRequestDetourFunc>();
+struct ConnectionSkinInfo {
+    std::string* skinId;
+    SerializedSkin* skin;
+    char _pad[0x10];
+    __int64 other;
+    void** holder;
+};
 
-    auto holder = nes::make_holder<ConnectionRequestEvent>(result, privKeyManager, cert, selfSignedId, serverAddress, clientRandomId,
-        skinId, skinData, capeData, skin, deviceId, inputMode, uiProfile, guiScale, languageCode, isEditorMode, IsEduMode,
-        tenantId, adRole, platformUserId, thirdPartyName, thirdPartyNameOnly, platformOnlineID, platformOfflineID, capeId,
-        CompatibleWithClientSideChunkGen);
+void* ConnectionRequestHook::createRequestDetourFunc(
+    __int64 _this,
+    __int64/*Bedrock::NonOwnerPointer<::AppPlatform>*/ appPlatform,
+    class ConnectionAuthInfo* authInfo,
+    std::string* selfSignedId,
+    std::string* serverAddress,
+    unsigned __int64 clientRandomId,
+    class ConnectionSkinInfo const* skinInfo,
+    std::string* deviceId,
+    int /*InputMode*/ currentInputMode,
+    int guiScale,
+    std::string const& languageCode,
+    bool clientIsEditorCapable,
+    int /*EditorConnectionJoinIntent*/ clientEditorConnectionIntent,
+    bool isEduMode,
+    void* /*std::optional<class WebToken>*/ eduTokenChain,
+    std::string eduSessionToken,
+    std::string eduJoinerToHostNonce,
+    unsigned char /*edu::Role*/  classRole,
+    std::string const& platformId,
+    std::string const& thirdPartyName,
+    std::string const& platformOnlineId,
+    std::string const& platformOfflineId,
+    std::optional<class PlayerPartyInfo> const& partyInfo,
+    bool compatibleWithClientSideChunkGen,
+    struct SyncedClientOptionsComponent const& options,
+    void* /*std::optional<class Nonce> const&*/  nonce
+    )
+{
+
+    SerializedSkinImpl* skinImpl = (skinInfo && skinInfo->skin && skinInfo->skin->impl)
+        ? &skinInfo->skin->impl->Object
+        : nullptr;
+
+    auto holder = nes::make_holder<ConnectionRequestEvent>(*selfSignedId, *serverAddress, clientRandomId, *skinInfo->skinId, *deviceId, currentInputMode, skinImpl);
     gFeatureManager->mDispatcher->trigger(holder);
 
-    // Uhhhhh what the fhauck am i doing here lol
-    result = holder->mResult;
-    privKeyManager = holder->mPrivKeyManager;
-    cert = holder->mCert;
-    *selfSignedId = *holder->mSelfSignedId;
-    *serverAddress = *holder->mServerAddress;
+    *selfSignedId = holder->mSelfSignedId;
+    *serverAddress = holder->mServerAddress;
     clientRandomId = holder->mClientRandomId;
-    *skinId = *holder->mSkinId;
-    *deviceId = *holder->mDeviceId;
-    inputMode = holder->mInputMode;
-    uiProfile = holder->mUiProfile;
-    guiScale = holder->mGuiScale;
-    *languageCode = *holder->mLanguageCode;
-    isEditorMode = holder->mIsEditorMode;
-    IsEduMode = holder->mIsEduMode;
-    *tenantId = *holder->mTenantId;
-    adRole = holder->mAdRole;
-    *platformUserId = *holder->mPlatformUserId;
-    *thirdPartyName = *holder->mThirdPartyName;
-    thirdPartyNameOnly = holder->mThirdPartyNameOnly;
-    *platformOnlineID = *holder->mPlatformOnlineID;
-    *platformOfflineID = *holder->mPlatformOfflineID;
-    *capeId = *holder->mCapeId;
-    CompatibleWithClientSideChunkGen = holder->mCompatibleWithClientSideChunkGen;
+    *skinInfo->skinId = holder->mSkinId;
+    *deviceId = holder->mDeviceId;
+    currentInputMode = holder->mInputMode;
 
-    return oFunc(result, privKeyManager, cert, selfSignedId, serverAddress, clientRandomId, skinId, skinData, capeData, skin,
-        deviceId, inputMode, uiProfile, guiScale, languageCode, isEditorMode, IsEduMode, tenantId, adRole, platformUserId,
-        thirdPartyName, thirdPartyNameOnly, platformOnlineID, platformOfflineID, capeId, CompatibleWithClientSideChunkGen);
+    auto oFunc = mDetour->getOriginal<&createRequestDetourFunc>();
+
+    return oFunc(
+        _this,
+        appPlatform,
+        authInfo,
+        selfSignedId,
+        serverAddress,
+        clientRandomId,
+        skinInfo,
+        deviceId,
+        currentInputMode,
+        guiScale,
+        languageCode,
+        clientIsEditorCapable,
+        clientEditorConnectionIntent,
+        isEduMode,
+        eduTokenChain,
+        eduSessionToken,
+        eduJoinerToHostNonce,
+        classRole,
+        platformId,
+        thirdPartyName,
+        platformOnlineId,
+        platformOfflineId,
+        partyInfo,
+        compatibleWithClientSideChunkGen,
+        options,
+        nonce
+    );
 }
 
 void ConnectionRequestHook::init()

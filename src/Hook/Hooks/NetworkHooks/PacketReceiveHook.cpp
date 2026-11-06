@@ -11,6 +11,7 @@
 #include <SDK/Minecraft/GameSession.hpp>
 #include <SDK/Minecraft/MinecraftSim.hpp>
 #include <Utils/MiscUtils/ColorUtils.hpp>
+#include <SDK/Minecraft/Network/Packets/NetworkStackLatencyPacket.hpp>
 #include <omp.h>
 
 std::unordered_map<PacketID, std::unique_ptr<Detour>> PacketReceiveHook::mDetours;
@@ -28,7 +29,12 @@ void* PacketReceiveHook::onPacketSend(void* _this, void* networkIdentifier, void
 
     auto holder = nes::make_holder<PacketInEvent>(packet, networkIdentifier, netEventCallback);
     gFeatureManager->mDispatcher->trigger(holder);
-    if (holder->isCancelled()) return nullptr;
+    if (holder->isCancelled()) {
+        auto ofunc2 = PacketReceiveHook::mDetours[PacketID::NetworkStackLatency]->getOriginal<&PacketReceiveHook::onPacketSend>();
+        packet = MinecraftPackets::createPacket<NetworkStackLatencyPacket>();
+
+        return ofunc2(_this, networkIdentifier, netEventCallback, packet);
+    }
 
     return ofunc(_this, networkIdentifier, netEventCallback, packet);
 }

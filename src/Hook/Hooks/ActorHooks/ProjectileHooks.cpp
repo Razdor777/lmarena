@@ -1,54 +1,49 @@
 #include "ProjectileHooks.hpp"
 #include <Features/Events/ProjectileHitEvent.hpp>
 #include <Features/FeatureManager.hpp>
-#include <SDK/Minecraft/Actor/Actor.hpp>
-#include <Windows.h>
+#include <SDK/SigManager.hpp>
 
-std::unique_ptr<Detour> ProjectileHooks::mDetourProjectileHitEntity;
-std::unique_ptr<Detour> ProjectileHooks::mDetourProjectileHitBlock;
+std::unique_ptr<Detour> ProjectileHooks::mHitEntityDetour;
+std::unique_ptr<Detour> ProjectileHooks::mHitBlockDetour;
 
-void ProjectileHooks::onProjectileHitEntity(Actor *projectile,
-                                            const HitResult &hitResult) {
-  auto original = mDetourProjectileHitEntity
-                      ->getOriginal<&ProjectileHooks::onProjectileHitEntity>();
+void ProjectileHooks::onHitEntity(void* _this, Actor* owner, Actor* hitEntity)
+{
+    auto original = mHitEntityDetour->getOriginal<&ProjectileHooks::onHitEntity>();
+    original(_this, owner, hitEntity);
 
-  // Trigger event
-  if (projectile) {
-    auto holder = nes::make_holder<ProjectileHitEvent>(projectile, hitResult);
-    gFeatureManager->mDispatcher->trigger(holder);
-  }
+    if (owner && hitEntity && gFeatureManager && gFeatureManager->mDispatcher)
+    {
+        glm::vec3 hitPos = glm::vec3(0);
+        if (auto p = hitEntity->getPos())
+            hitPos = *p;
 
-  original(projectile, hitResult);
+        auto holder = nes::make_holder<ProjectileHitEvent>(owner, hitEntity, hitPos, false);
+        gFeatureManager->mDispatcher->trigger(holder);
+    }
 }
 
-void ProjectileHooks::onProjectileHitBlock(Actor *projectile,
-                                           const HitResult &hitResult) {
-  auto original = mDetourProjectileHitBlock
-                      ->getOriginal<&ProjectileHooks::onProjectileHitBlock>();
+void ProjectileHooks::onHitBlock(void* _this, Actor* owner, glm::vec3* hitPos, int side, bool b)
+{
+    auto original = mHitBlockDetour->getOriginal<&ProjectileHooks::onHitBlock>();
+    original(_this, owner, hitPos, side, b);
 
-  if (projectile) {
-    auto holder = nes::make_holder<ProjectileHitEvent>(projectile, hitResult);
-    gFeatureManager->mDispatcher->trigger(holder);
-  }
-
-  original(projectile, hitResult);
+    if (owner && hitPos && gFeatureManager && gFeatureManager->mDispatcher)
+    {
+        auto holder = nes::make_holder<ProjectileHitEvent>(owner, nullptr, *hitPos, true);
+        gFeatureManager->mDispatcher->trigger(holder);
+    }
 }
 
-void ProjectileHooks::init() {
-  uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
-
-  // projectileHitEntity sub_1423A0270
-  // Offset: 0x23A0270
-  uintptr_t hitEntityAddr = base + 0x23A0270;
-
-  // projectileHitBlock sub_1423A0440
-  // Offset: 0x23A0440
-  uintptr_t hitBlockAddr = base + 0x23A0440;
-
-  mDetourProjectileHitEntity =
-      std::make_unique<Detour>("projectileHitEntity", (void *)hitEntityAddr,
-                               &ProjectileHooks::onProjectileHitEntity);
-  mDetourProjectileHitBlock =
-      std::make_unique<Detour>("projectileHitBlock", (void *)hitBlockAddr,
-                               &ProjectileHooks::onProjectileHitBlock);
+void ProjectileHooks::init()
+{
+    if (SigManager::Projectile_hitEntity)
+    {
+        mHitEntityDetour = std::make_unique<Detour>("ProjectileComponent::onHitEntity", reinterpret_cast<void*>(SigManager::Projectile_hitEntity), &ProjectileHooks::onHitEntity);
+        mHitEntityDetour->enable();
+    }
+    if (SigManager::Projectile_hitBlock)
+    {
+        mHitBlockDetour = std::make_unique<Detour>("ProjectileComponent::onHitBlock", reinterpret_cast<void*>(SigManager::Projectile_hitBlock), &ProjectileHooks::onHitBlock);
+        mHitBlockDetour->enable();
+    }
 }

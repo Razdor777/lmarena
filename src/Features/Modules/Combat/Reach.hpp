@@ -22,15 +22,11 @@ public:
         };
     }
 
-    static inline unsigned char mOriginalData[11];
+    static inline unsigned char mOriginalData[18];
 
-    static inline unsigned char mDetourBytes[] = {
-        0x00, 0x00, 0x40, 0x40,
-        0xF3, 0x44, 0x0F, 0x5D, 0x3D, 0xF3, 0xFF, 0xFF, 0xFF
-    };
-
-    static inline void* mDetour = nullptr;
+    float* mCombatPtr = nullptr;
     float* mBlockReachPtr = nullptr;
+    float mOrigBlockReach = 5.7f;
 
     void onEnable() override;
     void onDisable() override;

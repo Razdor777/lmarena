@@ -20,11 +20,12 @@ struct ActorPartModel {
 
 struct Bone
 {
+    PAD(0xe8);
     CLASS_FIELD(std::string, mBoneStr, 0x10);
 
     ActorPartModel* getActorPartModel()
     {
-        return reinterpret_cast<ActorPartModel*>(reinterpret_cast<uintptr_t>(this + 0xEC));
+        return reinterpret_cast<ActorPartModel*>(reinterpret_cast<uintptr_t>(this) + 0x78); // 1.21.131
     }
 };
 

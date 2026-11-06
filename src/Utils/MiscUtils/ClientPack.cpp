@@ -434,6 +434,53 @@ namespace ClientPack
         // если клиент работает — каталог существует. Это верно для обычного
         // UWP-пакета; Beta/Preview отсеются проверкой существования ниже и
         // будут найдены перебором.
+        // ── 0. GDK (26.62 / 1.21.70+): %APPDATA%\Minecraft Bedrock\Users\<XUID|Shared>\games\com.mojang
+        if (const char* appData = std::getenv("APPDATA"))
+        {
+            for (const char* gdkDir : { "Minecraft Bedrock", "Minecraft Bedrock Preview" })
+            {
+                const auto usersDir = std::filesystem::path(appData) / gdkDir / "Users";
+                if (!std::filesystem::exists(usersDir, ec)) continue;
+
+                std::filesystem::path bestUserComMojang;
+                std::filesystem::file_time_type bestTime{};
+                bool hasBest = false;
+
+                for (const auto& entry : std::filesystem::directory_iterator(usersDir, ec))
+                {
+                    if (!entry.is_directory(ec)) continue;
+                    const std::string name = entry.path().filename().string();
+                    if (packToLower(name) == "shared") continue;
+
+                    const auto cm = entry.path() / "games" / "com.mojang";
+                    const auto opts = cm / "minecraftpe" / "options.txt";
+                    if (std::filesystem::exists(opts, ec) ||
+                        std::filesystem::exists(cm / "minecraftWorlds", ec) ||
+                        std::filesystem::exists(cm / "resource_packs", ec))
+                    {
+                        auto t = std::filesystem::exists(opts, ec)
+                                     ? std::filesystem::last_write_time(opts, ec)
+                                     : std::filesystem::last_write_time(cm, ec);
+                        if (!hasBest || t > bestTime)
+                        {
+                            bestTime = t;
+                            bestUserComMojang = cm;
+                            hasBest = true;
+                        }
+                    }
+                }
+
+                if (hasBest) return bestUserComMojang;
+
+                const auto sharedCm = usersDir / "Shared" / "games" / "com.mojang";
+                if (std::filesystem::exists(sharedCm / "resource_packs", ec) ||
+                    std::filesystem::exists(sharedCm, ec))
+                {
+                    return sharedCm;
+                }
+            }
+        }
+
         try
         {
             const std::filesystem::path roaming(FileUtils::getRoamingStatePath());
@@ -627,6 +674,22 @@ namespace ClientPack
 
             if (iconIt != rootFiles.end())
                 packCopyFile(iconIt->second, result.packPath / "pack_icon.png", &copied);
+
+            // На GDK (26.62) общие resource_packs живут в Users\Shared\games\com.mojang\resource_packs,
+            // тогда как списки паков и options.txt — в Users\<XUID>\games\com.mojang\minecraftpe.
+            // Зеркалим установленную папку и в Shared, если такой каталог рядом есть.
+            {
+                const auto gamesDir = result.comMojang.parent_path();
+                const auto userDir = gamesDir.parent_path();
+                const auto usersRoot = userDir.parent_path();
+                if (packToLower(usersRoot.filename().string()) == "users" &&
+                    packToLower(userDir.filename().string()) != "shared")
+                {
+                    const auto sharedPackPath = usersRoot / "Shared" / "games" / "com.mojang" / "resource_packs" / folder;
+                    std::filesystem::remove_all(sharedPackPath, ec);
+                    packCopyTree(result.packPath, sharedPackPath, nullptr);
+                }
+            }
 
             result.filesCopied = copied;
 
@@ -984,9 +1047,20 @@ namespace ClientPack
 
             std::error_code ec;
             const auto packPath = comMojang / "resource_packs" / folder;
-            const bool hadFolder = std::filesystem::exists(packPath, ec);
+            bool hadFolder = std::filesystem::exists(packPath, ec);
             if (hadFolder)
                 std::filesystem::remove_all(packPath, ec);
+
+            const auto usersRoot = comMojang.parent_path().parent_path().parent_path();
+            if (packToLower(usersRoot.filename().string()) == "users")
+            {
+                const auto sharedPackPath = usersRoot / "Shared" / "games" / "com.mojang" / "resource_packs" / folder;
+                if (std::filesystem::exists(sharedPackPath, ec))
+                {
+                    std::filesystem::remove_all(sharedPackPath, ec);
+                    hadFolder = true;
+                }
+            }
 
             if (messageOut)
             {

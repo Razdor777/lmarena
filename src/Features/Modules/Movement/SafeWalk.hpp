@@ -17,6 +17,9 @@ public:
         };
     }
 
+    static inline unsigned char mOriginalData[13];
+    static inline unsigned char mOriginalData2[25];
+
     void onEnable() override;
     void onDisable() override;
     void onBaseTickEvent(class BaseTickEvent& event);

@@ -4,32 +4,29 @@
 
 #include "Solstice.hpp"
 
-
 #include <fstream>
 #include <Features/FeatureManager.hpp>
-#include <Features/Modules/Misc/DeviceSpoof.hpp>
 #include <Features/Configs/ConfigManager.hpp>
+#include <Features/Modules/Misc/DeviceSpoof.hpp>
+#include <Features/IRC/IrcClient.hpp>
+#include <Features/Modules/Misc/IRC.hpp>
 #include <Hook/HookManager.hpp>
 #include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 
 #include <SDK/OffsetProvider.hpp>
-
 #include <SDK/SigManager.hpp>
-
-#include <Utils/GameUtils/ChatUtils.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/MinecraftGame.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
-
-#include <Features/Auth/Authorization.hpp>
+#include <SDK/Minecraft/Rendering/GuiData.hpp>
 
 #include "spdlog/sinks/stdout_color_sinks-inl.h"
+#include "spdlog/sinks/basic_file_sink.h"
 #include <winrt/base.h>
 #include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.UI.Core.h>
 #include <build_info.h>
-#include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/OAuthUtils.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
 
@@ -37,30 +34,51 @@
 #pragma comment(lib, "wininet.lib")
 
 #ifdef __DEBUG__
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [debug]";
+std::string title = "[Juzdex] [" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [debug]";
 #elif __PRIVATE_BUILD__
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [private]";
+std::string title = "[Juzdex] [" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [private]";
 #else
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "]";
+std::string title = "[Juzdex] [" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "]";
 #endif
 
-
-void setTitle(std::string title)
+void setTitle(std::string titleStr)
 {
-    auto w = winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [title]() {
-        winrt::Windows::UI::ViewManagement::ApplicationView::GetForCurrentView().Title(winrt::to_hstring(title));
-    });
+    if (!titleStr.empty())
+    {
+        titleStr += " - ";
+    }
+    titleStr += "Minecraft";
+
+    if (!Solstice::GameWindow)
+    {
+        Solstice::GameWindow = ProcUtils::getMinecraftWindow();
+    }
+
+    if (Solstice::GameWindow)
+    {
+        int s = MultiByteToWideChar(CP_UTF8, 0, titleStr.c_str(), -1, nullptr, 0);
+        std::wstring wtitle(s, 0);
+        MultiByteToWideChar(CP_UTF8, 0, titleStr.c_str(), -1, wtitle.data(), s);
+        SetWindowTextW(Solstice::GameWindow, wtitle.c_str());
+    }
+    Solstice::mReadyWindow = true;
 }
 
-std::vector<unsigned char> gBpBytes = {0x1c}; // Defines the new offset for mInHandSlot
-DEFINE_PATCH_FUNC(patchInHandSlot, SigManager::ItemInHandRenderer_renderItem_bytepatch2+2, gBpBytes);
+std::vector<unsigned char> gBpBytes = {0x1c}; // 26.62 offset for mInHandSlot
+DEFINE_PATCH_FUNC(patchInHandSlot, SigManager::ItemInHandRenderer_renderItem_bytepatch2 + 2, gBpBytes);
 
-// called using winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [&]()
 void Solstice::init(HMODULE hModule)
 {
-    // Not doing this could cause crashes if you inject too soon
-    // Honestly, I don't think this helps much but it's not a bad idea to have it here
-    while (ProcUtils::getModuleCount() < 130) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while (ProcUtils::getModuleCount() < 130)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    Solstice::GameWindow = FindWindowA(nullptr, "Minecraft");
+    if (!Solstice::GameWindow)
+    {
+        Solstice::GameWindow = ProcUtils::getMinecraftWindow();
+    }
 
     int64_t start = NOW;
 
@@ -73,37 +91,38 @@ void Solstice::init(HMODULE hModule)
 
     console = spdlog::stdout_color_mt(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
 
-    // Create a file logger sink
     std::string logFile = FileUtils::getSolsticeDir() + xorstr_("solstice.log");
- 
-    // Don't use the file sink if the log file doesn't exist
+
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
     console_sink->set_level(spdlog::level::trace);
     console->set_level(spdlog::level::trace);
     console->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
-    spdlog::set_default_logger(std::make_shared<spdlog::logger>(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::sinks_init_list{console_sink}));
 
-    console->info("Welcome to " + CC(0, 255, 0) + "Solstice" + ANSI_COLOR_RESET + "!"
+    if (FileUtils::fileExists(logFile))
+    {
+        auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFile, true);
+        file_sink->set_pattern("[%H:%M:%S.%e] [%n] [%l] %v");
+        file_sink->set_level(spdlog::level::trace);
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::sinks_init_list{console_sink, file_sink}));
+    }
+    else
+    {
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::sinks_init_list{console_sink}));
+    }
+
+    console->info("Welcome to " + CC(0, 255, 0) + "Juzdex (Solstice 26.62)" + ANSI_COLOR_RESET + "!"
 #ifdef __DEBUG__
         + CC(255, 0, 0) + " [Debug] " + ANSI_COLOR_RESET
 #endif
-);
+    );
 
     spdlog::info("Minecraft version: {}", ProcUtils::getVersion());
 
     ExceptionHandler::init();
-
     FileUtils::validateDirectories();
 
-    // Change the window title
-
-
     setTitle(title);
-
-
-    sHWID = GET_HWID().toString();
-    spdlog::info("HWID: {}", sHWID);
 
     if (MH_Initialize() != MH_OK)
     {
@@ -112,7 +131,11 @@ void Solstice::init(HMODULE hModule)
 
     Prefs = PreferenceManager::load();
 
-    HWND hwnd = ProcUtils::getMinecraftWindow(); // Cache the window handle
+    HWND hwnd = ProcUtils::getMinecraftWindow();
+    if (!Solstice::GameWindow && hwnd)
+    {
+        Solstice::GameWindow = hwnd;
+    }
 
 #ifdef __DEBUG__
     if (Prefs->mEnforceDebugging)
@@ -126,21 +149,6 @@ void Solstice::init(HMODULE hModule)
     }
 #endif
 
-#ifdef __PRIVATE_BUILD__
-#ifndef __PRIVATE_DEBUG__
-#pragma message("Note: This is a private build. Please do not share this build with anyone.")
-    Auth auth;
-    auth.init();
-    if(!auth.isPrivateUser())
-    {
-        auth.exit();
-    }
-#endif
-#endif
-
-
-
-
     console->info("initializing signatures...");
     int64_t sstart = NOW;
     OffsetProvider::initialize();
@@ -149,7 +157,6 @@ void Solstice::init(HMODULE hModule)
 
     int failedSigs = 0;
 
-    // Go through all signatures and print any that failed
     for (const auto& [sig, result] : SigManager::mSigs)
     {
         if (result == 0)
@@ -168,51 +175,21 @@ void Solstice::init(HMODULE hModule)
         }
     }
 
+#ifdef __DEBUG__
     if (failedSigs > 0)
     {
-        console->critical("Failed to find {} signatures/offsets!", failedSigs);
-
-#ifdef __DEBUG__
-        {
-            console->critical("Solstice should not be used in this state.");
-            console->info("Type 'DEBUG' to continue, or press ENTER to exit.");
-            std::string input;
-            std::getline(std::cin, input);
-            if (input != "DEBUG")
-            {
-                SigManager::deinitialize();
-                OffsetProvider::deinitialize();
-                Logger::deinitialize();
-
-                setTitle("");
-                FreeLibraryAndExitThread(hModule, 0);
-            }
-        }
-#else
-        else
-        {
-            ExceptionHandler::makeCrashLog("Failed to find signatures/offsets!", 0xFF01);
-            int* p = nullptr;
-            *p = 0;
-            exit(0);
-        }
-#endif
+        console->warn("{} signatures/offsets failed in Debug mode. Continuing...", failedSigs);
     }
+#endif
 
     console->info("initialized signatures in {}ms", send - sstart);
 
-    console->info("clientinstance addr @ 0x{:X}", reinterpret_cast<uintptr_t>(ClientInstance::get()));
-    console->info("mcgame from clientinstance addr @ 0x{:X}", reinterpret_cast<uintptr_t>(ClientInstance::get()->getMinecraftGame()));
-    console->info("localplayer addr @ 0x{:X}", reinterpret_cast<uintptr_t>(ClientInstance::get()->getLocalPlayer()));
-
-    // press enter to continue if failed sigs
-    if (failedSigs > 0)
+    if (auto ci = ClientInstance::get())
     {
-        console->info("Press ENTER to continue...");
-        std::string input;
-        std::getline(std::cin, input);
+        console->info("clientinstance addr @ 0x{:X}", reinterpret_cast<uintptr_t>(ci));
+        console->info("mcgame from clientinstance addr @ 0x{:X}", reinterpret_cast<uintptr_t>(ci->getMinecraftGame()));
+        console->info("localplayer addr @ 0x{:X}", reinterpret_cast<uintptr_t>(ci->getLocalPlayer()));
     }
-
 
     gFeatureManager = std::make_shared<FeatureManager>();
     gFeatureManager->init();
@@ -222,9 +199,11 @@ void Solstice::init(HMODULE hModule)
 
     console->info("initialized in {}ms", NOW - start);
 
-
-
-    ClientInstance::get()->getMinecraftGame()->playUi("beacon.activate", 1, 1.0f);
+    if (auto ci = ClientInstance::get())
+    {
+        if (auto mcGame = ci->getMinecraftGame())
+            mcGame->playUi("beacon.activate", 1, 1.0f);
+    }
     ChatUtils::displayClientMessage("Initialized!");
 
     console->info("Press END to eject dll.");
@@ -236,41 +215,17 @@ void Solstice::init(HMODULE hModule)
 
 void Solstice::shutdownThread()
 {
-    // Wait for the user to press END
     bool firstCall = true;
     bool isLpValid = false;
     while (!mRequestEject)
     {
         if (firstCall)
         {
-            NotifyUtils::notify("Solstice initialized!", 5.0f, Notification::Type::Info);
+            NotifyUtils::notify("Juzdex initialized!", 5.0f, Notification::Type::Info);
             firstCall = false;
-
-            std::string latestHash;
-            latestHash = OAuthUtils::getLatestCommitHash();
-
-            if(latestHash == xorstr_("403"))
-            {
-
-            }
-            else if (!latestHash.empty())
-            {
-                if (latestHash != SOLSTICE_BUILD_VERSION)
-                {
-                    console->warn("Solstice is out of date! Latest commit: {}", latestHash);
-                    NotifyUtils::notify("There is a new version of Solstice available!\nIt is recommended to update.", 10.0f, Notification::Type::Warning);
-                    ChatUtils::displayClientMessage("§aThere is a new version of Solstice available! Download it from the Discord server.");
-                } else {
-                    console->info("Solstice is up to date!");
-                }
-            }
-            else if(latestHash.empty())
-            {
-
-            }
         }
 
-        if (!isLpValid && ClientInstance::get()->getLocalPlayer())
+        if (!isLpValid && ClientInstance::get() && ClientInstance::get()->getLocalPlayer())
         {
             isLpValid = true;
             HookManager::init(true); // Initialize the base tick hook
@@ -288,17 +243,18 @@ void Solstice::shutdownThread()
                     Prefs->mDefaultConfigName = "";
                     PreferenceManager::save(Prefs);
                 }
-            } else {
+            }
+            else
+            {
                 console->warn("No default config set!");
             }
 
-            // Device spoofing is mandatory for every injected session, even if
-            // the loaded default config previously had it disabled.
+            // Device spoofing is mandatory for every injected session
             auto deviceSpoof = gFeatureManager->mModuleManager->getModule<DeviceSpoof>();
             if (deviceSpoof) deviceSpoof->setEnabled(true);
         }
 
-        patchInHandSlot(ClientInstance::get()->getLocalPlayer() != nullptr);
+        patchInHandSlot(ClientInstance::get() && ClientInstance::get()->getLocalPlayer() != nullptr);
 
         mLastTick = NOW;
         gFeatureManager->mModuleManager->onClientTick();
@@ -314,19 +270,12 @@ void Solstice::shutdownThread()
 
     HookManager::shutdown();
 
-    // The hooks are gone, but the render thread may still be inside the frame it
-    // started before that. Give it a few frames to get out before anything is
-    // freed.
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     gFeatureManager->shutdown();
 
-    // Shutdown
     console->warn("Shutting down...");
 
-    // Both of these used to be raw dereferences inside the eject path — pulling
-    // the module while the game was between worlds (GuiData gone) crashed right
-    // here, before anything was even unloaded.
     if (auto* ci = ClientInstance::get())
     {
         if (auto* game = ci->getMinecraftGame())
@@ -340,22 +289,10 @@ void Solstice::shutdownThread()
     SigManager::deinitialize();
     OffsetProvider::deinitialize();
 
-    // wait for threads to finish
-    Sleep(1000); // Give the user time to read the message
+    Sleep(1000);
 
     Logger::deinitialize();
 
-    // ---- unload ---------------------------------------------------------
-    //
-    // This used to be a plain `FreeLibrary(mModule)` right here, and that is the
-    // uninject crash: the DLL gets unmapped while *this* thread is still
-    // executing code inside it, so the very next instruction (the function
-    // epilogue, the std::thread teardown, the CRT) jumps into freed memory.
-    //
-    // A dedicated thread owns the unload instead. It waits until this thread is
-    // definitely gone, then calls FreeLibraryAndExitThread, which frees the
-    // module and terminates the thread inside kernel32 without ever returning
-    // into unmapped code. This thread ends with ExitThread for the same reason.
     HANDLE unloader = CreateThread(nullptr, 0, &Solstice::unloadThreadProc, mModule, 0, nullptr);
     if (unloader)
     {
@@ -363,16 +300,12 @@ void Solstice::shutdownThread()
         ExitThread(0);
     }
 
-    // Thread creation failed: unload from here, but still never return.
     FreeLibraryAndExitThread(mModule, 0);
 }
 
 DWORD WINAPI Solstice::unloadThreadProc(LPVOID module)
 {
-    // Give the ejecting thread time to actually terminate (it calls ExitThread,
-    // so nothing of ours is left running by then).
     Sleep(250);
-
     FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
     return 0;
 }

@@ -636,7 +636,7 @@ void Nametags::onRenderEvent(RenderEvent& event)
         if (actor == lp) {
             if (!mRenderLocal.mValue) continue;
             auto* opts = ci->getOptions();
-            if (opts && opts->mThirdPerson->value == 0 &&
+            if (opts && opts->mThirdPerson->mValue == 0 &&
                 !lp->getFlag<RenderCameraComponent>()) continue;
         }
 
@@ -844,7 +844,7 @@ void Nametags::onNametagRenderEvent(NametagRenderEvent& event)
 
     if (actor == lp) {
         auto* opts = ci->getOptions();
-        if (opts && opts->mThirdPerson->value == 0
+        if (opts && opts->mThirdPerson->mValue == 0
             && !lp->getFlag<RenderCameraComponent>()) return;
     }
 

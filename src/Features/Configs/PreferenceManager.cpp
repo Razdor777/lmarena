@@ -45,6 +45,7 @@ std::shared_ptr<Preferences> PreferenceManager::load()
         prefs->mFriends = j["Friends"].get<std::vector<std::string>>();
         prefs->mFallbackToD3D11 = j["FallbackToD3D11"];
         prefs->mEnforceDebugging = j["EnforceDebugging"];
+        prefs->mIrcName = j.value("IrcName", std::string(""));
         prefs->mStreamerName = j["StreamerName"];
     }
     catch (std::exception e)
@@ -78,6 +79,7 @@ void PreferenceManager::save(const std::shared_ptr<Preferences>& prefs)
         j["Friends"] = prefs->mFriends;
         j["FallbackToD3D11"] = prefs->mFallbackToD3D11;
         j["EnforceDebugging"] = prefs->mEnforceDebugging;
+        j["IrcName"] = prefs->mIrcName;
         j["StreamerName"] = prefs->mStreamerName;
     } catch (std::exception& e)
     {

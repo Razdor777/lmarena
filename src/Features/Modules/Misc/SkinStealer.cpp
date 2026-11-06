@@ -148,9 +148,9 @@ void SkinStealer::applySkin(Actor* actor, const std::vector<uint8_t>& skinData, 
     if (!currentSkin) return;
 
     auto skinPacket = MinecraftPackets::createPacket<PlayerSkinPacket>();
-    skinPacket->mSkin.mId = currentSkin->mId;
-    skinPacket->mSkin.mPlayFabId = currentSkin->mPlayFabId;
-    skinPacket->mSkin.mFullId = currentSkin->mFullId;
+    auto skin = &skinPacket->mSkin.impl->Object;
+    skin->mId = currentSkin->mId;
+    skin->mFullId = currentSkin->mFullId;
 
     std::string defaultGeometry;
     bool isSlim = false;
@@ -174,22 +174,22 @@ void SkinStealer::applySkin(Actor* actor, const std::vector<uint8_t>& skinData, 
         return;
     }
 
-    skinPacket->mSkin.mResourcePatch = std::string("{\"geometry\": {\"default\": \"") + (isSlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom") + "\"}}";
-    skinPacket->mSkin.mDefaultGeometryName = isSlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom";
+    skin->mResourcePatch = std::string("{\"geometry\": {\"default\": \"") + (isSlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom") + "\"}}";
+    skin->mDefaultGeometryName = isSlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom";
 
     int width, height, depth;
     std::vector<unsigned char> skinImage = converToRGBA(skinData, width, height, depth);
-    skinPacket->mSkin.mSkinImage.mImageBytes = mce::Blob::fromVector(skinImage);
-    skinPacket->mSkin.mSkinImage.mWidth = width;
-    skinPacket->mSkin.mSkinImage.mHeight = height;
-    skinPacket->mSkin.mSkinImage.mDepth = 4;
+    skin->mSkinImage.mImageBytes = mce::Blob::fromVector(skinImage);
+    skin->mSkinImage.mWidth = width;
+    skin->mSkinImage.mHeight = height;
+    skin->mSkinImage.mDepth = 4;
 
     if (!capeData.empty()) {
         std::vector<unsigned char> capeImage = converToRGBA(capeData, capeWidth, capeHeight, depth);
-        skinPacket->mSkin.mCapeImage.mImageBytes = mce::Blob::fromVector(capeImage);
-        skinPacket->mSkin.mCapeImage.mWidth = capeWidth;
-        skinPacket->mSkin.mCapeImage.mHeight = capeHeight;
-        skinPacket->mSkin.mCapeImage.mDepth = 4;
+        skin->mCapeImage.mImageBytes = mce::Blob::fromVector(capeImage);
+        skin->mCapeImage.mWidth = capeWidth;
+        skin->mCapeImage.mHeight = capeHeight;
+        skin->mCapeImage.mDepth = 4;
     }
 
     ClientInstance::get()->getPacketSender()->send(skinPacket.get());

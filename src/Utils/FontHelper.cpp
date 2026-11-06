@@ -31,6 +31,7 @@
 
 void FontHelper::load()
 {
+    Fonts.clear();
     ResourceLoader::loadResources();
 
     auto& io = ImGui::GetIO();

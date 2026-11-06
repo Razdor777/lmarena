@@ -3,7 +3,6 @@
 
 
 //
-// Created by vastrakai on 7/7/2024.
 //
 
 class LevelRendererPlayer {
@@ -11,6 +10,8 @@ public:
     glm::vec3* getCameraPos();
     float* getFovX();
     float* getFovY();
+    void setFovX(float v);
+    void setFovY(float v);
 };
 
 class LevelRenderer {

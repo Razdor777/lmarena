@@ -75,10 +75,19 @@ void BoneEsp::onRenderEvent(RenderEvent& event)
 
 void BoneEsp::onBoneRenderEvent(BoneRenderEvent& event)
 {
-    auto bone = event.mBone;
-    auto partModel = event.mPartModel;
+    if (!event.mBones || !event.mActor) return;
     auto actor = event.mActor;
+    auto& out = mBoneMap[actor];
+    out.clear();
 
-    if (bone->mBoneStr != "rightarm") return;
-    mBoneMap[actor].emplace_back(bone, partModel);
+    for (auto& [key, boneVec] : *event.mBones)
+    {
+        for (auto& bone : boneVec)
+        {
+            if (bone.mBoneStr == "rightarm")
+            {
+                out.emplace_back(&bone, bone.getActorPartModel());
+            }
+        }
+    }
 }

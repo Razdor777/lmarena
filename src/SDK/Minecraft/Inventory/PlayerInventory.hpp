@@ -1,13 +1,16 @@
 #pragma once
 //
-// Created by vastrakai on 7/5/2024.
 //
 
 #include <Utils/MemUtils.hpp>
 
 #include "SimpleContainer.hpp"
+class FillingContainer : public Container
+{
+public:
 
-class Inventory : public SimpleContainer {
+};
+class Inventory : public FillingContainer {
 public:
     void dropSlot(int slot);
     void swapSlots(int from, int to);

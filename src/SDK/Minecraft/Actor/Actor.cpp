@@ -4,24 +4,33 @@
 
 #include "Actor.hpp"
 
-#include <SDK/OffsetProvider.hpp>
-#include <SDK/SigManager.hpp>
+#include "SerializedSkin.hpp"
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/MinecraftSim.hpp>
+#include <SDK/Minecraft/MinecraftGame.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
+#include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/AnimatePacket.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
+#include <SDK/OffsetProvider.hpp>
+#include <SDK/SigManager.hpp>
 #include <Utils/MiscUtils/RenderUtils.hpp>
-#include "SerializedSkin.hpp"
+
+#include <Features/Modules/Movement/NoJumpDelay.hpp>
 
 #include "ActorType.hpp"
-#include "Components/ActorTypeComponent.hpp"
-#include "Components/RuntimeIDComponent.hpp"
-#include "Components/FlagComponent.hpp"
-#include "Components/FallDistanceComponent.hpp"
 #include "Components/ActorGameTypeComponent.hpp"
+#include "Components/ActorTypeComponent.hpp"
+#include "Components/FallDistanceComponent.hpp"
+#include "Components/FlagComponent.hpp"
+#include "Components/RuntimeIDComponent.hpp"
+#include "Components/MobJumpComponent.hpp"
 #include <SDK/Minecraft/Network/Packets/SetPlayerGameTypePacket.hpp>
+#include <Utils/GameUtils/PacketUtils.hpp>
 
+
+/*FUCK YOU CLANG*/
 #define COMPONENT_GET_FUNC(funcName, componentType) \
 componentType* Actor::funcName() \
 { \
@@ -61,429 +70,454 @@ COMPONENT_GET_FUNC(getAttributesComponent, AttributesComponent)
 COMPONENT_GET_FUNC(getCameraComponent, CameraComponent)
 COMPONENT_GET_FUNC(getActorDataFlagComponent, ActorDataFlagComponent)
 
-void Actor::swing()
+void Actor::swing(ActorSwingSource swingsource)
 {
-    MemUtils::callVirtualFunc<void>(OffsetProvider::Actor_swing, this);
+
+	MemUtils::callVirtualFunc<bool, unsigned char, unsigned char>(OffsetProvider::Actor_swing, this, (unsigned char)swingsource/* msvc meme*/, 0/*HAND SLOT*/);
 }
 
 bool Actor::isDestroying()
 {
-    return hat::member_at<bool>(this, OffsetProvider::Actor_mDestroying);
+	//return hat::member_at<bool>(this, 0xAED);
+	return hat::member_at<bool>(this, OffsetProvider::Actor_mDestroying);
 }
 
 bool Actor::isSwinging()
 {
-    return hat::member_at<bool>(this, OffsetProvider::Actor_mSwinging);
+	return hat::member_at<bool>(this, OffsetProvider::Actor_mSwinging);
 }
 
 void Actor::setSwinging(bool swinging)
 {
-    hat::member_at<bool>(this, OffsetProvider::Actor_mSwinging) = swinging;
+	hat::member_at<bool>(this, OffsetProvider::Actor_mSwinging) = swinging;
 }
 
 int Actor::getGameType()
 {
-    return mContext.getComponent<ActorGameTypeComponent>()->mGameType;
+	auto comp = mContext.try_get<ActorGameTypeComponent>();
+	return comp ? comp->mGameType : 0;
 }
 
 void Actor::setGameType(int type)
 {
-    auto pkt = MinecraftPackets::createPacket<SetPlayerGameTypePacket>();
-    pkt->mPlayerGameType = static_cast<GameType>(type);
-    PacketUtils::sendToSelf(pkt);
-    ClientInstance::get()->getPacketSender()->sendToServer(pkt.get()); // on some servers this can server-side set the gamemode
+	auto pkt = MinecraftPackets::createPacket<SetPlayerGameTypePacket>();
+	pkt->mPlayerGameType = static_cast<GameType>(type);
+	PacketUtils::sendToSelf(pkt);
+	ClientInstance::get()->getPacketSender()->sendToServer(pkt.get()); // on some servers this can server-side set the gamemode
 }
 
 bool Actor::isDebugCameraActive()
 {
-    // use da flag component
-    auto storage = mContext.mRegistry->assure_t<DebugCameraIsActiveComponent>();
-    return storage->contains(this->mContext.mEntityId);
+	// use da flag component
+	auto storage = mContext.mRegistry->assure_t<DebugCameraIsActiveComponent>(0x25D8BF40u);
+	return storage->contains(this->mContext.mEntityId);
 }
 
 void Actor::setDebugCameraActive(bool active)
 {
-    auto storage = mContext.mRegistry->assure_t<DebugCameraIsActiveComponent>();
-    bool wasActive = isDebugCameraActive();
-    if (active && !wasActive)
-    {
-        storage->emplace(this->mContext.mEntityId);
-    }
-    else if (!active && wasActive)
-    {
-        storage->remove(this->mContext.mEntityId);
-    }
+	auto storage = mContext.mRegistry->assure_t<DebugCameraIsActiveComponent>(0x25D8BF40u);
+	bool wasActive = isDebugCameraActive();
+	if (active && !wasActive)
+	{
+		storage->emplace(this->mContext.mEntityId);
+	}
+	else if (!active && wasActive)
+	{
+		storage->remove(this->mContext.mEntityId);
+	}
 }
 
 
 int Actor::getSwingProgress()
 {
-    return hat::member_at<int>(this, OffsetProvider::Actor_mSwinging + 0x4);
+	return hat::member_at<int>(this, OffsetProvider::Actor_mSwingProgress);
 }
 
 int Actor::getOldSwingProgress()
 {
-    return hat::member_at<int>(this, OffsetProvider::Actor_mSwinging + 0x8);
+	return hat::member_at<int>(this, OffsetProvider::Actor_mSwinging + 0x8);
 }
 
 void Actor::setSwingProgress(int progress)
 {
-    hat::member_at<int>(this, OffsetProvider::Actor_mSwinging + 0x4) = progress;
+	hat::member_at<int>(this, OffsetProvider::Actor_mSwingProgress) = progress;
 }
 
 AABB Actor::getAABB(bool normal)
 {
-    if (normal)
-    {
-        return AABB(this->getAABBShapeComponent()->mMin, this->getAABBShapeComponent()->mMax);
-    }
-    // Get all components
-    auto renderPositionComponent = getRenderPositionComponent();
-    if (!renderPositionComponent) return AABB();
-    auto aabbShapeComponent = getAABBShapeComponent();
-    if (!aabbShapeComponent) return AABB();
+	if (normal)
+	{
+		return AABB(this->getAABBShapeComponent()->mMin, this->getAABBShapeComponent()->mMax);
+	}
+	// Get all components
+	auto renderPositionComponent = getRenderPositionComponent();
+	if (!renderPositionComponent) return AABB();
+	auto aabbShapeComponent = getAABBShapeComponent();
+	if (!aabbShapeComponent) return AABB();
 
-    glm::vec3 renderPos = renderPositionComponent->mPosition - glm::vec3(0, PLAYER_HEIGHT, 0);
-    if (!isPlayer()) renderPos = renderPositionComponent->mPosition;
+	glm::vec3 renderPos = renderPositionComponent->mPosition - glm::vec3(0, PLAYER_HEIGHT, 0);
+	if (!isPlayer()) renderPos = renderPositionComponent->mPosition;
 
-    glm::vec2 size = { aabbShapeComponent->mWidth, aabbShapeComponent->mHeight };
-    auto localPlayer = ClientInstance::get()->getLocalPlayer();
-    if (this == localPlayer)
-    {
-        renderPos = RenderUtils::transform.mPlayerPos - glm::vec3(0, PLAYER_HEIGHT, 0);
-    }
+	glm::vec2 size = { aabbShapeComponent->mWidth, aabbShapeComponent->mHeight };
+	auto localPlayer = ClientInstance::get()->getLocalPlayer();
+	if (this == localPlayer)
+	{
+		renderPos = RenderUtils::transform.mPlayerPos - glm::vec3(0, PLAYER_HEIGHT, 0);
+	}
 
-    float hitboxWidth = size.x;
-    float hitboxHeight = size.y;
-    glm::vec3 aabbMin = renderPos - glm::vec3(hitboxWidth / 2, 0, hitboxWidth / 2);
-    glm::vec3 aabbMax = renderPos + glm::vec3(hitboxWidth / 2, hitboxHeight, hitboxWidth / 2);
-    aabbMin = aabbMin - glm::vec3(0.1f, 0.1f, 0.1f);
-    aabbMax = aabbMax + glm::vec3(0.1f, 0.1f, 0.1f);
-    return AABB(aabbMin, aabbMax, true);
+	float hitboxWidth = size.x;
+	float hitboxHeight = size.y;
+	glm::vec3 aabbMin = renderPos - glm::vec3(hitboxWidth / 2, 0, hitboxWidth / 2);
+	glm::vec3 aabbMax = renderPos + glm::vec3(hitboxWidth / 2, hitboxHeight, hitboxWidth / 2);
+	aabbMin = aabbMin - glm::vec3(0.1f, 0.1f, 0.1f);
+	aabbMax = aabbMax + glm::vec3(0.1f, 0.1f, 0.1f);
+	return AABB(aabbMin, aabbMax, true);
 }
 
 void Actor::setAABB(AABB& aabb)
 {
-    AABBShapeComponent* aabbShapeComponent = getAABBShapeComponent();
-    if (!aabbShapeComponent) return;
-    aabbShapeComponent->mMin = aabb.mMin;
-    aabbShapeComponent->mMax = aabb.mMax;
+	AABBShapeComponent* aabbShapeComponent = getAABBShapeComponent();
+	if (!aabbShapeComponent) return;
+	aabbShapeComponent->mMin = aabb.mMin;
+	aabbShapeComponent->mMax = aabb.mMax;
 }
 
 
 bool Actor::isPlayer()
 {
-    auto actorType = getActorTypeComponent();
-    if (!actorType) return false;
-    return actorType->mType == ActorType::Player;
+	auto actorType = getActorTypeComponent();
+	if (!actorType) return false;
+	return actorType->mType == ActorType::Player;
 }
 
 ChunkPos Actor::getChunkPos()
 {
-    glm::vec3 pos = *getPos();
-    pos.x = static_cast<int>(floor(pos.x));
-    pos.y = static_cast<int>(floor(pos.y - (float)2.0f));
-    pos.z = static_cast<int>(floor(pos.z));
-    return ChunkPos(pos);
+	glm::vec3 pos = *getPos();
+	pos.x = static_cast<int>(floor(pos.x));
+	pos.y = static_cast<int>(floor(pos.y - (float)2.0f));
+	pos.z = static_cast<int>(floor(pos.z));
+	return ChunkPos(pos);
 }
 
 glm::vec3* Actor::getPos()
 {
-    return &getStateVectorComponent()->mPos;
+	auto sv = getStateVectorComponent();
+	return sv ? &sv->mPos : nullptr;
 }
 
 glm::vec3* Actor::getPosPrev()
 {
-    return &getStateVectorComponent()->mPosOld;
+	auto sv = getStateVectorComponent();
+	return sv ? &sv->mPosOld : nullptr;
 }
 
 GameMode* Actor::getGameMode()
 {
-    return hat::member_at<GameMode*>(this, OffsetProvider::Actor_mGameMode);
+	return hat::member_at<GameMode*>(this, OffsetProvider::Actor_mGameMode);
 }
+
 
 DebugCameraComponent* Actor::getDebugCameraComponent()
 {
-    return mContext.try_get<DebugCameraComponent>();
+	return mContext.try_get<DebugCameraComponent>();
 }
 
 CameraPresetComponent* Actor::getCameraPresetComponent()
 {
-    return mContext.try_get<CameraPresetComponent>();
+	return mContext.try_get<CameraPresetComponent>();
 }
 
 ContainerManagerModel* Actor::getContainerManagerModel()
 {
-    return hat::member_at<ContainerManagerModel*>(this, OffsetProvider::Actor_mContainerManagerModel);
+	return hat::member_at<ContainerManagerModel*>(this, OffsetProvider::Actor_mContainerManagerModel);
 }
 
 JumpControlComponent* Actor::getJumpControlComponent()
 {
-    static auto func = SigManager::Mob_getJumpControlComponent;
-    auto id = mContext.mEntityId;
-    return MemUtils::callFastcall<JumpControlComponent*>(func, mContext.mRegistry, &id);
-
+	return nullptr; // useless now , localplayer doesnt it now :joy: 
 }
 
 MobHurtTimeComponent* Actor::getMobHurtTimeComponent()
 {
-    return hat::member_at<MobHurtTimeComponent*>(this, OffsetProvider::Actor_mHurtTimeComponent);
+	return mContext.try_get<MobHurtTimeComponent>();
 }
 
-// Both of these used to dereference the equipment component directly. A player
-// actor that is still being streamed in can exist in the registry without it,
-// and the result was an access violation (not a C++ exception, so the
-// try/catch in every caller never caught it). Callers already null-check the
-// returned container, so returning nullptr is safe everywhere.
 SimpleContainer* Actor::getArmorContainer()
 {
-    auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
-    return equipment ? equipment->mArmorContainer : nullptr;
+	auto eq = mContext.try_get<ActorEquipmentComponent>();
+	return eq ? eq->mArmorContainer : nullptr;
 }
 
 SimpleContainer* Actor::getOffhandContainer()
 {
-    auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
-    return equipment ? equipment->mOffhandContainer : nullptr;
+	auto eq = mContext.try_get<ActorEquipmentComponent>();
+	return eq ? eq->mOffhandContainer : nullptr;
 }
 
 PlayerInventory* Actor::getSupplies()
 {
-    return hat::member_at<PlayerInventory*>(this, OffsetProvider::Actor_mSupplies);
+	return hat::member_at<PlayerInventory*>(this, OffsetProvider::Actor_mSupplies);
 }
 
 Level* Actor::getLevel()
 {
-    return hat::member_at<Level*>(this, OffsetProvider::Actor_mLevel);
+	return hat::member_at<Level*>(this, OffsetProvider::Actor_mLevel);
 }
 
-SerializedSkin* Actor::getSkin()
+
+
+SerializedSkinImpl* Actor::getSkin() // only work 1.21.92 -100
 {
-    return hat::member_at<SerializedSkin*>(this, OffsetProvider::Actor_mSerializedSkin);
+	auto level = getLevel();
+	if (!level) return nullptr;
+	auto playerList = level->getPlayerList();
+	if (!playerList) return nullptr;
+	auto cmp = getActorUniqueIDComponent();
+	if (!cmp) return nullptr;
+	for (const auto& [UUID, Entry] : *playerList)
+	{
+		if (Entry.mId == cmp->mUniqueID)
+		{
+			auto Skin = &Entry.mSkin;
+			return Skin->impl ? &Skin->impl->Object : nullptr;
+		}
+	}
+	return nullptr;
 }
 
 int64_t Actor::getRuntimeID()
 {
-    auto runtimeIDComponent = mContext.getComponent<RuntimeIDComponent>();
-    return runtimeIDComponent ? runtimeIDComponent->mRuntimeID : -1;
+	auto runtimeIDComponent = mContext.getComponent<RuntimeIDComponent>();
+	return runtimeIDComponent ? runtimeIDComponent->mRuntimeID : -1;
 }
 
 void Actor::setPosition(glm::vec3 pos)
 {
-    static uintptr_t func = SigManager::Actor_setPosition;
-    MemUtils::callFastcall<void, void*, glm::vec3*>(func, this, &pos);
+	// stupid fix
+	/*static uintptr_t func = SigManager::Actor_setPosition;
+	MemUtils::callFastcall<void, void*, glm::vec3*>(func, this, &pos);*/
+	auto mpp = MinecraftPackets::createPacket<MovePlayerPacket>();
+	mpp->mPlayerID = this->getRuntimeID();
+	auto rotComp = this->getActorRotationComponent();
+	mpp->mRot = { rotComp->mPitch, rotComp->mYaw };
+	mpp->mYHeadRot = this->getActorHeadRotationComponent()->mHeadRot;
+	mpp->mPos = pos;
+	mpp->mResetPosition = PositionMode::Teleport;
+	mpp->mRidingID = -1;
+	mpp->mCause = TeleportationCause::Unknown;
+	mpp->mSourceEntityType = ActorType::Player;
+	mpp->mTick = 0;
+	PacketUtils::sendToSelf(mpp);
+}
+
+void Actor::setPos(float x, float y, float z)
+{
+	setPosition({ x, y, z });
 }
 
 float Actor::distanceTo(Actor* actor)
 {
-    glm::vec3* actorPos = actor->getPos();
-    if (!actorPos) return -1;
-    glm::vec3 closestPoint = getAABB().getClosestPoint(*actorPos);
-    return distance(closestPoint, *actorPos);
+	glm::vec3* actorPos = actor->getPos();
+	if (!actorPos) return -1;
+	glm::vec3 closestPoint = getAABB().getClosestPoint(*actorPos);
+	return distance(closestPoint, *actorPos);
 }
 
 float Actor::distanceTo(const glm::vec3& pos)
 {
-    glm::vec3 closestPoint = getAABB().getClosestPoint(pos);
-    return distance(closestPoint, pos);
+	glm::vec3 closestPoint = getAABB().getClosestPoint(pos);
+	return distance(closestPoint, pos);
 }
 
 bool Actor::wasOnGround()
 {
-    return getFlag<WasOnGroundFlagComponent>();
+	return getFlag<WasOnGroundFlagComponent>();
 }
 
 bool Actor::isOnGround()
 {
-    return getFlag<OnGroundFlagComponent>();
+	return getFlag<OnGroundFlagComponent>();
 }
 
 void Actor::setOnGround(bool flag)
 {
-    setFlag<OnGroundFlagComponent>(flag);
+	setFlag<OnGroundFlagComponent>(flag);
 }
 
 bool Actor::isCollidingHorizontal()
 {
-    return getFlag<HorizontalCollisionFlagComponent>();
+	return getFlag<HorizontalCollisionFlagComponent>();
 }
 
 bool Actor::isDead()
 {
-    return getFlag<IsDeadFlagComponent>();
+	return getFlag<IsDeadFlagComponent>();
 }
 
 void Actor::jumpFromGround()
 {
-    auto jumpComponent = getJumpControlComponent();
-    bool noJumpDelay = jumpComponent->mNoJumpDelay;
-    jumpComponent->mNoJumpDelay = false;
-    static auto func = reinterpret_cast<void*>(SigManager::SimulatedPlayer_simulateJump);
-    MemUtils::callFastcall<void>(func, this);
-    jumpComponent->mNoJumpDelay = noJumpDelay;
+	NoJumpDelay::PatchNoJumpDelay(true);
+	static auto func = reinterpret_cast<void*>(SigManager::SimulatedPlayer_simulateJump);
+	MemUtils::callFastcall<void>(func, this);
+	NoJumpDelay::PatchNoJumpDelay(false);
 }
 
-// getComponent<T>() returns nullptr when the actor is invalid or the component is
-// missing, so both of these used to be raw null dereferences.
 float Actor::getFallDistance()
 {
-    auto* fall = mContext.getComponent<FallDistanceComponent>();
-    return fall ? fall->mFallDistance : 0.f;
+	auto fc = mContext.try_get<FallDistanceComponent>();
+	return fc ? fc->mFallDistance : 0.f;
 }
 
 void Actor::setFallDistance(float distance)
 {
-    auto* fall = mContext.getComponent<FallDistanceComponent>();
-    if (!fall) return;
-    fall->mFallDistance = distance;
+	if (auto fc = mContext.try_get<FallDistanceComponent>()) {
+		fc->mFallDistance = distance;
+	}
 }
 
 std::string Actor::getRawName()
 {
-    auto actorType = getActorTypeComponent();
-    if (!actorType)
-    {
-        spdlog::warn("Actor::getRawName: No ActorTypeComponent found");
-        return "Unknown?";
-    }
-    auto actorUniqueID = getActorUniqueIDComponent();
-    if (!actorUniqueID)
-    {
-        spdlog::warn("Actor::getRawName: No ActorUniqueIDComponent found");
-        return "What?";
-    }
+	auto actorType = getActorTypeComponent();
+	if (!actorType)
+	{
+		spdlog::warn("Actor::getRawName: No ActorTypeComponent found");
+		return "Unknown?";
+	}
+	auto actorUniqueID = getActorUniqueIDComponent();
+	if (!actorUniqueID)
+	{
+		spdlog::warn("Actor::getRawName: No ActorUniqueIDComponent found");
+		return "What?";
+	}
 
-    if (actorType->mType != ActorType::Player)
-    {
-        // mEntityIdentifier will be used as fallback
-        return mEntityIdentifier;
-    }
-    auto player = ClientInstance::get()->getLocalPlayer();
-    uint64_t uniqueId = actorUniqueID->mUniqueID;
+	if (actorType->mType != ActorType::Player)
+	{
+		// mEntityIdentifier will be used as fallback
+		return mEntityIdentifier;
+	}
+	auto player = ClientInstance::get()->getLocalPlayer();
+	uint64_t uniqueId = actorUniqueID->mUniqueID;
 
-    for (auto& [id, entry] : *player->getLevel()->getPlayerList())
-    {
-        if (entry.mId == uniqueId)
-        {
-            return entry.mName;
-        }
-    }
+	if (player && player->getLevel() && player->getLevel()->getPlayerList())
+	{
+		for (auto& [id, entry] : *player->getLevel()->getPlayerList())
+		{
+			if (entry.mId == uniqueId)
+			{
+				return entry.mName;
+			}
+		}
+	}
 
-    std::string name = getNameTag();
-    name = name.substr(0, name.find('\n'));
-    name = ColorUtils::removeColorCodes(name);
-    return name;
+	std::string name = getNameTag();
+	name = name.substr(0, name.find('\n'));
+	name = ColorUtils::removeColorCodes(name);
+	return name;
 }
 
 const std::string& Actor::getNameTag()
 {
-    static auto func = SigManager::Actor_getNameTag;
-    return *MemUtils::callFastcall<std::string*>(func, this);
+	static auto func = SigManager::Actor_getNameTag;
+	return *MemUtils::callFastcall<std::string*>(func, this);
 }
 
 void Actor::setNametag(const std::string& name)
 {
-    static auto func = SigManager::Actor_setNameTag;
-    MemUtils::callFastcall<void, void*, std::string>(func, this, name);
+	static auto func = SigManager::Actor_setNameTag;
+	MemUtils::callFastcall<void, void*, std::string>(func, this, name);
 }
 
 float Actor::getMaxHealth()
 {
-    auto health = getAttribute(Health);
-    if (!health) return 0;
-    return health->mMaximumValue;
+	auto health = getAttribute(Health);
+	if (!health) return 0;
+	return health->mCurrentMaxValue;
 }
 
 float Actor::getHealth()
 {
-    auto health = getAttribute(Health);
-    if (!health) return 0;
-    return health->mCurrentValue;
-}
-
-float Actor::getHunger()
-{
-    auto hunger = getAttribute(PlayerHunger);
-    if (!hunger) return 20.f;
-    return hunger->mCurrentValue;
+	auto health = getAttribute(Health);
+	if (!health) return 0;
+	return health->mCurrentValue;
 }
 
 float Actor::getAbsorption()
 {
-    auto absorption = getAttribute(Absorption);
-    if (!absorption) return 0;
-    return absorption->mCurrentValue;
+	auto absorption = getAttribute(Absorption);
+	if (!absorption) return 0;
+	return absorption->mCurrentValue;
 }
 
 float Actor::getMaxAbsorption()
 {
-    auto absorption = getAttribute(Absorption);
-    if (!absorption) return 0;
-    return absorption->mMaximumValue;
+	auto absorption = getAttribute(Absorption);
+	if (!absorption) return 0;
+	return absorption->mCurrentMaxValue;
+}
+
+float Actor::getHunger()
+{
+	auto component = getAttributesComponent();
+	if (!component) return 20.f;
+	if (auto byName = component->mBaseAttributeMap.getInstanceByName("hunger")) {
+		return byName->mCurrentValue;
+	}
+	if (auto inst = component->mBaseAttributeMap.getInstance(PlayerHunger)) {
+		return inst->mCurrentValue;
+	}
+	return 20.f;
 }
 
 AttributeInstance* Actor::getAttribute(AttributeId id)
 {
-    return getAttribute(static_cast<int>(id));
+	return getAttribute(static_cast<int>(id));
 }
 
 AttributeInstance* Actor::getAttribute(int id)
 {
-    auto component = getAttributesComponent();
-    if (!component) {
-        spdlog::critical("Actor::getAttribute: No AttributesComponent found");
-        return nullptr;
-    }
-    // Directly access the map
-    auto& map = component->mBaseAttributeMap.mAttributes;
-    auto it = map.find(id);
-    if (it != map.end()) {
-        return &it->second;
-    }
-    return nullptr;
+	auto component = getAttributesComponent();
+	if (!component) {
+		spdlog::critical("Actor::getAttribute: No AttributesComponent found");
+		return nullptr;
+	}
+	return component->mBaseAttributeMap.getInstance(id);
 }
 
 bool Actor::isOnFire()
 {
-    return getFlag<OnFireComponent>();
+	return getFlag<OnFireComponent>();
 }
 
 std::string Actor::getLocalName()
 {
-    auto result = hat::member_at<std::string>(this, OffsetProvider::Actor_mLocalName);
-    return result.empty() ? getRawName() : result;
+	auto result = hat::member_at<std::string>(this, OffsetProvider::Actor_mLocalName);
+	return result.empty() ? getRawName() : result;
 }
 
 void Actor::setLocalName(std::string newLocalName)
 {
-    auto& localName = hat::member_at<std::string>(this, OffsetProvider::Actor_mLocalName);
-    localName = newLocalName;
+	auto& localName = hat::member_at<std::string>(this, OffsetProvider::Actor_mLocalName);
+	localName = newLocalName;
 }
 
 std::string Actor::getXuid()
 {
-    return "0";
+	return ClientInstance::get()->getMinecraftGame()->getxuid();
 }
 
 bool Actor::isValid()
 {
-    if (this == nullptr) return false;
-    // Make sure mRegistry is a valid ptr
-    if (!mContext.mRegistry) return false;
+	if (this == nullptr) return false;
+	if (!mContext.mRegistry) return false;
 
-    // Every component getter / setFlag() goes through this, so it has to survive
-    // "we are not in a world": dereferencing a missing local player here is what
-    // crashed modules while they were being disabled during a world unload.
-    auto ci = ClientInstance::get();
-    if (!ci) return false;
-
-    auto player = ci->getLocalPlayer();
-    if (!player || !player->mContext.mRegistry) return false;
-
-    return player->mContext.mRegistry->valid(mContext.mEntityId);
+	auto player = ClientInstance::get()->getLocalPlayer();
+	if (!player || !player->mContext.mRegistry) return false;
+	return player->mContext.mRegistry->valid(mContext.mEntityId);
 }
 
 bool Actor::canSee(Actor* actor)
 {
-    return MemUtils::callFastcall<bool>(SigManager::Actor_canSee, this, actor);
+	glm::vec3 buf{};
+	MemUtils::callFastcall<glm::vec3*, Actor*, glm::vec3*, ActorLocation,float>(SigManager::GetCollisionShapeActorProxy_getFeetAttachPos, actor ,&buf, ActorLocation::Body, 0.f);
+	return MemUtils::callFastcall<bool,Actor*,glm::vec3&, ShapeType>(SigManager::Actor_canSee, this, buf, ShapeType::Collision);
 }

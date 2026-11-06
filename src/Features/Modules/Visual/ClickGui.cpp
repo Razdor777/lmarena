@@ -4,10 +4,12 @@
 
 #include "ClickGui.hpp"
 
+#include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/MouseEvent.hpp>
 #include <Features/Events/KeyEvent.hpp>
 #include <Features/GUI/CombatantGui.hpp>
 #include <Features/GUI/ModernDropdown.hpp>
+#include <Hook/Hooks/ClientInstanceHooks/GrabMouseHook.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/MiscUtils/MathUtils.hpp>
 
@@ -16,11 +18,15 @@ static CombatantGui combatantGui = CombatantGui();
 
 void ClickGui::onEnable()
 {
-    mWasGrabbed = !ClientInstance::get()->getMouseGrabbed();
+    auto ci = ClientInstance::get();
+    mWasGrabbed = !ci->getMouseGrabbed();
     mGuiOpen = true;
-    ClientInstance::get()->releaseMouse();
+    GrabMouseHook::ShitNow = true;
+    ci->setDisableInput(true);
+    ci->releaseMouse();
 
     gFeatureManager->mDispatcher->listen<MouseEvent, &ClickGui::onMouseEvent>(this);
+    gFeatureManager->mDispatcher->listen<BaseTickEvent, &ClickGui::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->listen<KeyEvent, &ClickGui::onKeyEvent, nes::event_priority::FIRST>(this);
 
     modernGui.onOpen();
@@ -30,14 +36,23 @@ void ClickGui::onEnable()
 void ClickGui::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<MouseEvent, &ClickGui::onMouseEvent>(this);
+    gFeatureManager->mDispatcher->deafen<BaseTickEvent, &ClickGui::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->deafen<KeyEvent, &ClickGui::onKeyEvent>(this);
 
     mGuiOpen = false;
     modernGui.onClose();
     combatantGui.onClose();
 
+    if (mSkipRestore) {
+        mSkipRestore = false;
+        return;
+    }
+
+    auto ci = ClientInstance::get();
+    ci->setDisableInput(false);
+    GrabMouseHook::ShitNow = false;
     if (mWasGrabbed)
-        ClientInstance::get()->grabMouse();
+        ci->grabMouse();
 }
 
 void ClickGui::onWindowResizeEvent(WindowResizeEvent& event)
@@ -71,6 +86,14 @@ void ClickGui::onKeyEvent(KeyEvent& event)
         mIsPressingShift = event.mPressed;
 }
 
+void ClickGui::onBaseTickEvent(BaseTickEvent& event)
+{
+    auto ci = ClientInstance::get();
+    ci->setDisableInput(true);
+    if (mWasGrabbed)
+        ci->releaseMouse();
+}
+
 float ClickGui::getEaseAnim(EasingUtil ease, int mode)
 {
     switch (mode) {
@@ -84,9 +107,6 @@ float ClickGui::getEaseAnim(EasingUtil ease, int mode)
 
 void ClickGui::onRenderEvent(RenderEvent& event)
 {
-    if (mGuiOpen)
-        ClientInstance::get()->releaseMouse();
-
     static float animation = 0;
     static EasingUtil inEase = EasingUtil();
 

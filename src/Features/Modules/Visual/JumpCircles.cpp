@@ -71,10 +71,6 @@ namespace JumpCirclesImpl
     }
 }
 
-<<<<<<< HEAD
-=======
-using namespace JumpCirclesImpl;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 void JumpCircles::onEnable()
 {
@@ -147,89 +143,6 @@ void JumpCircles::onRenderEvent(RenderEvent& event)
             }
         }
         mGroundState[id] = isGround;
-<<<<<<< HEAD
-=======
-    }
-
-    for (auto it = mGroundState.begin(); it != mGroundState.end();)
-    {
-        if (!active.count(it->first)) it = mGroundState.erase(it);
-        else ++it;
-    }
-
-    const uint64_t life = lifetimeMs();
-    mCircles.erase(std::remove_if(mCircles.begin(), mCircles.end(),
-        [&](const Circle& c) { return now - c.start >= life; }), mCircles.end());
-
-    if (mCircles.empty()) return;
-
-    ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    // Новые круги рисуем первыми, как в combatant (обратный порядок).
-    for (auto it = mCircles.rbegin(); it != mCircles.rend(); ++it)
-        drawCircle(dl, *it, now);
-}
-
-void JumpCircles::drawCircle(ImDrawList* dl, const Circle& c, uint64_t now)
-{
-    const float passed = static_cast<float>(now - c.start);
-    const bool pulse = mMode.mValue == Mode::Pulse;
-
-    float half = 0.f;
-    float alpha = 0.f;
-    float angleDeg = 0.f;
-
-    if (pulse)
-    {
-        const float progress = std::min(passed / std::max(1.f, static_cast<float>(mPulseLifetime.mValue)), 1.f);
-        if (progress >= 1.f) return;
-        const float scale = bounceOut(progress) * mPulseMaxSize.mValue * mCircleScale.mValue;
-        if (scale <= 0.f) return;
-        half = scale * 0.5f;
-        alpha = pulseAlpha(progress);
-    }
-    else
-    {
-        const float t = passed * (mEaseOut.mValue ? 2.f : 1.f) / kLegacyGrowMs;
-        const float size = mCircleScale.mValue - std::pow(1.f - t, 4.f);
-        if (size <= 0.f) return;
-        half = size;
-        angleDeg = size * mRotateSpeed.mValue * 1000.f;
-        alpha = 1.f - passed / kLegacyFadeMs;
-    }
-
-    alpha = std::clamp(alpha, 0.f, 1.f);
-    if (alpha <= 0.f) return;
-
-    // Окружность на земле, спроецированная на экран. Если часть за камерой — пропускаем круг.
-    std::vector<ImVec2> ring;
-    ring.reserve(kSegments);
-    for (int i = 0; i < kSegments; i++)
-    {
-        const float a = static_cast<float>(i) / kSegments * 2.f * kPi;
-        const glm::vec3 p = c.pos + glm::vec3(std::cos(a) * half, 0.f, std::sin(a) * half);
-        ImVec2 s;
-        if (!RenderUtils::worldToScreen(p, s)) return;
-        ring.push_back(s);
-    }
-
-    const ImVec4 color = colorFor(static_cast<float>(c.start / 100 % 360), now);
-    const bool bubble = mMode.mValue == Mode::Bubble;
-
-    if (!bubble)
-        dl->AddConvexPolyFilled(ring.data(), static_cast<int>(ring.size()), toU32(color, alpha * 0.22f));
-
-    dl->AddPolyline(ring.data(), static_cast<int>(ring.size()), toU32(color, alpha * 0.9f),
-                    ImDrawFlags_Closed, bubble ? 2.5f : 1.5f);
-
-    // Вращающаяся подсветка — вместо вращения текстуры в combatant.
-    if (mMode.mValue == Mode::Default)
-    {
-        const int start = static_cast<int>(std::fmod(angleDeg / 360.f * kSegments, static_cast<float>(kSegments)));
-        std::vector<ImVec2> arc;
-        for (int j = 0; j <= kSegments / 4; j++)
-            arc.push_back(ring[(start + j) % kSegments]);
-        dl->AddPolyline(arc.data(), static_cast<int>(arc.size()), toU32(color, alpha), 0, 3.f);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 
     for (auto it = mGroundState.begin(); it != mGroundState.end();)

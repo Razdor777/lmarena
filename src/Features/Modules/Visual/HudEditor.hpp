@@ -176,5 +176,6 @@ public:
     void onCustomRenderEvent(class RenderEvent& event);
     void onKeyEvent(class KeyEvent& event);
     void onMouseEvent(MouseEvent& event);
+    void onBaseTickEvent(class BaseTickEvent& event);
 };
 

@@ -22,22 +22,8 @@ enum class SItemType
 
 class Item {
 public:
-    CLASS_FIELD(short, mItemId, 0xA2);
-    CLASS_FIELD(int, mArmorItemType, 0x244);
-    CLASS_FIELD(int, mProtection, 0x264);
-    CLASS_FIELD(std::string, mName, 0xD0); // если имена в HUD кривые — поменяй на 0x120
-
-    // vtable index 35 = Item::getMaxDamage(), игра возвращает short
-    int getMaxDamage() const {
-        return MemUtils::callVirtualFunc<short>(35, const_cast<Item*>(this));
-    }
-
-    // vtable index 15 = Item::isBlockItem() — "является ли предмет блоком".
-    // Это надёжный способ отличить блоки (в т.ч. те, у которых mBlock в ItemStack
-    // не заполнен, например campfire/костёр) от инструментов и прочих предметов.
-    bool isBlockItem() const {
-        return MemUtils::callVirtualFunc<bool>(15, const_cast<Item*>(this));
-    }
+    CLASS_FIELD(short, mItemId, 0xAA);
+    CLASS_FIELD(std::string, mName, 0xD8);
 
     int getArmorSlot();
     bool isHelmet();
@@ -49,5 +35,8 @@ public:
     bool isAxe();
     bool isShovel();
     int getItemTier();
+    int getArmorTier();
     SItemType getItemType();
+    int getMaxDamage() const;
+    bool isFood() const;
 };

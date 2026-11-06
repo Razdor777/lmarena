@@ -17,9 +17,11 @@ public:
     BoolSetting mShowInChat = BoolSetting("Show In Chat", "Show the current game in chat", true);
     BoolSetting mQueueOnDeath = BoolSetting("Queue On Death", "Queue for a game when you die", true);
     BoolSetting mQueueOnGameEnd = BoolSetting("Queue On Game End", "Queue for a game when the game ends", true);
+    BoolSetting mFlyOnGameEnd = BoolSetting("Fly On Game End", "Enable fly module when the game ends", false);
+    BoolSetting mDisableFly = BoolSetting("Disable Fly", "Disable fly module on dimension changes", false);
 
     AutoQueue() : ModuleBase("AutoQueue", "Automatically queues for games", ModuleCategory::Misc, 0, false){
-        addSettings(&mMode, &mQueueDelay, &mShowInChat, &mQueueOnDeath, &mQueueOnGameEnd);
+        addSettings(&mMode, &mQueueDelay, &mShowInChat, &mQueueOnDeath, &mQueueOnGameEnd, &mFlyOnGameEnd, &mDisableFly);
 
         mNames = {
             {NamingStyle::Lowercase, "autoqueue"},

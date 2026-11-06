@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/24/2024.
 //
 
 #include "MainView.hpp"
@@ -8,11 +7,14 @@
 
 class BedrockPlatformUWP* MainView::getBedrockPlatform()
 {
-    return hat::member_at<BedrockPlatformUWP*>(this, OffsetProvider::MainView_bedrockPlatform);
+    return nullptr;
+    //return hat::member_at<BedrockPlatformUWP*>(this, OffsetProvider::MainView_bedrockPlatform);
 }
 
 MainView* MainView::getInstance()
 {
+    return nullptr;
+    /*
     static auto mainView = reinterpret_cast<MainView**>(SigManager::MainView_instance);
-    return *mainView;
+    return *mainView;*/
 }

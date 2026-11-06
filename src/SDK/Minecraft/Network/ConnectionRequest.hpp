@@ -1,8 +1,7 @@
 #pragma once
 //
-// Created by vastrakai on 8/20/2024.
 //
-
+//maybe fix 
 #include <memory>
 #include <string>
 #include <nlohmann/json.hpp>
@@ -33,6 +32,7 @@ public:
     class UnverifiedCertificate  mUnverifiedCertificate;
     std::unique_ptr<Certificate> mParentCertificate;
     bool                         mIsValid;
+    bool 	                     mIsSelfSigned;
 };
 
 

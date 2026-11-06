@@ -4,7 +4,6 @@
 
 #include <Utils/Structs.hpp>
 //
-// Created by vastrakai on 6/24/2024.
 //
 
 
@@ -12,7 +11,7 @@
 class ClientInstance {
 public:
     //CLASS_FIELD(class MinecraftGame*, mcGame, 0xC8);
-
+    CLASS_FIELD(uintptr_t**, vtable, 0x0);
     static ClientInstance* get();
 
 
@@ -26,15 +25,19 @@ public:
     glm::vec2 getFov();
 
     class ClientInputHandler* getInputHandler();
-    class KeyboardMouseSettings* getKeyboardSettings();
+    class KeyboardRemappingLayout* getKeyboardSettings();
     class MinecraftGame* getMinecraftGame();
     class Actor* getLocalPlayer();
     class BlockSource* getBlockSource();
     class Options* getOptions();
+    std::string getPlatformOnlineId();
     std::string getScreenName();
     void setDisableInput(bool disable);
     bool getMouseGrabbed();
     void grabMouse();
     void releaseMouse();
     void playUi(const std::string& soundName, float volume, float pitch);
+
+
+
 };

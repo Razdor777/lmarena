@@ -19,4 +19,6 @@ public:
     void onEnable() override;
     void onDisable() override;
     void onBaseTickEvent(class BaseTickEvent& event);
+
+    static void PatchNoJumpDelay(bool v);
 };

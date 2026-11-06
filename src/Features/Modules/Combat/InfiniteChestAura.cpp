@@ -519,7 +519,7 @@ void InfiniteChestAura::onBaseTickEvent(BaseTickEvent& event)
             for (int i = 0; i < 9; ++i) {
                 auto stack = container->getItem(i);
                 if (!stack || !stack->mItem || !stack->getItem()) continue;
-                if (MemUtils::callVirtualFunc<bool>(8, stack->getItem())) {
+                if (stack->getItem()->isFood()) {
                     foodSlot = i;
                     break;
                 }

@@ -4,7 +4,9 @@
 
 #include "HudEditor.hpp"
 
+#include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/KeyEvent.hpp>
+#include <Hook/Hooks/ClientInstanceHooks/GrabMouseHook.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/MinecraftGame.hpp>
@@ -184,29 +186,37 @@ void HudEditor::loadFromFile() {
 void HudEditor::onInit() { loadFromFile(); }
 
 void HudEditor::onEnable() {
-  gFeatureManager->mDispatcher->listen<KeyEvent, &HudEditor::onKeyEvent>(this);
-  gFeatureManager->mDispatcher->listen<MouseEvent, &HudEditor::onMouseEvent>(
-      this);
+  static auto clickGuiModule =
+      gFeatureManager->mModuleManager->getModule<ClickGui>();
+  if (clickGuiModule && clickGuiModule->mEnabled) {
+    clickGuiModule->mSkipRestore = true;
+    clickGuiModule->setEnabled(false);
+  }
 
   auto ci = ClientInstance::get();
   lastCscState = !ci->getMouseGrabbed();
+  GrabMouseHook::ShitNow = true;
+  ci->setDisableInput(true);
   ci->releaseMouse();
+
+  gFeatureManager->mDispatcher->listen<KeyEvent, &HudEditor::onKeyEvent>(this);
+  gFeatureManager->mDispatcher->listen<MouseEvent, &HudEditor::onMouseEvent>(
+      this);
+  gFeatureManager->mDispatcher->listen<BaseTickEvent, &HudEditor::onBaseTickEvent>(this);
 
   loadFromFile();
   showAllElements();
-
-  static auto clickGuiModule =
-      gFeatureManager->mModuleManager->getModule<ClickGui>();
-  if (clickGuiModule)
-    clickGuiModule->setEnabled(false);
 }
 
 void HudEditor::onDisable() {
   gFeatureManager->mDispatcher->deafen<KeyEvent, &HudEditor::onKeyEvent>(this);
   gFeatureManager->mDispatcher->deafen<MouseEvent, &HudEditor::onMouseEvent>(
       this);
+  gFeatureManager->mDispatcher->deafen<BaseTickEvent, &HudEditor::onBaseTickEvent>(this);
 
   auto ci = ClientInstance::get();
+  ci->setDisableInput(false);
+  GrabMouseHook::ShitNow = false;
   if (lastCscState)
     ci->grabMouse();
   else
@@ -223,10 +233,6 @@ void HudEditor::onRenderEvent(RenderEvent &event) {
   // Draw grid lines
   auto drawList = ImGui::GetBackgroundDrawList();
   ImVec2 display = ImGui::GetIO().DisplaySize;
-
-  auto ci = ClientInstance::get();
-
-  ci->releaseMouse();
 
   // Draw background
   drawList->AddRectFilled(ImVec2(0, 0), display, IM_COL32(0, 0, 0, 50));
@@ -595,3 +601,12 @@ void HudEditor::onKeyEvent(KeyEvent &event) {
 }
 
 void HudEditor::onMouseEvent(MouseEvent &event) { event.cancel(); }
+
+void HudEditor::onBaseTickEvent(BaseTickEvent &event) {
+  if (mEnabled) {
+    auto ci = ClientInstance::get();
+    ci->setDisableInput(true);
+    if (lastCscState)
+      ci->releaseMouse();
+  }
+}

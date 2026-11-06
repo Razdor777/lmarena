@@ -43,7 +43,9 @@ void TargetStrafe::onBaseTickEvent(BaseTickEvent& event)
     glm::vec3 playerPos = *player->getPos();
     auto moveInputComponent = player->getMoveInputComponent();
     static auto speed = gFeatureManager->mModuleManager->getModule<Speed>();
-    auto& binds = *ClientInstance::get()->getKeyboardSettings();
+    auto* bindsPtr = ClientInstance::get()->getKeyboardSettings();
+    if (!bindsPtr) return;
+    auto& binds = *bindsPtr;
     bool isJumping = Keyboard::mPressedKeys[binds["key.jump"]];
 
     if (!Aura::sHasTarget || !Aura::sTarget || Aura::sTarget && !Aura::sTarget->getActorTypeComponent() || (mJumpOnly.mValue && !isJumping) || (mSpeedOnly.mValue && (speed == nullptr || !speed->mEnabled)))

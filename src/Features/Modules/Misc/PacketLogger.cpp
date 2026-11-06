@@ -53,7 +53,8 @@ void PacketLogger::onPacketOutEvent(PacketOutEvent& event)
     if (std::ranges::find(ignored, event.mPacket->getId()) != ignored.end()) return;
 
     // Log the packet
-    spdlog::info("[out] Packet: {}", event.mPacket->getName());
+    auto a = std::string(event.mPacket->getName());
+    spdlog::info("[out] Packet: {}", a);
     if (event.mPacket->getId() == PacketID::Login)
     {
         auto packet = event.getPacket<Packet>();

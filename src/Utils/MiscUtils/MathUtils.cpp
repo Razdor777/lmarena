@@ -53,15 +53,16 @@ float MathUtils::getRotationKeyOffset(bool raw, bool allowStrafe)
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return 0;
     auto moveInput = player->getMoveInputComponent();
-    if (raw) moveInput = reinterpret_cast<MoveInputComponent*>(player->getRawMoveInputComponent());
+    if (!moveInput) return 0;
 
-    bool isMoving = moveInput->mForward || moveInput->mBackward || moveInput->mLeft || moveInput->mRight;
+    const auto& state = raw ? moveInput->mRawInputState : moveInput->mInputState;
+    bool w = state.FlagValues.test((size_t)MoveInputState::Flag::Up);
+    bool s = state.FlagValues.test((size_t)MoveInputState::Flag::Down);
+    bool a = state.FlagValues.test((size_t)MoveInputState::Flag::Left);
+    bool d = state.FlagValues.test((size_t)MoveInputState::Flag::Right);
+
+    bool isMoving = w || s || a || d;
     if (!isMoving) return 0;
-
-    bool w = moveInput->mForward;
-    bool s = moveInput->mBackward;
-    bool a = moveInput->mLeft;
-    bool d = moveInput->mRight;
 
     float yawOffset = 0;
     if (w && a && allowStrafe)
@@ -248,7 +249,9 @@ glm::vec2 MathUtils::getMovement() {
     glm::vec2 ret = glm::vec2(0, 0);
     float forward = 0.0f;
     float side = 0.0f;
-    auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
+    auto* kbPtr = ClientInstance::get()->getKeyboardSettings();
+    if (!kbPtr) return ret;
+    auto& keyboard = *kbPtr;
 
     bool w = Keyboard::mPressedKeys[keyboard["key.forward"]];
     bool a = Keyboard::mPressedKeys[keyboard["key.left"]];

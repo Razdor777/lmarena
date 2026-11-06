@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 6/28/2024.
 //
 
 #include <Utils/MemUtils.hpp>
@@ -14,7 +13,8 @@ public:
 
     virtual ~LoopbackPacketSender() = 0;
 private:
-    virtual void _0() = 0;
+    virtual bool isInitialized() = 0;
+    // credit: tozic
 public:
     /// <summary>
     /// Sends a packet to the server.
@@ -22,6 +22,7 @@ public:
     /// </summary>
     /// <param name="packet">The packet to send.</param>
     virtual void send(void* packet) = 0;
+    virtual void sendTo(void* packet) = 0;
     /// <summary>
     /// Sends a packet to the server.
     /// Calling this function will NOT trigger the PacketOutEvent.

@@ -31,6 +31,7 @@ public:
     void onDisable() override;
 
     void onModuleStateChange(ModuleStateChangeEvent& event);
+    void onModuleScriptStateChange(ModuleScriptStateChangeEvent& event);
 
     std::string getSettingDisplay() override {
         return mSound.mValues[mSound.as<int>()];

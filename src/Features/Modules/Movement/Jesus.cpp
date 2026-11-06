@@ -10,7 +10,7 @@
 #include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Events/PacketOutEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
-#include <SDK/Minecraft/KeyboardMouseSettings.hpp>
+#include <SDK/Minecraft/KeyboardRemappingLayout.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 
 bool Jesus::sdjReplace(bool patch)
@@ -18,6 +18,8 @@ bool Jesus::sdjReplace(bool patch)
     static uintptr_t waterFunc = SigManager::WaterBlockLegacy_getCollisionShapeForCamera;
     static uintptr_t solidFunc = SigManager::ConcreteBlockLegacy_getCollisionShapeForCamera;
     static int funcIndex = OffsetProvider::BlockLegacy_getCollisionShape;
+
+    if (!waterFunc || !solidFunc) return false;
 
     auto funcOffset = funcIndex * 8;
 
@@ -107,8 +109,8 @@ void Jesus::onBaseTickEvent(BaseTickEvent& event)
     int belowBlockId = belowBlock->toLegacy()->getBlockId();
     // if player is in water and isn't holding shift
 
-    auto keyboard = *ci->getKeyboardSettings();
-    bool shift = Keyboard::mPressedKeys[keyboard["key.sneak"]];
+    auto* kbPtr = ci->getKeyboardSettings();
+    bool shift = kbPtr ? Keyboard::mPressedKeys[(*kbPtr)["key.sneak"]] : false;
 
     if ((blockId == 9 || blockId == 8) && !shift)
     {

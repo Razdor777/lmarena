@@ -31,8 +31,8 @@ public:
         MotionController
     };
 
-    EnumSettingT<OS> mOs = EnumSettingT<OS>("OS", "Operating system to spoof", OS::Windows10, "Unknown", "Android", "iOS", "macOS", "FireOs", "GearVR", "HoloLens", "Windows 10", "Windows", "Dedicated", "Orbis", "NX");
-    EnumSettingT<InputMethod> mInputMethod = EnumSettingT<InputMethod>("Input Method", "Input method to spoof", InputMethod::Mouse,  "Unknown", "Mouse", "Touch", "GamePad", "MotionController");
+    EnumSettingT<OS> mOs = EnumSettingT<OS>("OS", "Operating system to spoof", OS::Windows, "Unknown", "Android", "iOS", "macOS", "FireOs", "GearVR", "HoloLens", "Windows 10", "Windows", "Dedicated", "Orbis", "NX");
+    EnumSettingT<InputMethod> mInputMethod = EnumSettingT<InputMethod>("Input Method", "Input method to spoof", InputMethod::Mouse, "Unknown", "Mouse", "Touch", "GamePad", "MotionController");
 
     EditionFaker() : ModuleBase("EditionFaker", "Spoofs your operating system and input method", ModuleCategory::Misc, 0, false)
     {
@@ -47,30 +47,18 @@ public:
         };
     }
 
-    static inline unsigned char mOriginalData[sizeof(int32_t)];
+    static inline unsigned char mOriginalData[9];
+    static inline unsigned char mPatchBytes2[] = {
+        0x8B, 0x15, 0, 0, 0, 0, 0x90, 0x90, 0x90
+    };
 
-    static inline unsigned char mOriginalData1[5];
-    static inline unsigned char mOriginalData2[5];
+    static inline unsigned char mOriginalData3[10];
+    static inline unsigned char mPatchBytes[] = {
+        0xB8, 0x01, 0x0, 0x0, 0x0, 0x48, 0x83, 0xC4, 0x28, 0xC3
+    };
 
-    static inline unsigned char mOriginalInputData1[8];
-    static inline unsigned char mOriginalInputData2[8];
+    static inline int32_t* mOsPtr = nullptr;
 
-    static inline unsigned char mDetourBytes1[] = {
-        0x48, 0xBF, 0x01, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // mov rdi, 1 (input)
-        0x8B, 0xD7, // mov edx, edi
-        0x48, 0x8B, 0xCE }; // mov rcx, rsi
-
-    static inline unsigned char mDetourBytes2[] = {
-        0x48, 0xBF, 0x01, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // mov rdi, 1 (input)
-        0x49, 0x8B, 0x07, // mov rax, [r15]
-        0x8B, 0xD7 }; // mov edx, edi
-
-    static inline void* mDetour1 = nullptr;
-    static inline void* mDetour2 = nullptr;
-
-    void injectOsSpoofer();
-    void ejectOsSpoofer();
-    void updateOs();
     void inject();
     void eject();
     void spoofEdition();

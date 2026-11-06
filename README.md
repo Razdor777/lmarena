@@ -1,3 +1,3 @@
-# have fun <3
+# Juzdex / Solstice
 
-game version: 1.21.44 | cmake recommended
+game version: 26.62 (GDK x64) | cmake + Visual Studio 2022 recommended

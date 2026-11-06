@@ -17,7 +17,7 @@ struct SysTime {
 class Auth
 {
 public:
-
+    /*
     std::string UniqueID = "";
     std::string uniqueIdFile = FileUtils::getSolsticeDir() + xorstr_("uniqueId.txt");
     static inline std::string url = xorstr_("https://dllserver.solstice.works/hasPrivateAccess?uniqueId=");
@@ -26,7 +26,7 @@ public:
     void init();
     void exit();
     bool isPrivateUser();
-    static SysTime getOnlineTime();
+    static SysTime getOnlineTime();*/
 };
 
 #define isTimeSyncedCheck() \

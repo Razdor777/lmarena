@@ -1,19 +1,19 @@
 //
-// Created by alteik on 02/09/2024.
+// Created by vastrakai on 7/18/2024.
 //
 
 #include "NoHurtcam.hpp"
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 
-DEFINE_NOP_PATCH_FUNC(hurtTimePatch, SigManager::CameraComponent_applyRotation, 4);
+DEFINE_NOP_PATCH_FUNC(hurtTimePatch, SigManager::CameraComponent_applyRotation, 21);
 
 void NoHurtcam::onEnable()
 {
-    hurtTimePatch(true);
+    if (SigManager::CameraComponent_applyRotation) hurtTimePatch(true);
 }
 
 void NoHurtcam::onDisable()
 {
-    hurtTimePatch(false);
+    if (SigManager::CameraComponent_applyRotation) hurtTimePatch(false);
 }

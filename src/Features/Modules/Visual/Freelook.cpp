@@ -12,6 +12,7 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/Components/CameraComponent.hpp>
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
+
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 
 void Freelook::onEnable()
@@ -28,10 +29,10 @@ void Freelook::onEnable()
 
     auto gock = player->getActorHeadRotationComponent();
     mHeadYaw = { gock->mHeadRot, gock->mOldHeadRot };
-
     for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
     {
-        player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, false);
+     //   player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, false);
+
         auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
         if (storage->contains(id))
         {
@@ -56,8 +57,8 @@ void Freelook::onEnable()
         }
     }
 
-    mLastCameraState = ClientInstance::get()->getOptions()->mThirdPerson->value;
-    ClientInstance::get()->getOptions()->mThirdPerson->value = 1;
+    mLastCameraState = ClientInstance::get()->getOptions()->mThirdPerson->mValue;
+    ClientInstance::get()->getOptions()->mThirdPerson->mValue = 1;
 }
 
 void Freelook::onDisable()
@@ -72,9 +73,13 @@ void Freelook::onDisable()
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Freelook::onPacketOutEvent>(this);
 
     auto options = ClientInstance::get()->getOptions();
-    options->mThirdPerson->value = mLastCameraState;
+    options->mThirdPerson->mValue = mLastCameraState;
     mResetRot = true;
+
 }
+
+
+
 
 void Freelook::onBaseTickEvent(BaseTickEvent& event)
 {
@@ -110,12 +115,17 @@ void Freelook::onLookInputEvent(LookInputEvent& event)
     auto player = ClientInstance::get()->getLocalPlayer();
     for (auto&& [id, cameraComponent] : player->mContext.mRegistry->view<CameraComponent>().each())
     {
-        player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, true);
+       // player->mContext.mRegistry->set_flag<CameraAlignWithTargetForwardComponent>(id, true);
         auto storage = player->mContext.mRegistry->assure_t<UpdatePlayerFromCameraComponent>();
-        if (!storage->contains(id))
-        {
-            storage->emplace(id, UpdatePlayerFromCameraComponent(mCameras[id]));
+        if (storage) {
+            auto* base = (entt::basic_storage<UpdatePlayerFromCameraComponent, EntityId>*)storage;
+            if (!base->contains(id))
+            {
+                base->emplace(id);
+                base->get(id).mUpdateMode = mCameras[id];
+            }
         }
+
 
         if (cameraComponent.getMode() == CameraMode::FirstPerson)
         {

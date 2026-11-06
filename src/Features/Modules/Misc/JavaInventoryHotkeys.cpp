@@ -102,9 +102,9 @@ static ItemStack* findUsableItem(int& outSlot, bool& outIsOffhand, bool checkOff
         auto* off = player->getOffhandContainer();
         if (off) {
             ItemStack* it = off->getItem(0);
-            if (it && it->mItem) {
+            if (it && it->mItem && it->getItem()) {
                 for (int id : targets) {
-                    if ((*it->mItem)->mItemId == id) { outSlot = 0; outIsOffhand = true; return it; }
+                    if (it->getItem()->mItemId == id) { outSlot = 0; outIsOffhand = true; return it; }
                 }
             }
         }
@@ -112,9 +112,9 @@ static ItemStack* findUsableItem(int& outSlot, bool& outIsOffhand, bool checkOff
 
     for (int i = 0; i < 36; i++) {
         ItemStack* it = inv->getItem(i);
-        if (!it || !it->mItem) continue;
+        if (!it || !it->mItem || !it->getItem()) continue;
         for (int id : targets) {
-            if ((*it->mItem)->mItemId == id) { outSlot = i; return it; }
+            if (it->getItem()->mItemId == id) { outSlot = i; return it; }
         }
     }
     return nullptr;

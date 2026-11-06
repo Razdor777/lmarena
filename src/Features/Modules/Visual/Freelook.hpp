@@ -35,9 +35,13 @@ public:
     bool mResetRot = false;
     glm::vec2 mHeadYaw;
 
+
+    int mSetPerson = -1;
+
     void onEnable() override;
     void onDisable() override;
     void onBaseTickEvent(BaseTickEvent& event);
     void onPacketOutEvent(PacketOutEvent& event);
     void onLookInputEvent(LookInputEvent& event);
+
 };

@@ -20,29 +20,36 @@ void Goofy::onDisable()
 
 void Goofy::onBoneRenderEvent(BoneRenderEvent& event)
 {
+    if (!event.mBones) return;
     auto ent = event.mActor;
     auto player = ClientInstance::get()->getLocalPlayer();
-    auto bone = event.mBone;
-    auto partModel = event.mPartModel;
+    if (!player || ent != player) return;
+    if (ClientInstance::get()->getMouseGrabbed()) return;
 
-    if (ent != ClientInstance::get()->getLocalPlayer()) return;
-
-    if (bone->mBoneStr == "rightarm" || bone->mBoneStr == "leftarm")
+    for (auto& [key, boneVec] : *event.mBones)
     {
-        if ((!ClientInstance::get()->getMouseGrabbed()))
+        for (auto& bone : boneVec)
         {
-            player->getWalkAnimationComponent()->mWalkAnimSpeed = 0.79;
-
-            if (Keyboard::isUsingMoveKeys() && player->getSwingProgress() == 0)
+            if (bone.mBoneStr == "rightarm" || bone.mBoneStr == "leftarm")
             {
-                partModel->mRot.z *= 3.f;
-                partModel->mRot.x *= 1.4f;
-            }
+                auto* partModel = bone.getActorPartModel();
+                if (!partModel) continue;
 
-            if (Keyboard::isUsingMoveKeys())
-            {
-                float mAngle = bone->mBoneStr == "rightarm" ? 10.38 : -10.38;
-                partModel->mRot.z = mAngle;
+                if (auto* walk = player->getWalkAnimationComponent()) {
+                    walk->mWalkAnimSpeed = 0.79f;
+                }
+
+                if (Keyboard::isUsingMoveKeys() && player->getSwingProgress() == 0)
+                {
+                    partModel->mRot.z *= 3.f;
+                    partModel->mRot.x *= 1.4f;
+                }
+
+                if (Keyboard::isUsingMoveKeys())
+                {
+                    float mAngle = bone.mBoneStr == "rightarm" ? 10.38f : -10.38f;
+                    partModel->mRot.z = mAngle;
+                }
             }
         }
     }

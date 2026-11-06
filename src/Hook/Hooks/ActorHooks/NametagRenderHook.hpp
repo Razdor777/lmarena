@@ -24,6 +24,6 @@ public:
         __int64 a10)*/
     static std::unique_ptr<Detour> mRenderDetour;
 
-    static void* render(void* a1, void* a2, void* a3, void* a4, class Actor* actor, void* a6, glm::vec3* pos, bool unknown, float deltaThing, mce::Color* color);
+    static void* render(void* a1, void* a2, void* a3, void* a4, class Actor* actor, void* a6, glm::vec3* pos, float deltaThing, mce::Color* color);
     void init() override;
 };

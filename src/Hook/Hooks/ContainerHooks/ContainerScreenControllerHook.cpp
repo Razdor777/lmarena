@@ -99,10 +99,13 @@ void* ContainerScreenControllerHook::onContainerSlotHovered(class ContainerScree
 void ContainerScreenControllerHook::init()
 {
     auto func = SigManager::ContainerScreenController_tick;
-    mDetour = std::make_unique<Detour>("ContainerScreenController::tick",
-        reinterpret_cast<void*>(func),
-        &ContainerScreenControllerHook::onContainerTick);
-    mDetour->enable();
+    if (func)
+    {
+        mDetour = std::make_unique<Detour>("ContainerScreenController::tick",
+            reinterpret_cast<void*>(func),
+            &ContainerScreenControllerHook::onContainerTick);
+        mDetour->enable();
+    }
 
     // Without this one there is no way to know the hovered slot, so a missing
     // signature disables the feature instead of hooking address 0.

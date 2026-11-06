@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/25/2024.
 //
 #pragma once
 
@@ -27,6 +26,7 @@
 #include "Components/MaxAutoStepComponent.hpp"
 #include "Components/MobHurtTimeComponent.hpp"
 #include "Components/ActorDataFlagComponent.hpp"
+#include "Components/MobJumpComponent.hpp"
 
 
 #include <SDK/Minecraft/Inventory/ContainerManagerModel.hpp>
@@ -36,17 +36,45 @@
 #define PLAYER_HEIGHT 1.62f
 #define PLAYER_HEIGHT_VEC glm::vec3(0.f, PLAYER_HEIGHT, 0.f)
 
+enum class ActorSwingSource : unsigned char {
+    None = 0,
+    Build = 1,
+    Mine = 2,
+    Interact = 3,
+    Attack = 4,
+    UseItem = 5,
+    ThrowItem = 6,
+    DropItem = 7,
+    Event = 8,
+};
+enum class ActorLocation : int {
+    Feet = 0,
+    Body = 1,
+    WeaponAttachPoint = 2,
+    Head = 3,
+    DropAttachPoint = 4,
+    ExplosionPoint = 5,
+    Eyes = 6,
+    BreathingPoint = 7,
+    Mouth = 8,
+    Count = 9,
+};
+
+enum class ShapeType : unsigned char {
+    Outline = 0,
+    Collision = 1,
+    CollisionForCamera = 2,
+    All = Outline,
+    SolidOnly = Collision,
+};
 class Actor {
 public:
-    unsigned char filler[0x408]; // ItemActor::ItemActor on bds line 35 ItemStack::ItemStack((ItemActor *)((char *)this + 1024));
+    unsigned char filler[0x3d0]; // ItemActor::ItemActor on bds line 35 ItemStack::ItemStack((ItemActor *)((char *)this + 1024));
 
-    CLASS_FIELD(uintptr_t**, vtable, 0x0)
+    CLASS_FIELD(uintptr_t**, vtable, 0x0);
     CLASS_FIELD(EntityContext, mContext, 0x8);
     CLASS_FIELD(std::string, mEntityIdentifier, OffsetProvider::Actor_mEntityIdentifier);
 
-    // The flag component is not guaranteed to exist (dead actor, world change,
-    // disconnect) — it is null-checked here because these helpers are called from
-    // module disable paths, where the player is often already gone.
     bool getStatusFlag(ActorFlags flag) {
         auto data = getActorDataFlagComponent();
         return data ? data->getStatusFlag(flag) : false;
@@ -54,8 +82,7 @@ public:
 
     void setStatusFlag(ActorFlags flag, bool value) {
         auto data = getActorDataFlagComponent();
-        if (!data) return;
-        data->setStatusFlag(flag, value);
+        if (data) data->setStatusFlag(flag, value);
     }
 
     template<typename flag_t>
@@ -81,15 +108,17 @@ public:
             }
 
             mContext.mRegistry->set_flag<flag_t>(mContext.mEntityId, value);
-        } catch (std::exception& e) {
+        }
+        catch (std::exception& e) {
             spdlog::error("Failed to set flag: {}", e.what());
-        } catch (...) {
+        }
+        catch (...) {
             spdlog::error("Failed to set flag: unknown error");
         }
     }
 
-   template<typename flag_t>
-   bool getFlag(EntityId id) {
+    template<typename flag_t>
+    bool getFlag(EntityId id) {
         if (!isValid())
         {
             spdlog::error("Failed to get flag: actor is not valid");
@@ -118,16 +147,19 @@ public:
                 storage->remove(id);
             }*/
             mContext.mRegistry->set_flag<flag_t>(id, value);
-        } catch (std::exception& e) {
+        }
+        catch (std::exception& e) {
             spdlog::error("Failed to set flag: {}", e.what());
-        } catch (...) {
+        }
+        catch (...) {
             spdlog::error("Failed to set flag: unknown error");
         }
     }
 
 
 
-    void swing();
+
+    void swing(ActorSwingSource swingsource = ActorSwingSource::Attack);
     bool isDestroying();
     bool isSwinging();
     void setSwinging(bool swinging);
@@ -164,6 +196,7 @@ public:
     ActorHeadRotationComponent* getActorHeadRotationComponent();
     MobBodyRotationComponent* getMobBodyRotationComponent();
     JumpControlComponent* getJumpControlComponent();
+    MobJumpComponent* getMobJumpComponent();
     CameraComponent* getCameraComponent();
     CameraDirectLookComponent* getCameraDirectLookComponent();
     MaxAutoStepComponent* getMaxAutoStepComponent();
@@ -172,8 +205,9 @@ public:
     class SimpleContainer* getOffhandContainer();
     class PlayerInventory* getSupplies();
     class Level* getLevel();
-    class SerializedSkin* getSkin();
+    class SerializedSkinImpl* getSkin();
     void setPosition(glm::vec3 pos);
+    void setPos(float x, float y, float z);
     float distanceTo(Actor* actor);
     float distanceTo(const glm::vec3& pos);
     bool wasOnGround();
@@ -190,9 +224,9 @@ public:
     AttributesComponent* getAttributesComponent();
     float getMaxHealth();
     float getHealth();
-    float getHunger();
     float getAbsorption();
     float getMaxAbsorption();
+    float getHunger();
     AttributeInstance* getAttribute(AttributeId id);
     AttributeInstance* getAttribute(int id);
     bool isOnFire();
@@ -203,4 +237,4 @@ public:
     bool canSee(Actor* actor);
 };
 
-static_assert(sizeof(Actor) == 0x408, "Actor size is invalid");
+static_assert(sizeof(Actor) == 0x3d0, "Actor size is invalid");

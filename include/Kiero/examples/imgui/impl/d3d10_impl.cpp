@@ -1,37 +1,36 @@
-﻿#include "../../../kiero.h"
+﻿#include "renderer_impl.h"
 
-#if KIERO_INCLUDE_D3D10
+#ifdef KIERO_INCLUDE_D3D10
 
-#include "d3d10_impl.h"
+#include <cassert>
 #include <d3d10.h>
-#include <assert.h>
+
+#include <winrt/base.h>
 
 #include "win32_impl.h"
 
-#include "../imgui/imgui.h"
-#include "../imgui/examples/imgui_impl_win32.h"
-#include "../imgui/examples/imgui_impl_dx10.h"
+#include <kiero.hpp>
 
-typedef long(__stdcall* Present)(IDXGISwapChain*, UINT, UINT);
-static Present oPresent = NULL;
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx10.h>
 
-long __stdcall hkPresent10(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
-{
+using Present = HRESULT(__stdcall*)(IDXGISwapChain*, UINT, UINT);
+static Present oPresent = nullptr;
+
+static HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, const UINT SyncInterval, const UINT Flags) {
 	static bool init = false;
 
-	if (!init)
-	{
+	if (!init) {
 		DXGI_SWAP_CHAIN_DESC desc;
-		pSwapChain->GetDesc(&desc);
+		winrt::check_hresult(pSwapChain->GetDesc(&desc));
 
-		ID3D10Device* device;
-		pSwapChain->GetDevice(__uuidof(ID3D10Device), (void**)&device);
-
-		impl::win32::init(desc.OutputWindow);
+		winrt::com_ptr<ID3D10Device> device;
+		winrt::check_hresult(pSwapChain->GetDevice(IID_PPV_ARGS(device.put())));
 
 		ImGui::CreateContext();
-		ImGui_ImplWin32_Init(desc.OutputWindow);
-		ImGui_ImplDX10_Init(device);
+		ImGui_ImplDX10_Init(device.get());
+		impl::win32::init(desc.OutputWindow);
 
 		init = true;
 	}
@@ -49,9 +48,23 @@ long __stdcall hkPresent10(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT F
 	return oPresent(pSwapChain, SyncInterval, Flags);
 }
 
-void impl::d3d10::init()
-{
-	assert(kiero::bind(8, (void**)&oPresent, hkPresent10) == kiero::Status::Success);
+void impl::d3d10::init() {
+	const auto status = kiero::bind<&IDXGISwapChain::Present>(&oPresent, &hkPresent);
+	assert(status == kiero::Status::Success);
 }
+
+void impl::d3d10::shutdown() {
+	if (!ImGui::GetCurrentContext()) {
+		return;
+	}
+    win32::shutdown();
+	ImGui_ImplDX10_Shutdown();
+	ImGui::DestroyContext();
+}
+
+#else
+
+void impl::d3d10::init() {}
+void impl::d3d10::shutdown() {}
 
 #endif // KIERO_INCLUDE_D3D10

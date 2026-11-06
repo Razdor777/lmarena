@@ -7,14 +7,26 @@
 #include <SDK/OffsetProvider.hpp>
 #include <Utils/MemUtils.hpp>
 
+
 ItemStack* Container::getItem(int slot)
 {
-    static auto vFunc = OffsetProvider::Container_getItem;
-    return MemUtils::callVirtualFunc<ItemStack*, int>(vFunc, this, slot);
+	using func = ItemStack const& (__thiscall*)(void*, int);
+	ItemStack const& aids = (*static_cast<func**>((void*)this))[7]((void*)this, slot);
+	return const_cast<ItemStack*>(&aids);
 }
+/*
+ItemStack* Container::getItem(int slot)
+{
+	static auto Func = reinterpret_cast<ItemStack * (__thiscall*)(Container*, int)>((*reinterpret_cast<void***>(this))[7]);
+	return Func(this, slot);
+}
+*/
+
+
 
 void Container::setItem(int slot, ItemStack* item)
 {
-    static auto vFunc = OffsetProvider::Container_getItem + 5;
-    MemUtils::callVirtualFunc<void, int, ItemStack*>(vFunc, this, slot, item);
+	using SetItemFunc = void(__thiscall*)(Container*, int, ItemStack*);
+	auto vFunc = reinterpret_cast<SetItemFunc>((*reinterpret_cast<void***>(this))[12]);
+	vFunc(this, slot, item);
 }

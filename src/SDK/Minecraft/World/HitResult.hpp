@@ -1,11 +1,10 @@
 #pragma once
 //
-// Created by vastrakai on 7/10/2024.
 //
 
 #include <SDK/Minecraft/Actor/EntityId.hpp>
 
-enum HitType : uint32_t
+enum HitType : int
 {
     BLOCK = 0,
     ENTITY = 1,
@@ -27,9 +26,20 @@ public:
     glm::ivec3      mBlockPos;     // this+0x20
     glm::vec3       mPos;          // this+0x2C
     WeakEntityRef   mEntity;       // this+0x38
+    AABB            mEntityAABB;
     bool            mIsHitLiquid;  // this+0x50
     unsigned char   mLiquidFacing; // this+0x51
     glm::ivec3      mLiquid;       // this+0x54
     glm::vec3       mLiquidPos;    // this+0x60
     bool            mIndirectHit;  // this+0x6C
+
+    int getType() {
+        return mType;
+    }
+
+    std::string getTypeString() {
+        return std::string(magic_enum::enum_name(mType));
+    }
+
+
 };

@@ -4,12 +4,13 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-#include "Hook/Hook.hpp"
-#include "Hook/Detour.hpp"
+#include <Hook/Hook.hpp>
+#include <Hook/Detour.hpp>
 
 class ItemStack;
 class ItemRenderer;
 class BaseActorRenderContext;
+struct ActorRenderData;
 
 struct PendingItemIcon
 {
@@ -29,17 +30,18 @@ namespace ItemIconQueue
 class ItemRendererHook : public Hook
 {
 public:
-    static inline std::unique_ptr<Detour> mItemRendererDetour = nullptr;
+    static std::unique_ptr<Detour>        mDetour;
     static inline ItemRenderer*           sItemRenderer = nullptr;
     static inline BaseActorRenderContext* sBarContext   = nullptr;
 
     static ItemRenderer*           getItemRenderer() { return sItemRenderer; }
     static BaseActorRenderContext* getBarContext()   { return sBarContext; }
 
-    ItemRendererHook() { mName = "ItemRendererHook"; }
+    ItemRendererHook() : Hook()
+    {
+        mName = "ItemRenderer::render";
+    }
 
+    static void render(ItemRenderer* _this, BaseActorRenderContext* renderContext, ActorRenderData* actorRenderData);
     void init() override;
-
-    static void* onRender(ItemRenderer* _this, BaseActorRenderContext* ctx,
-                           void* a3, void* a4, void* a5, void* a6);
 };

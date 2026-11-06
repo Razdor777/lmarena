@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/25/2024.
 //
 
 #include "OffsetProvider.hpp"
@@ -7,14 +6,21 @@
 #include <Solstice.hpp>
 #include <Utils/MemUtils.hpp>
 #include <libhat.hpp>
+#include <mutex>
 
 #define NOW std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()
 
+namespace {
+    std::mutex sOffsetMutex;
+}
+
 hat::scan_result OffsetProvider::scanSig(hat::signature_view sig, const std::string& name, int offset)
 {
-    mSigScanCount++;
     auto minecraft = hat::process::get_process_module();
     auto result = hat::find_pattern(sig, ".text", minecraft);
+
+    std::lock_guard<std::mutex> lock(sOffsetMutex);
+    mSigScanCount++;
 
     if (!result.has_result()) {
         mSigs[name] = 0;
@@ -29,7 +35,7 @@ void OffsetProvider::initialize()
 {
     int64_t start = NOW;
     #pragma omp parallel for
-    for (int i = 0; i < mSigInitializers.size(); i++)
+    for (int i = 0; i < static_cast<int>(mSigInitializers.size()); i++)
     {
         mSigInitializers[i]();
     }
@@ -55,21 +61,17 @@ void OffsetProvider::initialize()
     auto mc = hat::process::get_process_module().address();
     auto mcSize = hat::process::get_process_module().get_module_data().size();
 
-    // Terminate if we failed to find a signature
     for (const auto& sig : mSigs) {
-        // Make a crash log if the sig is out of bounds
-        if (sig.second < mc || sig.second > mc + mcSize) {
-            ExceptionHandler::makeCrashLog("An error occurred while initializing: Signature out of bounds!", 0xFF00);
-            __fastfail(0);
-            std::exit(0);
-        }
-
         if (sig.second == 0) {
-            ExceptionHandler::makeCrashLog("An error occurred while initializing!", 0xFF02);
+            ExceptionHandler::makeCrashLog("An error occurred while initializing offset: " + sig.first, 0xFF02);
             __fastfail(0);
             std::exit(0);
         }
-
+        if (sig.second < mc || sig.second > mc + mcSize) {
+            ExceptionHandler::makeCrashLog("An error occurred while initializing: Offset sig out of bounds (" + sig.first + ")!", 0xFF00);
+            __fastfail(0);
+            std::exit(0);
+        }
     }
 #endif
 

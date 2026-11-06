@@ -1,4 +1,4 @@
-# have fun dark you retard <3
+# Juzdex / Solstice — Minecraft Bedrock 26.62 (GDK x64 / MSVC)
 cmake_minimum_required(VERSION 3.28)
 include(cmake/CPM.cmake)
 project(Solstice)
@@ -10,8 +10,19 @@ endif ()
 
 add_compile_definitions(__PRIVATE_DEBUG__)
 add_compile_definitions(__PRIVATE_BUILD__)
-add_compile_definitions(__DEBUG__)
 add_compile_options(/utf-8)
+
+if (PRIVATE_DEBUGBUILD)
+    add_compile_definitions(__PRIVATE_DEBUG__)
+    add_compile_definitions(__PRIVATE_BUILD__)
+    add_compile_definitions(__DEBUG__)
+    message(STATUS "Private+Debug build enabled")
+endif ()
+
+if (PRIVATE_BUILD)
+    add_compile_definitions(__PRIVATE_BUILD__)
+    message(STATUS "Private build enabled")
+endif ()
 
 find_program(LD_COMMAND ld)
 
@@ -28,7 +39,14 @@ if (NOT LD_COMMAND_AVAILABLE)
     message(FATAL_ERROR "The ld command is not available on your system. \nPlease install using `pacman -S mingw-w64-x86_64-binutils` in MSYS2, then add the bin directory to your PATH.\nAfter that, restart your IDE and CMake should be able to find the ld command.")
 endif ()
 
-set(CMAKE_UNITY_BUILD TRUE)
+# Parallel per-TU compilation instead of unity chunks so new/ported .cpp files
+# never collide on anonymous-namespace helpers or global allocator overrides.
+set(CMAKE_UNITY_BUILD FALSE)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
+
+if (MSVC)
+    add_compile_options(/bigobj /MP)
+endif ()
 
 CPMAddPackage(
         NAME spdlog
@@ -55,20 +73,15 @@ CPMAddPackage(
 )
 
 CPMAddPackage(
-        NAME DirectXTK
-        GITHUB_REPOSITORY microsoft/DirectXTK
-        GIT_TAG main
-)
-
-CPMAddPackage(
         NAME cryptopp-cmake
         GITHUB_REPOSITORY abdes/cryptopp-cmake
         GIT_TAG master
 )
 
-if(MSVC)
-    add_compile_options(/bigobj)
-endif()
+# VS 17.10+ / VS 18 stdext compatibility for cryptopp
+if (TARGET cryptopp)
+    target_compile_options(cryptopp PRIVATE "/FI${CMAKE_CURRENT_LIST_DIR}/cmake/msvc_stdext_compat.h")
+endif ()
 
 set(SHADER_DIR ${CMAKE_CURRENT_LIST_DIR}/src/Utils/Shaders)
 set(SHADER_BIN_DIR ${CMAKE_BINARY_DIR}/SolsticeShaders)
@@ -120,73 +133,67 @@ add_compile_definitions(JM_XORSTR_DISABLE_AVX_INTRINSICS)
 add_compile_definitions(ENTT_SPARSE_PAGE=2048)
 add_compile_definitions(ENTT_PACKED_PAGE=128)
 
-set(IS_DEBUG_BUILD CMAKE_BUILD_TYPE STREQUAL "Debug")
-
-if (${IS_DEBUG_BUILD})
-        add_compile_definitions(__DEBUG__)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(__DEBUG__)
 endif ()
+add_compile_definitions($<$<CONFIG:Debug>:__DEBUG__>)
 
-add_link_options($<$<CONFIG:Debug>:/INCREMENTAL>) # enable incremental linking
-add_link_options($<$<CONFIG:Debug>:/DEBUG>) # enable debugging
+# Debug options
+add_link_options($<$<CONFIG:Debug>:/INCREMENTAL>)
+add_link_options($<$<CONFIG:Debug>:/DEBUG>)
 add_compile_options($<$<CONFIG:Debug>:/Zi>)
 
-add_link_options($<$<CONFIG:Release>:/Zi>) # generate pdb
-add_link_options($<$<CONFIG:Release>:/INCREMENTAL:NO>) # disable incremental linking
-add_link_options($<$<CONFIG:Release>:/LTCG>) # link-time code generation
-add_link_options($<$<CONFIG:Release>:/DEBUG>) # enable debugging
-add_compile_options($<$<CONFIG:Release>:/O2>) # optimize for speed
-add_compile_options($<$<CONFIG:Release>:/Oi>) # enable intrinsic functions
-add_compile_options($<$<CONFIG:Release>:/GL>) # enable link-time code generation
-add_compile_options($<$<CONFIG:Release>:/Gy>) # separate functions for linker
-add_compile_options($<$<CONFIG:Release>:/Gw>) # optimize global data
-add_compile_options($<$<CONFIG:Release>:/Gm->) # disable minimal rebuild
-add_compile_options($<$<CONFIG:Release>:/GF>) # enable string pooling
-add_compile_options($<$<CONFIG:Release>:/fp:fast>) # optimize floating point
-add_compile_options($<$<CONFIG:Release>:/GR->) # disable RTTI
-add_compile_options($<$<CONFIG:Release>:/Gd>) # use __cdecl for all functions
-add_compile_options($<$<CONFIG:Release>:/MT>) # use static multithreaded runtime
-add_compile_options($<$<CONFIG:Release>:/Ob2>) # inline any suitable function
-add_compile_options($<$<CONFIG:Release>:/Ot>) # favor fast code
-add_compile_options($<$<CONFIG:Release>:/Oy->) # omit frame pointers
+# Release options
+add_link_options($<$<CONFIG:Release>:/Zi>)
+add_link_options($<$<CONFIG:Release>:/INCREMENTAL:NO>)
+add_link_options($<$<CONFIG:Release>:/LTCG>)
+add_link_options($<$<CONFIG:Release>:/OPT:REF>)
+add_link_options($<$<CONFIG:Release>:/OPT:ICF>)
+add_link_options($<$<CONFIG:Release>:/DEBUG>)
+add_compile_options($<$<CONFIG:Release>:/O2>)
+add_compile_options($<$<CONFIG:Release>:/Oi>)
+add_compile_options($<$<CONFIG:Release>:/GL>)
+add_compile_options($<$<CONFIG:Release>:/Gy>)
+add_compile_options($<$<CONFIG:Release>:/Gw>)
+add_compile_options($<$<CONFIG:Release>:/Gm->)
+add_compile_options($<$<CONFIG:Release>:/GF>)
+add_compile_options($<$<CONFIG:Release>:/fp:fast>)
+add_compile_options($<$<CONFIG:Release>:/GR->)
+add_compile_options($<$<CONFIG:Release>:/Gd>)
+add_compile_options($<$<CONFIG:Release>:/MT>)
+add_compile_options($<$<CONFIG:Release>:/Ob2>)
+add_compile_options($<$<CONFIG:Release>:/Ot>)
+add_compile_options($<$<CONFIG:Release>:/Oy->)
 
-
-
-
-
-set(SOLSTICE_VERSION "v1.0.0")
+set(SOLSTICE_VERSION "v2.0.0-26.62")
 add_compile_definitions(SOLSTICE_VERSION="${SOLSTICE_VERSION}")
 
 add_definitions(-DWIN32_LEAN_AND_MEAN)
+
+set(KIERO_INCLUDE_D3D11 ON)
+set(KIERO_INCLUDE_D3D12 ON)
+set(KIERO_BUILD_EXAMPLES OFF)
 
 include_directories(.)
 include_directories(src)
 include_directories(include)
 include_directories(include/minhook/include)
 include_directories(include/libhat)
+include_directories(include/libhat/include)
+include_directories(include/libhat/include/libhat)
 include_directories(include/entt)
-include_directories(include/libhat/libhat)
 include_directories(include/ImGui)
+include_directories(include/Kiero/include)
 include_directories(include/Kiero)
 include_directories(include/nes)
+include_directories(include/nes/include)
 
 file(GLOB_RECURSE sourceFiles "src/*.cpp")
 file(GLOB_RECURSE includeFiles "include/*.hpp")
 set_source_files_properties(${sourceFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 set_source_files_properties(${includeFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
-# Чат-бинды — новые .cpp; собираются отдельно, вне unity-чанков. Unity-сборка
-# режет список .cpp на чанки по 8 подряд, и каждый новый файл сдвигал бы все
-# чанки после себя: в одном .cpp оказывались бы соседи, которые раньше
-# собирались порознь (одноимённые функции/константы -> ошибки C2084/C2872).
-set_source_files_properties(
-        src/Features/ChatBinds/ChatBinds.cpp
-        src/Features/GUI/ChatBindsPanel.cpp
-	src/Features/Modules/Misc/AutoContract.cpp
-        PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-
-# Krazy resource embedding code
-
+# Resource embedding (resources/* -> .o via ld)
 file(GLOB_RECURSE resource_files_list "resources/*")
 
 function(add_resources out_var)
@@ -207,7 +214,6 @@ function(add_resources out_var)
     set(${out_var} "${result}" PARENT_SCOPE)
 endfunction()
 
-
 set(resource_files "")
 foreach(file ${resource_files_list})
     file(RELATIVE_PATH relative_file ${CMAKE_CURRENT_SOURCE_DIR}/resources ${file})
@@ -221,7 +227,6 @@ add_dependencies(${PROJECT_NAME} generate_build_info SolsticeShaders)
 
 set(RESOURCE_HEADER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.hpp")
 set(RESOURCE_SOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.cpp")
-
 
 set(RESOURCE_HEADER_CONTENT "// This file is generated by CMake. Do not edit it manually.\n")
 set(RESOURCE_HEADER_CONTENT "${RESOURCE_HEADER_CONTENT}#pragma once\n")
@@ -245,18 +250,14 @@ set(RESOURCE_HEADER_CONTENT "${RESOURCE_HEADER_CONTENT}    static inline std::un
 set(RESOURCE_HEADER_CONTENT "${RESOURCE_HEADER_CONTENT}    static void loadResources();\n")
 set(RESOURCE_HEADER_CONTENT "${RESOURCE_HEADER_CONTENT}};\n")
 
-
 file(WRITE ${RESOURCE_HEADER_FILE} "${RESOURCE_HEADER_CONTENT}")
-
 message(STATUS "Generated Resources.hpp")
-
 
 set(RESOURCE_SOURCE_CONTENT "// This file is generated by CMake. Do not edit it manually.\n")
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}#include \"Resources.hpp\"\n")
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}#include \"FontHelper.hpp\"\n")
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}\n")
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}void ResourceLoader::loadResources() {\n")
-
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    ImFontConfig font_config;\n")
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    font_config.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_NoHinting;\n")
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    font_config.FontDataOwnedByAtlas = false;\n")
@@ -265,11 +266,9 @@ set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    const ImWchar* cyrill
 foreach(file ${resource_files_list})
     file(RELATIVE_PATH relative_file ${CMAKE_CURRENT_SOURCE_DIR}/resources ${file})
 
-
     string(REGEX REPLACE "(.*)(/)(.*)(\\.)(.*)" "\\3" friendly_name ${relative_file})
     string(REPLACE "-" "_" friendly_name ${friendly_name})
     string(TOLOWER ${friendly_name} friendly_name)
-
 
     string(REPLACE "/" "_" resource_name ${relative_file})
     string(REPLACE "." "_" resource_name ${resource_name})
@@ -282,14 +281,13 @@ foreach(file ${resource_files_list})
         continue()
     endif()
 
-    set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    FontHelper::Fonts.emplace(\"${friendly_name}\", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(${resource_name}.data2(), ${resource_name}.size(), 20, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));\n")
-    set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    FontHelper::Fonts.emplace(\"${friendly_name}_large\", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(${resource_name}.data2(), ${resource_name}.size(), 42, &font_config, ImGui::GetIO().Fonts->GetGlyphRangesCyrillic()));\n")
+    set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    FontHelper::Fonts.emplace(\"${friendly_name}\", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(${resource_name}.data2(), ${resource_name}.size(), 20, &font_config, cyrillic_ranges));\n")
+    set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}    FontHelper::Fonts.emplace(\"${friendly_name}_large\", ImGui::GetIO().Fonts->AddFontFromMemoryTTF(${resource_name}.data2(), ${resource_name}.size(), 42, &font_config, cyrillic_ranges));\n")
 endforeach()
 
 set(RESOURCE_SOURCE_CONTENT "${RESOURCE_SOURCE_CONTENT}}\n")
 
 file(WRITE ${RESOURCE_SOURCE_FILE} "${RESOURCE_SOURCE_CONTENT}")
-
 message(STATUS "Generated Resources.cpp")
 
 add_subdirectory(include/minhook)
@@ -298,16 +296,44 @@ add_subdirectory(include/ImGui)
 add_subdirectory(include/Kiero)
 add_subdirectory(include/nes)
 
-set_property(TARGET DirectXTK PROPERTY UNITY_BUILD FALSE)
 set_property(TARGET minhook PROPERTY UNITY_BUILD FALSE)
 
 target_include_directories(Solstice PRIVATE include/ImGui)
+target_include_directories(Solstice PRIVATE include/Kiero/include)
 target_include_directories(Solstice PRIVATE include/Kiero)
 
-target_link_libraries(Solstice PRIVATE OpenMP::OpenMP_CXX DirectXTK spdlog version.lib nlohmann_json glm minhook kiero nuvola_event_system libhat dbghelp.lib winmm.lib magic_enum d3d12.lib d3d11.lib d2d1.lib dxgi.lib dxguid.lib dwrite.lib winmm.lib dbghelp.lib comctl32.lib ws2_32.lib cryptopp ole32.lib Mmdevapi.lib RuntimeObject.lib)
+target_link_libraries(Solstice PRIVATE
+        OpenMP::OpenMP_CXX
+        spdlog
+        version.lib
+        nlohmann_json
+        glm
+        minhook
+        kiero
+        nuvola_event_system
+        libhat
+        magic_enum
+        cryptopp
+        d3d12.lib
+        d3d11.lib
+        d2d1.lib
+        dxgi.lib
+        dxguid.lib
+        dwrite.lib
+        winmm.lib
+        wininet.lib
+        dbghelp.lib
+        comctl32.lib
+        ws2_32.lib
+        ole32.lib
+        Mmdevapi.lib
+        WindowsApp.lib
+        OneCore.lib
+        RuntimeObject.lib
+)
 
-set_property(TARGET Solstice nlohmann_json minhook spdlog cryptopp DirectXTK glm kiero nuvola_event_system magic_enum libhat PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
-
+set_property(TARGET Solstice nlohmann_json minhook spdlog cryptopp glm kiero nuvola_event_system magic_enum libhat
+        PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
 
 target_precompile_headers(Solstice PRIVATE
         "$<$<COMPILE_LANGUAGE:CXX>:<src/pch.hpp$<ANGLE-R>>"
