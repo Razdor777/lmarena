@@ -3,6 +3,14 @@
 // Created by vastrakai on 8/7/2024.
 //
 
+struct ItemInfo
+{
+    glm::vec3 pos;
+    glm::vec2 size;
+    std::string name;
+    bool isUseful;
+    std::vector<std::pair<std::string, int>> enchants;
+};
 
 class ItemESP : public ModuleBase<ItemESP> {
 public:
@@ -12,12 +20,12 @@ public:
     BoolSetting mThemedColor = BoolSetting("Themed Color", "Whether to use the themed color", true);
     BoolSetting mShowNames = BoolSetting("Show Names", "Whether to show the item names", true);
     BoolSetting mDistanceScaledFont = BoolSetting("Distance Scaled Font", "Whether to scale the font based on distance", true);
-    NumberSetting mFontSize = NumberSetting("Font Size", "The size of the font", 20, 1, 40, 0.01);;
+    NumberSetting mFontSize = NumberSetting("Font Size", "The size of the font", 20, 1, 40, 0.01);
     NumberSetting mScalingMultiplier = NumberSetting("Scaling Multiplier", "The multiplier to use for scaling the font", 1.25f, 0.f, 5.f, 0.01f);
     BoolSetting mHighlightUsefulItems = BoolSetting("Highlight Useful Items", "Toggle highlighting of useful items", true);
     BoolSetting mShowEnchant = BoolSetting("Show Enchant", "Whether to show the enchantments of the items", true);
 
-    ItemESP () : ModuleBase("ItemESP", "Draws a box around items", ModuleCategory::Visual, 0, false) {
+    ItemESP() : ModuleBase("ItemESP", "Draws a box around items", ModuleCategory::Visual, 0, false) {
         addSettings(
             &mDistanceLimited,
             &mDistance,
@@ -32,7 +40,6 @@ public:
         );
 
         VISIBILITY_CONDITION(mDistance, mDistanceLimited.mValue);
-        VISIBILITY_CONDITION(mFontSize, mShowNames.mValue);
         VISIBILITY_CONDITION(mDistanceScaledFont, mShowNames.mValue);
         VISIBILITY_CONDITION(mFontSize, mShowNames.mValue && !mDistanceScaledFont.mValue);
         VISIBILITY_CONDITION(mScalingMultiplier, mShowNames.mValue && mDistanceScaledFont.mValue);

@@ -11,6 +11,7 @@
 #include <SDK/Minecraft/World/Level.hpp>
 #include <SDK/Minecraft/World/HitResult.hpp>
 #include <Features/Modules/Misc/AntiBot.hpp>
+#include <Features/Modules/Misc/Friends.hpp>  // <-- Добавить этот include
 
 void TriggerBot::onEnable() {
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &TriggerBot::onBaseTickEvent>(this);
@@ -36,6 +37,9 @@ Actor* TriggerBot::getActorFromEntityId(EntityId entityId)
         if(mUseAntibot.mValue && antiBot->isBot(actor)) continue;
         if(mHive.mValue && actor->getmEntityIdentifier() == "hivecommon:shadow") continue;
         if(actor == player) continue;
+        
+        // Проверка на друзей
+        if(mIgnoreFriends.mValue && gFriendManager && gFriendManager->isFriend(actor)) continue;
 
         if(actor->mContext.mEntityId == entityId) return actor;
     }
@@ -65,7 +69,7 @@ void TriggerBot::onBaseTickEvent(class BaseTickEvent &event) {
 
         lastAttack = NOW;
 
-        player->swing(ActorSwingSource::Attack);
-        player->getGameMode()->attack(*actor);
+        player->swing();
+        player->getGameMode()->attack(actor);
     }
 }

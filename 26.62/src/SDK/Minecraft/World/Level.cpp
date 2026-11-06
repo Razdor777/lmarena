@@ -55,3 +55,11 @@ LevelData* Level::getLevelData()
     static auto vIndex = OffsetProvider::Level_mLevelData;
     return MemUtils::callVirtualFunc<LevelData*>(vIndex, this);*/
 }
+
+// ==== ported from the 1.21.44 master ====
+class BlockPalette* Level::getBlockPalette()
+{
+    static auto vIndex = OffsetProvider::Level_getBlockPalette;
+    return MemUtils::callVirtualFunc<class BlockPalette*>(vIndex, this);
+}
+// ==== end of ported block ====

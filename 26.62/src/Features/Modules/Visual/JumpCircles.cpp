@@ -1,34 +1,77 @@
 //
-// Created by alteik on 26/10/2024.
+// JumpCircles — перенос из combatant-client (visuals/JumpCircles.java).
+// Логика: круг появляется, когда игрок переходит из «на земле» в «в воздухе».
+// Длительность и рост — как в combatant (легаси-режим и Pulse).
 //
 
 #include "JumpCircles.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <unordered_set>
+
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
-#include <SDK/Minecraft/Rendering/GuiData.hpp>
-#include <cmath>
+#include <Utils/GameUtils/ActorUtils.hpp>
+#include <Utils/MiscUtils/ColorUtils.hpp>
+#include <Utils/MiscUtils/RenderUtils.hpp>
 
-float JumpCircles::toRadians(float deg)
+namespace JumpCirclesImpl
 {
-    return deg * (PI / 180.0f);
+    constexpr float kPi       = 3.14159265f;
+    constexpr int   kSegments = 48;    // точек на окружности
+    constexpr float kLegacyGrowMs = 5000.f;  // знаменатель роста (как в combatant)
+    constexpr float kLegacyFadeMs = 6000.f;  // знаменатель затухания
+
+    // Отскок в конце роста — из combatant (JumpCircles.bounceOut).
+    float bounceOut(float value)
+    {
+        const float n1 = 7.5625f;
+        const float d1 = 2.75f;
+        if (value < 1.f / d1)       return n1 * value * value;
+        if (value < 2.f / d1) { value -= 1.5f / d1;   return n1 * value * value + 0.75f; }
+        if (value < 2.5f / d1) { value -= 2.25f / d1; return n1 * value * value + 0.9375f; }
+        value -= 2.625f / d1;
+        return n1 * value * value + 0.984375f;
+    }
+
+    // Прозрачность пульса — из combatant (JumpCircles.pulseAlpha).
+    float pulseAlpha(float progress)
+    {
+        const float fadeInDuration = 0.15f;
+        const float glowStart = 0.65f;
+        const float fadeOutStart = 0.85f;
+        float alpha;
+        if (progress < fadeInDuration) {
+            alpha = progress / fadeInDuration;
+        } else if (progress >= fadeOutStart) {
+            const float fadeOutProgress = (progress - fadeOutStart) / (1.f - fadeOutStart);
+            alpha = 1.f - fadeOutProgress;
+            if (progress > glowStart) {
+                const float glowProgress = (progress - glowStart) / (fadeOutStart - glowStart);
+                const float glowPulse = std::sin(glowProgress * kPi * 3.f) * 0.3f + 0.3f;
+                alpha += glowPulse * (1.f - fadeOutProgress);
+            }
+        } else if (progress > glowStart) {
+            const float glowProgress = (progress - glowStart) / (fadeOutStart - glowStart);
+            const float glowPulse = std::sin(glowProgress * kPi * 3.f) * 0.3f + 0.3f;
+            alpha = 1.f + glowPulse;
+        } else {
+            alpha = 1.f;
+        }
+        return std::clamp(alpha, 0.f, 1.f);
+    }
+
+    ImU32 toU32(const ImVec4& c, float alpha)
+    {
+        return IM_COL32(static_cast<int>(std::clamp(c.x, 0.f, 1.f) * 255.f),
+                        static_cast<int>(std::clamp(c.y, 0.f, 1.f) * 255.f),
+                        static_cast<int>(std::clamp(c.z, 0.f, 1.f) * 255.f),
+                        static_cast<int>(std::clamp(alpha, 0.f, 1.f) * 255.f));
+    }
 }
 
-void JumpCircles::addCircle(const glm::vec3& pos, float radius, const ImVec4& color, float opacity, float glowAmount) {
-    uint64_t currentTime = NOW;
-
-    if (currentTime - lastAddTime < 100) return;
-
-    Circle newCircle = { pos, radius, color, glowAmount, opacity, currentTime };
-    circles.push_back(newCircle);
-    lastAddTime = currentTime;
-}
-
-ImU32 convertToImU32(const ImVec4& color) {
-    return IM_COL32(static_cast<int>(color.x * 255.0f),
-                    static_cast<int>(color.y * 255.0f),
-                    static_cast<int>(color.z * 255.0f),
-                    static_cast<int>(color.w * 255.0f));
-}
+using namespace JumpCirclesImpl;
 
 void JumpCircles::onEnable()
 {
@@ -37,84 +80,229 @@ void JumpCircles::onEnable()
 
 void JumpCircles::onDisable()
 {
-    circles.clear();
     gFeatureManager->mDispatcher->deafen<RenderEvent, &JumpCircles::onRenderEvent>(this);
+    mCircles.clear();
+    mGroundState.clear();
 }
 
- void JumpCircles::onRenderEvent(RenderEvent& event)
+uint64_t JumpCircles::lifetimeMs() const
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
-    if (!player || !player->getLevel()) return;
+    if (mMode.mValue == Mode::Pulse) return static_cast<uint64_t>(mPulseLifetime.mValue);
+    return mEaseOut.mValue ? 5000 : 6000;
+}
 
-    uint64_t currentTime = NOW;
+ImVec4 JumpCircles::colorFor(float index, uint64_t now) const
+{
+    const float seconds = static_cast<float>(now) * mColorSpeed.mValue / 18000.f;
+    switch (mColorMode.mValue)
+    {
+    case ColorMode::Static:
+        return ImVec4(mColor.mValue[0], mColor.mValue[1], mColor.mValue[2], mColor.mValue[3]);
 
-    if (!player->wasOnGround() && player->isOnGround()) {
-        glm::vec3 pos = RenderUtils::transform.mPlayerPos;
-        pos.y -= 2;
+    case ColorMode::Rainbow:
+        return ColorUtils::Rainbow(seconds, 1.f, 1.f, static_cast<int>(index)).Value;
 
-        float radius = 0.1f;
-        ImVec4 color = ColorUtils::getThemedColor(0);
-        color.w = mOpacity.mValue;
-        float glowAmount = mGlowAmount.mValue;
-
-        addCircle(pos, radius, color, color.w, glowAmount);
+    case ColorMode::DoubleColor:
+    {
+        const ImVec4 c1(mColor.mValue[0], mColor.mValue[1], mColor.mValue[2], mColor.mValue[3]);
+        const ImVec4 c2(mColor2.mValue[0], mColor2.mValue[1], mColor2.mValue[2], mColor2.mValue[3]);
+        return ColorUtils::LerpColors(seconds, index, { ImColor(c1), ImColor(c2) }).Value;
     }
 
-    for (auto it = circles.begin(); it != circles.end(); ) {
-        if ((currentTime - it->startTime) > mTime.mValue) {
-            it = circles.erase(it);
-            continue;
-        }
+    case ColorMode::Theme:
+        return ColorUtils::getThemedColor(index).Value;
+    }
+    return ImVec4(1.f, 1.f, 1.f, 1.f);
+}
 
-        // Increase radius gradually by the speed factor instead of based on elapsed time
-        it->radius += mSize.mValue;
+void JumpCircles::onRenderEvent(RenderEvent& event)
+{
+    auto* localPlayer = ClientInstance::get()->getLocalPlayer();
+    if (!localPlayer || !ClientInstance::get()->getLevelRenderer()) return;
 
-        // Opacity animation independent of elapsed time
-        it->color.z = mOpacity.mValue;
+    const uint64_t now = NOW;
 
-        int pointCount = 100;
-        glm::vec2 screenPosPrev, screenPosCurr;
-        auto corrected = RenderUtils::transform.mMatrix;
+    // Отрыв от земли: ground -> air. Круг ставится под ногами (getPos() — на высоте глаз).
+    std::unordered_set<int64_t> active;
+    for (Actor* actor : ActorUtils::getActorList(true, false))
+    {
+        if (mOnlySelf.mValue && actor != localPlayer) continue;
 
-        bool firstPoint = true;
+        const int64_t id = actor->getRuntimeID();
+        active.insert(id);
 
-        for (int i = 0; i < 16; i++) {
-            ImVec4 mUIColor = it->color;
+        const auto it = mGroundState.find(id);
+        const bool wasGround = it != mGroundState.end() && it->second;
+        const bool isGround = actor->isOnGround();
 
-            mUIColor.z = it->opacity * (1.f - i / 16.f);
-
-            float ringRadius = it->radius - i * ringSpacing;  // Shrinking radius per ring
-
-            for (int j = 0; j <= pointCount; j++)
+        if (wasGround && !isGround)
+        {
+            if (auto* pos = actor->getPos())
             {
-                // Circle points
-
-                float angle = (j / (float)pointCount) * 360.f;
-                float rad = toRadians(angle);
-
-                glm::vec3 currentPos = {
-                    it->position.x + ringRadius * cosf(rad),
-                    it->position.y,
-                    it->position.z + ringRadius * sinf(rad)
-                };
-
-                if (corrected.OWorldToScreen(RenderUtils::transform.mOrigin, currentPos, screenPosCurr, MathUtils::fov,
-                                         ClientInstance::get()->getGuiData()->mResolution))
-                {
-                    if (!firstPoint) {
-                        ImGui::GetBackgroundDrawList()->AddLine(
-                            ImVec2(screenPosPrev.x, screenPosPrev.y),
-                            ImVec2(screenPosCurr.x, screenPosCurr.y),
-                            convertToImU32(mUIColor),
-                            2.0f
-                        );
-                    }
-
-                    screenPosPrev = screenPosCurr;
-                    firstPoint = false;
-                }
+                const glm::vec3 feet = *pos - PLAYER_HEIGHT_VEC;
+                mCircles.push_back({ glm::vec3(feet.x, std::floor(feet.y) + 0.001f, feet.z), now });
             }
         }
-        ++it;
+        mGroundState[id] = isGround;
+    }
+
+    for (auto it = mGroundState.begin(); it != mGroundState.end();)
+    {
+        if (!active.count(it->first)) it = mGroundState.erase(it);
+        else ++it;
+    }
+
+    const uint64_t life = lifetimeMs();
+    mCircles.erase(std::remove_if(mCircles.begin(), mCircles.end(),
+        [&](const Circle& c) { return now - c.start >= life; }), mCircles.end());
+
+    if (mCircles.empty()) return;
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    // Новые круги рисуем первыми, как в combatant (обратный порядок).
+    for (auto it = mCircles.rbegin(); it != mCircles.rend(); ++it)
+        drawCircle(dl, *it, now);
+}
+
+void JumpCircles::drawCircle(ImDrawList* dl, const Circle& c, uint64_t now)
+{
+    const float passed = static_cast<float>(now - c.start);
+    const bool pulse = mMode.mValue == Mode::Pulse;
+
+    float half = 0.f;
+    float alpha = 0.f;
+    float angleDeg = 0.f;
+
+    if (pulse)
+    {
+        const float progress = std::min(passed / std::max(1.f, static_cast<float>(mPulseLifetime.mValue)), 1.f);
+        if (progress >= 1.f) return;
+        const float scale = bounceOut(progress) * mPulseMaxSize.mValue * mCircleScale.mValue;
+        if (scale <= 0.f) return;
+        half = scale * 0.5f;
+        alpha = pulseAlpha(progress);
+    }
+    else
+    {
+        const float t = passed * (mEaseOut.mValue ? 2.f : 1.f) / kLegacyGrowMs;
+        const float size = mCircleScale.mValue - std::pow(1.f - t, 4.f);
+        if (size <= 0.f) return;
+        half = size;
+        angleDeg = size * mRotateSpeed.mValue * 1000.f;
+        alpha = 1.f - passed / kLegacyFadeMs;
+    }
+
+    alpha = std::clamp(alpha, 0.f, 1.f);
+    if (alpha <= 0.f) return;
+
+    // Окружность на земле, спроецированная на экран. Если часть за камерой — пропускаем круг.
+    std::vector<ImVec2> ring;
+    ring.reserve(kSegments);
+    for (int i = 0; i < kSegments; i++)
+    {
+        const float a = static_cast<float>(i) / kSegments * 2.f * kPi;
+        const glm::vec3 p = c.pos + glm::vec3(std::cos(a) * half, 0.f, std::sin(a) * half);
+        ImVec2 s;
+        if (!RenderUtils::worldToScreen(p, s)) return;
+        ring.push_back(s);
+    }
+
+    const ImVec4 color = colorFor(static_cast<float>(c.start / 100 % 360), now);
+    const bool bubble = mMode.mValue == Mode::Bubble;
+
+    if (!bubble)
+        dl->AddConvexPolyFilled(ring.data(), static_cast<int>(ring.size()), toU32(color, alpha * 0.22f));
+
+    dl->AddPolyline(ring.data(), static_cast<int>(ring.size()), toU32(color, alpha * 0.9f),
+                    ImDrawFlags_Closed, bubble ? 2.5f : 1.5f);
+
+    // Вращающаяся подсветка — вместо вращения текстуры в combatant.
+    if (mMode.mValue == Mode::Default)
+    {
+        const int start = static_cast<int>(std::fmod(angleDeg / 360.f * kSegments, static_cast<float>(kSegments)));
+        std::vector<ImVec2> arc;
+        for (int j = 0; j <= kSegments / 4; j++)
+            arc.push_back(ring[(start + j) % kSegments]);
+        dl->AddPolyline(arc.data(), static_cast<int>(arc.size()), toU32(color, alpha), 0, 3.f);
+    }
+
+    for (auto it = mGroundState.begin(); it != mGroundState.end();)
+    {
+        if (!active.count(it->first)) it = mGroundState.erase(it);
+        else ++it;
+    }
+
+    const uint64_t life = lifetimeMs();
+    mCircles.erase(std::remove_if(mCircles.begin(), mCircles.end(),
+        [&](const Circle& c) { return now - c.start >= life; }), mCircles.end());
+
+    if (mCircles.empty()) return;
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    // Новые круги рисуем первыми, как в combatant (обратный порядок).
+    for (auto it = mCircles.rbegin(); it != mCircles.rend(); ++it)
+        drawCircle(dl, *it, now);
+}
+
+void JumpCircles::drawCircle(ImDrawList* dl, const Circle& c, uint64_t now)
+{
+    const float passed = static_cast<float>(now - c.start);
+    const bool pulse = mMode.mValue == Mode::Pulse;
+
+    float half = 0.f;
+    float alpha = 0.f;
+    float angleDeg = 0.f;
+
+    if (pulse)
+    {
+        const float progress = std::min(passed / std::max(1.f, static_cast<float>(mPulseLifetime.mValue)), 1.f);
+        if (progress >= 1.f) return;
+        const float scale = JumpCirclesImpl::bounceOut(progress) * mPulseMaxSize.mValue * mCircleScale.mValue;
+        if (scale <= 0.f) return;
+        half = scale * 0.5f;
+        alpha = JumpCirclesImpl::pulseAlpha(progress);
+    }
+    else
+    {
+        const float t = passed * (mEaseOut.mValue ? 2.f : 1.f) / JumpCirclesImpl::kLegacyGrowMs;
+        const float size = mCircleScale.mValue - std::pow(1.f - t, 4.f);
+        if (size <= 0.f) return;
+        half = size;
+        angleDeg = size * mRotateSpeed.mValue * 1000.f;
+        alpha = 1.f - passed / JumpCirclesImpl::kLegacyFadeMs;
+    }
+
+    alpha = std::clamp(alpha, 0.f, 1.f);
+    if (alpha <= 0.f) return;
+
+    // Окружность на земле, спроецированная на экран. Если часть за камерой — пропускаем круг.
+    std::vector<ImVec2> ring;
+    ring.reserve(JumpCirclesImpl::kSegments);
+    for (int i = 0; i < JumpCirclesImpl::kSegments; i++)
+    {
+        const float a = static_cast<float>(i) / JumpCirclesImpl::kSegments * 2.f * JumpCirclesImpl::kPi;
+        const glm::vec3 p = c.pos + glm::vec3(std::cos(a) * half, 0.f, std::sin(a) * half);
+        ImVec2 s;
+        if (!RenderUtils::worldToScreen(p, s)) return;
+        ring.push_back(s);
+    }
+
+    const ImVec4 color = colorFor(static_cast<float>(c.start / 100 % 360), now);
+    const bool bubble = mMode.mValue == Mode::Bubble;
+
+    if (!bubble)
+        dl->AddConvexPolyFilled(ring.data(), static_cast<int>(ring.size()), JumpCirclesImpl::toU32(color, alpha * 0.22f));
+
+    dl->AddPolyline(ring.data(), static_cast<int>(ring.size()), JumpCirclesImpl::toU32(color, alpha * 0.9f),
+                    ImDrawFlags_Closed, bubble ? 2.5f : 1.5f);
+
+    // Вращающаяся подсветка — вместо вращения текстуры в combatant.
+    if (mMode.mValue == Mode::Default)
+    {
+        const int start = static_cast<int>(std::fmod(angleDeg / 360.f * JumpCirclesImpl::kSegments, static_cast<float>(JumpCirclesImpl::kSegments)));
+        std::vector<ImVec2> arc;
+        for (int j = 0; j <= JumpCirclesImpl::kSegments / 4; j++)
+            arc.push_back(ring[(start + j) % JumpCirclesImpl::kSegments]);
+        dl->AddPolyline(arc.data(), static_cast<int>(arc.size()), JumpCirclesImpl::toU32(color, alpha), 0, 3.f);
     }
 }

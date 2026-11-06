@@ -1,26 +1,24 @@
 #pragma once
-//
-// Created by vastrakai on 6/29/2024.
-//
-
 
 class FontHelper {
 public:
     static inline std::map<std::string, ImFont*> Fonts;
+    // Единственный реальный шрифт интерфейса — Mntsb (робото нужен только как
+    // донор глифов, в списке шрифтов его нет — см. FontHelper::load()).
+    static inline std::string currentFontKey = "mntsb";
+    static inline float fontScale = 1.0f;
 
     static void load();
-    /// <summary>
-    /// Pushes the preferred font to the ImGui stack.
-    /// </summary>
-    /// <param name="large">Whether to push the large font.</param>
     static void pushPrefFont(bool large = false, bool bold = false, bool mForcePSans = false);
-    /// <summary>
-    /// Gets the appropriate font, according to interface settings.
-    /// </summary>
-    /// <param name="large">Whether to get the large font.</param>
     static ImFont* getFont(bool large = false, bool bold = false, bool mForcePSans = false);
-    /// <summary>
-    /// Pops the font from the ImGui stack.
-    /// </summary>
     static void popPrefFont();
+    static void setCurrentFont(const std::string& fontKey);
+    static void setFontScale(float scale);
+
+    static float getScaledSize(float baseSize);
+
+    // Иконочный шрифт Nurik (в нём картинки, а не текст — см. NurikIcons.hpp).
+    // Возвращает nullptr, если шрифт не загрузился, поэтому вызывающий код
+    // обязан это проверять.
+    static ImFont* getIconFont(bool large = false);
 };

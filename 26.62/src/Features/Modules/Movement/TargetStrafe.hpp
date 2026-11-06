@@ -38,11 +38,11 @@ public:
 
     bool mShouldStrafe = false;
     Actor* mCurrentTarget = nullptr;
+    bool mWasStrafing = false;
 
     bool mForward = false;
     bool mBackward = false;
     bool mMoveRight = true;
-
 
     void onEnable() override;
     void onDisable() override;

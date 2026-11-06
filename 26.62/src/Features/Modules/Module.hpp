@@ -38,16 +38,11 @@ public:
     int mKey;
     int mEnableWhileHeld = false;
 
-<<<<<<< HEAD:26.62/src/Features/Modules/Module.hpp
     BoolSetting mVisibleInArrayList = BoolSetting("Visible", "Whether the module is visible in the Arraylist", true);
 
     std::vector<class Setting*> mSettings = {
         &mVisibleInArrayList
     };
-=======
-    BoolSetting mVisibleInArrayList = BoolSetting("Visible", "Whether the module is visible in the arraylist.", true);
-    std::vector<class Setting*> mSettings = { &mVisibleInArrayList };
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Module.hpp
 
     Module(std::string name, std::string description, const ModuleCategory category, const int key, const bool enabled, std::unordered_map<NamingStyle, std::string> names = {})
         : mName(std::move(name)), mDescription(std::move(description)), mCategory(category), mWantedState(enabled), mKey(key), mNames(std::move(names)) {}
@@ -74,6 +69,11 @@ public:
     nlohmann::json serialize();
     Setting* getSetting(const std::string& string);
 
+    // ==== ported from the 1.21.44 master: модули со своим состоянием в конфиге ====
+    virtual bool hasCustomData() const { return false; }
+    virtual nlohmann::json serializeCustomData() { return nlohmann::json::object(); }
+    virtual void deserializeCustomData(const nlohmann::json& j) { (void)j; }
+
     template <typename... Args>
     void addSettings(Args... args) {
         (addSetting(args), ...);
@@ -87,10 +87,9 @@ public:
     float cAnim = 0;
     float cFade = 0;
     float cScale = 0;
+    float boolScale = 0;
 
     float mArrayListAnim = 0.f;
-<<<<<<< HEAD:26.62/src/Features/Modules/Module.hpp
-=======
     float toggleBurst = 0.f;
 
     // Hover / pulse animations
@@ -102,7 +101,6 @@ public:
     float rippleY      = 0.f;
     float rippleRadius = 0.f;
     float rippleAlpha  = 0.f;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Module.hpp
 };
 
 template <typename T>

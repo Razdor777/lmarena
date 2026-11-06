@@ -162,6 +162,7 @@ public:
     bool isSwinging();
     void setSwinging(bool swinging);
     int getGameType();
+    void setGameType(int type);
     bool isDebugCameraActive();
     void setDebugCameraActive(bool active);
     void setAllowInsideBlockRender(bool allow);
@@ -199,6 +200,8 @@ public:
     MaxAutoStepComponent* getMaxAutoStepComponent();
     MobHurtTimeComponent* getMobHurtTimeComponent();
     class SimpleContainer* getArmorContainer();
+    class SimpleContainer* getOffhandContainer();
+    float getHunger();
     class PlayerInventory* getSupplies();
     class Level* getLevel();
     class SerializedSkinImpl* getSkin();

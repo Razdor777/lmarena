@@ -34,6 +34,10 @@ public:
 class LevelData
 {
 public:
+    // ==== ported from the 1.21.44 master ====
+    // Нужен ItemStack::fromDescriptor и ChestStealer.
+    class BlockPalette* getBlockPalette();
+    // ==== end of ported block ====
 	CLASS_FIELD(uint64_t, mTick, OffsetProvider::LevelData_mTick);
 };
 

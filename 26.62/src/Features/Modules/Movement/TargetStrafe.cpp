@@ -43,17 +43,23 @@ void TargetStrafe::onBaseTickEvent(BaseTickEvent& event)
     glm::vec3 playerPos = *player->getPos();
     auto moveInputComponent = player->getMoveInputComponent();
     static auto speed = gFeatureManager->mModuleManager->getModule<Speed>();
-    auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
-    bool isJumping = Keyboard::mPressedKeys[keyboard["key.jump"]];
+    auto& binds = *ClientInstance::get()->getKeyboardSettings();
+    bool isJumping = Keyboard::mPressedKeys[binds["key.jump"]];
 
-
-    if (!Aura::sHasTarget || !Aura::sTarget || !Aura::sTarget->getActorTypeComponent() || (mJumpOnly.mValue && !isJumping) || (mSpeedOnly.mValue && (speed == nullptr || !speed->mEnabled)))
+    if (!Aura::sHasTarget || !Aura::sTarget || Aura::sTarget && !Aura::sTarget->getActorTypeComponent() || (mJumpOnly.mValue && !isJumping) || (mSpeedOnly.mValue && (speed == nullptr || !speed->mEnabled)))
+   
     {
+        mWasStrafing = mShouldStrafe;
         mShouldStrafe = false;
+
+        // restore original movement keys
+        if (mWasStrafing)  handleKeyInput(Keyboard::mPressedKeys[binds["key.forward"]], Keyboard::mPressedKeys[binds["key.left"]],
+            Keyboard::mPressedKeys[binds["key.back"]], Keyboard::mPressedKeys[binds["key.right"]]);
+
         return;
     }
 
-    if (mSpeedOnly.mValue && mJumpOnly.mValue) moveInputComponent->setJumping(false);
+    if (mSpeedOnly.mValue && mJumpOnly.mValue) moveInputComponent->mIsJumping = false;
 
     mCurrentTarget = Aura::sTarget;
     glm::vec3 targetPos = *mCurrentTarget->getPos();
@@ -65,11 +71,13 @@ void TargetStrafe::onBaseTickEvent(BaseTickEvent& event)
         mMoveRight = !mMoveRight;
     }
     else {
-        if (moveInputComponent->isLeft()) mMoveRight = false;
-        else if (moveInputComponent->isRight()) mMoveRight = true;
+        if (moveInputComponent->mLeft) mMoveRight = false;
+        else if (moveInputComponent->mRight) mMoveRight = true;
     }
 
     handleKeyInput(mForward, !mMoveRight, mBackward, mMoveRight);
+
+    mWasStrafing = mShouldStrafe;
     mShouldStrafe = true;
 }
 
@@ -81,6 +89,7 @@ void TargetStrafe::onRenderEvent(RenderEvent& event)
     if (mShouldStrafe)
     {
         if (!mCurrentTarget->getActorTypeComponent()) return;
+
         float yaw = MathUtils::getRots(*player->getPos(), mCurrentTarget->getAABB()).y;
         auto rotationComponent = player->getActorRotationComponent();
         rotationComponent->mYaw = yaw;
@@ -116,8 +125,8 @@ void TargetStrafe::handleKeyInput(bool pressingW, bool pressingA, bool pressingS
 
     auto moveInputComponent = player->getMoveInputComponent();
 
-    moveInputComponent->setUp(pressingW);
-    moveInputComponent->setLeft(pressingA);
-    moveInputComponent->setDown(pressingS);
-    moveInputComponent->setRight(pressingD);
+    moveInputComponent->mForward = pressingW;
+    moveInputComponent->mLeft = pressingA;
+    moveInputComponent->mBackward = pressingS;
+    moveInputComponent->mRight = pressingD;
 }

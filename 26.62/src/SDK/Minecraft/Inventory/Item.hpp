@@ -23,6 +23,14 @@ enum class SItemType
 class Item {
 public:
     CLASS_FIELD(short, mItemId, 0xAA);
+    // Из мастер-ветки (1.21.44): vtable index 35 = Item::getMaxDamage(), возвращает short.
+    int getMaxDamage() const {
+        return MemUtils::callVirtualFunc<short>(35, const_cast<Item*>(this));
+    }
+    // vtable index 15 = Item::isBlockItem()
+    bool isBlockItem() const {
+        return MemUtils::callVirtualFunc<bool>(15, const_cast<Item*>(this));
+    }
     CLASS_FIELD(std::string, mName, 0xD8);
 
     int getArmorSlot();

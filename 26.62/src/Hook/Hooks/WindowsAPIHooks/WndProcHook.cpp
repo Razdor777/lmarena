@@ -10,16 +10,18 @@ LRESULT CALLBACK WndProcHook::onDetour(HWND HWND, UINT Msg, WPARAM wParam, LPARA
     if (!ImGui::GetCurrentContext()) {
         return CallWindowProcW(mDetour, HWND, Msg, wParam, lParam);
     }
+    // ==== ported from the 1.21.44 master (решение "гасить или нет" — за KeyHook) ====
+    // KeyHook::onKey сам кормит ImGui, обрабатывает CustomChat/ChatBinds/KeyEvent
+    // и модули, а возвращает true, если клавишу игре отдавать нельзя.
+    bool swallowKey = false;
     if (Msg == WM_KEYDOWN)
     {
         if (!(lParam & (1 << 30)))
-        {
-            KeyHook::onKey((uint32_t)wParam, true);
-        }
+            swallowKey = KeyHook::onKey((uint32_t)wParam, true);
     }
     else if (Msg == WM_KEYUP)
     {
-        KeyHook::onKey((uint32_t)wParam, false);
+        swallowKey = KeyHook::onKey((uint32_t)wParam, false);
     }
 
     switch (Msg) {/*stuck mpresskeys in winkey ;sob;*/
@@ -93,7 +95,7 @@ LRESULT CALLBACK WndProcHook::onDetour(HWND HWND, UINT Msg, WPARAM wParam, LPARA
     }
     }
 
-    if ((Msg == WM_KEYUP || Msg == WM_KEYDOWN) && KeyHook::mCurrentCancel)
+    if (swallowKey)
     {
         return 0;
     }

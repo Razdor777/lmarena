@@ -1,33 +1,44 @@
 #pragma once
-//
-// Created by vastrakai on 7/4/2024.
-//
-
 #include <Features/FeatureManager.hpp>
 #include <Features/Events/NotifyEvent.hpp>
 
-
+//
+// Notifications — минималистичные чёрные карточки с цветной полоской-акцентом.
+//
+// Здесь сознательно НЕТ настроек цвета, свечения, шиммера, пульсации, углов,
+// плотности, анимаций и прочего. Всё это удалено вместе с блюром и двойными
+// тенями, которые и создавали лаги на каждом кадре.
+//
+// Осталось ровно четыре настройки: когда показывать, сколько держать и в каком
+// углу. Внешний вид фиксирован: сплошной чёрный, белый текст, серая подпись,
+// тонкая линия времени и цветная полоска-акцент слева (тип события — по её цвету:
+// мятная — включено, серая — выключено, янтарная — предупреждение, коралловая —
+// ошибка, холодная белая — инфо).
+//
 class Notifications : public ModuleBase<Notifications> {
 public:
-    enum class Style {
-        Solaris,
+    enum class Position {
+        TopRight,
+        BottomRight,
     };
-    EnumSettingT<Style> mStyle = EnumSettingT<Style>("Style", "The style of the notifications", Style::Solaris, "Solaris");
+
+    // Тип события. Пиктограмм больше нет — вместо них цветная полоска-акцент
+    // слева на карточке (цвет — accentColor в Notifications.cpp).
+    enum class Icon {
+        Success,
+        Disabled,
+        Warning,
+        Error,
+        Info,
+    };
+
     BoolSetting mShowOnToggle = BoolSetting("Show on toggle", "Show a notification when a module is toggled", true);
     BoolSetting mShowOnJoin = BoolSetting("Show on join", "Show a notification when you join a server", true);
-    BoolSetting mColorGradient = BoolSetting("Color gradient", "Enable a color gradient on the notifications", false);
-    BoolSetting mLimitNotifications = BoolSetting("Limit notifications", "Limit the number of notifications shown at one time", false);
-    NumberSetting mMaxNotifications = NumberSetting("Max notifications", "The maximum number of notifications shown at one time", 6, 1, 25, 1);
-
+    NumberSetting mDuration = NumberSetting("Duration", "How long toggle / join notifications stay on screen", 3.f, 1.f, 10.f, 0.5f);
+    EnumSettingT<Position> mPosition = EnumSettingT<Position>("Position", "Which corner the cards appear in", Position::TopRight, "Top Right", "Bottom Right");
 
     Notifications() : ModuleBase("Notifications", "Shows notifications on module toggle and other events", ModuleCategory::Visual, 0, true) {
-        addSetting(&mStyle);
-        addSetting(&mShowOnToggle);
-        addSetting(&mShowOnJoin);
-        //addSetting(&mColorGradient);
-        addSetting(&mLimitNotifications);
-        addSetting(&mMaxNotifications);
-        VISIBILITY_CONDITION(mMaxNotifications, mLimitNotifications.mValue == true);
+        addSettings(&mShowOnToggle, &mShowOnJoin, &mDuration, &mPosition);
 
         mNames = {
             {Lowercase, "notifications"},
@@ -39,17 +50,34 @@ public:
         gFeatureManager->mDispatcher->listen<RenderEvent, &Notifications::onRenderEvent, nes::event_priority::VERY_LAST>(this);
     }
 
-    std::vector<Notification> mNotifications;
-
     void onEnable() override;
     void onDisable() override;
     void onRenderEvent(class RenderEvent& event);
     void onModuleStateChange(ModuleStateChangeEvent& event);
-    //void onModuleScriptStateChange(ModuleScriptStateChangeEvent& event);
     void onConnectionRequestEvent(class ConnectionRequestEvent& event);
     void onNotifyEvent(class NotifyEvent& event);
 
-    std::string getSettingDisplay() override {
-        return mStyle.mValues[mStyle.as<int>()];
-    }
+private:
+    // One card. Everything that can be precomputed is precomputed ONCE, when the
+    // card is created — the render loop must not allocate strings or re-parse
+    // colour codes every frame (that was a big part of the stutter).
+    //
+    // Карточка двухстрочная: заголовок (что случилось) и подпись (в каком
+    // состоянии / адрес сервера). Так же выглядят уведомления в дорогих
+    // клиентах, но здесь нет ни блюра, ни тени, ни иконок-глифов — только два
+    // прямоугольника, полоска-акцент и текст.
+    struct Entry {
+        std::string title;      // already stripped of § codes
+        std::string subtitle;   // "enabled" / "disabled" / адрес сервера / ""
+        Icon        icon = Icon::Info;
+        float       duration = 3.f;
+        float       life = 0.f;   // seconds on screen
+        float       width = 0.f;  // measured lazily on the first frame
+        float       titleW = 0.f;
+        float       subtitleW = 0.f;
+    };
+
+    std::vector<Entry> mEntries;
+
+    void push(std::string title, Icon icon, float duration, std::string subtitle = {});
 };
