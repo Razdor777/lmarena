@@ -6,53 +6,45 @@
 
 #include <Features/Events/MouseEvent.hpp>
 #include <Features/Events/KeyEvent.hpp>
+#include <Features/GUI/CombatantGui.hpp>
 #include <Features/GUI/ModernDropdown.hpp>
-#include <Features/GUI/ScriptingGui.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
+#include <Utils/MiscUtils/MathUtils.hpp>
 
-#include <Hook/Hooks/ClientInstanceHooks/GrabMouseHook.hpp> // wuwuwuuwww
-
-static bool lastMouseState = false;
-static bool isPressingShift = false;
 static ModernGui modernGui = ModernGui();
-
+static CombatantGui combatantGui = CombatantGui();
 
 void ClickGui::onEnable()
 {
-    auto ci = ClientInstance::get();
-    lastMouseState = !ci->getMouseGrabbed();
-
-    //ci->releaseMouse();
-    GrabMouseHook::ShitNow = true;
+    mWasGrabbed = !ClientInstance::get()->getMouseGrabbed();
+    mGuiOpen = true;
+    ClientInstance::get()->releaseMouse();
 
     gFeatureManager->mDispatcher->listen<MouseEvent, &ClickGui::onMouseEvent>(this);
-    gFeatureManager->mDispatcher->listen<BaseTickEvent, &ClickGui::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->listen<KeyEvent, &ClickGui::onKeyEvent, nes::event_priority::FIRST>(this);
+
+    modernGui.onOpen();
+    combatantGui.onOpen();
 }
 
 void ClickGui::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<MouseEvent, &ClickGui::onMouseEvent>(this);
-    gFeatureManager->mDispatcher->deafen<BaseTickEvent, &ClickGui::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->deafen<KeyEvent, &ClickGui::onKeyEvent>(this);
 
-    if (shit) {
-        shit = false;
-        return;
-    }
+    mGuiOpen = false;
+    modernGui.onClose();
+    combatantGui.onClose();
 
-    ClientInstance::get()->setDisableInput(false);
-    if (lastMouseState) {
+    if (mWasGrabbed)
         ClientInstance::get()->grabMouse();
-    }
-    GrabMouseHook::ShitNow = false;
 }
 
 void ClickGui::onWindowResizeEvent(WindowResizeEvent& event)
 {
-    modernGui.onWindowResizeEvent(event); // are you okay in the head 😭
+    modernGui.onWindowResizeEvent(event);
+    combatantGui.onWindowResizeEvent(event);
 }
-
 
 void ClickGui::onMouseEvent(MouseEvent& event)
 {
@@ -61,218 +53,68 @@ void ClickGui::onMouseEvent(MouseEvent& event)
 
 void ClickGui::onKeyEvent(KeyEvent& event)
 {
-    if (event.mKey == VK_ESCAPE) {
-        if (!modernGui.isBinding && event.mPressed) this->toggle();
-        event.mCancelled = true;
-    }
-
-    // Consume all key events to prevent unintended module toggles
-    if (modernGui.isBinding) {
+    const bool consumed = mStyle.mValue == ClickGuiStyle::Combatant
+        ? combatantGui.onKey(event.mKey, event.mPressed)
+        : modernGui.onKey(event.mKey, event.mPressed);
+    if (consumed) {
         event.mCancelled = true;
         return;
     }
 
-    if (event.mKey == VK_SHIFT && event.mPressed) {
-        isPressingShift = true;
+    if (event.mKey == VK_ESCAPE && event.mPressed) {
+        this->toggle();
         event.mCancelled = true;
+        return;
     }
-    else {
-        isPressingShift = false;
-    }
+
+    if (event.mKey == VK_SHIFT)
+        mIsPressingShift = event.mPressed;
 }
-void ClickGui::onBaseTickEvent(BaseTickEvent& event)
+
+float ClickGui::getEaseAnim(EasingUtil ease, int mode)
 {
-    ClientInstance::get()->setDisableInput(true);
-    if (lastMouseState) {
-        ClientInstance::get()->releaseMouse();
-    }
-
-}
-
-float ClickGui::getEaseAnim(EasingUtil ease, int mode) {
     switch (mode) {
-    case 0: return ease.easeOutExpo(); break;
-    case 1: return mEnabled ? ease.easeOutElastic() : ease.easeOutBack(); break;
-    default: return ease.easeOutExpo(); break;
+    case 0: return ease.easeOutExpo();
+    case 1: return mEnabled ? ease.easeOutElastic() : ease.easeOutBack();
+    case 2: return 0.90f + 0.10f * ease.easeOutCubic();
+    case 3: return mEnabled ? ease.easeOutElastic() : ease.easeInBack();
+    default: return ease.easeOutExpo();
     }
-
 }
-
-enum class Tab
-{
-    ClickGui,
-    HudEditor,
-    Scripting
-};
 
 void ClickGui::onRenderEvent(RenderEvent& event)
 {
+    if (mGuiOpen)
+        ClientInstance::get()->releaseMouse();
+
     static float animation = 0;
-    static int styleMode = 0; // Ease enum
-    static int scrollDirection = 0;
-    static char h[2] = { 0 };
     static EasingUtil inEase = EasingUtil();
 
     float delta = ImGui::GetIO().DeltaTime;
 
-    this->mEnabled ? inEase.incrementPercentage(delta * mEaseSpeed.mValue / 10)
-    : inEase.decrementPercentage(delta * 2 * mEaseSpeed.mValue / 10);
+    mEnabled
+        ? inEase.incrementPercentage(delta * mEaseSpeed.mValue / 10)
+        : inEase.decrementPercentage(delta * 2 * mEaseSpeed.mValue / 10);
+
     float inScale = getEaseAnim(inEase, mAnimation.as<int>());
-    if (inEase.isPercentageMax()) inScale = 0.996;
-    if (mAnimation.mValue == ClickGuiAnimation::Zoom) inScale = MathUtils::clamp(inScale, 0.0f, 0.996);
+    if (inEase.isPercentageMax()) inScale = 1.f;
+    if (mAnimation.mValue == ClickGuiAnimation::Zoom)
+        inScale = MathUtils::clamp(inScale, 0.0f, 1.f);
+
     animation = MathUtils::lerp(0, 1, inEase.easeOutExpo());
 
-    if (animation < 0.0001f) {
-        return;
-    }
+    if (animation < 0.0001f) return;
 
-    // Use IO to determine the scroll direction
-    if (ImGui::GetIO().MouseWheel > 0) {
-        scrollDirection = -1;
-    }
-    else if (ImGui::GetIO().MouseWheel < 0) {
-        scrollDirection = 1;
-    }
-    else {
-        scrollDirection = 0;
-    }
-
-    static Tab currentTab = Tab::ClickGui;
-
-
-    auto drawList = ImGui::GetForegroundDrawList(); // because we need to draw in front of everything else
-
-    switch (currentTab)
+    if (mStyle.mValue == ClickGuiStyle::Modern)
     {
-    case Tab::ClickGui:
-        if (mStyle.mValue == ClickGuiStyle::Modern)
-            modernGui.render(animation, inScale, scrollDirection, h, mBlurStrength.mValue, mMidclickRounding.mValue, isPressingShift);
-        break;
-    case Tab::HudEditor:
-        {
-            // draw red text in the middle of the screen saying "Not implemented yet!"
-            ImVec2 screen = ImRenderUtils::getScreenSize();
-            drawList->AddRectFilled(ImVec2(0, 0), ImVec2(screen.x, screen.y), IM_COL32(0, 0, 0, 255 * animation * 0.38f));
-            ImRenderUtils::addBlur(ImVec4(0.f, 0.f, screen.x, screen.y),
-                               animation * mBlurStrength.mValue, 0);
-            ImColor shadowRectColor = ColorUtils::getThemedColor(0);
-            shadowRectColor.Value.w = 0.5f * animation; // Adjust rect alpha with animation
-
-            float firstheight = (screen.y - screen.y / 3);
-
-            firstheight = MathUtils::lerp(screen.y, firstheight, inScale);
-            ImRenderUtils::fillGradientOpaqueRectangle(
-                ImVec4(0, firstheight, screen.x, screen.y),
-                shadowRectColor, shadowRectColor, 0.4f * inScale, 0.0f);
-
-            FontHelper::pushPrefFont(true, false, true);
-            float fontSize = 25.f;
-            float fontX = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, "Not implemented yet!").x;
-            drawList->AddText(ImVec2(ImRenderUtils::getScreenSize().x / 2 - (fontX), ImRenderUtils::getScreenSize().y / 2), IM_COL32(255, 0, 0, 255), "Not implemented yet!");
-            FontHelper::popPrefFont();
-            //HudEditor::render(inScale, animation, ImRenderUtils::getScreenSize());
-            break;
-        }
-    case Tab::Scripting:
-        ScriptingGui::render(inScale, animation, ImRenderUtils::getScreenSize(), mBlurStrength.mValue);
-        break;
+        modernGui.render(animation, inScale,
+            mBlurStrength.mValue, mMidclickRounding.mValue,
+            mUiScale.mValue, mAmbientOrbs.mValue, mShowHints.mValue,
+            mEffectIntensity.mValue, mPanelGlow.mValue,
+            mCursorGlow.mValue, mParallax.mValue, mBackdropGrid.mValue);
     }
-
-    //ScriptingGui::render(inScale, animation, ImRenderUtils::getScreenSize());
-
-    FontHelper::pushPrefFont(false, false, true);
-
-    // Render tabs at the top
-    std::vector<std::pair<Tab, std::string>> tabs = {
-        {Tab::ClickGui, "ClickGui"},
-        {Tab::HudEditor, "HudEditor"},
-        {Tab::Scripting, "Scripting"}
-    };
-
-    float paddingBetween = 20.f;  // Increased padding for a better look
-    float fontSize = 25.f;
-    static ImVec2 underlinePos = ImVec2(0, 0);
-    static ImVec2 underlineSize = ImVec2(0, 0);
-
-    // Calculate the text sizes for each tab
-    std::map<Tab, ImVec2> tabTextSizes;
-    for (auto& tab : tabs)
+    else if (mStyle.mValue == ClickGuiStyle::Combatant)
     {
-        tabTextSizes[tab.first] = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, tab.second.c_str());
+        combatantGui.render(animation, inScale, mUiScale.mValue);
     }
-
-    // Calculate the entire size of each tab including where their padding is
-    std::map<Tab, ImVec2> tabSizes;
-    for (auto& tab : tabs)
-    {
-        tabSizes[tab.first] = ImVec2(tabTextSizes[tab.first].x + paddingBetween, tabTextSizes[tab.first].y);
-    }
-
-    // Calculate total width of all tabs + padding
-    auto windowSize = ImGui::GetIO().DisplaySize;
-    float totalWidth = paddingBetween * (tabs.size() - 1);
-    for (auto& tab : tabs)
-    {
-        totalWidth += tabTextSizes[tab.first].x;
-    }
-
-    float anim = inScale;
-    float startY = -35; // Start the tabs off screen
-    float targetY = 10;
-
-    // Calculate the starting X position to center tabs horizontally
-    float x = (windowSize.x - totalWidth) / 2;
-    float y = MathUtils::lerp(startY, targetY, anim);
-
-    // Render background behind the tabs
-    ImVec4 bg = ImVec4(x - paddingBetween, y, x + totalWidth, y + tabTextSizes[currentTab].y + 5);
-    drawList->AddRectFilled(ImVec2(bg.x, bg.y), ImVec2(bg.z, bg.w), IM_COL32(30, 30, 30, 180), 5.f);
-
-    std::map<Tab, ImVec2> tabPositions;
-
-    for (auto& tab : tabs)
-    {
-        ImVec2 textSize = tabTextSizes[tab.first];
-        ImVec2 textPos = ImVec2(x, y);
-
-        // Center text vertically
-        textPos.y += (bg.w - bg.y - textSize.y) / 2;
-
-        // Center text horizontally by adjusting x for the tab's text size
-        float centeredX = x + (textSize.x / 2) - (tabTextSizes[tab.first].x / 2);
-
-        // Update position to center horizontally
-        textPos.x = centeredX;
-
-        // Check if the mouse is hovering over the tab
-        if (ImRenderUtils::isMouseOver(ImVec4(x, y, x + textSize.x, y + textSize.y)))
-        {
-            if (ImGui::IsMouseClicked(0))
-            {
-                currentTab = tab.first;
-            }
-        }
-
-        tabPositions[tab.first] = textPos;
-
-        // Render the tab text
-        drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), tab.second.c_str());
-
-        // Move to the next tab position
-        x += textSize.x + paddingBetween;
-    }
-
-    // Animate the underline position and size
-    ImVec2 underlineTargetPos = ImVec2(tabPositions[currentTab].x - paddingBetween, tabPositions[currentTab].y + tabSizes[currentTab].y + 2);
-    underlinePos.x = MathUtils::lerp(underlinePos.x, underlineTargetPos.x, ImGui::GetIO().DeltaTime * 10);
-    underlinePos.y = underlineTargetPos.y;
-
-    ImVec2 underlineTargetSize = ImVec2(tabSizes[currentTab].x, 2);
-    underlineSize = MathUtils::lerp(underlineSize, underlineTargetSize, ImGui::GetIO().DeltaTime * 10);
-
-    // Render the underline
-    drawList->AddLine(underlinePos, ImVec2(underlinePos.x + underlineSize.x, underlinePos.y), IM_COL32(255, 255, 255, 255), underlineSize.y);
-
-    FontHelper::popPrefFont();
-
 }

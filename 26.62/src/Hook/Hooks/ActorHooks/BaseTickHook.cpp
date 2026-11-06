@@ -6,6 +6,7 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
+#include <Features/ChatBinds/ChatBinds.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
@@ -43,6 +44,10 @@ void BaseTickHook::onBaseTick(Actor* actor)
         }
         mQueuedPackets.clear();
     }
+
+    // Чат-бинды: клавишу ловит KeyHook, а отправка — здесь, в потоке игры,
+    // как и обычный чат.
+    ChatBinds::flushPending();
 
 
     auto holder = nes::make_holder<BaseTickEvent>(actor);

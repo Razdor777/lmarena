@@ -6,6 +6,7 @@
 #include <Solstice.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
 #include <Features/Events/KeyEvent.hpp>
+#include <Features/ChatBinds/ChatBinds.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 
 std::unique_ptr<Detour> KeyHook::mDetour = nullptr;
@@ -178,6 +179,13 @@ void KeyHook::onKey(uint32_t key, bool isDown)
     {
         return;
     }
+
+    // Чат-бинды (ClickGui -> Chat Binds): если клавиша забиндена — текст ушёл в
+    // чат, а игре клавиша не отдаётся ни нажатием, ни отпусканием (иначе T
+    // открыл бы ещё и ванильный чат). Работает только в игре: в меню, чате и
+    // ClickGui не срабатывает.
+    if (ChatBinds::handleKey(static_cast<int>(key), isDown))
+        return;
     //oFunc(key, isDown);
     mCurrentCancel = false;
 
