@@ -138,7 +138,7 @@ bool AutoLoot::findAndTeleportToNearest(Actor* player, glm::vec3 fromPos)
     for (auto item : itemActors)
     {
         if (!item) continue;
-        if (!item->mItem.mItem) continue;
+        if (!item->mItem) continue;
         if (!item->getStateVectorComponent()) continue;
 
         glm::vec3 itemPos = item->getStateVectorComponent()->mPos;
@@ -153,7 +153,7 @@ bool AutoLoot::findAndTeleportToNearest(Actor* player, glm::vec3 fromPos)
 
         if (mOnlyUseful.mValue)
         {
-            if (InvManager::isItemUseless(&item->mItem, -1)) continue;
+            if (InvManager::isItemUseless(item, -1)) continue;
         }
 
         targets.push_back({itemPos, dist});

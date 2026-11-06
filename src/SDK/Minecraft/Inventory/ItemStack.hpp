@@ -7,24 +7,39 @@
 #include <regex>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>
+#include <SDK/heap_rd.hpp>
+#include <SDK/Minecraft/ptr/WeakPtr.hpp>
 #include <Utils/MemUtils.hpp>
 
 #include "CompoundTag.hpp"
 
 
+// Layout re-pinned for the 26.62 build.
+//
+// 1.21.44:  Item** mItem; CompoundTag*; Block*; short; int8_t count; bool valid; PAD(0x60)
+// 26.62  :  WeakPtr<Item> (ref-counted, 16 bytes); CompoundTag*; Block*; short;
+//           uint8_t count; bool valid; PAD(0x58)
+// sizeof(ItemStackBase) stays 0x88 and sizeof(ItemStack) stays 0x98, which is
+// what the static_asserts below check.  WeakPtr keeps a SharedCounter* instead
+// of a raw Item**, so every plain `*mItem` dereference in the old code had to go.
 class ItemStackBase {
 public:
     uintptr_t** mVfTable;
-    class Item** mItem;
+    WeakPtr<class Item> mItem;
     CompoundTag* mCompoundTag;
     class Block* mBlock;
     short mAuxValue;
-    int8_t mCount;
+    uint8_t mCount;
+    // Kept so existing call sites that test `valid` still compile. The engine no
+    // longer uses it as a validity flag - always ask getItem() instead.
     bool valid;
-    PAD(0x60);
 
     Item* getItem() const {
-        return *mItem;
+        return mItem.get();
+    }
+
+    bool isValid() const {
+        return getItem() != nullptr;
     }
 };
 
@@ -72,8 +87,9 @@ enum class Enchant : int {
 class ItemStack : public ItemStackBase
 {
 public:
-    uint8_t mStackNetId; //0x0088
-    PAD(0x8);
+    // 26.62 adds 24 bytes of trailing state after the base class; mStackNetId
+    // no longer sits at 0x88, so it is kept as a named tail only for size.
+    PAD(24);
 
     void reinit(Item* item, int count, int itemData) {
         mVfTable = reinterpret_cast<uintptr_t**>(SigManager::ItemStack_vTable);
@@ -83,8 +99,20 @@ public:
     std::string getCustomName() {
         static auto func = SigManager::ItemStack_getCustomName;
         std::string str;
+        if (!func) return {};
         MemUtils::callFastcall<void, ItemStack*, std::string*>(func, this, &str);
-        return str;
+        // The engine hands the text back in a buffer it owns; copy it out and
+        // release it through the game heap wrapper (mimalloc or the process heap).
+        std::string out(str.c_str(), str.size());
+        if (str.capacity() > 15) {
+            void* raw = &str;
+            if (mr::ensure()) {
+                mr::freep(raw);
+            } else {
+                HeapFree(GetProcessHeap(), 0, raw);
+            }
+        }
+        return out;
     }
 
     std::map<int, int> gatherEnchants()

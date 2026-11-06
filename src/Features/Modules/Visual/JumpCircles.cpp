@@ -71,10 +71,7 @@ namespace JumpCirclesImpl
     }
 }
 
-<<<<<<< HEAD
-=======
 using namespace JumpCirclesImpl;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 void JumpCircles::onEnable()
 {
@@ -147,8 +144,6 @@ void JumpCircles::onRenderEvent(RenderEvent& event)
             }
         }
         mGroundState[id] = isGround;
-<<<<<<< HEAD
-=======
     }
 
     for (auto it = mGroundState.begin(); it != mGroundState.end();)
@@ -229,7 +224,6 @@ void JumpCircles::drawCircle(ImDrawList* dl, const Circle& c, uint64_t now)
         for (int j = 0; j <= kSegments / 4; j++)
             arc.push_back(ring[(start + j) % kSegments]);
         dl->AddPolyline(arc.data(), static_cast<int>(arc.size()), toU32(color, alpha), 0, 3.f);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 
     for (auto it = mGroundState.begin(); it != mGroundState.end();)

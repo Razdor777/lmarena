@@ -11,7 +11,7 @@ void Zoom::onEnable()
 {
     mPastFov = ClientInstance::get()->getOptions()->mGfxFieldOfView->mValue;
     mCurrentValue = mZoomValue.mValue;
-    ClientInstance::get()->getOptions()->mGfxFieldOfView->mMinimum = 10.f;
+    ClientInstance::get()->getOptions()->mGfxFieldOfView->mMinValue = 10.f;
 
     gFeatureManager->mDispatcher->listen<MouseEvent, &Zoom::onMouseEvent>(this);
     gFeatureManager->mDispatcher->listen<RenderEvent, &Zoom::onRenderEvent>(this);
@@ -23,7 +23,7 @@ void Zoom::onDisable()
     gFeatureManager->mDispatcher->deafen<RenderEvent, &Zoom::onRenderEvent>(this);
 
     ClientInstance::get()->getOptions()->mGfxFieldOfView->mValue = mPastFov;
-    ClientInstance::get()->getOptions()->mGfxFieldOfView->mMinimum = 30.f;
+    ClientInstance::get()->getOptions()->mGfxFieldOfView->mMinValue = 30.f;
 }
 
 void Zoom::onMouseEvent(MouseEvent& event)

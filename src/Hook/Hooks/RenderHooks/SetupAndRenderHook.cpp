@@ -78,7 +78,7 @@ void* SetupAndRenderHook::onSetupAndRender(void* screenView, void* mcuirc)
                 if (!ic.stack || !ic.stack->mItem) { NDrawLog("  skip: null stack"); continue; }
                 if (ic.scale <= 0.f)              { NDrawLog("  skip: scale<=0"); continue; }
 
-                Item* itemPtr = ic.stack->mItem ? *ic.stack->mItem : nullptr;
+                Item* itemPtr = ic.stack->mItem.get();
                 NDrawLog("  draw: item=%s pos=%.1f,%.1f scale=%.3f",
                          itemPtr ? itemPtr->mName.c_str() : "?",
                          ic.pos.x, ic.pos.y, ic.scale);

@@ -57,90 +57,329 @@ class OffsetProvider {
     static hat::scan_result scanSig(hat::signature_view sig, const std::string& name, int offset = 0);
 
     static inline std::vector<std::function<void()>> mSigInitializers;
-    static inline int mSigScanCount;
+    static inline std::atomic<int> mSigScanCount{0};
 public:
     static inline bool mIsInitialized = false;
     static inline std::unordered_map<std::string, uintptr_t> mSigs;
 
-    DEFINE_INDEX_FIELD(ClientInstance_getLocalPlayer, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 8B 88 ? ? ? ? C1 E1", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(ClientInstance_getBlockSource, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 85 ? 75 ? 48 83 C4 ? 5B C3 48 8B", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(ClientInstance_getOptions, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 3C ? 75 ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 3C", 3, OffsetType::Index);
+    // DEFINE_INDEX_FIELD(ClientInstance_getLocalPlayer, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 8B 88 ? ? ? ? C1 E1", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(ClientInstance_getBlockSource, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 85 ? 75 ? 48 83 C4 ? 5B C3 48 8B", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(ClientInstance_getOptions, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 3C ? 75 ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 3C", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     //DEFINE_INDEX_FIELD(ClientInstance_getScreenName, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 90 48 85 ? 74 ? 48 8B ? E8 ? ? ? ? 90 48 89 ? ? ? 48 8B ? ? ? 48 89 ? ? ? 48 85 ? 74 ? E8 ? ? ? ? 48 8B ? ? ? 48 85 ? 74 ? 48 8B ? E8 ? ? ? ? 48 8B ? 48 8B ? ? ? 48 8B ? ? ? 48 83 C4 ? 5F C3 E8 ? ? ? ? 90 CC CC CC CC CC 48 89 ? ? ? 48 89 ? ? ? 57 48 83 EC ? 48 8B ? ? 48 83 C1", 3, OffsetType::Index);
     DEFINE_INDEX_FIELD(ClientInstance_getMouseGrabbed, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 75 ? 48 8B ? ? ? ? ? 48 85 ? 0F 84 ? ? ? ? 80 38 ? 0F 84 ? ? ? ? 48 8B ? ? ? ? ? 48 85 ? 74 ? F0 FF ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? ? ? ? F2 0F", 3, OffsetType::Index); // PLEASE CHECK AFTER IDK IF THIS IS CORRECT!!!
-    DEFINE_INDEX_FIELD(ClientInstance_setDisableInput, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? 48 8B", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(ClientInstance_grabMouse, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? 48 8B", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(ClientInstance_releaseMouse, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? 48 8B", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(ClientInstance_mMinecraftSim, "48 8B ? ? ? ? ? E8 ? ? ? ? 88 87 ? ? ? ? 48 8B ? ? ? ? ? 48 8B", 3, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(ClientInstance_setDisableInput, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? 48 8B", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(ClientInstance_grabMouse, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? 48 8B", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(ClientInstance_releaseMouse, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? 48 8B", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(ClientInstance_mMinecraftSim, "48 8B ? ? ? ? ? E8 ? ? ? ? 88 87 ? ? ? ? 48 8B ? ? ? ? ? 48 8B", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD(ClientInstance_mLevelRenderer, "48 8B ? ? ? ? ? 48 85 ? 74 ? 48 8B ? ? ? ? ? 48 05 ? ? ? ? C3", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(ClientInstance_mPacketSender, "48 8B ? ? ? ? ? C3 CC CC CC CC CC CC CC CC 48 8B ? ? ? ? ? 48 8B ? 48 8B", 3, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(ClientInstance_mPacketSender, "48 8B ? ? ? ? ? C3 CC CC CC CC CC CC CC CC 48 8B ? ? ? ? ? 48 8B ? 48 8B", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     //DEFINE_INDEX_FIELD(ClientInstance_mGuiData, "48 8B ? ? ? ? ? 48 8B ? 48 85 ? 74 ? 33 C9 48 89 ? 48 89 ? ? 48 8B ? ? 48 85 ? 74 ? F0 FF ? ? 48 8B ? ? 48 8B ? ? 48 8B ? ? 48 89 ? 48 89 ? ? 48 85 ? 74 ? E8 ? ? ? ? 48 8B ? 48 85 ? 74 ? 48 83 38 ? 74 ? 48 8B ? 48 83 C4 ? 5B C3 E8 ? ? ? ? CC CC CC CC CC CC CC CC CC CC CC CC 48 8B ? ? ? ? ? C3 CC CC CC CC CC CC CC CC 48 89 ? ? ? 57", 3, OffsetType::FieldOffset);
     DEFINE_INDEX_FIELD(MinecraftGame_playUi, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 83 C4 ? C3 48 89 ? ? ? 48 89 ? ? ? 57 48 83 EC ? 48 8B", 3, OffsetType::Index);
     DEFINE_INDEX_FIELD(MinecraftGame_mClientInstances, "48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? 80 78 19 ? 75 ? 48 8B ? 48 8B ? 80 78 19 ? 74 ? 80 79 19 ? 75 ? 80 79 20 ? 76 ? 48 8B ? 48 3B", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(MinecraftGame_mProfanityContext, "49 8B ? ? ? ? ? ? 49 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8D ? ? E8", 4, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(MinecraftGame_mMouseGrabbed, "80 B9 ? ? ? ? ? 0F 84 ? ? ? ? 48 8B 01 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 48 85 C0", 2, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(MinecraftGame_mProfanityContext, "49 8B ? ? ? ? ? ? 49 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8D ? ? E8", 4, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(MinecraftGame_mMouseGrabbed, "80 B9 ? ? ? ? ? 0F 84 ? ? ? ? 48 8B 01 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 48 85 C0", 2, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD(MainView_bedrockPlatform, "48 8B ? ? ? ? ? 48 8B ? B2 ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(Actor_baseTick, "48 8B 80 ? ? ? ? FF 15 ? ? ? ? 48 8B 8B ? ? ? ? 48 8B 01 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 45 84 ED", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(MinecraftSim_mGameSim, "49 8B 85 ? ? ? ? 8B 40", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(MinecraftSim_mRenderSim, "48 8B ? ? ? ? ? F3 0F ? ? ? F3 41 ? ? ? ? 48 8D", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(MinecraftSim_mGameSession, "48 8B ? ? ? ? ? 48 85 ? 0F 84 ? ? ? ? 44 38 ? ? 0F 84 ? ? ? ? 48 8B", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD_TYPED(uint8_t, GameSession_mEventCallback, "48 8B ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 48 8B ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 CC CC CC CC CC CC CC CC 48 89", 3, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(Actor_baseTick, "48 8B 80 ? ? ? ? FF 15 ? ? ? ? 48 8B 8B ? ? ? ? 48 8B 01 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 45 84 ED", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(MinecraftSim_mGameSim, "49 8B 85 ? ? ? ? 8B 40", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(MinecraftSim_mRenderSim, "48 8B ? ? ? ? ? F3 0F ? ? ? F3 41 ? ? ? ? 48 8D", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(MinecraftSim_mGameSession, "48 8B ? ? ? ? ? 48 85 ? 0F 84 ? ? ? ? 44 38 ? ? 0F 84 ? ? ? ? 48 8B", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD_TYPED(uint8_t, GameSession_mEventCallback, "48 8B ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 48 8B ? ? 48 85 ? 74 ? 48 8B ? 48 8B ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 CC CC CC CC CC CC CC CC 48 89", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD_TYPED(uint8_t, BedrockPlatformUWP_mcGame, "48 8B ? ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 84 C0", 3, OffsetType::FieldOffset);
     DEFINE_INDEX_FIELD(bgfx_d3d12_RendererContextD3D12_m_commandQueue, "48 8B ? ? ? ? ? 4C 8B ? ? 48 8B ? 48 8B ? ? 48 8B ? ? FF 15 ? ? ? ? 48 FF ? ? 48 8B ? ? 48 8B ? 48 3B ? 74 ? 48 8B", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(bgfx_context_m_renderCtx, "48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 48 89 ? ? ? ? ? 48 63", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(BlockLegacy_mBlockId, "44 0F ? ? ? ? ? ? B8 ? ? ? ? 48 8B ? 48 8B", 4, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(BlockLegacy_mayPlaceOn, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 49 8B ? 0F B6 ? E8 ? ? ? ? 48 85 ? 74 ? 45 0F", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(Actor_mContainerManagerModel, "49 8B ? ? ? ? ? 48 89 ? ? ? 48 89 ? ? ? F0 FF ? ? 66 0F ? ? ? ? EB ? 0F 57 ? 66 0F 73 D8 ? 66 48 ? ? ? 0F 57 ? 66 0F ? ? ? ? ? ? 48 85", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(Actor_mGameMode, "49 8B 8E ? ? ? ? 45 84 FF 74 ? 84 DB", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(Actor_mSupplies, "48 8B ? ? ? ? ? 80 BA B0 00 00 00 ? 75 ? 48 8B ? ? ? ? ? 8B 52 ? 48 8B ? 48 8B ? ? 48 FF ? ? ? ? ? 48 8D ? ? ? ? ? C3 48 89", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(PlayerInventory_mContainer, "48 8B ? ? ? ? ? 8B 52 ? 48 8B ? 48 8B ? ? 48 FF ? ? ? ? ? 48 8D", 3, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(bgfx_context_m_renderCtx, "48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 48 89 ? ? ? ? ? 48 63", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(BlockLegacy_mBlockId, "44 0F ? ? ? ? ? ? B8 ? ? ? ? 48 8B ? 48 8B", 4, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(BlockLegacy_mayPlaceOn, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 49 8B ? 0F B6 ? E8 ? ? ? ? 48 85 ? 74 ? 45 0F", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mContainerManagerModel, "49 8B ? ? ? ? ? 48 89 ? ? ? 48 89 ? ? ? F0 FF ? ? 66 0F ? ? ? ? EB ? 0F 57 ? 66 0F 73 D8 ? 66 48 ? ? ? 0F 57 ? 66 0F ? ? ? ? ? ? 48 85", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mGameMode, "49 8B 8E ? ? ? ? 45 84 FF 74 ? 84 DB", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mSupplies, "48 8B ? ? ? ? ? 80 BA B0 00 00 00 ? 75 ? 48 8B ? ? ? ? ? 8B 52 ? 48 8B ? 48 8B ? ? 48 FF ? ? ? ? ? 48 8D ? ? ? ? ? C3 48 89", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(PlayerInventory_mContainer, "48 8B ? ? ? ? ? 8B 52 ? 48 8B ? 48 8B ? ? 48 FF ? ? ? ? ? 48 8D", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD_TYPED(uint8_t, Container_getItem, "48 8B ? ? FF 15 ? ? ? ? 4C 8B ? 41 80 7E 23", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(LevelRenderer_mRendererPlayer, "48 8B ? ? ? ? ? F3 0F ? ? ? ? ? ? 0F AF", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(LevelRendererPlayer_mCameraPos, "F3 0F ? ? ? ? ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? 0F 2F ? ? ? ? ? 0F 83 ? ? ? ? 80 BB 3A 0A 00 00", 4, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(LevelRendererPlayer_mFovX, "0F 10 ? ? ? ? ? 0F 11 ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 80 B9 58 0F 00 00", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(LevelRendererPlayer_mFovY, "89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? F3 0F", 2, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(Actor_mSwinging, "88 ? ? ? ? ? EB ? 33 ? 89", 2, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(Actor_swing, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 48 8B", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(Actor_mLevel, "48 8B ? ? ? ? ? 48 89 ? ? ? F3 0F ? ? ? 4C 8B", 3, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(LevelRenderer_mRendererPlayer, "48 8B ? ? ? ? ? F3 0F ? ? ? ? ? ? 0F AF", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(LevelRendererPlayer_mCameraPos, "F3 0F ? ? ? ? ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? 0F 2F ? ? ? ? ? 0F 83 ? ? ? ? 80 BB 3A 0A 00 00", 4, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(LevelRendererPlayer_mFovX, "0F 10 ? ? ? ? ? 0F 11 ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 80 B9 58 0F 00 00", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(LevelRendererPlayer_mFovY, "89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? 89 87 ? ? ? ? 41 8B ? ? ? F3 0F", 2, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mSwinging, "88 ? ? ? ? ? EB ? 33 ? 89", 2, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_swing, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 48 8B", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mLevel, "48 8B ? ? ? ? ? 48 89 ? ? ? F3 0F ? ? ? 4C 8B", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD(Level_getHitResult, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 48 8B ? 49 8B ? ? 48 8B ? ? ? ? ? 49 8B ? FF 15 ? ? ? ? F3 0F", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(Level_getPlayerList, "48 8B 80 ? ? ? ? FF 15 ? ? ? ? 8B 48 ? 39 8E ? ? ? ? 0F 84", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(Level_getPlayerMovementSettings, "48 8B 80 ? ? ? ? FF 15 ? ? ? ? 49 8B 7E ? 80 78", 3, OffsetType::Index);
+    // DEFINE_INDEX_FIELD(Level_getPlayerList, "48 8B 80 ? ? ? ? FF 15 ? ? ? ? 8B 48 ? 39 8E ? ? ? ? 0F 84", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Level_getPlayerMovementSettings, "48 8B 80 ? ? ? ? FF 15 ? ? ? ? 49 8B 7E ? 80 78", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD(Level_getLevelData, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 0F 10 ? ? ? ? ? 0F 11 ? ? 8B 88", 3, OffsetType::Index); // Also works on .40
     DEFINE_INDEX_FIELD(Level_getBlockPalette, "48 8B ? ? ? ? ? 48 8B ? FF 15 ? ? ? ? 4C 8B ? 48 8B ? 48 8B ? ? 48 8D ? ? 49 8B ? FF 15 ? ? ? ? 48 8B ? 44 0F", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(LevelData_mTick, "48 8B ? ? ? ? ? 4C 8B ? ? ? ? ? E8 ? ? ? ? 44 8B", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(Actor_mDestroying, "44 38 ? ? ? ? ? 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 44 39", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD_TYPED(uint8_t, UIProfanityContext_mEnabled, "80 79 ? ? 74 ? 80 79 ? ? 74 ? 45 ? ? 75 ? 4C 8D", 2, OffsetType::FieldOffset);
+    // DEFINE_INDEX_FIELD(LevelData_mTick, "48 8B ? ? ? ? ? 4C 8B ? ? ? ? ? E8 ? ? ? ? 44 8B", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mDestroying, "44 38 ? ? ? ? ? 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 44 39", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD_TYPED(uint8_t, UIProfanityContext_mEnabled, "80 79 ? ? 74 ? 80 79 ? ? 74 ? 45 ? ? 75 ? 4C 8D", 2, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD(Bone_mPartModel, "8B 81 ? ? ? ? 89 82 ? ? ? ? F3 0F 11 8A", 2, OffsetType::FieldOffset); // this isn't even correct lmao
     DEFINE_INDEX_FIELD(Actor_mHurtTimeComponent, "48 8B ? ? ? ? ? 48 85 ? 74 ? 66 0F ? ? ? ? ? ? 0F 5B ? 0F 2F", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD(BlockSource_getChunk, "48 8B ? ? ? ? ? 44 89 ? ? ? FF 15 ? ? ? ? 48 83 C4", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(BlockSource_setBlock, "48 8B ? ? ? ? ? FF 15 ? ? ? ? EB ? 41 83 FF", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(LevelChunk_mSubChunks, "48 2B ? ? ? ? ? 48 8B ? 48 C1 FF ? 48 0F", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD_TYPED(uint8_t, BlockSource_mBuildHeight, "0F BF ? ? 3B C8 0F 8D ? ? ? ? 8B 0F", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD_TYPED(uint8_t, ContainerManagerModel_getContainerType, "48 8B ? ? FF 15 ? ? ? ? 84 C0 75 ? 48 8B ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 84 C0 74 ? B0", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD_TYPED(uint8_t, ContainerManagerModel_getSlot, "48 8B ? ? FF 15 ? ? ? ? 0F B6 ? ? 44 89", 3, OffsetType::Index); // what the actual fcuk is wrong with me.
-    DEFINE_INDEX_FIELD(Actor_mSerializedSkin, "4C 8B ? ? ? ? ? 48 8B ? 48 8B ? ? 89 44", 3, OffsetType::FieldOffset);
-    DEFINE_INDEX_FIELD_TYPED(uint8_t, BlockLegacy_getCollisionShape, "48 8B ? ? FF 15 ? ? ? ? 0F 10 ? 0F 11 ? ? ? ? ? ? F2 0F ? ? ? F2 0F", 3, OffsetType::Index);
-    DEFINE_INDEX_FIELD(BlockSource_clip, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 90 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 48 8B", 3, OffsetType::Index);
+    // DEFINE_INDEX_FIELD(BlockSource_getChunk, "48 8B ? ? ? ? ? 44 89 ? ? ? FF 15 ? ? ? ? 48 83 C4", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(BlockSource_setBlock, "48 8B ? ? ? ? ? FF 15 ? ? ? ? EB ? 41 83 FF", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(LevelChunk_mSubChunks, "48 2B ? ? ? ? ? 48 8B ? 48 C1 FF ? 48 0F", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD_TYPED(uint8_t, BlockSource_mBuildHeight, "0F BF ? ? 3B C8 0F 8D ? ? ? ? 8B 0F", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD_TYPED(uint8_t, ContainerManagerModel_getContainerType, "48 8B ? ? FF 15 ? ? ? ? 84 C0 75 ? 48 8B ? 48 8B ? 48 8B ? ? FF 15 ? ? ? ? 84 C0 74 ? B0", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD_TYPED(uint8_t, ContainerManagerModel_getSlot, "48 8B ? ? FF 15 ? ? ? ? 0F B6 ? ? 44 89", 3, OffsetType::Index); // what the actual fcuk is wrong with me.
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(Actor_mSerializedSkin, "4C 8B ? ? ? ? ? 48 8B ? 48 8B ? ? 89 44", 3, OffsetType::FieldOffset);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD_TYPED(uint8_t, BlockLegacy_getCollisionShape, "48 8B ? ? FF 15 ? ? ? ? 0F 10 ? 0F 11 ? ? ? ? ? ? F2 0F ? ? ? F2 0F", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
+    // DEFINE_INDEX_FIELD(BlockSource_clip, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 90 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 48 8B", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
 
-    DEFINE_INDEX_FIELD(ClientInstance_getInputHandler, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 8D 7E", 3, OffsetType::Index);
+    // DEFINE_INDEX_FIELD(ClientInstance_getInputHandler, "48 8B ? ? ? ? ? FF 15 ? ? ? ? 8D 7E", 3, OffsetType::Index);
+    // ^ disabled: the same member is pinned as a constant below.
+    //   Both declarations used to be active, which redeclares the static
+    //   member and does not compile. 26.62 pins this field as a constant
+    //   too, so the constant is treated as authoritative here as well.
     DEFINE_INDEX_FIELD(ClientInputMappingFactory_mKeyboardMouseSettings, "49 8B 9D ? ? ? ? 48 89 5D ? 4D 8B AD ? ? ? ? 4C 89 6D ? E9", 3, OffsetType::FieldOffset); // TODO: replace with betta siggy
 
     //DEFINE_INDEX_FIELD_TYPED(uint8_t, ClientInputHandler_mMappingFactory, "48 8B ? ? EB ? 48 8D ? ? 48 85 ? 74 ? 48 8B ? E8 ? ? ? ? 48 8B ? 48 8B ? ? ? 48 33 ? E8 ? ? ? ? 48 8B ? ? ? 48 8B ? ? ? 48 83 C4 ? 5F C3 E8 ? ? ? ? CC CC CC CC CC CC 48 89", 3, OffsetType::FieldOffset);
-    DEFINE_FIELD(ClientInputHandler_mMappingFactory, 0x28);
+    DEFINE_FIELD(ClientInputHandler_mMappingFactory, 0x48);
 
     // TODO: Move all CLASS_FIELD declarations and hat::member_at offsets to here
     DEFINE_FIELD(ContainerScreenController_tryExit, 12);
     DEFINE_FIELD(ItemStack_reInit, 3);
     DEFINE_FIELD(MinecraftUIRenderContext_drawImage, 7);
-    DEFINE_FIELD(Actor_mEntityIdentifier, 0x240);
-    DEFINE_FIELD(Actor_mLocalName, 0xCB0);
-    DEFINE_FIELD(ClientInstance_mViewMatrix, 0x368);
-    DEFINE_FIELD(ClientInstance_mFovX, 0x728);
-    DEFINE_FIELD(ClientInstance_mFovY, 0x73C);
+    DEFINE_FIELD(Actor_mEntityIdentifier, 0x260);
+    DEFINE_FIELD(Actor_mLocalName, 0xbe8);
+    DEFINE_FIELD(ClientInstance_mViewMatrix, 0x438);
+    DEFINE_FIELD(ClientInstance_mFovX, 0x728); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(ClientInstance_mFovY, 0x73C); // STALE on 26.62: no value in the new dump, re-derive from the binary
     DEFINE_FIELD(Block_mRuntimeId, 0xC0);
-    DEFINE_FIELD(Block_mLegacy, 0x30);
-    DEFINE_FIELD(ClientInstance_getScreenName, 266); // i will make sig for it later (maybe)
-    DEFINE_FIELD(ClientInstance_mGuiData, 0x590); // i will make sig for it later (maybe)
+    DEFINE_FIELD(Block_mLegacy, 0x68);
+    DEFINE_FIELD(ClientInstance_getScreenName, 243); // i will make sig for it later (maybe)
+    DEFINE_FIELD(ClientInstance_mGuiData, 0x668); // i will make sig for it later (maybe)
     DEFINE_FIELD(BlockPalette_mLevel, 0x80);
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // Added from the 26.62 SDK dump: engine members that had no entry in
+    // the 1.21.44 table at all (new or renamed fields).
+    // ═══════════════════════════════════════════════════════════════
+    DEFINE_FIELD(BlockLegacy_mBlockId, 0x17e);
+    DEFINE_FIELD(BlockLegacy_mTileName, 0x8);
+    DEFINE_FIELD(BlockLegacy_mName, 0xE8);
+    DEFINE_FIELD(BlockLegacy_mMaterial, 0x28);
+    DEFINE_FIELD(BlockLegacy_BlockFlags, 0x164);
+    DEFINE_FIELD(BlockLegacy_mayPlaceOn, 68);
+    DEFINE_FIELD(BlockLegacy_getCollisionShape, 4);
+    DEFINE_FIELD(BlockSource_getChunk, 41);
+    DEFINE_FIELD(BlockSource_clip, 51);
+    DEFINE_FIELD(BlockSource_setBlock, 32);
+    DEFINE_FIELD(BlockSource_mBuildHeight, (uint8_t)0x38);
+    DEFINE_FIELD(bgfx_context_m_renderCtx, 0x1EBF2D0);
+    DEFINE_FIELD(MinecraftGame_mMouseGrabbed, 0x1F8);
+    DEFINE_FIELD(MinecraftGame_mXuid, 0x270);
+    DEFINE_FIELD(MinecraftGame_mProfanityContext, 0x1D8);
+    DEFINE_FIELD(MinecraftSim_mGameSession, 0xd0);
+    DEFINE_FIELD(MinecraftSim_mGameSim, 0xe8);
+    DEFINE_FIELD(MinecraftSim_mRenderSim, 0xf0);
+    DEFINE_FIELD(ContainerManagerModel_getSlot, (uint8_t)9);
+    DEFINE_FIELD(ContainerManagerModel_getContainerType, (uint8_t)3);
+    DEFINE_FIELD(GameSession_mEventCallback, (uint8_t)0x50);
+    DEFINE_FIELD(UIProfanityContext_mEnabled, 0x1A);
+    DEFINE_FIELD(ClientInstance_getLocalPlayer, 30);
+    DEFINE_FIELD(ClientInstance_getBlockSource, 29);
+    DEFINE_FIELD(ClientInstance_setDisableInput, 305);
+    DEFINE_FIELD(ClientInstance_grabMouse, 306);
+    DEFINE_FIELD(ClientInstance_releaseMouse, 307);
+    DEFINE_FIELD(ClientInstance_getOptions, 172);
+    DEFINE_FIELD(ClientInstance_playUi, 316);
+    DEFINE_FIELD(ClientInstance_getLevelRenderer, 185);
+    DEFINE_FIELD(ClientInstance_getInputHandler, 299);
+    DEFINE_FIELD(ClientInstance_mPacketSender, 0x1F0);
+    DEFINE_FIELD(ClientInstance_mMinecraftSim, 0x1D0);
+    DEFINE_FIELD(ClientInputMappingFactory_mKeyboardRemappingLayout, 0x110);
+    DEFINE_FIELD(Level_getPlayerList, 319);
+    DEFINE_FIELD(Level_getRuntimeActorList, 325);
+    DEFINE_FIELD(Level_getPlayerMovementSettings, 304);
+    DEFINE_FIELD(Level_mHitResult, 0x1e0);
+    DEFINE_FIELD(Level_mLevelData, 0x80);
+    DEFINE_FIELD(LevelData_mTick, 0x328);
+    DEFINE_FIELD(LevelChunk_mSubChunks, 0x1c8);
+    DEFINE_FIELD(Actor_baseTick, 25);
+    DEFINE_FIELD(Actor_mLevel, 0x200);
+    DEFINE_FIELD(Actor_mSwingProgress, 0x410);
+    DEFINE_FIELD(Actor_mSwinging, 0x434);
+    DEFINE_FIELD(Actor_mContainerManagerModel, 0x5c8);
+    DEFINE_FIELD(Actor_mSupplies, 0x5e0);
+    DEFINE_FIELD(Actor_mGameMode, 0xac8);
+    DEFINE_FIELD(Actor_mSerializedSkin, 0xad8);
+    DEFINE_FIELD(Actor_mDestroying, 0xb4a);
+    DEFINE_FIELD(Actor_swing, 109);
+    DEFINE_FIELD(GameMode_buildBlock, 6);
+    DEFINE_FIELD(PlayerInventory_mContainer, 0xb8);
+    DEFINE_FIELD(LevelRendererPlayer_mFovX, 0xF50);
+    DEFINE_FIELD(LevelRendererPlayer_mFovY, 0xF64);
+    DEFINE_FIELD(LevelRendererPlayer_mCameraPos, 0x9C4);
+    DEFINE_FIELD(LevelRenderer_mRendererPlayer, 0x480);
 
     // ═══════════════════════════════════════════════════════════════
     // All offsets below imported from Flarial OffsetInit::init2140()
@@ -148,54 +387,54 @@ public:
     // ═══════════════════════════════════════════════════════════════
 
     // --- Level ---
-    DEFINE_FIELD(Flarial_Level_hitResult, 0x248);
-    DEFINE_FIELD(Flarial_Level_worldFolderName, 0x2B8);
-    DEFINE_FIELD(Flarial_Level_getPlayerMap, 0xBF0);
-    DEFINE_FIELD(Flarial_Level_LevelData, 0x110);
+    DEFINE_FIELD(Flarial_Level_hitResult, 0x248); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_Level_worldFolderName, 0x2B8); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_Level_getPlayerMap, 0xBF0); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_Level_LevelData, 0x110); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- LevelData ---
-    DEFINE_FIELD(Flarial_LevelData_worldName, 0x390);
+    DEFINE_FIELD(Flarial_LevelData_worldName, 0x390); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- Player ---
-    DEFINE_FIELD(Flarial_Player_gamemode, 0xB28);
-    DEFINE_FIELD(Flarial_Player_playerName, 0xCB0);
+    DEFINE_FIELD(Flarial_Player_gamemode, 0xB28); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_Player_playerName, 0xCB0); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- ClientInstance ---
-    DEFINE_FIELD(Flarial_ClientInstance_getBlockSource, 29); // vtable index
-    DEFINE_FIELD(Flarial_ClientInstance_minecraftGame, 0xD0);
-    DEFINE_FIELD(Flarial_ClientInstance_levelRenderer, 0xE8);
-    DEFINE_FIELD(Flarial_ClientInstance_camera, 0x2A8);
-    DEFINE_FIELD(Flarial_ClientInstance_viewMatrix, 0x368);
-    DEFINE_FIELD(Flarial_ClientInstance_guiData, 0x590);
-    DEFINE_FIELD(Flarial_ClientInstance_getFovX, 0x728);
-    DEFINE_FIELD(Flarial_ClientInstance_getFovY, 0x73C);
-    DEFINE_FIELD(Flarial_ClientInstance_getPacketSender, 0xF8);
+    DEFINE_FIELD(Flarial_ClientInstance_getBlockSource, 29); // vtable index // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_minecraftGame, 0xD0); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_levelRenderer, 0xE8); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_camera, 0x2A8); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_viewMatrix, 0x368); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_guiData, 0x590); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_getFovX, 0x728); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_getFovY, 0x73C); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_ClientInstance_getPacketSender, 0xF8); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- MinecraftGame ---
-    DEFINE_FIELD(Flarial_MinecraftGame_mouseGrabbed, 0x1A0);
-    DEFINE_FIELD(Flarial_MinecraftGame_textureGroup, 0x650);
+    DEFINE_FIELD(Flarial_MinecraftGame_mouseGrabbed, 0x1A0); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_MinecraftGame_textureGroup, 0x650); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- RaknetConnector ---
-    DEFINE_FIELD(Flarial_RaknetConnector_getPeer, 0x2A0);
-    DEFINE_FIELD(Flarial_RaknetConnector_JoinedIp, 0x398);
-    DEFINE_FIELD(Flarial_RaknetConnector_port, 0x3B8);
-    DEFINE_FIELD(Flarial_RaknetConnector_rawIp, 0x378);
+    DEFINE_FIELD(Flarial_RaknetConnector_getPeer, 0x2A0); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_RaknetConnector_JoinedIp, 0x398); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_RaknetConnector_port, 0x3B8); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_RaknetConnector_rawIp, 0x378); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- LevelRenderer ---
-    DEFINE_FIELD(Flarial_LevelRender_getLevelRendererPlayer, 0x318);
-    DEFINE_FIELD(Flarial_LevelRendererPlayer_cameraPos, 0x620);
+    DEFINE_FIELD(Flarial_LevelRender_getLevelRendererPlayer, 0x318); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_LevelRendererPlayer_cameraPos, 0x620); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- NetworkSystem ---
-    DEFINE_FIELD(Flarial_NetworkSystem_remoteConnectorComposite, 0x90);
-    DEFINE_FIELD(Flarial_RemoteConnectorComposite_netherNetConnector, 0x68);
-    DEFINE_FIELD(Flarial_RemoteConnectorComposite_rakNetConnector, 0x70);
-    DEFINE_FIELD(Flarial_NetherNetConnector_mPeers, 0x1F0);
+    DEFINE_FIELD(Flarial_NetworkSystem_remoteConnectorComposite, 0x90); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_RemoteConnectorComposite_netherNetConnector, 0x68); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_RemoteConnectorComposite_rakNetConnector, 0x70); // STALE on 26.62: no value in the new dump, re-derive from the binary
+    DEFINE_FIELD(Flarial_NetherNetConnector_mPeers, 0x1F0); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- ScreenContext ---
-    DEFINE_FIELD(Flarial_ScreenContext_tessellator, 0xC8);
+    DEFINE_FIELD(Flarial_ScreenContext_tessellator, 0xC8); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
     // --- Biome ---
-    DEFINE_FIELD(Flarial_Biome_name, 0x10);
+    DEFINE_FIELD(Flarial_Biome_name, 0x10); // STALE on 26.62: no value in the new dump, re-derive from the binary
 
 
     static void initialize();

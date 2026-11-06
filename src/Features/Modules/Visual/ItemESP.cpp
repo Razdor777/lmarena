@@ -49,8 +49,8 @@ void ItemESP::onBaseTickEvent(BaseTickEvent& event)
         auto shape = actor->getAABBShapeComponent();
         if (!shape) continue;
 
-        // Защита от nullptr: проверяем И указатель, И объект
-        if (!actor->mItem.mItem) continue;
+        // actor->mItem is an ItemStack (ItemActor::mItem), not the Item pointer;
+        // getItem() already handles the null case, so one check is enough.
         Item* itemPtr = actor->mItem.getItem();
         if (!itemPtr) continue;
 

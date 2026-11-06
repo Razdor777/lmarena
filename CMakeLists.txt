@@ -10,7 +10,6 @@ endif ()
 
 add_compile_definitions(__PRIVATE_DEBUG__)
 add_compile_definitions(__PRIVATE_BUILD__)
-add_compile_definitions(__DEBUG__)
 add_compile_options(/utf-8)
 
 find_program(LD_COMMAND ld)
@@ -120,10 +119,19 @@ add_compile_definitions(JM_XORSTR_DISABLE_AVX_INTRINSICS)
 add_compile_definitions(ENTT_SPARSE_PAGE=2048)
 add_compile_definitions(ENTT_PACKED_PAGE=128)
 
-set(IS_DEBUG_BUILD CMAKE_BUILD_TYPE STREQUAL "Debug")
-
-if (${IS_DEBUG_BUILD})
-        add_compile_definitions(__DEBUG__)
+# NOTE: this used to read
+#     set(IS_DEBUG_BUILD CMAKE_BUILD_TYPE STREQUAL "Debug")
+#     if (${IS_DEBUG_BUILD})
+# which makes IS_DEBUG_BUILD the *list* "CMAKE_BUILD_TYPE;STREQUAL;Debug", so the
+# condition was always true and __DEBUG__ was defined in every configuration.
+# Every `#ifndef __DEBUG__` guard (the signature/offset fail-fast) was therefore
+# dead code: a signature that stopped resolving stayed 0 and the client crashed
+# later somewhere unrelated. Now it really depends on the configuration:
+#   Debug   -> unresolved signatures are printed, the client keeps running
+#   Release -> aborts at init with the full list in the crash-log
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(__DEBUG__)
+    message(STATUS "Debug build: signature fail-fast is disabled")
 endif ()
 
 add_link_options($<$<CONFIG:Debug>:/INCREMENTAL>) # enable incremental linking

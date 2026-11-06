@@ -12,7 +12,7 @@
 
 hat::scan_result OffsetProvider::scanSig(hat::signature_view sig, const std::string& name, int offset)
 {
-    mSigScanCount++;
+    mSigScanCount.fetch_add(1, std::memory_order_relaxed);
     auto minecraft = hat::process::get_process_module();
     auto result = hat::find_pattern(sig, ".text", minecraft);
 
@@ -73,7 +73,7 @@ void OffsetProvider::initialize()
     }
 #endif
 
-    Solstice::console->info("[offsets] initialized in {}ms, {} total sigs scanned", end - start, mSigScanCount);
+    Solstice::console->info("[offsets] initialized in {}ms, {} total sigs scanned", end - start, mSigScanCount.load());
     mIsInitialized = true;
 }
 

@@ -13,7 +13,11 @@ public:
 };
 
 
-class KeyboardMouseSettings {
+// 26.62 renamed the binds holder: ClientInputMappingFactory now exposes
+// getKeyboardRemappingLayout() and the type is KeyboardRemappingLayout.
+// The layout itself is unchanged, so the old name is kept as an alias and every
+// module written against KeyboardMouseSettings keeps compiling.
+class KeyboardRemappingLayout {
 public:
     PAD(0x8);
     std::vector<MinecraftBind> mKeyTypeA;
@@ -22,9 +26,16 @@ public:
     int operator[](const std::string& key);
 };
 
+using KeyboardMouseSettings = KeyboardRemappingLayout;
+
 class ClientInputMappingFactory {
 public:
-    class KeyboardMouseSettings* getKeyboardMouseSettings();
+    class KeyboardRemappingLayout* getKeyboardRemappingLayout();
+
+    // thin compatibility wrapper for existing call sites
+    class KeyboardRemappingLayout* getKeyboardMouseSettings() {
+        return getKeyboardRemappingLayout();
+    }
 };
 
 class ClientInputHandler {

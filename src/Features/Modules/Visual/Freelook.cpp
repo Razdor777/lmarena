@@ -56,8 +56,8 @@ void Freelook::onEnable()
         }
     }
 
-    mLastCameraState = ClientInstance::get()->getOptions()->mThirdPerson->value;
-    ClientInstance::get()->getOptions()->mThirdPerson->value = 1;
+    mLastCameraState = ClientInstance::get()->getOptions()->mThirdPerson->mValue;
+    ClientInstance::get()->getOptions()->mThirdPerson->mValue = 1;
 }
 
 void Freelook::onDisable()
@@ -72,7 +72,7 @@ void Freelook::onDisable()
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Freelook::onPacketOutEvent>(this);
 
     auto options = ClientInstance::get()->getOptions();
-    options->mThirdPerson->value = mLastCameraState;
+    options->mThirdPerson->mValue = mLastCameraState;
     mResetRot = true;
 }
 

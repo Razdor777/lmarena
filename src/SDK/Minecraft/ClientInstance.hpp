@@ -26,7 +26,7 @@ public:
     glm::vec2 getFov();
 
     class ClientInputHandler* getInputHandler();
-    class KeyboardMouseSettings* getKeyboardSettings();
+    class KeyboardRemappingLayout* getKeyboardSettings();
     class MinecraftGame* getMinecraftGame();
     class Actor* getLocalPlayer();
     class BlockSource* getBlockSource();

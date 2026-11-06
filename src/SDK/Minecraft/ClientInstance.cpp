@@ -69,9 +69,9 @@ ClientInputHandler* ClientInstance::getInputHandler()
     return MemUtils::callVirtualFunc<ClientInputHandler*>(OffsetProvider::ClientInstance_getInputHandler, this);
 }
 
-KeyboardMouseSettings* ClientInstance::getKeyboardSettings()
+KeyboardRemappingLayout* ClientInstance::getKeyboardSettings()
 {
-    return getInputHandler()->getMappingFactory()->getKeyboardMouseSettings();
+    return getInputHandler()->getMappingFactory()->getKeyboardRemappingLayout();
 }
 
 MinecraftGame* ClientInstance::getMinecraftGame()

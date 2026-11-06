@@ -104,7 +104,7 @@ static ItemStack* findUsableItem(int& outSlot, bool& outIsOffhand, bool checkOff
             ItemStack* it = off->getItem(0);
             if (it && it->mItem) {
                 for (int id : targets) {
-                    if ((*it->mItem)->mItemId == id) { outSlot = 0; outIsOffhand = true; return it; }
+                    if (it->mItem && it->mItem->mItemId == id) { outSlot = 0; outIsOffhand = true; return it; }
                 }
             }
         }
@@ -114,7 +114,7 @@ static ItemStack* findUsableItem(int& outSlot, bool& outIsOffhand, bool checkOff
         ItemStack* it = inv->getItem(i);
         if (!it || !it->mItem) continue;
         for (int id : targets) {
-            if ((*it->mItem)->mItemId == id) { outSlot = i; return it; }
+            if (it->mItem && it->mItem->mItemId == id) { outSlot = i; return it; }
         }
     }
     return nullptr;

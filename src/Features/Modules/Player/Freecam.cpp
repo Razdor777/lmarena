@@ -407,7 +407,7 @@ void Freecam::onLookInputEvent(LookInputEvent& event)
     if (!player) return;
 
     if (auto options = ClientInstance::get()->getOptions())
-        if (options->mThirdPerson) options->mThirdPerson->value = 0;
+        if (options->mThirdPerson) options->mThirdPerson->mValue = 0;
 
     if (mMode.mValue == Mode::Detached)
     {

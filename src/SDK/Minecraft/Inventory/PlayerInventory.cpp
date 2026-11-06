@@ -83,7 +83,7 @@ void Inventory::equipArmor(int slot)
 
     static ItemStack blankStack = ItemStack();
 
-    Item* item = *itemStack->mItem;
+    Item* item = itemStack->mItem.get();
     // Get the current item stack in the armor slot
     ItemStack* armorStack = player->getArmorContainer()->getItem(item->getArmorSlot());
 

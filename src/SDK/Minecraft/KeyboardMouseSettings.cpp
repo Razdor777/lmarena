@@ -4,7 +4,7 @@
 
 #include "KeyboardMouseSettings.hpp"
 
-int KeyboardMouseSettings::operator[](const std::string& key)
+int KeyboardRemappingLayout::operator[](const std::string& key)
 {
     for (auto& bind : mKeyTypeA) {
         if (bind.mBindName == key)
@@ -15,9 +15,9 @@ int KeyboardMouseSettings::operator[](const std::string& key)
     return -1;
 }
 
-KeyboardMouseSettings* ClientInputMappingFactory::getKeyboardMouseSettings()
+KeyboardRemappingLayout* ClientInputMappingFactory::getKeyboardRemappingLayout()
 {
-    return hat::member_at<KeyboardMouseSettings*>(this, OffsetProvider::ClientInputMappingFactory_mKeyboardMouseSettings);
+    return hat::member_at<KeyboardRemappingLayout*>(this, OffsetProvider::ClientInputMappingFactory_mKeyboardMouseSettings);
 }
 
 ClientInputMappingFactory* ClientInputHandler::getMappingFactory()

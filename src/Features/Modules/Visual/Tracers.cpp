@@ -77,10 +77,7 @@ namespace TracersImpl
     }
 }
 
-<<<<<<< HEAD
-=======
 using namespace TracersImpl;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 void Tracers::onEnable()
 {
@@ -108,13 +105,8 @@ void Tracers::onRenderEvent(RenderEvent& event)
 
     if (mMode.mValue == Mode::Lines)
     {
-<<<<<<< HEAD
         const float yaw = yawDeg * TracersImpl::kPi / 180.f;
         const float pitch = pitchDeg * TracersImpl::kPi / 180.f;
-=======
-        const float yaw = yawDeg * kPi / 180.f;
-        const float pitch = pitchDeg * kPi / 180.f;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         const glm::vec3 look(-std::sin(yaw) * std::cos(pitch),
                              -std::sin(pitch),
                              std::cos(yaw) * std::cos(pitch));
@@ -123,10 +115,8 @@ void Tracers::onRenderEvent(RenderEvent& event)
     else
     {
         // Стрелки имеют смысл только от первого лица (как в combatant).
-        if (ClientInstance::get()->getOptions()->mThirdPerson->value != 0) return;
+        if (ClientInstance::get()->getOptions()->mThirdPerson->mValue != 0) return;
         drawArrows(localPlayer, camPos, yawDeg, dt);
-<<<<<<< HEAD
-=======
     }
 }
 
@@ -211,7 +201,6 @@ void Tracers::drawArrows(Actor* localPlayer, const glm::vec3& camPos, float yawD
 
         const ImVec4 color = friendly ? ImVec4(0.f, 1.f, 0.f, 1.f) : ColorUtils::getThemedColor(0).Value;
         drawArrow(dl, p, angle, toU32(color, kArrowAlpha));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 }
 
