@@ -19,7 +19,10 @@
 | Утилиты: `ItemAtlas`, `ItemTextures`, `TexturePtr`, `ClientPack`, `CubemapGenerator`, `NurikIcons` | ✅ перенесено |
 | Хуки: `HealthHooks`, `ProjectileHooks`, `HurtColorHook`, `AmbienceHook`, ховер-детур инвентаря | ✅ добавлено (детуры встают только при живой сигнатуре) |
 | События: `ProjectileHitEvent`, `HurtColorEvent`, `ContainerSlotHoveredEvent` | ✅ добавлено |
-| Сигнатуры под 1.26.5x | ⚠️ 5 новых (`Actor_hurt`, `Projectile_onHit`, `HurtColor` + 5 Ambience-заглушек) ждут скана по бинарнику |
+| Полнота: модули, которые в базе были «беднее» корня | ✅ 17 модулей заменены (Scaffold 64 настройки, OreMiner, BlockESP, RobloxCamera, TargetHUD, LevelInfo, JumpCircles, ESP, Tracers, Arraylist, Velocity, CustomChat, Nametags, ClickTp, DestroyProgress, NameProtect, Glint) |
+| Сервисные файлы: `ExceptionHandler` (отчёт о крашах), `ConfigManager` (бэкап битых конфигов), `ChatUtils` | ✅ заменены полными версиями |
+| Ресурсы | ✅ `tools/gen_resources.py` пересобирает `Resources.hpp/.cpp` из `26.62/resources` |
+| Сигнатуры под 1.26.5x | ⚠️ 6 «догадок» (`Actor_hurt`, `Projectile_onHit`, `HurtColor`, `ContainerScreenController_onContainerSlotHovered`, `ItemStack_fromDescriptor`, `ContainerScreenController_tryBeginTransition`) + 5 Ambience ждут скана (`docs/SIGS_26.62_RU.md`) |
 
 Сборку целиком проверить негде: под рукой нет MSVC/Windows SDK, поэтому каждый
 шаг проверяется статически — `tools/check_includes.py` (резолвятся ли все
@@ -30,6 +33,8 @@
 python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сломалось в SDK
 python3 tools/check_includes.py 26.62/src                         # битые include
 python3 tools/check_members.py --vocab-exclude Features -- 26.62/src   # члены без объявления
+python3 tools/sig_checklist.py --out docs/SIGS_26.62_RU.md          # что ждёт скана
+python3 tools/gen_resources.py --check                              # ресурсы актуальны
 ```
 
 Короткий ответ на «что тебе показать»: **ничего показывать не надо** — обе базы
