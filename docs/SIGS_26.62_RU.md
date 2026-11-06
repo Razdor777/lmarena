@@ -3,8 +3,8 @@
 Сгенерировано `tools/sig_checklist.py`. Бинарника 1.26.5x нет, поэтому
 числа ниже — это не «найдено/не найдено», а «что ждёт скана».
 
-- живых `DEFINE_SIG`: **104**
-- закомментированных: **0**
+- живых `DEFINE_SIG`: **74**
+- закомментированных: **29**
 - объявленных заглушек (`= 0`, детур не встанет): **5**
 - имён, на которые реально ссылается код: **102**
 
@@ -15,11 +15,11 @@
 | Урон и снаряды | `Actor_hurt` | 🟡 паттерн-догадка (проверить) | Hook/Hooks/ActorHooks/HealthHooks.cpp |
 | Урон и снаряды | `Projectile_onHit` | 🟡 паттерн-догадка (проверить) | Hook/Hooks/ActorHooks/ProjectileHooks.cpp |
 | Урон и снаряды | `HurtColor` | 🟡 паттерн-догадка (проверить) | Hook/Hooks/RenderHooks/HurtColorHook.cpp |
-| Ambience (небо/туман/облака) | `Ambience_SkyRender` | ✅ есть паттерн | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
-| Ambience (небо/туман/облака) | `Ambience_EndSkyRender` | ✅ есть паттерн | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
-| Ambience (небо/туман/облака) | `Ambience_ChunkRender` | ✅ есть паттерн | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
-| Ambience (небо/туман/облака) | `Ambience_SunMoonRender` | ✅ есть паттерн | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
-| Ambience (небо/туман/облака) | `Ambience_CloudRender` | ✅ есть паттерн | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
+| Ambience (небо/туман/облака) | `Ambience_SkyRender` | ⛔ заглушка `= 0` | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
+| Ambience (небо/туман/облака) | `Ambience_EndSkyRender` | ⛔ заглушка `= 0` | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
+| Ambience (небо/туман/облака) | `Ambience_ChunkRender` | ⛔ заглушка `= 0` | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
+| Ambience (небо/туман/облака) | `Ambience_SunMoonRender` | ⛔ заглушка `= 0` | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
+| Ambience (небо/туман/облака) | `Ambience_CloudRender` | ⛔ заглушка `= 0` | Hook/Hooks/RenderHooks/AmbienceHook.cpp |
 | Инвентарь | `ContainerScreenController_tick` | ✅ есть паттерн | Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp |
 | Инвентарь | `ContainerScreenController_onContainerSlotHovered` | 🟡 паттерн-догадка (проверить) | Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp |
 | Инвентарь | `ContainerScreenController_handleAutoPlace` | ✅ есть паттерн | SDK/Minecraft/Inventory/ContainerScreenController.cpp |
@@ -37,7 +37,20 @@
 
 ## Код зовёт, а живого паттерна нет
 
-нет — всё, что зовёт код, имеет живой паттерн
+| Имя | Почему нет | Где |
+|---|---|---|
+| `ActorRenderDispatcher_render` | паттерн закомментирован | Hook/Hooks/RenderHooks/ActorRenderDispatcherHook.cpp |
+| `Actor_setPosition` | паттерн закомментирован | SDK/Minecraft/Actor/Actor.cpp |
+| `ClientInstance_getScreenName` | паттерн закомментирован | SDK/Minecraft/ClientInstance.cpp |
+| `FastEat` | паттерн закомментирован | Features/Modules/Player/FastEat.cpp |
+| `InputModeBypass` | паттерн закомментирован | Features/Modules/Misc/EditionFaker.cpp |
+| `InputModeBypassFix` | паттерн закомментирован | Features/Modules/Misc/EditionFaker.cpp |
+| `ItemPositionConst` | паттерн закомментирован | Features/Modules/Visual/ItemPhysics.cpp |
+| `JSON_toStyledString` | паттерн закомментирован | SDK/Minecraft/JSON.hpp |
+| `Keyboard_feed` | паттерн закомментирован | Hook/Hooks/MiscHooks/KeyHook.cpp |
+| `Level_getRuntimeActorList` | паттерн закомментирован | SDK/Minecraft/World/Level.cpp |
+| `MainView_instance` | паттерн закомментирован | SDK/Minecraft/UWP/MainView.cpp |
+| `mce_framebuilder_RenderItemInHandDescription_ctor` | паттерн закомментирован | Hook/Hooks/RenderHooks/RenderItemInHandHook.cpp |
 
 ## Порядок скана, когда появится exe
 

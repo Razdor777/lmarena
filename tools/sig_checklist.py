@@ -62,14 +62,19 @@ def parse():
     text_lines = text.split('\n')
     for i, line in enumerate(text_lines):
         code = line.split('//')[0]
-        # многострочный DEFINE_SIG: имя на одной строке, паттерн на следующей
-        flat = ' '.join(l.strip() for l in text_lines[i:i + 4])
         m = re.search(r'DEFINE_SIG\((\w+)\s*,\s*"([^"]*)"', code)
-        if not m:
-            m = re.search(r'DEFINE_SIG\((\w+)\s*,\s*"([^"]*)"', flat)
         if m:
             live[m.group(1)] = m.group(2)
             continue
+        # многострочный DEFINE_SIG: имя на одной строке, паттерн на следующей.
+        # Важно: склеиваем только НЕзакомментированные строки, иначе отключённые
+        # паттерны попадут в «живые».
+        if not m and code.strip().startswith('DEFINE_SIG'):
+            flat = ' '.join(l.split('//')[0].strip() for l in text_lines[i:i + 4])
+            m = re.search(r'DEFINE_SIG\((\w+)\s*,\s*"([^"]*)"', flat)
+            if m:
+                live[m.group(1)] = m.group(2)
+                continue
         m = re.search(r'//\s*DEFINE_SIG\((\w+)\s*,\s*"([^"]*)"', line)
         if m:
             off[m.group(1)] = m.group(2)
