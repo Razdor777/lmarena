@@ -49,7 +49,10 @@
 void CommandManager::init()
 {
 #ifdef __DEBUG__
-    //ADD_COMMAND(TestCommand);
+    // TestCommand — отладочная команда (в корневой базе она была включена).
+    // Регистрируем как есть: она изолирована от игровой логики, но нужна для
+    // проверки, что путь «команда → чат → CustomChat» жив целиком.
+    ADD_COMMAND(TestCommand);
 #endif
 
     ADD_COMMAND(AimbotCommand);
