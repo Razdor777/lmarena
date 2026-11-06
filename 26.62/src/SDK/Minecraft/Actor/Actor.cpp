@@ -240,7 +240,14 @@ MobHurtTimeComponent* Actor::getMobHurtTimeComponent()
 
 SimpleContainer* Actor::getArmorContainer()
 {
-	return mContext.getComponent<ActorEquipmentComponent>()->mArmorContainer;
+	auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+	return equipment ? equipment->mArmorContainer : nullptr;
+}
+
+SimpleContainer* Actor::getOffhandContainer()
+{
+	auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+	return equipment ? equipment->mOffhandContainer : nullptr;
 }
 
 PlayerInventory* Actor::getSupplies()
@@ -422,6 +429,13 @@ float Actor::getHealth()
 	auto health = getAttribute(Health);
 	if (!health) return 0;
 	return health->mCurrentValue;
+}
+
+float Actor::getHunger()
+{
+	auto hunger = getAttribute(PlayerHunger);
+	if (!hunger) return 20.f;
+	return hunger->mCurrentValue;
 }
 
 float Actor::getAbsorption()

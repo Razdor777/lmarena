@@ -18,7 +18,7 @@
 #include <SDK/Minecraft/World/BlockLegacy.hpp>
 #include <SDK/Minecraft/World/HitResult.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
-#include <SDK/Minecraft/Network/Packets/PlayerAuthinputPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/UpdateBlockPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/LevelEventPacket.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>

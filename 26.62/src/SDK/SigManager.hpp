@@ -5,9 +5,9 @@
 
 #include <cstdint>
 #include <future>
-#include <include/libhat/include/libhat.hpp>
-#include <include/libhat/include/libhat/Scanner.hpp>
-#include <include/libhat/include/libhat/Signature.hpp>
+#include <libhat.hpp>
+#include <libhat/scanner.hpp>
+#include <libhat/signature.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
 
 enum class SigType {
@@ -153,6 +153,35 @@ public:
 
 	DEFINE_SIG(LevelRenderer_renderLevel, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 9D ? ? ? ? 44 0F 29 95 ? ? ? ? 66 44 0F 7F 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD", SigType::Sig, 0);
 
+
+	// ── ported from the 1.21.44 tree (signatures verified against 1.21.44) ──
+  DEFINE_SIG(HurtColor,
+             "E8 ? ? ? ? 0F 28 05 ? ? ? ? 0F 11 85 68 02 00 00",
+             SigType::RefSig, 1);
+  DEFINE_SIG(ItemRenderer_getAtlasIconInfo,
+             "48 89 5C 24 ? 57 48 83 EC ? 48 8B FA 48 8B D9 E8 ? ? ? ? 80 7F ? 00 48 8D 8B",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_getIconUV,
+             "40 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 45 0F B6 C8 44 8B C2",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_renderGuiItemNew,
+             "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 D8 48 81 EC 28 01 00 00 0F 29 B4 24 10 01 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 00 44",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_iconBlit,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? F3 0F 11 5D",
+             SigType::Sig, 0);
+  DEFINE_SIG(HudCursorRenderer_render,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 89 8D",
+             SigType::Sig, 0);
+
+	DEFINE_SIG(ContainerScreenController_tryBeginTransition,
+		"40 53 56 57 41 56 41 57 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 "
+		"89 44 24 ? 8B FA",
+		SigType::Sig, 0);
+
+	DEFINE_SIG(ClientInputCallbacks_handleBuildAction_onAttack_setNoBlockBreakUntil,
+		"FF 15 ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 32 DB",
+		SigType::Sig, 0); // ported from the 1.21.44 tree (ItemUseDelayFix)
 
 	static void initialize();
 	static void deinitialize();

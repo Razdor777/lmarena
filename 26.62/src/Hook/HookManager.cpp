@@ -9,6 +9,10 @@
 #include "Hooks/ActorHooks/ActorModelHook.hpp"
 #include "Hooks/ActorHooks/AnimationHooks.hpp"
 #include "Hooks/ActorHooks/NametagRenderHook.hpp"
+#include "Hooks/ActorHooks/HealthHooks.hpp"
+#include "Hooks/ActorHooks/ProjectileHooks.hpp"
+#include "Hooks/RenderHooks/HurtColorHook.hpp"
+#include "Hooks/RenderHooks/AmbienceHook.hpp"
 #include "Hooks/ContainerHooks/ContainerScreenControllerHook.hpp"
 #include "Hooks/MiscHooks/FireBlockChangedHook.hpp"
 #include "Hooks/MiscHooks/KeyHook.hpp"
@@ -73,6 +77,12 @@ void HookManager::init(bool initLp)
 		ADD_HOOK(WndProcHook);
 		ADD_HOOK(GrabMouseHook);
 		ADD_HOOK(LevelRendererHook);
+
+		// ported from the 1.21.44 tree
+		ADD_HOOK(HealthHooks);
+		ADD_HOOK(ProjectileHooks);
+		ADD_HOOK(HurtColorHook);
+		ADD_HOOK(AmbienceHook);
 
 		
 

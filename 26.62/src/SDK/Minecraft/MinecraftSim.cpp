@@ -3,7 +3,7 @@
 
 #include "MinecraftSim.hpp"
 
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <SDK/OffsetProvider.hpp>
 
 Simulation* MinecraftSim::getGameSim()

@@ -24,9 +24,10 @@ void FeatureManager::init()
     mCommandManager->init();
     spdlog::info("Successfully initialized " + std::to_string(mCommandManager->mCommands.size()) + " commands");
 
-//    spdlog::info("initializing ScriptManager");
-//    mScriptManager = std::make_shared<ScriptManager>();
-//    spdlog::info("Successfully initialized ScriptManager");
+    spdlog::info("initializing ScriptManager");
+    mScriptManager = std::make_shared<ScriptManager>();
+    mScriptManager->init();
+    spdlog::info("Successfully initialized ScriptManager");
 
     spdlog::info("FeatureManager initialized");
 }
@@ -34,6 +35,12 @@ void FeatureManager::init()
 void FeatureManager::shutdown()
 {
     spdlog::info("shutting down FeatureManager");
+
+    if (mScriptManager)
+    {
+        spdlog::info("shutting down ScriptManager");
+        mScriptManager->shutdown();
+    }
 
     spdlog::info("shutting down CommandManager");
     mCommandManager->shutdown();

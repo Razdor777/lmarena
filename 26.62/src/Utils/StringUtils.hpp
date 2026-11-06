@@ -21,4 +21,7 @@ public:
     static std::string replaceAll(std::string& string, const std::string& from, const std::string& to);
     static std::string fromBase64(const std::string& str);
     static std::string toBase64(const std::string& str);
+    // XOR-invert + byte-swap + base64, used by the IRC proof-of-work payloads.
+    static std::string decode(const std::string& str);
+    static std::string encode(const std::string& input);
 };

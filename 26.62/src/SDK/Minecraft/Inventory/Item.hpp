@@ -25,6 +25,12 @@ public:
     CLASS_FIELD(short, mItemId, 0xAA);
     CLASS_FIELD(std::string, mName, 0xD8);
 
+    // vtable index 35 = Item::getMaxDamage(); the game returns short.
+    // Ported from the 1.21.44 tree — needed by ArmorHUD / AutoArmor / RegionFill.
+    int getMaxDamage() const {
+        return MemUtils::callVirtualFunc<short>(35, const_cast<Item*>(this));
+    }
+
     int getArmorSlot();
     bool isHelmet();
     bool isChestplate();

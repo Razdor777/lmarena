@@ -141,6 +141,28 @@ public:
         return getEnchantValue(static_cast<int>(enchant));
     }
 
+    // ── durability helpers (ported from the 1.21.44 tree) ──────────────
+    int getMaxDamage() const {
+        Item* item = getItem();
+        if (!item) return 0;
+        return item->getMaxDamage();
+    }
+
+    int getRemainingDurability() const {
+        int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 0;
+        return maxDmg - getDamage();
+    }
+
+    float getDurabilityPercent() const {
+        int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 1.0f;
+        return static_cast<float>(getRemainingDurability()) / static_cast<float>(maxDmg);
+    }
+
+    bool isArmorEnchantable() const { return getMaxDamage() > 0; }
+    bool hasDurability() const { return getMaxDamage() > 0; }
+
     ItemStack()
     {
         memset(this, 0, sizeof(ItemStack));

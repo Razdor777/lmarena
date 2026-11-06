@@ -7,7 +7,7 @@
 
 #include <SDK/heap_rd_impl.hpp>
 
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>
 

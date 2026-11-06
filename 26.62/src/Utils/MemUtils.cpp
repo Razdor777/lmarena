@@ -2,10 +2,10 @@
 //
 
 #include "MemUtils.hpp"
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <windows.h>
 #include <Psapi.h>
-#include <libhat/Process.hpp>
+#include <libhat/process.hpp>
 
 #include <spdlog/spdlog.h>
 

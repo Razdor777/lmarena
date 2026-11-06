@@ -643,3 +643,33 @@ std::string StringUtils::toBase64(const std::string& str)
 {
     return Base64::encode(str);
 }
+
+std::string StringUtils::decode(const std::string& str)
+{
+    std::vector<uint8_t> bytes = Base64::decodeBytes(str);
+
+    for (auto& byte : bytes) {
+        byte = ~byte;
+    }
+
+    for (size_t i = 0; i + 1 < bytes.size(); i += 2) {
+        std::swap(bytes[i], bytes[i + 1]);
+    }
+
+    return std::string(bytes.begin(), bytes.end());
+}
+
+std::string StringUtils::encode(const std::string& input)
+{
+    std::vector<uint8_t> bytes(input.begin(), input.end());
+
+    for (size_t i = 0; i + 1 < bytes.size(); i += 2) {
+        std::swap(bytes[i], bytes[i + 1]);
+    }
+
+    for (auto& byte : bytes) {
+        byte = ~byte;
+    }
+
+    return Base64::encodeBytes(bytes);
+}

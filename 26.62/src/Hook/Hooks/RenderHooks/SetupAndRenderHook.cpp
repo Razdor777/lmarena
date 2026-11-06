@@ -10,6 +10,8 @@
 #include <Features/Modules/Visual/ClickGui.hpp>
 
 #include "D3DHook.hpp"
+#include "ItemRendererHook.hpp"
+#include <SDK/Minecraft/Rendering/ItemRenderer.hpp>
 
 std::unique_ptr<Detour> SetupAndRenderHook::mSetupAndRenderDetour;
 std::unique_ptr<Detour> SetupAndRenderHook::mDrawImageDetour;
@@ -43,6 +45,26 @@ void* SetupAndRenderHook::onSetupAndRender(void* screenView, void* mcuirc)
     }
 
     if (D3DHook::FrameTransforms) D3DHook::FrameTransforms->push({ ci->getViewMatrix(), origin, playerPos, ci->getFov() });
+
+    // Flush deferred GUI item icons (queued by modules such as InventoryHUD).
+    ItemIconQueue::swapBuffers();
+
+    if (!ItemIconQueue::drawing().empty())
+    {
+        ItemRenderer*           ir  = ItemRendererHook::getItemRenderer();
+        BaseActorRenderContext* bar = ItemRendererHook::getBarContext();
+
+        if (ir && bar)
+        {
+            for (const auto& ic : ItemIconQueue::drawing())
+            {
+                if (!ic.stack || !ic.stack->mItem || ic.scale <= 0.f) continue;
+                ir->renderGuiItemNew(bar, ic.stack, 0, ic.pos.x, ic.pos.y, 1.0f, ic.scale, false);
+            }
+        }
+    }
+
+    ItemIconQueue::drawing().clear();
 
     return original(screenView, mcuirc);
 }
