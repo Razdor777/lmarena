@@ -1,6 +1,8 @@
 //
 // Created by alteik on 03/09/2024.
 //
+#pragma once
+
 #include <Solstice.hpp>
 #include <Features/FeatureManager.hpp>
 #include <Features/Command/Command.hpp>

@@ -471,11 +471,6 @@ void ModuleManager::init()
 		{
 			spdlog::error("Failed to initialize module {}: {}", module->mName, e.what());
 		}
-		catch (const nlohmann::json::exception& e)
-
-		{
-			spdlog::error("Failed to initialize module {}: {}", module->mName, e.what());
-		}
 		catch (...)
 		{
 			spdlog::error("Failed to initialize module {}: unknown", module->mName);
@@ -590,11 +585,9 @@ void ModuleManager::onClientTick()
 				}
 			}
 		}
+		// nlohmann::json::exception — наследник std::exception, отдельная ветвь
+		// ниже была недостижима (MSVC C4286). Он ловится этим же catch.
 		catch (const std::exception& e)
-		{
-			spdlog::error("Failed to enable/disable module {}: {}", module->mName, e.what());
-		}
-		catch (const nlohmann::json::exception& e)
 		{
 			spdlog::error("Failed to enable/disable module {}: {}", module->mName, e.what());
 		}

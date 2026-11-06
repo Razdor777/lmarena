@@ -2,6 +2,8 @@
 // Created by alteik on 03/09/2024.
 //
 
+#pragma once
+
 #include <Features/FeatureManager.hpp>
 
 class SnipeCommand : public Command {

@@ -2,6 +2,8 @@
 // Created by alteik on 30/10/2024.
 //
 
+#pragma once
+
 #define EXPIRE_YEAR 2024
 #define EXPIRE_MONTH 12
 #define EXPIRE_DAY 15 // we should update it sometimes

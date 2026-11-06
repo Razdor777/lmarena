@@ -273,8 +273,12 @@ void ContainerActions::processDropAll(Actor* player) {
                 cit->data.addAction(fromArmor); cit->data.addAction(toWorld);
                 pkt->mTransaction = std::move(cit);
                 sender->sendToServer(pkt.get());
+                // mValid_DeprecatedSeeComment живёт в ItemStackBase, а ItemStack
+                // начинается с PAD(24) — квалифицированное имя обязательно,
+                // иначе MSVC C2039 «не является членом ItemStack».
                 armor->mItem=nullptr; armor->mCount=0; armor->mAuxValue=0;
-                armor->mBlock=nullptr; armor->mCompoundTag=nullptr; armor->mValid_DeprecatedSeeComment=false;
+                armor->mBlock=nullptr; armor->mCompoundTag=nullptr;
+                armor->ItemStackBase::mValid_DeprecatedSeeComment=false;
             }
             mActionSlot++;
         }

@@ -2,6 +2,8 @@
 // Created by vastrakai on 7/2/2024.
 //
 
+#pragma once
+
 #include "Event.hpp"
 
 class WindowResizeEvent : public Event

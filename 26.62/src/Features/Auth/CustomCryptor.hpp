@@ -2,6 +2,8 @@
 // Created by alteik on 31/10/2024.
 //
 
+#pragma once
+
 class CustomCryptor {
 public:
     CustomCryptor(unsigned long publicKey, unsigned long privateKey, unsigned long modulus)

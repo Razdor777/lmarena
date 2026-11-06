@@ -28,6 +28,9 @@ run "event-visibility" python3 tools/check_event_visibility.py 26.62/src
 run "sig-names"       python3 tools/check_sig_names.py 26.62/src
 run "method-case"     python3 tools/check_method_case.py 26.62/src
 run "enums"           python3 tools/check_enums.py 26.62/src
+run "duplicates"      python3 tools/check_duplicates.py 26.62/src
+run "unity-collisions" python3 tools/check_unity_collisions.py 26.62/src
+run "header-guards"    python3 tools/check_header_guards.py 26.62/src
 
 if [ "${1:-}" = "--fix" ]; then
     printf '== %-24s ' "resources"

@@ -2,6 +2,8 @@
 // Created by vastrakai on 7/22/2024.
 //
 
+#pragma once
+
 #include "Packet.hpp"
 
 #include <optional>

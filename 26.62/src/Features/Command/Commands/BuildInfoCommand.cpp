@@ -15,7 +15,10 @@ void BuildInfoCommand::execute(const std::vector<std::string>& args)
     ChatUtils::displayClientMessage("§6- §eBuild time§7: {}", __TIME__);
     ChatUtils::displayClientMessage("§6- §eSolstice version§7: {}", std::string(SOLSTICE_VERSION));
     ChatUtils::displayClientMessage("§6- §eMinecraft version§7: {}", ProcUtils::getVersion());
-    ChatUtils::displayClientMessage("§6- §eIntended Minecraft version§7: {}", std::string(SOLSTICE_INTENDED_VERSION != "" ? SOLSTICE_INTENDED_VERSION : "N/A"));
+    // SOLSTICE_INTENDED_VERSION — строковый литерал, поэтому `!= ""` сравнивает
+    // массивы (MSVC C5056) и всегда истинно. Сравниваем как std::string.
+    ChatUtils::displayClientMessage("§6- §eIntended Minecraft version§7: {}",
+        std::string(SOLSTICE_INTENDED_VERSION) != "" ? std::string(SOLSTICE_INTENDED_VERSION) : std::string("N/A"));
     ChatUtils::displayClientMessage("§6- §eCommit message§7: {}", std::string(DEXKO_BUILD_COMMIT_MESSAGE));
     ChatUtils::displayClientMessage("§6- §eCommit hash§7: {}", std::string(DEXKO_BUILD_VERSION));
     ChatUtils::displayClientMessage("§6- §eCompiled by§7: {}", std::string(SOLSTICE_PC_USERNAME));
@@ -31,7 +34,11 @@ void BuildInfoCommand::execute(const std::vector<std::string>& args)
 #else
     ChatUtils::displayClientMessage("§6- §eBuild type§7: Release");
 #endif
-    ChatUtils::displayClientMessage("§e{}§6 files changed locally compared to the last commit", STRING(SOLSTICE_FILES_CHANGED_COUNT));
+    // SOLSTICE_FILES_CHANGED_COUNT — число, а не строка: STRING() здесь дал бы
+    // "123" как литерал, но без <Utils/StringUtils.hpp> макрос вообще не виден.
+    // to_string проще и не зависит от порядка включений.
+    ChatUtils::displayClientMessage("§e{}§6 files changed locally compared to the last commit",
+        std::to_string(SOLSTICE_FILES_CHANGED_COUNT));
 }
 
 std::vector<std::string> BuildInfoCommand::getAliases() const

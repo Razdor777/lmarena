@@ -506,6 +506,10 @@ public:
   // Debug dump
   // =====================================================
   // Строка «сырого» дампа (Dump Seen): блок, который модуль увидел.
+  // ВАЖНО: структура и всё ниже — ЕДИНСТВЕННОЕ объявление дампа в классе.
+  // При слиянии корневой версии с 26.62-версией секция «Debug dump» попала в
+  // файл дважды (два struct DebugRow, два debugStart/debugFlush/debugStop/
+  // oreTypeName) — MSVC падал с C2011/C2535/C2086. Вторая копия удалена.
   struct DebugRow {
     BlockPos pos{};
     int      blockId  = 0;
@@ -567,32 +571,6 @@ public:
   static const char *verdictName(DropVerdict v);
   static std::string clockString();
 
-  // =====================================================
-  // Debug dump
-  // =====================================================
-  struct DebugRow {
-    BlockPos pos{};
-    int      blockId  = 0;
-    bool     deepslate = false;
-    float    distance = 0.f;
-    bool     onScreen = false;
-    float    screenX  = 0.f;
-    float    screenY  = 0.f;
-  };
-
-  std::string mDebugCsvPath;
-  std::string mDebugCoordsPath;
-  std::ofstream mDebugCsv;
-  std::ofstream mDebugCoords;
-  std::unordered_set<BlockPos> mDebugWritten; // каждая координата — ровно один раз
-  int  mDebugRows    = 0;
-  bool mDebugWasOn   = false;
-  uint64_t mDebugStartedAt = 0;
-
-  void debugStart();                                  // новый файл под дамп
-  void debugFlush(const std::vector<DebugRow> &rows);  // дописать строки
-  void debugStop();                                   // закрыть файлы
-  static const char *oreTypeName(int blockId);
 
   // =====================================================
   // Scan methods

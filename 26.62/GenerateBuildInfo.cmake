@@ -90,6 +90,18 @@ endif()
 
 file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define DEXKO_INTENDED_VERSION \"${DEXKO_INTENDED_VERSION}\"\n")
 
+# Клиент переименован в Solstice, но генератор по историческим причинам пишет
+# DEXKO_*. Часть перенесённого кода (ExceptionHandler, BuildInfoCommand) ждёт
+# SOLSTICE_*, часть (Solstice.cpp) — DEXKO_*, поэтому публикуем ОБА имени с
+# одинаковыми значениями: одно имя без другого даёт «undefined identifier».
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_BUILD_VERSION \"${DEXKO_BUILD_VERSION}\"\n")
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_BUILD_VERSION_SHORT \"${DEXKO_BUILD_VERSION_SHORT}\"\n")
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_BUILD_BRANCH \"${DEXKO_BUILD_BRANCH}\"\n")
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_BUILD_COMMIT_MESSAGE \"${DEXKO_BUILD_COMMIT_MESSAGE}\"\n")
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_PC_USERNAME \"${DEXKO_PC_USERNAME}\"\n")
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_INTENDED_VERSION \"${DEXKO_INTENDED_VERSION}\"\n")
+file(APPEND "${TEMP_BUILD_INFO_PATH}" "#define SOLSTICE_FILES_CHANGED_COUNT ${DEXKO_FILES_CHANGED_COUNT}\n")
+
 execute_process(
         COMMAND ${CMAKE_COMMAND} -E compare_files "${TEMP_BUILD_INFO_PATH}" "${BUILD_INFO_PATH}"
         RESULT_VARIABLE FILES_DIFFER
