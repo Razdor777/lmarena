@@ -13,6 +13,7 @@
 | Movement (29 модулей) | ✅ перенесено, зарегистрировано |
 | Misc (48 модулей) | ✅ перенесено, зарегистрировано |
 | Visual (73 модуля, включая `Ambience`, `SmartXRay`, `Trails`, `TazikHat`) | ✅ перенесено, зарегистрировано |
+| Регистрация модулей | ⚠️ 197 из 198: `FastEat` и `ItemPhysics` ждут живых сигнатур (их патчи пишут байты по адресу), `NoPause` — заглушка, в базе был пустой файл |
 | Команды (54: schematic, pos1/pos2, spammer, fakechat, skin, playeroffset) | ✅ перенесено, зарегистрировано |
 | GUI: новый ClickGui (`ModernDropdown` 1516 строк + `CombatantGui`), `ChatBinds` | ✅ перенесено |
 | Interface: живой градиент темы, палитры Aurora/Abyss/Ember/Blossom/Prism, шрифт Mntsb | ✅ перенесено |
