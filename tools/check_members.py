@@ -51,6 +51,51 @@ RE_IGNORE = re.compile(
     r')')
 
 
+def build_declarations():
+    """Все ИМЕНА, объявленные как поля/методы где-либо в дереве.
+
+    Нужно для обращений через цепочку указателей: `gFeatureManager->mModuleManager->mModules`
+    — получатель не наш класс, поэтому локальный поиск по своему .hpp его не видит.
+    В отличие от build_vocab() здесь только объявления, а не любое слово из текста,
+    иначе проверка перестаёт что-либо ловить.
+    """
+    decl = set()
+    # [[nodiscard]] / [[maybe_unused]] перед объявлением не должны мешать
+    attr = r'(?:\[\[[^\]]*\]\]\s*)*'
+    quals = r'(?:static|virtual|inline|constexpr|const|explicit|friend)\s+'
+    pats = (
+        # поле:  Type mName;   Type mName[4];   Type mName = 0;
+        re.compile(r'^\s*' + attr + r'(?:' + quals + r')*[\w:<>,\s\*&]+?\b(\w+)\s*'
+                   r'(?:\[[^\]]*\])?\s*(?:=[^;]*)?;'),
+        # метод: Type name(...) const {   /   Type name(...);
+        re.compile(r'^\s*' + attr + r'(?:' + quals + r')*[\w:<>,\s\*&]+?\b(\w+)\s*'
+                   r'\([^;{]*\)\s*(?:const\s*)?(?:noexcept\s*)?(?:=\s*0\s*)?(?:;|\{)'),
+    )
+    # сторонние библиотеки лежат в include/ — entt::registry::get_all_entity_components
+    # и подобное объявлено именно там
+    roots = [NEW, os.path.join(os.path.dirname(NEW), 'include', 'entt')]
+    for root_dir in roots:
+      for dirpath, _, files in os.walk(root_dir):
+        for f in files:
+            if not f.endswith(('.hpp', '.h')):
+                continue
+            try:
+                text = open(os.path.join(dirpath, f), encoding='utf-8', errors='ignore').read()
+            except OSError:
+                continue
+            text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+            for line in text.split('\n'):
+                line = line.split('//')[0]
+                for pat in pats:
+                    m = pat.match(line)
+                    if m:
+                        decl.add(m.group(1))
+                m = re.search(r'\b(\w+)\s*\([^;{]*\)\s*(?:const\s*)?(?:=\s*0\s*)?;', line)
+                if m:
+                    decl.add(m.group(1))
+    return decl
+
+
 def build_vocab(skip_dirs=()):
     words = set()
     skip = tuple(os.path.normpath(os.path.join(NEW, d)) for d in skip_dirs)
@@ -77,10 +122,13 @@ def build_vocab(skip_dirs=()):
 def scan(files, vocab):
     findings = []
     for path in files:
-        try:
-            lines = open(path, encoding='utf-8', errors='ignore').read().split('\n')
-        except OSError:
+        if not os.path.exists(path):
             continue
+        # Блочные комментарии вырезаем заранее: иначе код внутри /* ... */
+        # (например закомментированная ветка со ScriptManager) считается живым.
+        raw = open(path, encoding='utf-8', errors='ignore').read()
+        raw = re.sub(r'/\*.*?\*/', lambda m: '\n' * m.group(0).count('\n'), raw, flags=re.S)
+        lines = raw.split('\n')
         for n, line in enumerate(lines, 1):
             code = line.split('//')[0]
             if not code.strip() or code.lstrip().startswith('*'):
@@ -130,6 +178,7 @@ def main():
             files.append(p)
 
     vocab = build_vocab(a.vocab_exclude)
+    declared = build_declarations()
     findings = scan(files, vocab)
     if a.only_sdkish:
         sdkish = re.compile(r'^(get|set|is|has|on|try|begin|end|m[A-Z]|Player|Actor)')
@@ -141,6 +190,8 @@ def main():
     # A member defined in the same file it is used in is not a portability problem.
     kept = []
     for path, n, kind, name, text in findings:
+        if name in declared:
+            continue
         # a member declared in the module's own header (or the same file) is fine
         stem = os.path.splitext(path)[0]
         src = ''
@@ -173,9 +224,12 @@ def main():
             continue
         if re.search(r'\b' + re.escape(name) + r'\s*\([^;]*\)\s*(const\s*)?\{', src):
             continue
-        # only a declaration exists (member-pointer in listen<...> + prototype):
-        #   void onActorRenderEvent(class ActorRenderEvent& event);
-        if re.search(r'\b' + re.escape(name) + r'\s*\([^;{]*\)\s*(const\s*)?;', src):
+        # Прототип (объявление без тела): void onActorRenderEvent(Foo& e);
+        # Важно: вызов вида a->onEvent(); тоже заканчивается на ';', поэтому
+        # требуем, чтобы перед именем стоял тип, а не '->' или '.'.
+        if re.search(r'(?:^|[\s*&>])(?:[A-Za-z_]\w*[\s*&]+)+' + re.escape(name)
+                    + r'\s*\([^;{]*\)\s*(?:const\s*)?(?:noexcept\s*)?'
+                      r'(?:override\s*)?(?:=\s*0\s*)?;', src):
             continue
         # data member:  std::atomic<bool> mRelocating{false};  /  int mHops = 0;
         # скаляр, массив или инициализатор: int mHops = 0;  /  unsigned char mBuf[13];
