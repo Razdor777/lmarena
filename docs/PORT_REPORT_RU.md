@@ -14,7 +14,8 @@
 | хуки (`ADD_HOOK`) | 23 | **30** |
 | утилиты (`Utils/`) | 49 | 50 |
 | события (`Features/Events`) | 32 | 35 |
-| сигнатуры (`SigManager`) | 116 | 99 |
+| активные сигнатуры (`SigManager`) | 97 | 88 |
+| оффсеты (`OffsetProvider`) | 104 | 74 |
 | строк `.cpp`+`.hpp` | 139 995 | 101 868 |
 
 Сверка по именам файлов: **модули 0 расхождений, команды 0, утилиты 0,
@@ -117,6 +118,15 @@
 | `Item::getMaxDamage` (vtable 35), `isBlockItem` (vtable 15) | `ArmorHUD`, `AutoArmor`, `RegionFill` | прочность/броня показываются неверно |
 | `ClientInstance_mFovX/Y` = 0x6F0/0x704 | `ClientInstance::getFov` | FOV считается неверно |
 
+Дополнительно перенесены 10 сигнатур, которые база 26.62 держала
+закомментированными, а код на них ссылался (без них сборка падала):
+
+`ActorRenderDispatcher_render`, `ConnectionRequest_create_CurrentInputMode`,
+`FastEat`, `FireRender`, `InputModeBypass`, `InputModeBypassFix`,
+`ItemInHandRenderer_renderItem_bytepatch`, `ItemPositionConst`,
+`Keyboard_feed`, `mce_framebuilder_RenderItemInHandDescription_ctor`.
+
+Итого помечено `// UNVERIFIED (1.21.44)` — **19 сигнатур**.
 Ключевое: **все эти места деградируют, а не падают** — при `addr == 0`
 хук/фича сами себя выключают с `spdlog::warn`.
 
