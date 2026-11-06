@@ -31,6 +31,18 @@
 #include "Commands/SnipeCommand.hpp"
 #include "Commands/NameProtectCommand.hpp"
 #include "Commands/TeleportCommand.hpp"
+#include "Commands/FakeChatCommand.hpp"
+#include "Commands/PlayerOffsetCommand.hpp"
+#include "Commands/Pos1Command.hpp"
+#include "Commands/Pos2Command.hpp"
+#include "Commands/SBuildCommand.hpp"
+#include "Commands/SCancelCommand.hpp"
+#include "Commands/SCopyCommand.hpp"
+#include "Commands/SPasteCommand.hpp"
+#include "Commands/SPos1Command.hpp"
+#include "Commands/SPos2Command.hpp"
+#include "Commands/SkinCommand.hpp"
+#include "Commands/SpammerCommand.hpp"
 #include "Features/Events/ChatEvent.hpp"
 #include "spdlog/spdlog.h"
 
@@ -60,6 +72,18 @@ void CommandManager::init()
     ADD_COMMAND(SnipeCommand);
     ADD_COMMAND(NameProtectCommand);
     ADD_COMMAND(TeleportCommand);
+    ADD_COMMAND(FakeChatCommand);
+    ADD_COMMAND(PlayerOffsetCommand);
+    ADD_COMMAND(Pos1Command);
+    ADD_COMMAND(Pos2Command);
+    ADD_COMMAND(SBuildCommand);
+    ADD_COMMAND(SCancelCommand);
+    ADD_COMMAND(SCopyCommand);
+    ADD_COMMAND(SPasteCommand);
+    ADD_COMMAND(SPos1Command);
+    ADD_COMMAND(SPos2Command);
+    ADD_COMMAND(SkinCommand);
+    ADD_COMMAND(SpammerCommand);
 
     //ADD_COMMAND(LuaCommand);
 
