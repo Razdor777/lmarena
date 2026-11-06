@@ -228,5 +228,10 @@ void KeyHook::onKey(uint32_t key, bool isDown)
 
 void KeyHook::init()
 {
+   // Собственный детур Keyboard::feed не ставим: сигнатура не снята с 1.26.x.
+   // Клавиши приходят из WndProcHook (он вызывает KeyHook::onKey напрямую по
+   // WM_KEYDOWN/WM_KEYUP), поэтому KeyEvent, глобальные клавиши модулей и
+   // ChatBinds работают и без детура. Если раскомментировать — сначала убрать
+   // вызов из WndProcHook, иначе каждая клавиша придёт дважды.
    // mDetour = std::make_unique<Detour>("Keyboard::feed", reinterpret_cast<void*>(SigManager::Keyboard_feed), &KeyHook::onKey);
 }

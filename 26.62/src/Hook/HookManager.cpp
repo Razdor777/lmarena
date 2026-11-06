@@ -53,7 +53,11 @@ void HookManager::init(bool initLp)
 	else
 	{
 		std::vector<std::shared_ptr<Hook>> hooks;
-		//ADD_HOOK(KeyHook);
+		// KeyHook: собственный детур (Keyboard::feed) в 26.62 не встаёт — сигнатура
+		// не снята, — но сам объект нужен: WndProcHook зовёт статический
+		// KeyHook::onKey() по WM_KEYDOWN/UP. Пока хука нет в списке, KeyEvent,
+		// глобальные клавиши модулей и ChatBinds не получают клавиш вообще.
+		ADD_HOOK(KeyHook);
 		ADD_HOOK(SetupAndRenderHook);
 		ADD_HOOK(D3DHook);
 		ADD_HOOK(ContainerScreenControllerHook);
