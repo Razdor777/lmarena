@@ -133,6 +133,16 @@
   слушает. Вернули класс и одноразовый `trigger` в `BaseTickHook`.
 - Вывод клиентских сообщений (`BaseTickHook`) больше не обходит `ChatUtils::sSink`:
   при включённом `CustomChat` текст уходил мимо него.
+- `KeyHook` не был в списке `HookManager`, хотя `WndProcHook` зовёт
+  `KeyHook::onKey()` по `WM_KEYDOWN/UP` — без него не приходили `KeyEvent`,
+  глобальные клавиши модулей и чат-бинды.
+- 17 имён `SigManager::*` (`ItemRenderer_getIconUV/iconBlit/renderGuiItemNew/
+  getAtlasIconInfo`, `HudCursorRenderer_render`, `Actor_setPosition` и др.) и 4
+  поля `OffsetProvider` вызывались из кода, но в заголовках отсутствовали —
+  это ошибка компиляции, а не «сигнатура не нашлась». Объявлены нулями по
+  правилу проекта (паттерны ждут скана, см. `docs/SIGS_26.62_RU.md`).
+- Две мёртвые настройки (`Regen::mChecker`, `PotionHUD::mColorBars`) —
+  объявлены, но не регистрировались и не читались; удалены.
 - Из текстов убран бренд `Juzdex` (в папке, чате, дампах) — везде `Solstice`.
   Функция `FileUtils::getJuzdexDir()` оставлена алиасом на `Solstice\`.
 
