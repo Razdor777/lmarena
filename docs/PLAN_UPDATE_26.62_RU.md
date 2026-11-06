@@ -9,8 +9,17 @@
 | CMake `26.62/`: один таргет `Solstice`, DirectXTK, шейдеры, фильтр исходников | ✅ |
 | Слой совместимости SDK (методы, поля, `StringSetting`, `customData`) | ✅ |
 | Combat (13 модулей) | ✅ перенесено, зарегистрировано, адаптировано |
-| Остальные категории (Player / Movement / Misc / Visual / команды / хуки) | ⏳ дальше |
-| Сигнатуры под 1.26.5x | ⚠️ 2 «унаследованных» требуют проверки по бинарнику |
+| Player (36 модулей + трекеры `CPSTracker`/`HealthTracker`/`PlayerTracker`/`Schematic`) | ✅ перенесено, зарегистрировано |
+| Movement (29 модулей) | ✅ перенесено, зарегистрировано |
+| Misc (48 модулей) | ✅ перенесено, зарегистрировано |
+| Visual (73 модуля, включая `Ambience`, `SmartXRay`, `Trails`, `TazikHat`) | ✅ перенесено, зарегистрировано |
+| Команды (54: schematic, pos1/pos2, spammer, fakechat, skin, playeroffset) | ✅ перенесено, зарегистрировано |
+| GUI: новый ClickGui (`ModernDropdown` 1516 строк + `CombatantGui`), `ChatBinds` | ✅ перенесено |
+| Interface: живой градиент темы, палитры Aurora/Abyss/Ember/Blossom/Prism, шрифт Mntsb | ✅ перенесено |
+| Утилиты: `ItemAtlas`, `ItemTextures`, `TexturePtr`, `ClientPack`, `CubemapGenerator`, `NurikIcons` | ✅ перенесено |
+| Хуки: `HealthHooks`, `ProjectileHooks`, `HurtColorHook`, `AmbienceHook`, ховер-детур инвентаря | ✅ добавлено (детуры встают только при живой сигнатуре) |
+| События: `ProjectileHitEvent`, `HurtColorEvent`, `ContainerSlotHoveredEvent` | ✅ добавлено |
+| Сигнатуры под 1.26.5x | ⚠️ 5 новых (`Actor_hurt`, `Projectile_onHit`, `HurtColor` + 5 Ambience-заглушек) ждут скана по бинарнику |
 
 Сборку целиком проверить негде: под рукой нет MSVC/Windows SDK, поэтому каждый
 шаг проверяется статически — `tools/check_includes.py` (резолвятся ли все
@@ -20,8 +29,7 @@
 ```bash
 python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сломалось в SDK
 python3 tools/check_includes.py 26.62/src                         # битые include
-python3 tools/check_members.py --vocab-exclude Features/Modules/Combat -- \
-        26.62/src/Features/Modules/Combat                         # члены без объявления
+python3 tools/check_members.py --vocab-exclude Features -- 26.62/src   # члены без объявления
 ```
 
 Короткий ответ на «что тебе показать»: **ничего показывать не надо** — обе базы
@@ -128,6 +136,10 @@ python3 tools/sdk_compat.py --out docs/SDK_COMPAT_26.62_RU.md
 ---
 
 ## 3. Порядок работ (7 этапов, каждый — отдельный коммит)
+
+> **Состояние на 2026-11-06:** шаги 0–5 выполнены (см. «Статус на сейчас» и
+> `docs/PORT_LOG_26.62_RU.md`). Остались только шаг 6 (проверка в игре) и
+> доснятие сигнатур — оба требуют `Minecraft.Windows.exe` 1.26.5x.
 
 0. **Убрать конфликты и дубликаты** (п.1) — иначе дальше нечего собирать.
    Проверка: `grep -rn '^<<<<<<<' src 26.62/src` → пусто, в `26.62/src` один
