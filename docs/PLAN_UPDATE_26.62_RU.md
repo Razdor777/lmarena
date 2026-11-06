@@ -34,6 +34,7 @@ python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сл�
 python3 tools/check_includes.py 26.62/src                         # битые include
 python3 tools/check_members.py --vocab-exclude Features -- 26.62/src   # члены без объявления
 python3 tools/sig_checklist.py --out docs/SIGS_26.62_RU.md          # что ждёт скана
+python3 tools/check_undefined.py 26.62/src                          # объявлено, но не определено
 python3 tools/gen_resources.py --check                              # ресурсы актуальны
 ```
 

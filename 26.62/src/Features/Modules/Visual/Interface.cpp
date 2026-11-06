@@ -423,14 +423,45 @@ void Interface::onActorRenderEvent(ActorRenderEvent& event)
     bodyRotations->yOldBodyRot = realOldBodyYaw;
 }
 
+// Мир уже нарисован (LevelRendererHook шлёт событие до и после
+// LevelRenderer::renderLevel). Здесь доворачиваем тело/голову СВОЕЙ модели на
+// время кадра, а в onActorRenderEvent — ещё и подменяем углы на сглаженные.
+// В 1.21.44 этот обработчик был, при переносе .cpp его потеряли — hpp продолжал
+// на него ссылаться, и линковка падала на &Interface::onLevelRenderEvent.
+void Interface::onLevelRenderEvent(LevelRenderEvent& event)
+{
+    if (!gInterfaceRotReady) return;
+
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+
+    // От первого лица модель не видна — трогать компоненты незачем.
+    if (ClientInstance::get()->getOptions()->mThirdPerson->value == 0) return;
+
+    const auto actorRotations = player->getActorRotationComponent();
+    const auto headRotations  = player->getActorHeadRotationComponent();
+    const auto bodyRotations  = player->getMobBodyRotationComponent();
+    if (!actorRotations || !headRotations || !bodyRotations) return;
+
+    if (event.mUnkoMan) return; // после отрисовки мир уже снят — ничего не меняем
+
+    actorRotations->mOldPitch   = actorRotations->mPitch   = pLerpedPitch;
+    headRotations->mHeadRot     = headRotations->mOldHeadRot = pLerpedHeadYaw;
+    bodyRotations->yBodyRot     = bodyRotations->yOldBodyRot = pLerpedBodyYaw;
+}
+
 void Interface::onDrawImageEvent(DrawImageEvent& event)
 {
     if (!mSlotEasing.mValue) return;
     // Wait for ImGui to be initialized
     if (!ImGui::GetCurrentContext()) return;
 
+    // drawImage зовётся и с пустыми текстурами (атлас/иконки), а разыменование
+    // нулевого shared_ptr — это краш прямо в рендер-потоке.
+    if (!event.mTexture || !event.mTexture->mTexture || !event.mPos) return;
+
     static glm::vec2 hotbarPos = {};
-    auto path = event.mTexture->mTexture->mFilePath.c_str();
+    const char* path = event.mTexture->mTexture->mFilePath.c_str();
 
     // textures/ui/selected_hotbar_slot
     // If the selected hotbar slot is being drawn
