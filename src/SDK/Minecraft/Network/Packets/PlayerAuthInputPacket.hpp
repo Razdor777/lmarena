@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/28/2024.
 //
 
 #pragma once
@@ -203,6 +202,12 @@ enum class AuthInputAction : uint64_t {
     IS_ROT_CONTROLLED_BY_MOVE_DIRECTION = 1ULL << 55,
     START_SPIN_ATTACK = 1ULL << 56,
     STOP_SPIN_ATTACK = 1ULL << 57,
+    IsHotbarOnlyTouch = 1ULL <<58,
+    JumpReleasedRaw = 1ULL << 59,
+    JumpPressedRaw = 1ULL << 60,
+    JumpCurrentRaw = 1ULL << 61,
+    SneakReleasedRaw = 1ULL << 62,
+    SneakPressedRaw = 1ULL << 63,
     INPUT_NUM = 1ULL << 58,
 };
 
@@ -239,6 +244,10 @@ inline bool operator!(AuthInputAction a) {
     return static_cast<uint64_t>(a) == 0;
 }
 
+class PackedItemUseLegacyInventoryTransaction
+{
+
+};
 class PlayerAuthInputPacket : public Packet {
 public:
     // PlayerAuthInputPacket inner types define
@@ -302,12 +311,14 @@ public:
     glm::vec3                                                           mPos;
     float                                                               mYHeadRot;
     glm::vec3                                                           mPosDelta;
-    glm::vec2                                                           mAnalogMoveVector;
     glm::vec2                                                           mVehicleRotation;
+    glm::vec2                                                           mAnalogMoveVector;
     glm::vec2                                                           mMove;
     glm::vec2                                                           mInteractRots;
-    glm::vec2                                                           mCameraOrientation;
+    glm::vec3                                                           mCameraOrientation;
+    glm::vec2                                                           mRawMoveVector;
     AuthInputAction                                                     mInputData;
+    __int64 Want__int128;
     InputMode                                                           mInputMode;
     ClientPlayMode                                                      mPlayMode;
     NewInteractionModel                                                 mNewInteractionModel;
@@ -320,6 +331,7 @@ public:
 
     void removeAllInputData() {
         mInputData = AuthInputAction::NONE;
+        Want__int128 = 0;
     }
     void removeMovingInput()
     {

@@ -7,17 +7,25 @@
 std::vector<unsigned char> gRetOvrPatch = { 0xC3, 0x90 };
 DEFINE_PATCH_FUNC(NoRender::patchOverlay, SigManager::Unknown_renderBlockOverlay, gRetOvrPatch);
 
-std::vector<unsigned char> gFrBytes = {0xC3}; // 0xC3 is the opcode for "ret"
+std::vector<unsigned char> gFrBytes = { 0xC3 };
 DEFINE_PATCH_FUNC(NoRender::patchFireRender, SigManager::FireRender, gFrBytes);
 
 void NoRender::onEnable()
 {
-    patchOverlay(mNoBlockOverlay.mValue);
-    patchFireRender(mNoFire.mValue);
+    if (SigManager::Unknown_renderBlockOverlay) {
+        patchOverlay(mNoBlockOverlay.mValue);
+    }
+    if (SigManager::FireRender) {
+        patchFireRender(mNoFire.mValue);
+    }
 }
 
 void NoRender::onDisable()
 {
-    patchOverlay(false);
-    patchFireRender(false);
+    if (SigManager::Unknown_renderBlockOverlay) {
+        patchOverlay(false);
+    }
+    if (SigManager::FireRender) {
+        patchFireRender(false);
+    }
 }

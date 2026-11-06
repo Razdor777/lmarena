@@ -1,57 +1,34 @@
 #include "HealthHooks.hpp"
 #include <Features/Events/EntityHurtEvent.hpp>
 #include <Features/FeatureManager.hpp>
-#include <SDK/Minecraft/Actor/Actor.hpp>
-#include <Windows.h>
+#include <SDK/Minecraft/ClientInstance.hpp>
+#include <SDK/SigManager.hpp>
 
+std::unique_ptr<Detour> HealthHooks::mHurtDetour;
 
-std::unique_ptr<Detour> HealthHooks::mDetourEntityHurt;
-std::unique_ptr<Detour> HealthHooks::mDetourEntityHealthChanged;
+bool HealthHooks::onEntityHurt(Actor* _this, ActorDamageSource* src, float damage, bool knock, bool ignite)
+{
+    auto original = mHurtDetour->getOriginal<&HealthHooks::onEntityHurt>();
+    bool result = original(_this, src, damage, knock, ignite);
 
-bool HealthHooks::onEntityHurt(Actor *actor, ActorDamageSource *source,
-                               int damage, bool knockback, bool ignites) {
-  auto original = mDetourEntityHurt->getOriginal<&HealthHooks::onEntityHurt>();
+    if (result && gFeatureManager && gFeatureManager->mDispatcher)
+    {
+        auto holder = nes::make_holder<EntityHurtEvent>(_this, src, static_cast<int>(damage), knock, ignite);
+        gFeatureManager->mDispatcher->trigger(holder);
+    }
 
-  if (actor) {
-    auto holder = nes::make_holder<EntityHurtEvent>(actor, source, damage,
-                                                    knockback, ignites);
-    gFeatureManager->mDispatcher->trigger(holder);
-  }
-
-  return original(actor, source, damage, knockback, ignites);
+    return result;
 }
 
-void HealthHooks::onEntityHealthChanged(Actor *actor, int oldHealth,
-                                        int newHealth,
-                                        const AttributeModifier &modifier) {
-  // We can guess signature for now, likely just void
-  // Or maybe just void(Actor*)?
-  // User provided no sig.
-  // If we detour with wrong sig, we crash.
-  // Safest is to skip healthChanged if we have hurt, unless required.
-  // DamageLog can use hurt.
+void HealthHooks::init()
+{
+    uintptr_t hurtAddr = SigManager::Health_entityHurt;
+    if (!hurtAddr)
+    {
+        // BaseTickHook natively dispatches EntityHurtEvent via MobHurtTimeComponent on 26.62.
+        return;
+    }
 
-  auto original = mDetourEntityHealthChanged
-                      ->getOriginal<&HealthHooks::onEntityHealthChanged>();
-  original(actor, oldHealth, newHealth, modifier);
-}
-
-void HealthHooks::init() {
-  uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
-
-  // entityHurt sub_1423A09B0
-  // Offset: 0x23A09B0
-  uintptr_t hurtAddr = base + 0x23A09B0;
-
-  // entityHealthChanged sub_1423A0B80
-  // Offset: 0x23A0B80
-  uintptr_t healthChangedAddr = base + 0x23A0B80;
-
-  mDetourEntityHurt = std::make_unique<Detour>("entityHurt", (void *)hurtAddr,
-                                               &HealthHooks::onEntityHurt);
-
-  // Temporarily disabled healthChanged hook until signature is confirmed to
-  // avoid crashes mDetourEntityHealthChanged =
-  // std::make_unique<Detour>("entityHealthChanged", (void*)healthChangedAddr,
-  // &HealthHooks::onEntityHealthChanged);
+    mHurtDetour = std::make_unique<Detour>("Mob::_hurt", reinterpret_cast<void*>(hurtAddr), &HealthHooks::onEntityHurt);
+    mHurtDetour->enable();
 }

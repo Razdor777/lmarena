@@ -56,7 +56,7 @@ void Disabler::onPacketInEvent(class PacketInEvent& event)
 
         if (mPacketQueue.size() >= static_cast<int>(mQueuedPackets.mValue))
         {
-            for (auto& [first, second]: mPacketQueue)
+            for (auto& [first, second] : mPacketQueue)
             {
                 auto newLatency = MinecraftPackets::createPacket<NetworkStackLatencyPacket>();
                 newLatency->mCreateTime = second;
@@ -159,6 +159,24 @@ void Disabler::onPacketOutEvent(PacketOutEvent& event)
         float newY = MathUtils::lerp(packet->mPos.y, targetY, tickPerc);
         packet->mPos.y = newY;
     }
+    if (mMode.mValue == Mode::sentinelfull)
+    {
+        if (event.mPacket->getId() == PacketID::NetworkStackLatency)
+        {
+
+            auto latency = event.getPacket<NetworkStackLatencyPacket>();
+
+            mLatencyTimestamps.push_back(latency->mCreateTime);
+            event.mCancelled = true;
+            return;
+
+
+
+        }
+
+
+    }
+
 
 #ifdef __PRIVATE_BUILD__
     if (mMode.mValue == Mode::SentinelNew && event.mPacket->getId() == PacketID::PlayerAuthInput)
@@ -245,14 +263,14 @@ void Disabler::onPacketOutEvent(PacketOutEvent& event)
                 spdlog::info("Removed sprinting and sneaking flags");
 
                 // Stop the player from sprinting
-                player->getMoveInputComponent()->setmIsSprinting(false);
+                player->getMoveInputComponent()->setSprinting(false);
             }
             //ChatUtils::displayClientMessage("Move: " + to_string(pkt->mMove.x) + " | " + to_string(pkt->mMove.y));
             return;
         }
         else if (mDisablerType.mValue == DisablerType::MoveFixV2) {
             if (event.mPacket->getId() != PacketID::PlayerAuthInput) return;
-            
+
             auto pkt = event.getPacket<PlayerAuthInputPacket>();
             glm::vec2 moveVec = pkt->mMove;
             glm::vec2 xzVel = MathUtils::getMotion(player->getActorRotationComponent()->mYaw, 1);
@@ -415,7 +433,7 @@ void Disabler::onPacketOutEvent(PacketOutEvent& event)
             {
                 auto actor = ActorUtils::getActorFromUniqueId(ait->mActorId);
                 if (!actor) return;
-                player->getGameMode()->interact(actor, *actor->getPos());
+                player->getGameMode()->interact(actor, *actor->getPos(), 0 /*if it offhand getting crash*/);
                 //ChatUtils::displayClientMessage("Interacted");
             }
 
@@ -425,7 +443,7 @@ void Disabler::onPacketOutEvent(PacketOutEvent& event)
                 const auto transac = reinterpret_cast<ItemUseInventoryTransaction*>(it->mTransaction.get());
                 if (transac->mActionType == ItemUseInventoryTransaction::ActionType::Place)
                 {
-                    transac->mClickPos = BlockUtils::clickPosOffsets    [transac->mFace];
+                    transac->mClickPos = BlockUtils::clickPosOffsets[transac->mFace];
                     for (int i = 0; i < 3; i++)
                     {
                         if (transac->mClickPos[i] == 0.5)
@@ -448,12 +466,39 @@ void Disabler::onPacketOutEvent(PacketOutEvent& event)
 }
 
 void Disabler::onRunUpdateCycleEvent(RunUpdateCycleEvent& event) {
-    if (mMode.mValue != Mode::Sentinel) return;
+    if (mMode.mValue == Mode::Sentinel)
+    {
 
-    if (event.isCancelled() || event.mApplied) return;
 
-    Sleep(101);
-    mFirstAttackedActor = nullptr;
+        if (event.isCancelled() || event.mApplied) return;
+
+        Sleep(101);
+        mFirstAttackedActor = nullptr;
+
+    }
+    else if (mMode.mValue == Mode::sentinelfull)
+    {
+        if (!event.isCancelled() && !event.mApplied)
+        {
+
+            if (++mLatencyTickCounter >= mLatencyFlushInterval.mValue * 100)
+            {
+
+                for (auto ts : mLatencyTimestamps)
+                {
+                    auto pkt = MinecraftPackets::createPacket<NetworkStackLatencyPacket>();
+                    pkt->mCreateTime = ts;
+                    pkt->mFromServer = false;
+                    ClientInstance::get()->getPacketSender()->sendToServer(pkt.get());
+                }
+                mLatencyTimestamps.clear();
+                mLatencyTickCounter = 0;
+            }
+        }
+    }
+
+
+
 }
 
 static constexpr unsigned char newTimestamp[9] = { 0x3, 0x0, 0x0, 0x0, 0x0, 0xFF, 0xFF, 0xFF, 0xFF };

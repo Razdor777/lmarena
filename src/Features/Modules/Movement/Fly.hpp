@@ -12,9 +12,10 @@ public:
         Elytra,
         Pregame,
         Jump,
+        Vertical,
     };
 
-    EnumSettingT<Mode> mMode = EnumSettingT("Mode", "The mode of the fly", Mode::Motion,  "Motion", "Elytra", "Pregame", "Jump");
+    EnumSettingT<Mode> mMode = EnumSettingT("Mode", "The mode of the fly", Mode::Motion,  "Motion", "Elytra", "Pregame", "Jump", "Vertical");
     BoolSetting mApplyGlideFlags = BoolSetting("Apply Glide Flags", "Applies glide flags to the player", true); // Exclusive to Motion mode
     NumberSetting mSpeed = NumberSetting("Speed", "The speed of the fly", 5.6f, 0.f, 20.f, 0.1f);
 
@@ -28,6 +29,8 @@ public:
     BoolSetting mResetOnGround = BoolSetting("Reset On Ground", "Reset the airjump height when on ground", true);
     BoolSetting mResetOnDisable = BoolSetting("Reset On Disable", "Resets velocity when you disable", true);
     BoolSetting mDebug = BoolSetting("Debug", "Displays debug messages", false);
+
+    NumberSetting mStep = NumberSetting("Step", "The step of the vertical fly", 2.50, 1, 5, 0.01);
 
     // Applies to all modes
     BoolSetting mTimerBoost = BoolSetting("Timer Boost", "Whether to boost the timer", false);
@@ -49,6 +52,8 @@ public:
             &mResetOnDisable,
             &mDebug,
 
+            &mStep,
+
             &mTimerBoost,
             &mTimerBoostValue
         );
@@ -62,9 +67,11 @@ public:
         VISIBILITY_CONDITION(mDamageOnly, mMode.mValue == Mode::Jump);
         VISIBILITY_CONDITION(mFlyTime, mMode.mValue == Mode::Jump && mDamageOnly.mValue);
 
-        VISIBILITY_CONDITION(mDebug, mMode.mValue == Mode::Jump);
+        VISIBILITY_CONDITION(mDebug, mMode.mValue == Mode::Jump || mMode.mValue == Mode::Vertical);
         VISIBILITY_CONDITION(mResetOnGround, mMode.mValue == Mode::Jump);
         VISIBILITY_CONDITION(mResetOnDisable, mMode.mValue == Mode::Jump);
+
+        VISIBILITY_CONDITION(mStep, mMode.mValue == Mode::Vertical);
 
         VISIBILITY_CONDITION(mTimerBoostValue, mTimerBoost.mValue);
 
@@ -84,6 +91,7 @@ public:
     uint64_t mLastJump = 0;
     float mCurrentFriction = 1.f;
     uint64_t mLastDamage = 0;
+    float topY = 0;
 
 
     void onEnable() override;

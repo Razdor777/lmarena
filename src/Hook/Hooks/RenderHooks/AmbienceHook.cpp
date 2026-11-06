@@ -308,30 +308,31 @@ char AmbienceHook::onCloudRender(__int64 a1, uint64_t* a2, __int64 a3) {
 
 // ============ INITIALIZATION ============
 void AmbienceHook::init() {
-    // Create detours for each render function
-    // NOTE: You may need to add signatures to SigManager.hpp instead of using hardcoded addresses
-    // Адреса ниже — под один конкретный билд; prepare() отсекает явно неверные
-    // (вне модуля / выравнивающий мусор) и печатает первые байты для сигнатур.
+    if (!SigManager::Ambience_SkyRender && !SigManager::Ambience_EndSkyRender &&
+        !SigManager::Ambience_ChunkRender && !SigManager::Ambience_SunMoonRender &&
+        !SigManager::Ambience_CloudRender) {
+        spdlog::info("[AmbienceHook] Optional Ambience shader sigs not populated for 26.62 — shader hooks skipped (Time Changer active).");
+        return;
+    }
 
-    const bool skyOk = AmbienceDiag::prepare("SkyRender", getRVA(AmbienceAddresses::SkyRender), &AmbienceHook::onSkyRender, mSkyRenderDetour);
-    const bool endSkyOk = AmbienceDiag::prepare("EndSkyRender", getRVA(AmbienceAddresses::EndSkyRender), &AmbienceHook::onEndSkyRender, mEndSkyRenderDetour);
-    const bool chunkOk = AmbienceDiag::prepare("ChunkRender", getRVA(AmbienceAddresses::ChunkRender), &AmbienceHook::onChunkRender, mChunkRenderDetour);
-    const bool sunMoonOk = AmbienceDiag::prepare("SunMoonRender", getRVA(AmbienceAddresses::SunMoonRender), &AmbienceHook::onSunMoonRender, mSunMoonRenderDetour);
-    const bool cloudOk = AmbienceDiag::prepare("CloudRender", getRVA(AmbienceAddresses::CloudRender), &AmbienceHook::onCloudRender, mCloudRenderDetour);
+    const bool skyOk = SigManager::Ambience_SkyRender && AmbienceDiag::prepare("SkyRender", SigManager::Ambience_SkyRender, &AmbienceHook::onSkyRender, mSkyRenderDetour);
+    const bool endSkyOk = SigManager::Ambience_EndSkyRender && AmbienceDiag::prepare("EndSkyRender", SigManager::Ambience_EndSkyRender, &AmbienceHook::onEndSkyRender, mEndSkyRenderDetour);
+    const bool chunkOk = SigManager::Ambience_ChunkRender && AmbienceDiag::prepare("ChunkRender", SigManager::Ambience_ChunkRender, &AmbienceHook::onChunkRender, mChunkRenderDetour);
+    const bool sunMoonOk = SigManager::Ambience_SunMoonRender && AmbienceDiag::prepare("SunMoonRender", SigManager::Ambience_SunMoonRender, &AmbienceHook::onSunMoonRender, mSunMoonRenderDetour);
+    const bool cloudOk = SigManager::Ambience_CloudRender && AmbienceDiag::prepare("CloudRender", SigManager::Ambience_CloudRender, &AmbienceHook::onCloudRender, mCloudRenderDetour);
 
-    // Enable detours that actually installed
     if (mSkyRenderDetour) mSkyRenderDetour->enable();
     if (mEndSkyRenderDetour) mEndSkyRenderDetour->enable();
     if (mChunkRenderDetour) mChunkRenderDetour->enable();
     if (mSunMoonRenderDetour) mSunMoonRenderDetour->enable();
     if (mCloudRenderDetour) mCloudRenderDetour->enable();
 
-    spdlog::warn("AmbienceHook summary: SkyRender={} EndSkyRender={} ChunkRender={} SunMoonRender={} CloudRender={} (FAILED = hook not installed, function will never fire)",
-                 skyOk ? "OK" : "FAILED",
-                 endSkyOk ? "OK" : "FAILED",
-                 chunkOk ? "OK" : "FAILED",
-                 sunMoonOk ? "OK" : "FAILED",
-                 cloudOk ? "OK" : "FAILED");
+    spdlog::info("AmbienceHook summary: Sky={} EndSky={} Chunk={} SunMoon={} Cloud={}",
+                 skyOk ? "OK" : "SKIP",
+                 endSkyOk ? "OK" : "SKIP",
+                 chunkOk ? "OK" : "SKIP",
+                 sunMoonOk ? "OK" : "SKIP",
+                 cloudOk ? "OK" : "SKIP");
 }
 
 void AmbienceHook::shutdown() {

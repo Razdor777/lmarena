@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libhat/Platform.h>
+#include "../platform.h"
 
 #if defined(LIBHAT_WINDOWS)
     #if defined(LIBHAT_BUILD_SHARED_LIB)
@@ -29,9 +29,12 @@ extern "C" {
 typedef enum libhat_status_t {
     libhat_success,         // The operation was successful
     libhat_err_unknown,
-    libhat_err_sig_invalid, // The signature contained an invalid byte
-    libhat_err_sig_empty,   // The signature is empty
-    libhat_err_sig_nobyte,  // The signature did not contain a present byte, only wildcards
+    libhat_err_sig_missing_masked_byte,
+    libhat_err_sig_element_parse_error,
+    libhat_err_sig_empty_signature,
+    libhat_err_sig_expected_wildcard,
+    libhat_err_sig_invalid_token_length,
+    libhat_err_sig_illegal_first_byte,
 } libhat_status_t;
 
 typedef enum scan_alignment {
@@ -60,14 +63,14 @@ LIBHAT_API const void* libhat_find_pattern(
     const signature_t*  signature,
     const void*         buffer,
     size_t              size,
-    scan_alignment      align
+    scan_alignment_t    align
 );
 
 LIBHAT_API const void* libhat_find_pattern_mod(
     const signature_t*  signature,
     const void*         module,
     const char*         section,
-    scan_alignment      align
+    scan_alignment_t    align
 );
 
 LIBHAT_API const void* libhat_get_module(const char* name);

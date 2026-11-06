@@ -5,11 +5,6 @@
 #include <SDK/SigManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/Structs.hpp>
-//
-// Created by vastrakai on 6/29/2024.
-//
-
-
 
 class D3DHook : public Hook
 {
@@ -24,9 +19,13 @@ public:
     static inline bool forceFallback = false;
 
     static bool loadTextureFromEmbeddedResource(const char* resourceName, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height);
+    static bool createTextureFromFile(const char* filename, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height);
     static bool createTextureFromData(const uint8_t* data, int width, int height, ID3D11ShaderResourceView** out_srv);
-    static HRESULT present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT flags);
-    static HRESULT resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+
+    static HRESULT present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags);
+    static HRESULT resizeBuffers(IDXGISwapChain* swapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+    static HRESULT resizeBuffers1(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT format, UINT flags, const UINT* creationNodeMask, IUnknown* const* presentQueue);
+
     static void initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext);
     static void shutdownImGui();
     static void igNewFrame();
@@ -36,4 +35,3 @@ public:
     void shutdown() override;
     static void s_shutdown();
 };
-

@@ -22,13 +22,14 @@ public:
 
     bool mHasOpenContainer = false;
 
-    static void patchFunc1(bool);
-    static void patchFunc2(bool);
-    static void patchFunc(bool b)
-    {
-        patchFunc1(b);
-        patchFunc2(b);
-    }
+    std::vector<unsigned char> OriginalBytes;
+    std::vector<unsigned char> OriginalBytes2;
+    std::vector<unsigned char> OriginalBytes3;
+    bool Patched = false;
+
+    void Patch();
+    void UnPatch();
+
     void onEnable() override;
     void onDisable() override;
     void onBaseTickEvent(class BaseTickEvent& event);

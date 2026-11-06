@@ -91,7 +91,7 @@ public:
 
     void onEnable() override;
     void onDisable() override;
-    void onRenderItemInHandDescriptionEvent(class RenderItemInHandDescriptionEvent& event);
+    void onSetupShaderParameterEvent(class SetupShaderParameterEvent& event);
 
 private:
     // Colour before Saturation / Brightness / Pulse are applied.

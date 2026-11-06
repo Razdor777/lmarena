@@ -78,8 +78,8 @@ bool Speed::tickSwiftness()
     }
 
     static bool lastSpace = false;
-    auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
-    bool space = Keyboard::mPressedKeys[keyboard["key.jump"]];
+    auto* kbPtr = ClientInstance::get()->getKeyboardSettings();
+    bool space = kbPtr ? Keyboard::mPressedKeys[(*kbPtr)["key.jump"]] : false;
 
 
     int spellbook = ItemUtils::getSwiftnessSpellbook(mSwiftnessHotbar.mValue);

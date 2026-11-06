@@ -4,6 +4,7 @@
 //
 
 #include <Features/Modules/ModuleManager.hpp>
+#include <Features/Events/ClientTickEvent.hpp>
 #include <Utils/OAuthUtils.hpp>
 #include <build_info.h>
 
@@ -30,6 +31,7 @@
 #include "Misc/Disabler.hpp"
 #include "Misc/FakeChat.hpp"
 #include "Misc/Friends.hpp"
+#include "Misc/IRC.hpp"
 #include "Misc/JavaInventory.hpp"
 #include "Misc/JavaInventoryHotkeys.hpp"
 #include "Misc/KickSounds.hpp"
@@ -52,6 +54,7 @@
 #include "Movement/AutoPath.hpp"
 #include "Movement/AutoPatrol.hpp"
 #include "Movement/AutoSneak.hpp"
+#include "Movement/AutoWalk.hpp"
 #include "Movement/Fly.hpp"
 #include "Movement/InventoryMove.hpp"
 #include "Movement/Jesus.hpp"
@@ -71,6 +74,7 @@
 
 #include "Player/AntiVoid.hpp"
 #include "Player/AutoArmor.hpp"
+#include "Player/AutoEat.hpp"
 #include "Player/AutoKick.hpp"
 #include "Player/AutoTool.hpp"
 #include "Player/Cage.hpp"
@@ -192,6 +196,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<ReverseStep>());
   mModules.emplace_back(std::make_shared<Jetpack>());
   mModules.emplace_back(std::make_shared<AutoPatrol>());
+  mModules.emplace_back(std::make_shared<AutoWalk>());
 
   // Player
   mModules.emplace_back(std::make_shared<Timer>());
@@ -221,6 +226,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<FastEat>());
   mModules.emplace_back(std::make_shared<SpawnerAura>());
   mModules.emplace_back(std::make_shared<AutoLoot>());
+  mModules.emplace_back(std::make_shared<AutoEat>());
   mModules.emplace_back(std::make_shared<Cage>());
 
   // Misc
@@ -242,7 +248,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<NetSkip>());
   mModules.emplace_back(std::make_shared<Disabler>());
   mModules.emplace_back(std::make_shared<JavaInventoryHotkeys>());
-  mModules.emplace_back(std::make_shared<JavaInventory>());
+  mModules.emplace_back(std::make_shared<IRC>());
   mModules.emplace_back(std::make_shared<Spammer>());
   mModules.emplace_back(std::make_shared<SkinStealer>());
   mModules.emplace_back(std::make_shared<TestModule>());
@@ -438,6 +444,9 @@ void ModuleManager::onClientTick() {
                     module->mName);
     }
   }
+
+  auto holder = nes::make_holder<ClientTickEvent>();
+  gFeatureManager->mDispatcher->trigger(holder);
 }
 
 nlohmann::json ModuleManager::serialize() const {

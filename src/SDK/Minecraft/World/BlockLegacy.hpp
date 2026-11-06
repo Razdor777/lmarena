@@ -13,14 +13,22 @@
 class Material
 {
 public:
+    /*
     CLASS_FIELD(int, mType, 0x0);
-    CLASS_FIELD(bool, mIsFlammable, 0x4);
+    CLASS_FIELD(bool, mIsFlammable, 0x4); 
     CLASS_FIELD(bool, mIsNeverBuildable, 0x5);
     CLASS_FIELD(bool, mIsLiquid, 0x6);
     CLASS_FIELD(bool, mIsBlockingMotion, 0xC);
     CLASS_FIELD(bool, mIsBlockingPrecipitation, 0xD);
     CLASS_FIELD(bool, mIsSolid, 0xE);
-    CLASS_FIELD(bool, mIsSuperHot, 0xF);
+    CLASS_FIELD(bool, mIsSuperHot, 0xF);*/
+    unsigned char mType;
+    bool mIsNeverBuildable : 1;
+    bool mIsLiquid : 1;
+    bool mIsBlockingMotion : 1;
+    bool mIsBlockingPrecipitation : 1;
+    bool mIsSolid : 1;
+    bool mIsSuperHot : 1;
 
     bool isTopSolid(bool includeWater, bool includeLeaves)
     {
@@ -30,17 +38,30 @@ public:
         return true;
     }
 };
+//fuck clang? microsoft?
+struct __BlockFlags {
+    bool mCanBeOriginalSurface : 1;
+    bool mSolid : 1;
+    bool mPushesOutItems : 1;
+    bool mIgnoreBlockForInsideCubeRenderer : 1;
+    bool mIsOpaqueFullBlock : 1;
+    bool mShouldRandomTickExtraLayer : 1;
+    bool mIsMobPiece : 1;
+    bool mCanBeExtraBlock : 1;
+};
 
 class BlockLegacy {
 public:
     CLASS_FIELD(uintptr_t**, mVfTable, 0x0);
-    CLASS_FIELD(std::string, mTileName, 0x28);
-    CLASS_FIELD(std::string, mName, 0xA0);
-    CLASS_FIELD(Material*, mMaterial, 0x128);
-    CLASS_FIELD(bool, mSolid, 0x164);
+    CLASS_FIELD(std::string, mTileName, OffsetProvider::BlockLegacy_mTileName);
+    CLASS_FIELD(std::string, mName, OffsetProvider::BlockLegacy_mName); 
+    CLASS_FIELD(Material, mMaterial, OffsetProvider::BlockLegacy_mMaterial);
+    CLASS_FIELD(__BlockFlags, _BlockFlags, OffsetProvider::BlockLegacy_BlockFlags);
 
     uint16_t getBlockId();
     bool mayPlaceOn(glm::ivec3 pos);
     bool isAir();
+    bool isSolid() { return _BlockFlags.mSolid; }
+    bool getmSolid() { return _BlockFlags.mSolid; }
     AABB getCollisionShape(Block* block, BlockSource* source, BlockPos pos);
 };

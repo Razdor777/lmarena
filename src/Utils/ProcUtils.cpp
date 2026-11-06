@@ -39,33 +39,40 @@ int ProcUtils::getModuleCount()
 HWND ProcUtils::getMinecraftWindow()
 {
     static HWND window = nullptr;
-    if (!window)
+    if (!window || !IsWindow(window))
     {
-        std::map<HWND, std::string> titles;
-        auto callback = [](HWND hwnd, LPARAM lParam) -> BOOL {
+        window = nullptr;
+        struct FindData {
+            DWORD pid;
+            HWND best;
+            HWND fallback;
+        } data{ GetCurrentProcessId(), nullptr, nullptr };
 
-            char title[256];
+        auto callback = [](HWND hwnd, LPARAM lParam) -> BOOL {
+            if (!IsWindowVisible(hwnd)) return TRUE;
+            char title[256]{};
             GetWindowTextA(hwnd, title, sizeof(title));
             std::string titleStr = title;
-            auto *titles = reinterpret_cast<std::map<HWND, std::string> *>(lParam);
-            titles->insert({hwnd, titleStr});
+            if (titleStr.find("Minecraft") == std::string::npos && titleStr.find("Juzdex") == std::string::npos && titleStr.find("Solstice") == std::string::npos)
+                return TRUE;
+
+            auto* d = reinterpret_cast<FindData*>(lParam);
+            DWORD pid = 0;
+            GetWindowThreadProcessId(hwnd, &pid);
+            if (pid == d->pid) {
+                d->best = hwnd;
+                return FALSE;
+            }
+            if (!d->fallback) d->fallback = hwnd;
             return TRUE;
         };
 
-        EnumWindows(callback, reinterpret_cast<LPARAM>(&titles));
-
-        for (auto& [hwnd, title] : titles)
-        {
-            if (title.find("Minecraft") != std::string::npos)
-            {
-                window = hwnd;
-                break;
-            }
-        }
+        EnumWindows(callback, reinterpret_cast<LPARAM>(&data));
+        window = data.best ? data.best : data.fallback;
+        if (!window) window = FindWindowA(nullptr, "Minecraft");
 
         spdlog::info("Minecraft window handle: 0x{:X}", reinterpret_cast<uintptr_t>(window));
     }
-
 
     return window;
 }

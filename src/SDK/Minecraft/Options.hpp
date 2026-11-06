@@ -1,39 +1,60 @@
-#pragma once
-//
-// Created by vastrakai on 7/8/2024.
-//
-
-#include <vector>
-#include <Utils/MemUtils.hpp>
-
-
-class IntOption {
+#pragma once  
+//  
+// Created by vastrakai on 7/8/2024.  
+//  
+#include <xmmintrin.h>
+#include <vector>  
+#include <Utils/MemUtils.hpp>  
+class Option {
 public:
-    PAD(0x10);
-    int maximum;
-    PAD(0x4);
-    int value;
-    PAD(0x4);
-    int minimum;
+    class Impl {
+    public:
+        PAD(0x2a0);
+
+    };
+    std::unique_ptr<Option::Impl> mImpl;
+
+    virtual ~Option(); // need for size SHIT CLANG
 };
+class IntOption : public Option { 
+public:  
+    int32_t mMaxValue;
+    int32_t mMinValue;
+    int32_t mValue;
+    int32_t mDefaultValue;
+    bool mClampToRange;
+    PAD(0x58);
+};  
 
-static_assert(sizeof(IntOption) == 36, "IntOption size is incorrect!");
 
-class FloatOption
-{
-public:
-    PAD(0x10);
-    float mMinimum;
-    float mMaximum;
+
+
+class FloatOption : public Option{  
+public:  
+    float mMaxValue;
+    float mMinValue;
     float mValue;
     float mDefaultValue;
-};
+    float mDelta;
+};  
 
-class Options
-{
-public:
-    CLASS_FIELD(IntOption*, mThirdPerson, 0x30);
-    CLASS_FIELD(void*, mViewBob, 0x120);
-    CLASS_FIELD(FloatOption*, mGfxFieldOfView, 0x1A0);
-    CLASS_FIELD(FloatOption*, mGfxGamma, 0x1B8);
+static_assert(sizeof(IntOption) == 0x80);
+static_assert(sizeof(FloatOption) == 0x28);
+
+
+class Options {  
+public:  
+    void* vtable;
+    std::array<std::unique_ptr<class Option>, 813> options;/*TODO move to array*/
+
+    CLASS_FIELD(IntOption*, mThirdPerson, 0x28);  
+   //CLASS_FIELD(void*, mViewBob, 0x120);  
+    CLASS_FIELD(FloatOption*, mGfxFieldOfView, 0x188); // its ci-> get options -> any vtable -> optionid * 8  + 8-24 = this
+    CLASS_FIELD(FloatOption*, mGfxGamma, 0x1A0);
+
+
+
+    //FloatOption* mGfxGamma()
+   // IntOption* mThirdPerson();
+
 };

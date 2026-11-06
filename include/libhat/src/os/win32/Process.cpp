@@ -1,10 +1,14 @@
-#include <libhat/Defines.hpp>
+#include <libhat/defines.hpp>
 #ifdef LIBHAT_WINDOWS
 
-#include <libhat/Process.hpp>
+#include <libhat/process.hpp>
 
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
 
 #include <bit>
@@ -23,7 +27,7 @@ namespace hat::process {
             return false;
         }
 
-        if (size && *size < dosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS)) {
+        if (size && *size < static_cast<size_t>(dosHeader->e_lfanew) + sizeof(IMAGE_NT_HEADERS)) {
             return false;
         }
 
@@ -41,13 +45,7 @@ namespace hat::process {
         return *reinterpret_cast<const IMAGE_NT_HEADERS*>(scanBytes + dosHeader->e_lfanew);
     }
 
-    bool is_readable(const std::span<const std::byte> region) {
-        constexpr DWORD readFlags = PAGE_EXECUTE_READ
-            | PAGE_EXECUTE_READWRITE
-            | PAGE_EXECUTE_WRITECOPY
-            | PAGE_READONLY
-            | PAGE_READWRITE
-            | PAGE_WRITECOPY;
+    static bool regionHasFlags(const std::span<const std::byte> region, const DWORD flags) {
         for (auto* addr = region.data(); addr < region.data() + region.size();) {
             MEMORY_BASIC_INFORMATION mbi{};
             if (!VirtualQuery(addr, &mbi, sizeof(mbi))) {
@@ -56,7 +54,7 @@ namespace hat::process {
             if (mbi.State != MEM_COMMIT) {
                 return false;
             }
-            if (!(mbi.Protect & readFlags)) {
+            if (!(mbi.Protect & flags)) {
                 return false;
             }
             addr = static_cast<const std::byte*>(mbi.BaseAddress) + mbi.RegionSize;
@@ -64,25 +62,30 @@ namespace hat::process {
         return true;
     }
 
+    bool is_readable(const std::span<const std::byte> region) {
+        constexpr DWORD flags = PAGE_EXECUTE_READ
+            | PAGE_EXECUTE_READWRITE
+            | PAGE_EXECUTE_WRITECOPY
+            | PAGE_READONLY
+            | PAGE_READWRITE
+            | PAGE_WRITECOPY;
+        return regionHasFlags(region, flags);
+    }
+
     bool is_writable(const std::span<const std::byte> region) {
-        constexpr DWORD writeFlags = PAGE_EXECUTE_READWRITE
+        constexpr DWORD flags = PAGE_EXECUTE_READWRITE
             | PAGE_EXECUTE_WRITECOPY
             | PAGE_READWRITE
             | PAGE_WRITECOPY;
-        for (auto* addr = region.data(); addr < region.data() + region.size();) {
-            MEMORY_BASIC_INFORMATION mbi{};
-            if (!VirtualQuery(addr, &mbi, sizeof(mbi))) {
-                return false;
-            }
-            if (mbi.State != MEM_COMMIT) {
-                return false;
-            }
-            if (!(mbi.Protect & writeFlags)) {
-                return false;
-            }
-            addr = static_cast<const std::byte*>(mbi.BaseAddress) + mbi.RegionSize;
-        }
-        return true;
+        return regionHasFlags(region, flags);
+    }
+
+    bool is_executable(const std::span<const std::byte> region) {
+        constexpr DWORD flags = PAGE_EXECUTE
+            | PAGE_EXECUTE_READ
+            | PAGE_EXECUTE_READWRITE
+            | PAGE_EXECUTE_WRITECOPY;
+        return regionHasFlags(region, flags);
     }
 
     hat::process::module get_process_module() {
@@ -96,7 +99,7 @@ namespace hat::process {
         }
 
         std::wstring str;
-        str.resize(size);
+        str.resize(static_cast<size_t>(size));
 
         MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()), str.data(), size);
 
@@ -137,6 +140,27 @@ namespace hat::process {
             }
         }
         return {};
+    }
+
+    void hat::process::module::for_each_segment(const std::function<bool(std::span<std::byte>, hat::protection)>& callback) const {
+        const auto& ntHeaders = getNTHeaders(*this);
+
+        const auto* sectionHeader = IMAGE_FIRST_SECTION(&ntHeaders);
+        for (WORD i = 0; i < ntHeaders.FileHeader.NumberOfSections; i++, sectionHeader++) {
+            const std::span data{
+                reinterpret_cast<std::byte*>(this->address() + sectionHeader->VirtualAddress),
+                sectionHeader->Misc.VirtualSize
+            };
+
+            hat::protection prot{};
+            if (sectionHeader->Characteristics & IMAGE_SCN_MEM_READ) prot |= hat::protection::Read;
+            if (sectionHeader->Characteristics & IMAGE_SCN_MEM_WRITE) prot |= hat::protection::Write;
+            if (sectionHeader->Characteristics & IMAGE_SCN_MEM_EXECUTE) prot |= hat::protection::Execute;
+
+            if (!callback(data, prot)) {
+                break;
+            }
+        }
     }
 }
 #endif

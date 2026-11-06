@@ -22,7 +22,7 @@ void ChinaHat::onDisable() {
 }
 
 void ChinaHat::onRenderEvent(RenderEvent& event) {
-    if (ClientInstance::get()->getOptions()->mThirdPerson->value == 0) return;
+    if (ClientInstance::get()->getOptions()->mThirdPerson->mValue == 0) return;
 
     int pointCount = 20;
     float radius = mSize.mValue;

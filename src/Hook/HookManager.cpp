@@ -8,28 +8,33 @@
 
 #include "Hooks/ActorHooks/ActorModelHook.hpp"
 #include "Hooks/ActorHooks/AnimationHooks.hpp"
+#include "Hooks/ActorHooks/BaseTickHook.hpp"
+#include "Hooks/ActorHooks/HealthHooks.hpp"
 #include "Hooks/ActorHooks/NametagRenderHook.hpp"
 #include "Hooks/ActorHooks/ProjectileHooks.hpp"
+#include "Hooks/ClientInstanceHooks/GrabMouseHook.hpp"
 #include "Hooks/ContainerHooks/ContainerScreenControllerHook.hpp"
 #include "Hooks/MiscHooks/FireBlockChangedHook.hpp"
 #include "Hooks/MiscHooks/KeyHook.hpp"
 #include "Hooks/MiscHooks/MouseHook.hpp"
 #include "Hooks/MiscHooks/PreGameHook.hpp"
 #include "Hooks/NetworkHooks/ConnectionRequestHook.hpp"
+#include "Hooks/NetworkHooks/NetherNetHooks.hpp"
 #include "Hooks/NetworkHooks/PacketReceiveHook.hpp"
 #include "Hooks/NetworkHooks/PacketSendHook.hpp"
 #include "Hooks/NetworkHooks/RakPeerHooks.hpp"
 #include "Hooks/RenderHooks/ActorRenderDispatcherHook.hpp"
+#include "Hooks/RenderHooks/AmbienceHook.hpp"
 #include "Hooks/RenderHooks/D3DHook.hpp"
 #include "Hooks/RenderHooks/HoverTextRendererHook.hpp"
-#include "Hooks/RenderHooks/ItemRendererHook.hpp"
-#include "Hooks/RenderHooks/RenderItemInHandHook.hpp"
-#include "Hooks/RenderHooks/LookInputHook.hpp"
-#include "Hooks/RenderHooks/SetupAndRenderHook.hpp"
-#include "Hooks/ActorHooks/NametagRenderHook.hpp"
-#include "Hooks/RenderHooks/AmbienceHook.hpp"
 #include "Hooks/RenderHooks/HurtColorHook.hpp"
-
+#include "Hooks/RenderHooks/ItemRendererHook.hpp"
+#include "Hooks/RenderHooks/LevelRendererHook.hpp"
+#include "Hooks/RenderHooks/LookInputHook.hpp"
+#include "Hooks/RenderHooks/RenderItemInHandHook.hpp"
+#include "Hooks/RenderHooks/SetupAndRenderHook.hpp"
+#include "Hooks/RenderHooks/SetupShaderParameterHook.hpp"
+#include "Hooks/WindowsAPIHooks/WndProcHook.hpp"
 
 #define ADD_HOOK(hook) hooks.emplace_back(std::make_shared<hook>())
 
@@ -48,9 +53,7 @@ void HookManager::init(bool initLp)
     else
     {
         std::vector<std::shared_ptr<Hook>> hooks;
-        ADD_HOOK(KeyHook);
         ADD_HOOK(SetupAndRenderHook);
-        ADD_HOOK(ProjectileHooks);
         ADD_HOOK(D3DHook);
         ADD_HOOK(ContainerScreenControllerHook);
         ADD_HOOK(MouseHook);
@@ -58,20 +61,24 @@ void HookManager::init(bool initLp)
         ADD_HOOK(PacketReceiveHook);
         ADD_HOOK(PacketSendHook);
         ADD_HOOK(RakPeerHooks);
-        ADD_HOOK(ActorRenderDispatcherHook);
         ADD_HOOK(AnimationHooks);
         ADD_HOOK(HoverTextRendererHook);
         ADD_HOOK(LookInputHook);
         ADD_HOOK(ActorModelHook);
         ADD_HOOK(ItemRendererHook);
-        ADD_HOOK(RenderItemInHandHook);
         ADD_HOOK(FireBlockChangedHook);
+        ADD_HOOK(SetupShaderParameterHook);
         ADD_HOOK(PreGameHook);
         ADD_HOOK(NametagRenderHook);
+        ADD_HOOK(WndProcHook);
+        ADD_HOOK(GrabMouseHook);
+        ADD_HOOK(LevelRendererHook);
+
+        // Optional hooks (no-op unless optional sigs are populated in SigManager)
+        ADD_HOOK(ProjectileHooks);
+        ADD_HOOK(HealthHooks);
         ADD_HOOK(AmbienceHook);
         ADD_HOOK(HurtColorHook);
-
-
 
         for (auto& hook : hooks)
         {
@@ -95,4 +102,3 @@ void HookManager::shutdown()
 
     mHooks.clear();
 }
-

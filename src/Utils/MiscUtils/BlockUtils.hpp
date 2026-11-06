@@ -80,7 +80,7 @@ if (!IsAirBlock(pos + BlockPos(0, 1, 0))) return 0;*/
     };
 
     static int getBlockPlaceFace(glm::ivec3 blockPos);
-    static int getExposedFace(glm::ivec3 blockPos);
+    static int getExposedFace(glm::ivec3 blockPos, bool useFilter = false);
     static bool isGoodBlock(glm::ivec3 blockPos);
     static bool isAirBlock(glm::ivec3 blockPos);
     static glm::ivec3 getClosestPlacePos(glm::ivec3 pos, float distance);

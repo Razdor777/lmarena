@@ -1,22 +1,16 @@
-#pragma once
+//
+// Created by vastrakai on 6/24/2024.
+//
 
-#include <iostream>
 #include <Solstice.hpp>
-#include <thread>
 #include <Windows.h>
-#include <Utils/Logger.hpp>
-#include <winrt/base.h>
-#include <winrt/Windows.UI.ViewManagement.h>
-#include <winrt/Windows.ApplicationModel.Core.h>
-#include <winrt/Windows.UI.Core.h>
 
-bool __stdcall DllMain(const HMODULE hModule, const DWORD fdwReason, [[maybe_unused]] LPVOID lpReserved) {
-    if(fdwReason == DLL_PROCESS_ATTACH) {
-        DisableThreadLibraryCalls(hModule);
-        winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [hModule]()
-        {
-            Solstice::init(hModule);
-        });
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
+{
+    if (fdwReason == DLL_PROCESS_ATTACH)
+    {
+        DisableThreadLibraryCalls(hinstDLL);
+        CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(Solstice::init), hinstDLL, 0, nullptr);
     }
-    return true;  // Successful DLL_PROCESS_ATTACH
+    return TRUE;
 }

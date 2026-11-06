@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/7/2024.
 //
 
 #include "LevelRenderer.hpp"
@@ -20,6 +19,16 @@ float* LevelRendererPlayer::getFovX()
 float* LevelRendererPlayer::getFovY()
 {
     return &hat::member_at<float>(this, OffsetProvider::LevelRendererPlayer_mFovY);
+}
+
+void LevelRendererPlayer::setFovX(float v)
+{
+    hat::member_at<float>(this, OffsetProvider::LevelRendererPlayer_mFovX) = v;
+}
+
+void LevelRendererPlayer::setFovY(float v)
+{
+    hat::member_at<float>(this, OffsetProvider::LevelRendererPlayer_mFovY) = v;
 }
 
 LevelRendererPlayer* LevelRenderer::getRendererPlayer()

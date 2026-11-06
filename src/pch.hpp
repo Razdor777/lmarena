@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/13/2024.
 //
 
 #ifndef PCH_HPP
@@ -18,6 +17,16 @@ enum struct EventPriorities {
 };
 #define NES_PRIORITY_TYPE EventPriorities
 
+#define ENTT_SPARSE_PAGE 2048
+#define ENTT_PACKED_PAGE 128
+#define ENTT_USE_ATOMIC
+
+#include <SDK/EnttHashs.hpp>
+#include <SDK/heap_rd.hpp>
+#include <entt/entity/registry.hpp>
+#include <entt/entity/entity.hpp>
+#include <entt/entity/helper.hpp>
+
 #include <corecrt_math_defines.h>
 #include <set>
 #include <unordered_map>
@@ -32,6 +41,11 @@ enum struct EventPriorities {
 #include <thread>
 #include <vector>
 #include <Windows.h>
+#include <winrt/base.h>
+#include <winrt/Windows.System.h>
+#include <winrt/Windows.UI.Core.h>
+#include <winrt/Windows.ApplicationModel.Core.h>
+#include <winrt/Windows.Foundation.h>
 #include <glm/glm.hpp>
 #include "spdlog/logger.h"
 #include <glm/gtc/matrix_transform.hpp>

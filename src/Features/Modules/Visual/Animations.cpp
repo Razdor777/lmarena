@@ -18,10 +18,12 @@ std::vector<unsigned char> gNoSwitchAnimation = {
     0x90, 0x90, 0x90, 0x90, 0x90 // nop
 };
 
+std::vector<unsigned char> gFluxSwing = {
+    0xEB, 0x03, 0x90, 0x90, 0x90
+};
+
 DEFINE_PATCH_FUNC(patchNoSwitchAnimation, SigManager::ItemInHandRenderer_render_bytepatch, gNoSwitchAnimation);
-DEFINE_NOP_PATCH_FUNC(patchFluxSwing, SigManager::FluxSwing, 0x5);
-DEFINE_NOP_PATCH_FUNC(patchDefaultSwing, SigManager::ItemInHandRenderer_renderItem_bytepatch, 0x8);
-DEFINE_NOP_PATCH_FUNC(patchDefaultSwing2, SigManager::ItemInHandRenderer_renderItem_bytepatch+11, 0x8);
+DEFINE_PATCH_FUNC(patchFluxSwing, SigManager::FluxSwing, gFluxSwing);
 
 void Animations::onEnable()
 {
@@ -30,16 +32,14 @@ void Animations::onEnable()
     gFeatureManager->mDispatcher->listen<BoneRenderEvent, &Animations::onBoneRenderEvent>(this);
     gFeatureManager->mDispatcher->listen<BobHurtEvent, &Animations::onBobHurtEvent>(this);
 
-    if (!mSwingAngle)
+    if (!mSwingAngle && SigManager::TapSwingAnim)
     {
         mSwingAngle = reinterpret_cast<float*>(SigManager::TapSwingAnim);
         MemUtils::setProtection(reinterpret_cast<uintptr_t>(mSwingAngle), sizeof(float), PAGE_READWRITE);
     }
 
-    patchNoSwitchAnimation(mNoSwitchAnimation.mValue);
-    patchFluxSwing(mFluxSwing.mValue);
-    patchDefaultSwing(mAnimation.mValue == Animation::Test);
-    patchDefaultSwing2(mAnimation.mValue == Animation::Test);
+    if (SigManager::ItemInHandRenderer_render_bytepatch) patchNoSwitchAnimation(mNoSwitchAnimation.mValue);
+    if (SigManager::FluxSwing) patchFluxSwing(mFluxSwing.mValue);
 }
 
 void Animations::onDisable()
@@ -48,43 +48,36 @@ void Animations::onDisable()
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &Animations::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->deafen<BoneRenderEvent, &Animations::onBoneRenderEvent>(this);
     gFeatureManager->mDispatcher->deafen<BobHurtEvent, &Animations::onBobHurtEvent>(this);
-    patchNoSwitchAnimation(false);
-    patchFluxSwing(false);
 
-    if (mSwingAngle) *mSwingAngle = glm::radians(-80.f);
+    if (SigManager::ItemInHandRenderer_render_bytepatch) patchNoSwitchAnimation(false);
+    if (SigManager::FluxSwing) patchFluxSwing(false);
 
-    patchDefaultSwing(false);
-    patchDefaultSwing2(false);
+    if (mSwingAngle) *mSwingAngle = -80.f;
 }
-
 
 void Animations::onBaseTickEvent(BaseTickEvent& event)
 {
     auto player = event.mActor;
 
-    patchNoSwitchAnimation(mNoSwitchAnimation.mValue);
-    patchFluxSwing(mFluxSwing.mValue);
-    patchDefaultSwing(mAnimation.mValue == Animation::Test);
-    patchDefaultSwing2(mAnimation.mValue == Animation::Test);
+    if (SigManager::ItemInHandRenderer_render_bytepatch) patchNoSwitchAnimation(mNoSwitchAnimation.mValue);
+    if (SigManager::FluxSwing) patchFluxSwing(mFluxSwing.mValue);
 
     if (mOnlyOnBlock.mValue && mSwingAngle)
     {
         if (mShouldBlock)
         {
-            *mSwingAngle = glm::radians(mCustomSwingAngle.mValue ? mSwingAngleSetting.as<float>() : -80.f);
+            *mSwingAngle = mCustomSwingAngle.mValue ? glm::radians(mSwingAngleSetting.as<float>()) : -80.f;
         } else
         {
-            *mSwingAngle = glm::radians(-80.f);
+            *mSwingAngle = -80.f;
         }
     } else if (mSwingAngle)
     {
-        *mSwingAngle = glm::radians(mCustomSwingAngle.mValue ? mSwingAngleSetting.as<float>() : -80.f);
+        *mSwingAngle = mCustomSwingAngle.mValue ? glm::radians(mSwingAngleSetting.as<float>()) : -80.f;
     }
-
 
     mOldSwingDuration = mSwingDuration;
     mSwingDuration = player->getSwingProgress();
-
 }
 
 void Animations::onSwingDurationEvent(SwingDurationEvent& event)
@@ -94,24 +87,34 @@ void Animations::onSwingDurationEvent(SwingDurationEvent& event)
 
 void Animations::onBoneRenderEvent(BoneRenderEvent& event)
 {
+    if (!mThirdPersonBlock.mValue) return;
+    if (!event.mBones) return;
     auto ent = event.mActor;
     auto player = ClientInstance::get()->getLocalPlayer();
-    auto bone = event.mBone;
-    auto partModel = event.mPartModel;
+    if (!player || ent != player) return;
 
-    if (ent != ClientInstance::get()->getLocalPlayer()) return;
+    auto& bones = *event.mBones;
+    Bone* bone = nullptr;
 
-    if (bone->mBoneStr == "rightarm" && mThirdPersonBlock.mValue)
+    for (auto it = bones.begin(); it != bones.end(); it++) {
+        if (it->second.size() == 26) {
+            bone = &it->second[19];
+        }
+    }
+    if (!bone) return;
+
+    auto partModel = bone->getActorPartModel();
+    if (!partModel) return;
+
+    if (bone->mBoneStr == "rightarm")
     {
         auto heldItem = player->getSupplies()->getContainer()->getItem(player->getSupplies()->mInHandSlot);
-        bool isHoldingSword = heldItem && heldItem->mItem && heldItem->getItem()->isSword();
-        if ((!ClientInstance::get()->getMouseGrabbed() && ImGui::IsMouseDown(ImGuiMouseButton_Right) && isHoldingSword || event.mDoBlockAnimation && isHoldingSword) && mAnimation.mValue != Animation::Default)
+        bool isHoldingSword = heldItem && heldItem->getItem() && heldItem->getItem()->isSword();
+        if (((!ClientInstance::get()->getMouseGrabbed() && ImGui::IsMouseDown(ImGuiMouseButton_Right) && isHoldingSword) || (event.mDoBlockAnimation && isHoldingSword)) && mAnimation.mValue != Animation::Default)
         {
             float xRot = mXRot.mValue;
             float yRot = mYRot.mValue;
             float zRot = mZRot.mValue;
-
-            Actor* player = ClientInstance::get()->getLocalPlayer();
 
             if (player->getSwingProgress() > 0) {
                 xRot = MathUtils::animate(-30, xRot, ImRenderUtils::getDeltaTime() * 3.f);
@@ -125,7 +128,7 @@ void Animations::onBoneRenderEvent(BoneRenderEvent& event)
             partModel->mRot.x = xRot;
             partModel->mRot.y = yRot;
             partModel->mRot.z = zRot;
-            partModel->mSize.z = 0.9177761;
+            partModel->mSize.z = 0.9177761f;
         }
     }
 }
@@ -139,12 +142,12 @@ void Animations::onBobHurtEvent(BobHurtEvent& event)
     if (!player) return;
 
     auto heldItem = player->getSupplies()->getContainer()->getItem(player->getSupplies()->mInHandSlot);
-    bool isHoldingSword = heldItem && heldItem->mItem && heldItem->getItem()->isSword();
-    if ((!ClientInstance::get()->getMouseGrabbed() && ImGui::IsMouseDown(ImGuiMouseButton_Right) && isHoldingSword || event.mDoBlockAnimation && isHoldingSword) && mAnimation.mValue != Animation::Default)
+    bool isHoldingSword = heldItem && heldItem->getItem() && heldItem->getItem()->isSword();
+    if (((!ClientInstance::get()->getMouseGrabbed() && ImGui::IsMouseDown(ImGuiMouseButton_Right) && isHoldingSword) || (event.mDoBlockAnimation && isHoldingSword)) && mAnimation.mValue != Animation::Default)
     {
         mShouldBlock = true;
 
-        *matrix = glm::translate(*matrix, glm::vec3(0.4, 0.0, -0.15));
+        *matrix = glm::translate(*matrix, glm::vec3(0.4f, 0.0f, -0.15f));
         *matrix = glm::translate(*matrix, glm::vec3(-0.1f, 0.15f, -0.2f));
         *matrix = glm::translate(*matrix, glm::vec3(-0.24F, 0.25f, -0.20F));
         *matrix = glm::rotate(*matrix, -1.98F, glm::vec3(0.0F, 1.0F, 0.0F));
@@ -158,7 +161,6 @@ void Animations::onBobHurtEvent(BobHurtEvent& event)
         mShouldBlock = false;
     }
 
-
     if (mAnimation.mValue != Animation::Test) return;
 
     int swingTime = mSwingTime.as<int>();
@@ -166,7 +168,5 @@ void Animations::onBobHurtEvent(BobHurtEvent& event)
     int oldSwingProgress = mOldSwingDuration;
     float lerpedSwingProgress = MathUtils::lerp(oldSwingProgress, swingProgress, ClientInstance::get()->getMinecraftSim()->getGameSim()->mDeltaTime);
     float percent = lerpedSwingProgress / swingTime;
-    // spdlog::info("swingProgress: {} oldSwingProgress: {} lerpedSwingProgress: {} percent: {}", swingProgress, oldSwingProgress, lerpedSwingProgress, percent);
-
-    // TODO: Take transforms from Java Edition that swing and apply them here (they should work fine for bedrock?)
-};
+    (void)percent;
+}

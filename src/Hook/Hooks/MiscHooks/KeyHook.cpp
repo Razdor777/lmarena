@@ -6,6 +6,7 @@
 
 #include <Solstice.hpp>
 #include <Features/ChatBinds/ChatBinds.hpp>
+#include <Features/Modules/ModuleToggle.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
@@ -13,17 +14,11 @@
 
 #include <unordered_set>
 
-// Клавиши, которые игра реально видела зажатыми (oFunc вызван с isDown=true).
-// Нужно, чтобы во время набора в CustomChat пропускать игре ОТПУСКАНИЯ этих
-// клавиш: иначе зажатая до открытия чата W «залипла» бы — игра не узнала бы, что
-// клавиша отпущена, и игрок продолжал бы идти после закрытия чата.
-// Отпускания клавиш, которых игра не видела (T/Enter, которыми открыли наш чат),
-// наоборот, гасятся: Bedrock открывает ванильный чат именно по отпусканию Enter.
 static std::unordered_set<int> gGameSeenKeysDown;
 
 std::unique_ptr<Detour> KeyHook::mDetour = nullptr;
 
-ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
+static ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
 {
     switch (wParam)
     {
@@ -136,74 +131,42 @@ ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
 
 void KeyHook::onKey(uint32_t key, bool isDown)
 {
-    auto oFunc = mDetour->getOriginal<&onKey>();
+    mCurrentCancel = true;
 
-    // ── ImGui получает клавиши ДО всего остального ───────────────────────────
-    // Это принципиально для CustomChat: пока игрок печатает в нашем чате, игре
-    // нажатия не отдаются (иначе персонаж шёл бы вперёд), но самому чату символы
-    // нужны — он читает их из io.InputQueueCharacters. Поэтому кормим ImGui
-    // первым, а все остальные проверки (eject, KeyEvent, модули) идут ниже.
     if (ImGui::GetCurrentContext())
     {
         ImGuiIO& io = ImGui::GetIO();
-
         ImGuiKey imKey = ImGui_ImplWin32_VirtualKeyToImGuiKey(key);
-        io.AddKeyEvent(imKey, isDown);
-        if (isDown)
-        {
-            // ToUnicode, а НЕ ToAscii: ToAscii отдаёт байт в ANSI-кодировке, и для
-            // русской раскладки это 0xE0 (CP1251), а не код символа 'а'. Дальше ImGui
-            // получал отрицательный char -> U+FFFD, и в интерфейсе вместо кириллицы
-            // рисовались знаки вопроса (глиф '?' как fallback).
-            int scanCode = MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
-            BYTE keyState[256] = { 0 };
-            GetKeyboardState(keyState);
-
-            WCHAR translation[8] = { 0 };
-            int result = ToUnicode(key, scanCode, keyState, translation, 8, 0);
-
-            // result < 0 — мёртвая клавиша: символ появится при следующем нажатии
-            // (Windows сам хранит состояние композиции), поэтому просто пропускаем.
-            for (int i = 0; i < result; ++i)
-            {
-                if (translation[i] >= 32)
-                    io.AddInputCharacter(static_cast<unsigned int>(translation[i]));
-            }
-        }
+        if (imKey != ImGuiKey_None)
+            io.AddKeyEvent(imKey, isDown);
     }
 
-    // ── Пока игрок печатает в нашем чате, клавиатуру держит он ───────────────
-    // Символы уже ушли в ImGui выше, а игре нажатия не нужны: не вызывая oFunc,
-    // мы не даём персонажу идти (W/A/S/D), прыгать (Space) и открывать инвентарь
-    // (E). Заодно гасим состояние для клиентских модулей — Disabler и
-    // InventoryMove читают тот же Keyboard::mPressedKeys.
+    // While CustomChat input is open, swallow keydowns so the player doesn't move/jump/open inv,
+    // but let key-ups of previously held keys pass through so keys never stick.
     if (ChatUtils::sChatInputActive)
     {
         Keyboard::mPressedKeys[key] = false;
-
-        // Отпускание клавиши, которую игра видела зажатой, обязано до неё доехать,
-        // иначе она останется «зажатой» навсегда (стрибун, бег и т.д.). Нажатия же
-        // и отпускания «невидимых» игре клавиш гасим полностью.
         if (!isDown && gGameSeenKeysDown.count(static_cast<int>(key)) > 0)
         {
             gGameSeenKeysDown.erase(static_cast<int>(key));
-            oFunc(key, false);
+            mCurrentCancel = false;
         }
         return;
     }
 
-    // Отпускание клавиши, закрывшей наш чат, тоже гасим: ванильный Minecraft
-    // открывает чат по ОТПУСКАНИЮ Enter, и если оно «утечёт» в игру после
-    // закрытия нашего чата, оригинальный экран откроется прямо поверх нашего.
+    // Swallow the trailing key-up of Enter/T that closed CustomChat so vanilla chat doesn't open.
     if (ChatUtils::sChatSwallowKey == static_cast<int>(key) && ImGui::GetCurrentContext() &&
         ImGui::GetTime() < ChatUtils::sChatSwallowDeadline)
     {
         Keyboard::mPressedKeys[key] = false;
-        if (!isDown) ChatUtils::sChatSwallowKey = 0; // отпускание поймано — хватит
+        if (!isDown) ChatUtils::sChatSwallowKey = 0;
         return;
     }
 
-    if (key == VK_END && isDown && ClientInstance::get()->getScreenName() != "chat_screen" && !ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantTextInput)
+    auto* ci = ClientInstance::get();
+    bool inImGuiCapture = ImGui::GetCurrentContext() && (ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantTextInput);
+
+    if (key == VK_END && isDown && (!ci || ci->getScreenName() != "chat_screen") && !inImGuiCapture)
     {
         Solstice::mRequestEject = true;
     }
@@ -211,77 +174,58 @@ void KeyHook::onKey(uint32_t key, bool isDown)
     Keyboard::mPressedKeys[key] = isDown;
 
     auto holder = nes::make_holder<KeyEvent>(key, isDown);
-    if (!gFeatureManager)
-    {
-        spdlog::critical("FeatureManager is null");
-    }
-    if (!gFeatureManager->mDispatcher)
-    {
-        spdlog::critical("Dispatcher is null");
-    }
+    if (gFeatureManager && gFeatureManager->mDispatcher)
+        gFeatureManager->mDispatcher->trigger(holder);
 
-    gFeatureManager->mDispatcher->trigger<KeyEvent>(holder);
-
-    if (holder->mCancelled) return;
-
-    if (!ImGui::GetCurrentContext()) return;
-    ImGuiIO& io = ImGui::GetIO();
-
-    // Return and don't call oFunc if ImGui wants to capture keyboard or text input
-    if (io.WantCaptureKeyboard || io.WantTextInput)
+    if (holder->isCancelled())
     {
         return;
     }
 
-    // Чат-бинды (ClickGui -> Chat Binds): клавиша забиндена — текст ушёл в чат,
-    // а игре клавиша не отдаётся ни нажатием, ни отпусканием (T иначе открыл бы
-    // ещё и ванильный чат). Только в игре: в меню/чате/ClickGui не срабатывает.
+    if (inImGuiCapture)
+    {
+        return;
+    }
+
     if (ChatBinds::handleKey(static_cast<int>(key), isDown))
+    {
         return;
+    }
 
     if (isDown) gGameSeenKeysDown.insert(static_cast<int>(key));
     else        gGameSeenKeysDown.erase(static_cast<int>(key));
 
-    oFunc(key, isDown);
+    mCurrentCancel = false;
 
-    // Look for modules
+    if (!gFeatureManager || !gFeatureManager->mModuleManager) return;
+
     const auto* clickGui = gFeatureManager->mModuleManager->getModule<ClickGui>();
+    if (!clickGui) return;
 
-    for (auto& module : gFeatureManager->mModuleManager->getModules())
+    for (const auto& mod : gFeatureManager->mModuleManager->getModules())
     {
-        if (ClientInstance::get()->getMouseGrabbed() && module.get() != clickGui) continue;
-        if (ClientInstance::get()->getScreenName() == "chat_screen") continue;
-
-        if (module->mKey == key)
+        if (mod->mKey == static_cast<int>(key))
         {
-            if (module->mEnableWhileHeld)
+            if (clickGui->mEnabled && mod != clickGui) continue;
+
+            if (ci && ci->getScreenName() != "hud_screen" && mod != clickGui)
             {
-                module->mWantedState = isDown;
+                if (!mod->mEnableWhileHeld || !mod->mEnabled) continue;
+            }
+
+            if (mod->mEnableWhileHeld)
+            {
+                ModuleToggle::requestSet(mod.get(), isDown);
             }
             else if (isDown)
             {
-                module->toggle();
+                ModuleToggle::requestToggle(mod.get());
             }
         }
-
-        /*if (isDown)
-        {
-            for (Setting* setting : module->mSettings)
-            {
-                if (auto boolSetting = dynamic_cast<BoolSetting*>(setting))
-                {
-                    if (boolSetting->mKey == key)
-                    {
-                        bool oldValue = static_cast<bool>(*boolSetting);
-                        boolSetting->setValue(!oldValue);
-                    }
-                }
-            }
-        }*/
     }
 }
 
 void KeyHook::init()
 {
-    mDetour = std::make_unique<Detour>("Keyboard::feed", reinterpret_cast<void*>(SigManager::Keyboard_feed), &KeyHook::onKey);
+    // Driven by WndProcHook on 26.62 GDK
 }

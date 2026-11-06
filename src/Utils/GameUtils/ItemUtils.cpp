@@ -16,7 +16,7 @@
 
 int ItemUtils::getItemValue(ItemStack* item) {
     int value = 0;
-    if (!item || !item->mItem) return -1;
+    if (!item || !item->getItem()) return -1;
     switch (item->getItem()->getItemType())
     {
     case SItemType::Helmet:
@@ -40,7 +40,7 @@ int ItemUtils::getItemValue(ItemStack* item) {
 
     // If the item is armor, add the getArmorValue function
     if (item->getItem()->getItemType() >= SItemType::Helmet && item->getItem()->getItemType() <= SItemType::Boots)
-        value += item->getItem()->mProtection;
+        value += item->getItem()->getArmorTier();
 
     // If the item is a weapon, add the getItemTier function
     if (item->getItem()->getItemType() == SItemType::Sword || item->getItem()->getItemType() == SItemType::Pickaxe || item->getItem()->getItemType() == SItemType::Axe || item->getItem()->getItemType() == SItemType::Shovel)
@@ -51,30 +51,23 @@ int ItemUtils::getItemValue(ItemStack* item) {
 
 int ItemUtils::getBestItem(SItemType type, bool hotbarOnly)
 {
-    // Раньше здесь ни один указатель не проверялся: в момент смены мира,
-    // респавна или открытия контейнера supply/container/item бывают null —
-    // и Aura, которая зовёт это каждый удар, роняла игру.
     auto* ci = ClientInstance::get();
     if (!ci) return 0;
-
-    auto* player = ci->getLocalPlayer();
+    auto player = ci->getLocalPlayer();
     if (!player) return 0;
-
-    auto* supplies = player->getSupplies();
+    auto supplies = player->getSupplies();
     if (!supplies) return 0;
-
-    auto* container = supplies->getContainer();
+    auto container = supplies->getContainer();
     if (!container) return std::clamp(supplies->mSelectedSlot, 0, 8);
 
-    int bestSlot  = std::clamp(supplies->mSelectedSlot, 0, 8);
+    int bestSlot = std::clamp(supplies->mSelectedSlot, 0, 8);
     int bestValue = 0;
 
     for (int i = 0; i < 36; i++)
     {
         if (hotbarOnly && i > 8) break;
-
-        auto* item = container->getItem(i);
-        if (!item || !item->mItem) continue;
+        auto item = container->getItem(i);
+        if (!item || !item->getItem()) continue;
 
         if (item->getItem()->getItemType() == type)
         {
@@ -82,19 +75,18 @@ int ItemUtils::getBestItem(SItemType type, bool hotbarOnly)
             if (value > bestValue)
             {
                 bestValue = value;
-                bestSlot  = i;
+                bestSlot = i;
             }
         }
     }
 
-    // Только хотбар: 36 слотов контейнера — это не слоты хотбара.
     if (hotbarOnly && (bestSlot < 0 || bestSlot > 8)) bestSlot = 0;
     return bestSlot;
 }
 
 bool ItemUtils::hasItemType(ItemStack* item)
 {
-    if (!item->mItem) return false;
+    if (!item->getItem()) return false;
     return item->getItem()->getItemType() != SItemType::None;
 }
 
@@ -111,7 +103,7 @@ std::unordered_map<SItemType, int> ItemUtils::getBestItems()
     for (int i = 0; i < 36; i++)
     {
         auto item = container->getItem(i);
-        if (!item->mItem) continue;
+        if (!item->getItem()) continue;
 
         switch (item->getItem()->getItemType())
         {
@@ -131,7 +123,7 @@ std::unordered_map<SItemType, int> ItemUtils::getBestItems()
     for (const auto& [type, slot] : bestItems)
     {
         auto item = container->getItem(slot);
-        if (!item->mItem) continue;
+        if (!item->getItem()) continue;
 
         int value = getItemValue(item);
 
@@ -161,17 +153,22 @@ int ItemUtils::getAllPlaceables(bool hotbarOnly)
     for (int i = 0; i < 36; i++)
     {
         ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        if (!stack->getItem()) continue;
         Item* item = stack->getItem();
         if (hotbarOnly && i > 8) continue;
-        if (stack->mBlock && stack->mBlock->mLegacy)
+        if (stack->mBlock)
         {
             // If the string contains any of the blacklisted blocks, skip it (compare using StringUtils::containsIgnoreCase
             bool skip = false;
 
             for (const auto& blacklistedBlock : blacklistedBlocks)
             {
-                if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                /*if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                {
+                    skip = true;
+                    break;
+                }*/
+                if (StringUtils::containsIgnoreCase(stack->getItem()->mName, blacklistedBlock))
                 {
                     skip = true;
                     break;
@@ -196,7 +193,7 @@ int ItemUtils::getFirstPlaceable(bool hotbarOnly)
     for (int i = 0; i < 36; i++)
     {
         ItemStack* stack = supplies->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        if (!stack->getItem()) continue;
         Item* item = stack->getItem();
         if (hotbarOnly && i > 8) continue;
         if (stack->mBlock)
@@ -206,7 +203,12 @@ int ItemUtils::getFirstPlaceable(bool hotbarOnly)
 
             for (const auto& blacklistedBlock : blacklistedBlocks)
             {
-                if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                /*if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                {
+                    skip = true;
+                    break;
+                }*/
+                if (StringUtils::containsIgnoreCase(stack->getItem()->mName, blacklistedBlock))
                 {
                     skip = true;
                     break;
@@ -223,22 +225,17 @@ int ItemUtils::getFirstPlaceable(bool hotbarOnly)
 
 int ItemUtils::getPlaceableItemOnBlock(glm::vec3 blockPos, bool hotbarOnly, bool prioHighest)
 {
-    auto* ci = ClientInstance::get();
-    if (!ci) return -1;
-    auto player = ci->getLocalPlayer();
+    auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return -1;
     auto supplies = player->getSupplies();
-    if (!supplies) return -1;
-    auto* container = supplies->getContainer();
-    if (!container) return -1;
 
     int slot = -1;
     // slot, count
     std::map<int, int> placeables;
     for (int i = 0; i < 36; i++)
     {
-        ItemStack* stack = container->getItem(i);
-        if (!stack || !stack->mItem) continue;
+        ItemStack* stack = supplies->getContainer()->getItem(i);
+        if (!stack->getItem()) continue;
         Item* item = stack->getItem();
         if (hotbarOnly && i > 8) continue;
         if (stack->mBlock)
@@ -248,7 +245,12 @@ int ItemUtils::getPlaceableItemOnBlock(glm::vec3 blockPos, bool hotbarOnly, bool
 
             for (const auto& blacklistedBlock : blacklistedBlocks)
             {
-                if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                /*if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                {
+                    skip = true;
+                    break;
+                }*/
+                if (StringUtils::containsIgnoreCase(stack->getItem()->mName, blacklistedBlock))
                 {
                     skip = true;
                     break;
@@ -256,8 +258,8 @@ int ItemUtils::getPlaceableItemOnBlock(glm::vec3 blockPos, bool hotbarOnly, bool
             }
             if (skip) continue;
 
-            Block* block = stack->mBlock;
-            if (!block->mLegacy->mayPlaceOn(blockPos)) continue;
+            const Block* block = stack->mBlock;
+            //if (!block->mLegacy->mayPlaceOn(blockPos)) continue;
 
             if (!prioHighest)
             {
@@ -287,8 +289,9 @@ int ItemUtils::getPlaceableItemOnBlock(glm::vec3 blockPos, bool hotbarOnly, bool
 
 bool ItemUtils::isUsableBlock(ItemStack* stack)
 {
-    if (!stack->mItem) return false;
-    return stack->mBlock && !StringUtils::containsAnyIgnoreCase(stack->mBlock->toLegacy()->mName, std::vector<std::string>(blacklistedBlocks.begin(), blacklistedBlocks.end()));
+    if (!stack->getItem()) return false;
+    //return stack->mBlock && !StringUtils::containsAnyIgnoreCase(stack->mBlock->toLegacy()->mName, std::vector<std::string>(blacklistedBlocks.begin(), blacklistedBlocks.end()));
+    return stack->mBlock && !StringUtils::containsAnyIgnoreCase(stack->getItem()->mName, std::vector<std::string>(blacklistedBlocks.begin(), blacklistedBlocks.end()));
 }
 
 int ItemUtils::getSwiftnessSpellbook(bool hotbarOnly)
@@ -301,7 +304,7 @@ int ItemUtils::getSwiftnessSpellbook(bool hotbarOnly)
     for (int i = 0; i < 36; i++)
     {
         ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        if (!stack->getItem()) continue;
         if (hotbarOnly && i > 8) break;
         Item* item = stack->getItem();
         if (StringUtils::containsIgnoreCase(stack->getCustomName(), "Spell of Swiftness"))
@@ -327,13 +330,77 @@ int ItemUtils::getBoombox(bool hotbarOnly, bool tnt)
     for (int i = 0; i < 36; i++)
     {
         ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        if (!stack->getItem()) continue;
         if (hotbarOnly && i > 8) break;
         Item* item = stack->getItem();
         if (StringUtils::containsIgnoreCase(item->getmName(), name))
         {
             slot = i;
             break;
+        }
+    }
+
+    return slot;
+}
+
+int ItemUtils::getNonSolidBlock(bool hotbarOnly)
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return -1;
+
+    int slot = -1;
+
+    for (int i = 0; i < 36; i++)
+    {
+        ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
+        if (!stack->getItem()) continue;
+        if (hotbarOnly && i > 8) break;
+        if (stack->mBlock && !stack->mBlock->mLegacy->_BlockFlags.mSolid) {
+            slot = i;
+            break;
+        }
+    }
+
+    return slot;
+}
+
+int ItemUtils::getBlocks(bool hotbarOnly, bool crumblingCobblestone)
+{
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return -1;
+
+    int slot = -1;
+
+    for (int i = 0; i < 36; i++)
+    {
+        ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
+        if (!stack->getItem()) continue;
+        if (hotbarOnly && i > 8) break;
+        if (stack->mBlock) {
+            // If the string contains any of the blacklisted blocks, skip it (compare using StringUtils::containsIgnoreCase
+            bool skip = false;
+
+            for (const auto& blacklistedBlock : blacklistedBlocks)
+            {
+                /*if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                {
+                    skip = true;
+                    break;
+                }*/
+                if (StringUtils::containsIgnoreCase(stack->getItem()->mName, blacklistedBlock))
+                {
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) continue;
+
+            bool isCrumblingCobblestone = StringUtils::containsIgnoreCase(stack->getItem()->mName, "crumbling");
+            if ((crumblingCobblestone && isCrumblingCobblestone) || (!crumblingCobblestone && !isCrumblingCobblestone))
+            {
+                slot = i;
+                break;
+            }
         }
     }
 
@@ -348,7 +415,7 @@ int ItemUtils::getEmptyHotbarSlot()
     for (int i = 0; i < 9; i++)
     {
         ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
-        if (!stack->mItem) return i;
+        if (!stack->getItem()) return i;
     }
 
     return -1;
@@ -360,7 +427,7 @@ void ItemUtils::useItem(int slot)
     if (!player) return;
 
     ItemStack* stack = player->getSupplies()->getContainer()->getItem(slot);
-    if (!stack->mItem) return;
+    if (!stack->getItem()) return;
 
     auto supplies = player->getSupplies();
 
@@ -381,7 +448,7 @@ int ItemUtils::getHardestBlock(int slot, bool hotbarOnly)
     for (int i = 0; i < 36; i++)
     {
         ItemStack* stack = supplies->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        if (!stack->getItem()) continue;
         Item* item = stack->getItem();
         if (hotbarOnly && i > 8) continue;
         if (stack->mBlock)
@@ -391,7 +458,12 @@ int ItemUtils::getHardestBlock(int slot, bool hotbarOnly)
 
             for (const auto& blacklistedBlock : blacklistedBlocks)
             {
-                if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                /*if (StringUtils::containsIgnoreCase(stack->mBlock->toLegacy()->mName, blacklistedBlock))
+                {
+                    skip = true;
+                    break;
+                }*/
+                if (StringUtils::containsIgnoreCase(stack->getItem()->mName, blacklistedBlock))
                 {
                     skip = true;
                     break;
@@ -423,7 +495,7 @@ int ItemUtils::getBestBreakingTool(Block* block, bool hotbarOnly)
     for (int i = 0; i < 36; i++)
     {
         auto item = container->getItem(i);
-        if (!item->mItem) continue;
+        if (!item->getItem()) continue;
 
         float speed = getDestroySpeed(i, block);
         if (speed > bestSpeed)
@@ -454,8 +526,8 @@ float ItemUtils::getDestroySpeed(const int slot, const Block* block, const float
 
 bool ItemUtils::isFireSword(ItemStack* stack)
 {
-    if (!stack->mItem) return false;
-    return StringUtils::containsAnyIgnoreCase(stack->getCustomName(), {"§6Sword of §eEmbers", "§cFire Sword"});
+    if (!stack->getItem()) return false;
+    return StringUtils::containsIgnoreCase(stack->getItem()->mName, "golden_sword") && stack->getEnchantValue(Enchant::FLAME) > 0;
 }
 
 int ItemUtils::getFireSword(bool hotbarOnly)
@@ -468,7 +540,7 @@ int ItemUtils::getFireSword(bool hotbarOnly)
     for (int i = 0; i < 36; i++)
     {
         ItemStack* stack = player->getSupplies()->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        if (!stack->getItem()) continue;
         if (isFireSword(stack))
         {
             slot = i;

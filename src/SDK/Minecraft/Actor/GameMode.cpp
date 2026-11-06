@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/5/2024.
 //
 
 #include "GameMode.hpp"
@@ -14,5 +13,5 @@ bool GameMode::baseUseItem(ItemStack* itemStack)
 {
     if (!itemStack) return false;
     static uintptr_t func = SigManager::GameMode_baseUseItem;
-    return MemUtils::callFastcall<bool>(func, this, itemStack);
+    return MemUtils::callFastcall<bool, GameMode*, ItemStack*, int>(func, this, itemStack, 0);
 }

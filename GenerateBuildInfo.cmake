@@ -66,9 +66,9 @@ execute_process(
 
 if ("${MC_INSTALL_LOC}" STREQUAL "")
     set(MC_INSTALL_LOC "Unknown")
-    set(SOLSTICE_INTENDED_VERSION "Unknown")
-    message(WARNING "Minecraft install location: Unknown")
-    message(WARNING "Intended version: Unknown")
+    set(SOLSTICE_INTENDED_VERSION "26.62")
+    message(WARNING "Minecraft install location: Unknown (GDK build)")
+    message(STATUS "Intended version: 26.62")
 else()
     string(REPLACE "\\" "/" MC_INSTALL_LOC "${MC_INSTALL_LOC}")
     string(REGEX REPLACE ".*\n" "" MC_INSTALL_LOC "${MC_INSTALL_LOC}")

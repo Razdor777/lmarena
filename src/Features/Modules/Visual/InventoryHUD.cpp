@@ -70,8 +70,10 @@ void InventoryHUD::onEnable() {
 
     auto* renderer = ItemRendererHook::getItemRenderer();
     if (!renderer) {
-        spdlog::warn("[ItemAtlas] ItemRenderer not captured yet — выключи и включи модуль ещё раз");
-        sDebugDumped = false;
+        if (SigManager::ItemRenderer_renderGuiItemNew) {
+            spdlog::warn("[ItemAtlas] ItemRenderer not captured yet — выключи и включи модуль ещё раз");
+            sDebugDumped = false;
+        }
         return;
     }
 

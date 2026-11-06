@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/24/2024.
 //
 
 #include "BedrockPlatformUWP.hpp"
@@ -8,5 +7,6 @@
 
 MinecraftGame* BedrockPlatformUWP::getMinecraftGame()
 {
-    return hat::member_at<MinecraftGame*>(this, OffsetProvider::BedrockPlatformUWP_mcGame);
+    return nullptr;
+    //return hat::member_at<MinecraftGame*>(this, OffsetProvider::BedrockPlatformUWP_mcGame);
 }

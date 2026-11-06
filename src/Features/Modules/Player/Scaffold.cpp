@@ -399,8 +399,8 @@ bool Scaffold::tickPlace(BaseTickEvent& event)
 
     // ── Tower ────────────────────────────────────────────────────────────
     {
-        auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
-        const bool space = Keyboard::mPressedKeys[keyboard["key.jump"]];
+        auto* kbPtr = ClientInstance::get()->getKeyboardSettings();
+        const bool space = kbPtr ? Keyboard::mPressedKeys[(*kbPtr)["key.jump"]] : false;
         const bool wasTowering = mIsTowering;
         const bool isMoving = Keyboard::isUsingMoveKeys();
 

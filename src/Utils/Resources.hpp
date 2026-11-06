@@ -30,7 +30,18 @@ LOAD_RESOURCE(effect_water_breathing_effect_png);
 LOAD_RESOURCE(effect_weakness_effect_png);
 LOAD_RESOURCE(effect_wither_effect_png);
 LOAD_RESOURCE(fard_wav);
+LOAD_RESOURCE(fonts_Comfortaa_Bold_ttf);
+LOAD_RESOURCE(fonts_Comfortaa_ttf);
+LOAD_RESOURCE(fonts_Mojangles_Bold_ttf);
+LOAD_RESOURCE(fonts_Mojangles_ttf);
+LOAD_RESOURCE(fonts_Open_Sans_Bold_ttf);
+LOAD_RESOURCE(fonts_Open_Sans_ttf);
+LOAD_RESOURCE(fonts_Product_Sans_Bold_ttf);
+LOAD_RESOURCE(fonts_Product_Sans_ttf);
 LOAD_RESOURCE(fonts_Roboto_Regular_ttf);
+LOAD_RESOURCE(fonts_SF_Pro_Display_Bold_ttf);
+LOAD_RESOURCE(fonts_SF_Pro_Display_ttf);
+LOAD_RESOURCE(fonts_Sarabun_Light_ttf);
 LOAD_RESOURCE(fonts_Tenacity_Icons_ttf);
 LOAD_RESOURCE(fonts_mntsb_ttf);
 LOAD_RESOURCE(fonts_nurik_ttf);
@@ -183,6 +194,7 @@ LOAD_RESOURCE(skinblinker_txt);
 LOAD_RESOURCE(smooth_off_wav);
 LOAD_RESOURCE(smooth_on_wav);
 LOAD_RESOURCE(windows_background_wav);
+LOAD_RESOURCE(yo_at_here_gif);
 
 class ResourceLoader {
 public:

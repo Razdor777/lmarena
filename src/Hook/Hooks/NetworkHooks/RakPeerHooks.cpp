@@ -22,12 +22,13 @@ float RakPeerHooks::LastPing;
 
 void* peer = nullptr;
 
-void RakPeerHooks::runUpdateCycle(void* _this, void* a2)
+bool RakPeerHooks::runUpdateCycle(void* _this, void* a2)
 {
+    israknetalive = true;
     if (!peer)
     {
         peer = _this;
-        uintptr_t getAveragePingAddr = MemUtils::getAddressByIndex(reinterpret_cast<uintptr_t>(peer), 44);
+        uintptr_t getAveragePingAddr = MemUtils::getAddressByIndex(reinterpret_cast<uintptr_t>(peer), 39); // 1.21.131
         init(getAveragePingAddr);
     }
     auto original = RunUpdateCycleDetour->getOriginal<&runUpdateCycle>();
@@ -38,10 +39,10 @@ void RakPeerHooks::runUpdateCycle(void* _this, void* a2)
     gFeatureManager->mDispatcher->trigger(holder);
     if (holder->isCancelled())
     {
-        return;
+        return false; //idontknow false = correct?
     }
 
-    original(_this, a2);
+    return original(_this, a2);
 }
 
 __int64 RakPeerHooks::getLastPing(void* _this, void* a2)

@@ -193,6 +193,16 @@ void ChestStealer::onBaseTickEvent(BaseTickEvent& event)
         itemIndex++;
     }
 
+    if (items.empty() && player->getContainerManagerModel())
+    {
+        for (int i = 0; i < 56; ++i) {
+            auto* item = player->getContainerManagerModel()->getSlot(i);
+            if (!item || !item->getItem()) continue;
+            if (mIgnoreUseless.mValue && InvManager::isItemUseless(item, -1)) continue;
+            items[i] = *item;
+        }
+    }
+
     mRemainingItems = items.size();
 
     uint64_t predictedStealTime = (static_cast<uint64_t>(getDelay()) * items.size()) + 2000 + mLastOpen;

@@ -366,9 +366,9 @@ void Notifications::onModuleStateChange(ModuleStateChangeEvent& event)
 void Notifications::onConnectionRequestEvent(ConnectionRequestEvent& event)
 {
     if (!mShowOnJoin.mValue) return;
-    if (!event.mServerAddress) return;
+    if (event.mServerAddress.empty()) return;
 
-    push("Connecting", Icon::Info, mDuration.mValue, *event.mServerAddress);
+    push("Connecting", Icon::Info, mDuration.mValue, event.mServerAddress);
 }
 
 void Notifications::onNotifyEvent(NotifyEvent& event)

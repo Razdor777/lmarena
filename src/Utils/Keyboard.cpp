@@ -1,11 +1,10 @@
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 #include "Keyboard.hpp"
 
 #include <SDK/Minecraft/ClientInstance.hpp>
-#include <SDK/Minecraft/KeyboardMouseSettings.hpp>
+#include <SDK/Minecraft/KeyboardRemappingLayout.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/Components/MoveInputComponent.hpp>
 
@@ -21,10 +20,13 @@ bool Keyboard::isUsingMoveKeys(bool includeSpaceShift)
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
 
-    auto& keyboard = *ClientInstance::get()->getKeyboardSettings();
+    auto* kbPtr = ClientInstance::get()->getKeyboardSettings();
+    if (!kbPtr) return false;
+    auto& keyboard = *kbPtr;
 
     auto moveInput = player->getMoveInputComponent();
-    bool isMoving = moveInput->mForward || moveInput->mBackward || moveInput->mLeft || moveInput->mRight;
+    if (!moveInput) return false;
+    bool isMoving = moveInput->isUp() || moveInput->isDown() || moveInput->isLeft() || moveInput->isRight();
     if (includeSpaceShift)
         return isMoving || Keyboard::mPressedKeys[keyboard["key.jump"]] || Keyboard::mPressedKeys[keyboard["key.sneak"]];
 
@@ -37,7 +39,7 @@ bool Keyboard::isStrafing()
     if (!player) return false;
 
     auto moveInput = player->getMoveInputComponent();
-    return moveInput->mLeft || moveInput->mRight || moveInput->mBackward;
+    return moveInput->isLeft() || moveInput->isRight() || moveInput->isDown();
 }
 
 // returns the char representation of the key

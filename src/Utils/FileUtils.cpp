@@ -17,8 +17,11 @@ std::string FileUtils::getRoamingStatePath() {
   _dupenv_s(&appdata, &len, "APPDATA");
   if (appdata == nullptr)
     return "";
-  return std::string(appdata) + "\\..\\Local\\Packages\\Microsoft.MinecraftUWP_"
-                                "8wekyb3d8bbwe\\RoamingState\\";
+  std::string result = std::string(appdata) +
+                       "\\..\\Local\\Packages\\Microsoft.MinecraftUWP_"
+                       "8wekyb3d8bbwe\\RoamingState\\";
+  free(appdata);
+  return result;
 }
 
 std::string FileUtils::getJuzdexDir() {
@@ -34,7 +37,8 @@ bool FileUtils::fileExists(const std::string &path) {
 
 void FileUtils::createDirectory(const std::string &path) {
   if (!std::filesystem::exists(path)) {
-    std::filesystem::create_directory(path);
+    std::error_code ec;
+    std::filesystem::create_directories(path, ec);
     spdlog::info("Created directory: {}", path);
   }
 }
@@ -42,6 +46,11 @@ void FileUtils::createDirectory(const std::string &path) {
 void FileUtils::validateDirectories() {
   createDirectory(getJuzdexDir());
   createDirectory(getJuzdexDir() + "Configs\\");
+  createDirectory(getJuzdexDir() + "Templates\\");
+  createDirectory(getJuzdexDir() + "Databases\\");
+  createDirectory(getJuzdexDir() + "Skins\\");
+  createDirectory(getJuzdexDir() + "BlinkerSkins\\");
+  createDirectory(getJuzdexDir() + "Audio\\");
   spdlog::info("Directories created successfully.");
 }
 

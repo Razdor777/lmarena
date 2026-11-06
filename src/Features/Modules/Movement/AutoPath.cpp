@@ -88,8 +88,10 @@ __forceinline float AutoPath::heuristicEstimation(const Vec3i& node, const Vec3i
 
 inline bool AutoPath::isCompletelyObstructed(const Vec3i& pos) {
     const auto block = cachedSrc->getBlock(pos.toGlm());
+    if (!block || !block->toLegacy()) return false;
+    auto* leg = block->toLegacy();
 
-    if (block->toLegacy()->getmMaterial()->getmIsBlockingMotion() || block->toLegacy()->getmSolid()|| block->toLegacy()->getmMaterial()->getmIsBlockingPrecipitation() || block->toLegacy()->getBlockId() != 0)
+    if (leg->mMaterial.mIsBlockingMotion || leg->getmSolid() || leg->mMaterial.mIsBlockingPrecipitation || leg->getBlockId() != 0)
         return true;
 
     return false;

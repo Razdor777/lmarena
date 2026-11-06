@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 8/22/2024.
 //
 
 #pragma once
@@ -123,16 +122,23 @@ enum class TrustedSkinFlag : int8_t {
 	NO = 1,
 	YES = 2,
 };
-// CYKA BLYAT IDA NAHUI
-class SerializedSkin
+template <typename T0>
+class ThreadOwner
 {
 public:
-    CLASS_FIELD(int32_t, skinWidth, 0xA4);
-    CLASS_FIELD(int32_t, skinHeight, 0xA8);
-    CLASS_FIELD(const uint8_t*, skinData, 0xC0); // skinImage + Blob = 0xB8 + 0x8 pointer = 0xC0
+    T0 Object;
+    bool ThreadIdInitialized{};
+    std::thread::id ThreadId;
+    unsigned int ThreadCheckIndex{};
+};
+// CYKA BLYAT IDA NAHUI
+class SerializedSkinImpl {
+public:
+    CLASS_FIELD(int32_t, skinWidth, 0x84);
+    CLASS_FIELD(int32_t, skinHeight, 0x88);
+    CLASS_FIELD(const uint8_t*, skinData, 0xA0); // skinImage + Blob = 0xB8 + 0x8 pointer = 0xC0
 public:
     std::string                                          mId;                             // this+0x0
-    std::string                                          mPlayFabId;                      // this+0x20
     std::string                                          mFullId;                         // this+0x40
     std::string                                          mResourcePatch;                  // this+0x60
     std::string                                          mDefaultGeometryName;            // this+0x80
@@ -154,24 +160,32 @@ public:
     bool                                                 mIsPersonaCapeOnClassicSkin;     // this+0x1DE
     bool                                                 mIsPrimaryUser;                  // this+0x1DF
     bool                                                 mOverridesPlayerAppearance;      // this+0x1E0
+};
+class SerializedSkin
+{
+public:
+    std::shared_ptr<ThreadOwner<SerializedSkinImpl>> impl;
 
     void operator= (const SerializedSkin& other) {
         // use memcpy to copy the data
         memcpy(this, &other, sizeof(SerializedSkin));
     }
 
-    // toString method, that returns all of the fields in a string format
-    std::string toString()
-    {
-        std::string result = "SerializedSkin: {\n";
-        result += "mId: " + mId + "\n";
-        result += "mPlayFabId: " + mPlayFabId + "\n";
-        result += "mFullId: " + mFullId + "\n";
-        result += "mResourcePatch: " + mResourcePatch + "\n";
-        result += "mDefaultGeometryName: " + mDefaultGeometryName + "\n";
-        result += "mSkinImage: [data]\n";
-        result += "mCapeImage: [data]\n";
+};
 
-        return result;
-    }
+
+class SerializedSkinBase
+{
+private:
+    template <typename To>
+    class ThreadOwner
+    {
+    public:
+        To Object;
+        bool ThreadIdInitialized{};
+        std::thread::id ThreadId;
+        unsigned int ThreadCheckIndex{};
+    };
+public:
+    std::shared_ptr<ThreadOwner<SerializedSkin>> Impl;
 };

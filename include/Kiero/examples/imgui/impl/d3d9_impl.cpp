@@ -1,46 +1,43 @@
-﻿#include "../../../kiero.h"
+﻿#include "renderer_impl.h"
 
-#if KIERO_INCLUDE_D3D9
+#ifdef KIERO_INCLUDE_D3D9
 
-#include "d3d9_impl.h"
 #include <d3d9.h>
 #include <assert.h>
 
+#include <winrt/base.h>
+
 #include "win32_impl.h"
 
-#include "../imgui/imgui.h"
-#include "../imgui/examples/imgui_impl_win32.h"
-#include "../imgui/examples/imgui_impl_dx9.h"
+#include <kiero.hpp>
 
-typedef long(__stdcall* Reset)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
-static Reset oReset = NULL;
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx9.h>
 
-typedef long(__stdcall* EndScene)(LPDIRECT3DDEVICE9);
-static EndScene oEndScene = NULL;
+using Reset = HRESULT(__stdcall*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
+static Reset oReset = nullptr;
 
-long __stdcall hkReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PARAMETERS* pPresentationParameters)
-{
+using EndScene = HRESULT(__stdcall*)(LPDIRECT3DDEVICE9);
+static EndScene oEndScene = nullptr;
+
+HRESULT __stdcall hkReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PARAMETERS* pPresentationParameters) {
 	ImGui_ImplDX9_InvalidateDeviceObjects();
-	long result = oReset(pDevice, pPresentationParameters);
+	const auto result = oReset(pDevice, pPresentationParameters);
 	ImGui_ImplDX9_CreateDeviceObjects();
-
 	return result;
 }
 
-long __stdcall hkEndScene(LPDIRECT3DDEVICE9 pDevice)
-{
+HRESULT __stdcall hkEndScene(LPDIRECT3DDEVICE9 pDevice) {
 	static bool init = false;
 
-	if (!init)
-	{
+	if (!init) {
 		D3DDEVICE_CREATION_PARAMETERS params;
-		pDevice->GetCreationParameters(&params);
-
-		impl::win32::init(params.hFocusWindow);
+		winrt::check_hresult(pDevice->GetCreationParameters(&params));
 
 		ImGui::CreateContext();
-		ImGui_ImplWin32_Init(params.hFocusWindow);
 		ImGui_ImplDX9_Init(pDevice);
+		impl::win32::init(params.hFocusWindow);
 
 		init = true;
 	}
@@ -58,10 +55,25 @@ long __stdcall hkEndScene(LPDIRECT3DDEVICE9 pDevice)
 	return oEndScene(pDevice);
 }
 
-void impl::d3d9::init()
-{
-	assert(kiero::bind(16, (void**)&oReset, hkReset) == kiero::Status::Success);
-	assert(kiero::bind(42, (void**)&oEndScene, hkEndScene) == kiero::Status::Success);
+void impl::d3d9::init() {
+	auto status = kiero::bind<&IDirect3DDevice9::Reset>(&oReset, &hkReset);
+	assert(status == kiero::Status::Success);
+	status = kiero::bind<&IDirect3DDevice9::EndScene>(&oEndScene, &hkEndScene);
+	assert(status == kiero::Status::Success);
 }
+
+void impl::d3d9::shutdown() {
+	if (!ImGui::GetCurrentContext()) {
+		return;
+	}
+    win32::shutdown();
+	ImGui_ImplDX9_Shutdown();
+	ImGui::DestroyContext();
+}
+
+#else
+
+void impl::d3d9::init() {}
+void impl::d3d9::shutdown() {}
 
 #endif // KIERO_INCLUDE_D3D9

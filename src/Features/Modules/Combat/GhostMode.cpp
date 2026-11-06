@@ -190,11 +190,13 @@ void GhostMode::onBaseTickEvent(BaseTickEvent& event)
         motion.x = calc.x;
         motion.z = calc.y;
 
-        auto& kb = *ClientInstance::get()->getKeyboardSettings();
-        if (Keyboard::mPressedKeys[kb["key.jump"]])
-            motion.y += mSpeed.mValue / 10.f;
-        else if (Keyboard::mPressedKeys[kb["key.sneak"]])
-            motion.y -= mSpeed.mValue / 10.f;
+        if (auto* kbPtr = ClientInstance::get()->getKeyboardSettings()) {
+            auto& kb = *kbPtr;
+            if (Keyboard::mPressedKeys[kb["key.jump"]])
+                motion.y += mSpeed.mValue / 10.f;
+            else if (Keyboard::mPressedKeys[kb["key.sneak"]])
+                motion.y -= mSpeed.mValue / 10.f;
+        }
     }
 
     mOldOrigin = mOrigin;

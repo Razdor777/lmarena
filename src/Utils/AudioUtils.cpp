@@ -16,7 +16,7 @@
 #include <comdef.h>
 #include <mmsystem.h>     // Multimedia API (for HWA
 
-#include "Audio.h"
+#include "AudioUtils.hpp"
 
 std::vector<std::string> AudioUtils::listMicrophones()
 {

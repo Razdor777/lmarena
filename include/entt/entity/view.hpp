@@ -151,8 +151,13 @@ struct extended_view_iterator final {
         return ++(*this), orig;
     }
 
+    template<std::size_t... Index>
+    [[nodiscard]] reference dereference(std::index_sequence<Index...>) const noexcept {
+        return std::tuple_cat(std::make_tuple(*it), static_cast<Type *>(const_cast<constness_as_t<typename Type::base_type, Type> *>(std::get<Index>(it.pools)))->get_as_tuple(*it)...);
+    }
+
     [[nodiscard]] reference operator*() const noexcept {
-        return std::apply([entt = *it](auto *...curr) { return std::tuple_cat(std::make_tuple(entt), static_cast<Type *>(const_cast<constness_as_t<typename Type::base_type, Type> *>(curr))->get_as_tuple(entt)...); }, it.pools);
+        return dereference(std::index_sequence_for<Type...>{});
     }
 
     [[nodiscard]] pointer operator->() const noexcept {

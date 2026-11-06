@@ -1,30 +1,43 @@
 //
-// Created by vastrakai on 7/5/2024.
 //
 
 #pragma once
 
+#include <SDK/heap_rd.hpp>
+
+#include <algorithm>
+#include <map>
 #include <regex>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>
 #include <Utils/MemUtils.hpp>
-
+#include <SDK/Minecraft/ptr/WeakPtr.hpp>
 #include "CompoundTag.hpp"
+#include "Item.hpp"
 
+class NetworkItemStackDescriptor;
 
 class ItemStackBase {
 public:
     uintptr_t** mVfTable;
-    class Item** mItem;
+    WeakPtr<class Item> mItem;
     CompoundTag* mCompoundTag;
     class Block* mBlock;
     short mAuxValue;
-    int8_t mCount;
-    bool valid;
-    PAD(0x60);
+    uint8_t mCount;
+    bool mValid_DeprecatedSeeComment;
+    PAD(0x58);
 
     Item* getItem() const {
-        return *mItem;
+        if (this && mItem)
+        {
+            return mItem.get();
+        }
+        return nullptr;
+    }
+
+    bool isValid() const {
+        return this != nullptr && getItem() != nullptr && mCount > 0;
     }
 };
 
@@ -72,9 +85,7 @@ enum class Enchant : int {
 class ItemStack : public ItemStackBase
 {
 public:
-    uint8_t mStackNetId; //0x0088
-    PAD(0x8);
-
+    PAD(24);
     void reinit(Item* item, int count, int itemData) {
         mVfTable = reinterpret_cast<uintptr_t**>(SigManager::ItemStack_vTable);
         MemUtils::callVirtualFunc<void>(OffsetProvider::ItemStack_reInit, this, item, count, itemData);
@@ -82,12 +93,13 @@ public:
 
     std::string getCustomName() {
         static auto func = SigManager::ItemStack_getCustomName;
+        if (!func) return "";
         std::string str;
-        MemUtils::callFastcall<void, ItemStack*, std::string*>(func, this, &str);
-        return str;
+        MemUtils::callFastcall<std::string*, ItemStack*, std::string*>(func, this, &str);
+        return std::string(str.data(), str.size());
     }
 
-    std::map<int, int> gatherEnchants()
+    std::map<int, int> gatherEnchants() const
     {
         if (!mCompoundTag) return {};
 
@@ -99,8 +111,11 @@ public:
                 if (entry->getId() != Tag::Type::Compound) continue;
 
                 const auto comp = reinterpret_cast<CompoundTag*>(entry);
-                int id = comp->get("id")->asShortTag()->val;
-                const int lvl = comp->get("lvl")->asShortTag()->val;
+                auto idTag = comp->get("id");
+                auto lvlTag = comp->get("lvl");
+                if (!idTag || !lvlTag) continue;
+                int id = idTag->asShortTag()->val;
+                const int lvl = lvlTag->asShortTag()->val;
                 enchants[id] = lvl;
             }
         }
@@ -108,52 +123,58 @@ public:
         return enchants;
     }
 
-    int getEnchantValue(int id)
+    int getEnchantValue(int id) const
     {
         auto enchants = gatherEnchants();
         return enchants.contains(id) ? enchants[id] : 0;
     }
 
-    int getEnchantValue(Enchant enchant)
+    int getEnchantValue(Enchant enchant) const
     {
         return getEnchantValue(static_cast<int>(enchant));
     }
 
-    // =====================================================
-    // DURABILITY / DAMAGE METHODS
-    // =====================================================
-    // ItemStackBase::mAuxValue offset: 0x20 (содержит damage)
-    
-    int getDamage() const {
-        return static_cast<int>(mAuxValue);
+    int getDamage() const
+    {
+        if (mCompoundTag) {
+            if (auto dmgVar = mCompoundTag->get("Damage")) {
+                if (dmgVar->type == Tag::Type::Int && dmgVar->asIntTag()) {
+                    return dmgVar->asIntTag()->val;
+                }
+                if (dmgVar->type == Tag::Type::Short && dmgVar->asShortTag()) {
+                    return dmgVar->asShortTag()->val;
+                }
+            }
+        }
+        return mAuxValue > 0 ? static_cast<int>(mAuxValue) : 0;
     }
 
-    int getMaxDamage() const {
+    int getMaxDamage() const
+    {
         Item* item = getItem();
-        if (!item) return 0;
-        return item->getMaxDamage(); // вызываем виртуальную функцию из vtable Item
+        return item ? item->getMaxDamage() : 0;
     }
 
-    int getRemainingDurability() const {
+    int getRemainingDurability() const
+    {
         int maxDmg = getMaxDamage();
         if (maxDmg <= 0) return 0;
-        return maxDmg - getDamage();
+        return std::max(0, maxDmg - getDamage());
     }
 
-    float getDurabilityPercent() const {
+    float getDurabilityPercent() const
+    {
         int maxDmg = getMaxDamage();
         if (maxDmg <= 0) return 1.0f;
-        return static_cast<float>(getRemainingDurability()) / static_cast<float>(maxDmg);
+        return std::clamp(static_cast<float>(maxDmg - getDamage()) / static_cast<float>(maxDmg), 0.0f, 1.0f);
     }
 
-    bool isArmorEnchantable() const {
-        int maxDmg = getMaxDamage();
-        return maxDmg > 0;
-    }
-
-    bool hasDurability() const {
+    bool hasDurability() const
+    {
         return getMaxDamage() > 0;
     }
+
+    static ItemStack fromDescriptor(NetworkItemStackDescriptor const& desc);
 
     ItemStack()
     {
@@ -172,8 +193,6 @@ public:
         name = StringUtils::replaceAll(name, "_", " ");
         return name;
     }
-
-    static ItemStack fromDescriptor(class NetworkItemStackDescriptor const& desc);
 };
 
 static_assert(sizeof(ItemStack) == 0x98, "ItemStack size invalid");

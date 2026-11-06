@@ -41,8 +41,8 @@ bool BlockUtils::isGoodBlock(glm::ivec3 blockPos)
     bool isLiquid = (8 <= blockId && blockId <= 11);
     if (isLiquid) return false;
 
-    // Must block motion to be considered a "good" (solid) block
-    if (!legacy->mMaterial || !legacy->mMaterial->mIsBlockingMotion) return false;
+    // Must block motion / be solid to be considered a "good" (solid) block
+    if (!legacy->_BlockFlags.mSolid && !legacy->mMaterial.mIsBlockingMotion) return false;
     return true;
 }
 
@@ -130,7 +130,7 @@ int BlockUtils::getBlockPlaceFace(glm::ivec3 blockPos)
     return -1;
 }
 
-int BlockUtils::getExposedFace(glm::ivec3 blockPos)
+int BlockUtils::getExposedFace(glm::ivec3 blockPos, bool useFilter)
 {
     static std::vector<glm::ivec3> offsetList = {
         glm::ivec3(0, -1, 0),
@@ -141,7 +141,13 @@ int BlockUtils::getExposedFace(glm::ivec3 blockPos)
         glm::ivec3(1, 0, 0),
     };
     for (int i = 0; i < offsetList.size(); i++) {
-        if (isAirBlock(blockPos + offsetList[i])) return i;
+        glm::ivec3 checkPos = blockPos + offsetList[i];
+        if (isAirBlock(checkPos)) return i;
+        if (useFilter)
+        {
+            Block* b = ClientInstance::get()->getBlockSource()->getBlock(checkPos);
+            if (b && b->mLegacy && !b->mLegacy->_BlockFlags.mSolid) return i;
+        }
     }
     return -1;
 }
@@ -241,7 +247,7 @@ void BlockUtils::placeBlock(glm::vec3 pos, int side)
 
     bool oldSwinging = player->isSwinging();
     int oldSwingProgress = player->getSwingProgress();
-    player->getGameMode()->buildBlock(blockPos + glm::ivec3(blockFaceOffsets[side]) , side, true);
+    player->getGameMode()->buildBlock(blockPos + glm::ivec3(blockFaceOffsets[side]), side, 0, false);
     player->setSwinging(oldSwinging);
     player->setSwingProgress(oldSwingProgress);
 
@@ -279,7 +285,7 @@ void BlockUtils::startDestroyBlock(glm::vec3 pos, int side)
     res->mPos = blockPos;
 
     bool isDestroyedOut = false;
-    player->getGameMode()->startDestroyBlock(&blockPos, side, isDestroyedOut);
+    player->getGameMode()->startDestroyBlock(blockPos, side, isDestroyedOut);
 
     vec += blockFaceOffsets[side] * -0.5f;
 
@@ -333,7 +339,7 @@ void BlockUtils::destroyBlock(glm::vec3 pos, int side, bool useTransac)
         bool oldSwinging = player->isSwinging();
         int oldSwingProgress = player->getSwingProgress();
 
-        player->getGameMode()->destroyBlock(&blockPos, side);
+        player->getGameMode()->destroyBlock(blockPos, side);
         player->getGameMode()->stopDestroyBlock(blockPos);
 
         player->setSwinging(oldSwinging);

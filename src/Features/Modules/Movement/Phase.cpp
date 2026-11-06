@@ -16,24 +16,28 @@
 #include <SDK/Minecraft/Network/Packets/MovePlayerPacket.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 
-std::vector<glm::ivec3> getCollidingBlocks(float range)
+std::vector<glm::ivec3> Phase::getCollidingBlocks()
 {
     std::vector<glm::ivec3> collidingBlockList;
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return collidingBlockList;
+
+
     AABBShapeComponent* aabb = player->getAABBShapeComponent();
-    glm::vec3 lower = aabb->mMin;
-    glm::vec3 upper = aabb->mMin;
-    lower.x -= range;
-    //lower.y -= 0.1f;
-    lower.z -= range;
+    glm::vec3 playerPos = *player->getPos() - PLAYER_HEIGHT_VEC;
+    glm::vec3 lower = playerPos;
+    glm::vec3 upper = playerPos;
+    float width = (aabb->mWidth / 2);
 
-    upper.x += range;
+    lower.x -= width;
+    lower.z -= width;
+
+    upper.x += width;
     upper.y += aabb->mHeight;
-    upper.z += range;
+    upper.z += width;
 
-    for (int x = floor(lower.x); x <= floor(upper.x); x++)
-        for (int y = floor(lower.y); y <= floor(upper.y); y++)
+    for (int y = floor(lower.y); y <= floor(upper.y); y++)
+        for (int x = floor(lower.x); x <= floor(upper.x); x++)
             for (int z = floor(lower.z); z <= floor(upper.z); z++) {
                 glm::ivec3 blockPos = { x, y, z };
                 if (!BlockUtils::isAirBlock(blockPos)) {
@@ -87,17 +91,20 @@ void Phase::onBaseTickEvent(BaseTickEvent& event)
     AABBShapeComponent* aabb = player->getAABBShapeComponent();
 
     if (mMode.mValue == Mode::Horizontal) {
-        std::vector<glm::ivec3> collidingBlocks = getCollidingBlocks(0.2);
-        mMoving = !collidingBlocks.empty() && player->getStateVectorComponent()->mVelocity != glm::vec3(0, 0, 0);
+        std::vector<glm::ivec3> collidingBlocks = getCollidingBlocks();
+        mMoving = !collidingBlocks.empty();
+        if (!mMoving) {
+            mLastSync = NOW;
+        }
         aabb->mMax.y = aabb->mMin.y;
     }
     else if (mMode.mValue == Mode::Vertical) {
-        std::vector<glm::ivec3> collidingBlocks = getCollidingBlocks(0);
+        std::vector<glm::ivec3> collidingBlocks = getCollidingBlocks();
 
         auto moveInput = player->getMoveInputComponent();
         auto stateVector = player->getStateVectorComponent();
-        bool isJumping = moveInput->mIsJumping;
-        bool isSneaking = moveInput->mIsSneakDown;
+        bool isJumping = moveInput->isJumping();
+        bool isSneaking = moveInput->isSneaking();
         float value = 0;
 
         glm::vec3 belowBlockPos = *player->getPos();
@@ -116,7 +123,7 @@ void Phase::onBaseTickEvent(BaseTickEvent& event)
             aabb->mMin.y += value;
             aabb->mMax.y += value;
             stateVector->mVelocity = { 0, 0, 0 };
-            moveInput->mIsSneakDown = false;
+            moveInput->setSneaking(false);
         }
     }
     else if (mMode.mValue == Mode::Clip) {
@@ -142,6 +149,18 @@ void Phase::onRunUpdateCycleEvent(RunUpdateCycleEvent& event)
     if (!player) return;
 
     if (mMoving && mBlink.mValue) {
-        event.mCancelled = true;
+        if (mDelay.mValue) {
+            if (mLastSync + mDelayMs.mValue > NOW) {
+                event.mApplied = true;
+                event.mCancelled = true;
+            }
+            else {
+                mLastSync = NOW;
+            }
+        }
+        else {
+            event.mApplied = true;
+            event.mCancelled = true;
+        }
     }
 }

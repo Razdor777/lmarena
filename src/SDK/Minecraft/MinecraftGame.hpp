@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 //
-// Created by vastrakai on 6/24/2024.
 //
 
 
@@ -12,5 +11,6 @@ public:
     class UIProfanityContext* getProfanityContext();
     bool getMouseGrabbed();
     void setMouseGrabbed(bool grabbed);
+    std::string getxuid();
     void playUi(const std::string& soundName, float volume, float pitch);
 };

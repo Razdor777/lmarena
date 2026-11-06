@@ -6,11 +6,8 @@
 #include <Features/Events/PacketOutEvent.hpp>
 #include <Features/Events/RenderEvent.hpp>
 #include <Features/Modules/Module.hpp>
-<<<<<<< HEAD
 #include <array>
 #include <atomic>
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 #include <fstream>
 
 
@@ -99,7 +96,6 @@ public:
   BoolSetting mEmerald = BoolSetting("Emerald", "Mine emerald ore", true);
 
   // === Debug ===
-<<<<<<< HEAD
   // Включил -> КАЖДЫЙ сломанный блок проверяется по тому, что реально упало в
   // инвентарь (на сервере автоподбор): ждали алмаз и пришёл алмаз — "real",
   // пришло что-то другое (булыжник, глубинный сланец, ...) — "fake", не пришло
@@ -122,15 +118,6 @@ public:
   NumberSetting mVerifyTimeout = NumberSetting(
       "Verify Timeout", "Max ms to wait for the drop to reach inventory",
       500.f, 100.f, 3000.f, 50.f);
-=======
-  // Включил -> модуль открывает CSV в Juzdex\Dumps\ и пишет туда КАЖДЫЙ
-  // найденный блок (все, что проходят фильтр радиуса и типа руды), по одной
-  // строке на координату, ровно один раз за сессию дампа. Файл кладётся рядом
-  // с конфигами, так что его можно открыть любым «софтом»: Excel, Python,
-  // блокнот (есть и plain-версия "x y z" построчно).
-  BoolSetting mDebug =
-      BoolSetting("Debug", "Dump every found ore block into a CSV/TXT file", false);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
   // === Render settings ===
   BoolSetting mDrawBlocks =
@@ -147,7 +134,6 @@ public:
             "Mine coal / iron / gold / diamond / emerald ores, auto-skip fakes",
             ModuleCategory::Player, 0, false) {
     addSettings(&mSpeed, &mStepDistance, &mSilentAccept, &mSwing,
-<<<<<<< HEAD
                 &mVeinMiner, &mFollow, &mAutoRelocate, &mIdleTime, &mHopCount,
                 &mHopDelay, &mAutoDrop, &mOnlyExposedOres, &mPatternFilter,
                 &mClusters, &mCoal, &mIron, &mGold, &mDiamond, &mEmerald,
@@ -158,12 +144,6 @@ public:
     VISIBILITY_CONDITION(mIdleTime, mAutoRelocate.mValue);
     VISIBILITY_CONDITION(mHopCount, mAutoRelocate.mValue);
     VISIBILITY_CONDITION(mHopDelay, mAutoRelocate.mValue);
-=======
-                &mVeinMiner, &mFollow, &mQuickTPDist, &mQuickTPKey, &mRadius,
-                &mChunkRadius, &mChunkUpdatesPerTick, &mOnlyExposedOres, &mCoal,
-                &mDiamond, &mEmerald, &mDebug, &mDrawBlocks, &mDrawPath,
-                &mDrawTarget, &mDrawCluster);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
     mNames = {{Lowercase, "oreminerv2"},
               {LowercaseSpaced, "ore miner v2"},

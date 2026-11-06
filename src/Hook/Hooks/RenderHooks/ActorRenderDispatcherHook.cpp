@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 7/8/2024.
 //
 
 #include "ActorRenderDispatcherHook.hpp"
@@ -14,6 +13,9 @@ void ActorRenderDispatcherHook::render(ActorRenderDispatcher* _this, BaseActorRe
     Actor* entity, glm::vec3* cameraTargetPos, glm::vec3* pos, glm::vec2* rot, bool ignoreLighting)
 {
     auto oFunc = mDetour->getOriginal<&render>();
+  //  ChatUtils::displayClientMessage("ActorRenderDispatcherHook::render called " + std::to_string(rot->y) + " " + std::to_string(rot->x));
+
+    
     auto localPlayer = ClientInstance::get()->getLocalPlayer();
     if (!localPlayer) return;
 
@@ -23,11 +25,10 @@ void ActorRenderDispatcherHook::render(ActorRenderDispatcher* _this, BaseActorRe
     {
         return;
     }
-
     return oFunc(_this, entityRenderContext, entity, cameraTargetPos, pos, rot, ignoreLighting);
 }
 
 void ActorRenderDispatcherHook::init()
 {
-    mDetour = std::make_unique<Detour>("ActorRenderDispatcher::render", reinterpret_cast<void*>(SigManager::ActorRenderDispatcher_render), &ActorRenderDispatcherHook::render);
+    //mDetour = std::make_unique<Detour>("ActorRenderDispatcher::render", reinterpret_cast<void*>(SigManager::ActorRenderDispatcher_render), &ActorRenderDispatcherHook::render);
 }

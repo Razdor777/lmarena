@@ -43,20 +43,22 @@ void AntiVoid::onBaseTickEvent(BaseTickEvent& event)
     if (player->isOnGround())
     {
         mCanTeleport = true;
-        mOnGroundPositions.push_back(*player->getPos());
         mTeleported = false;
 
-        // if we have more than 40 positions, remove the first one
-        if (mOnGroundPositions.size() > 40)
-        {
-            mOnGroundPositions.erase(mOnGroundPositions.begin());
+        if (mTeleport.mValue) {
+            mOnGroundPositions.push_back(*player->getPos());
+            // if we have more than 40 positions, remove the first one
+            if (mOnGroundPositions.size() > 40)
+            {
+                mOnGroundPositions.erase(mOnGroundPositions.begin());
+            }
         }
         return;
     }
 
     bool hasTeleported = mTeleported && mTpOnce.mValue;
 
-    if (player->getFallDistance() > mFallDistance.mValue && (!hasTeleported || !mTpOnce.mValue) && mCanTeleport)
+    if (player->getFallDistance() > mFallDistance.mValue && (!hasTeleported || !mTpOnce.mValue) && mCanTeleport && BlockUtils::isOverVoid(*player->getPos() - PLAYER_HEIGHT_VEC))
     {
         if (!mTeleport.mValue)
         {
@@ -74,6 +76,7 @@ void AntiVoid::onBaseTickEvent(BaseTickEvent& event)
                 {
                     mCanTeleport = false;
                 }
+                mTeleported = true;
             }
             return;
         }

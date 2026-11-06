@@ -11,17 +11,18 @@
 void ContainerScreenController::handleAutoPlace(const std::string& name, int slot)
 {
     static auto func = SigManager::ContainerScreenController_handleAutoPlace;
+    if (!func) return;
     return MemUtils::callFastcall<void>(func, this, 0x7FFFFFFF, name, slot);
+}
+
+void ContainerScreenController::_tryBeginTransition(int type, unsigned int flags, const std::string& collection, int slot)
+{
+    static auto func = SigManager::ContainerScreenController_tryBeginTransition;
+    if (!func) return;
+    MemUtils::callFastcall<void>(func, this, type, flags, collection, slot);
 }
 
 void* ContainerScreenController::_tryExit()
 {
-    // TODO: implement index signature instead of raw index
     return MemUtils::callVirtualFunc<void*>(OffsetProvider::ContainerScreenController_tryExit, this);
-}
-
-void ContainerScreenController::_tryBeginTransition(int targetState, unsigned int flags, const std::string& collectionName, int slot)
-{
-    static auto func = SigManager::ContainerScreenController_tryBeginTransition;
-    MemUtils::callFastcall<void>(func, this, targetState, flags, collectionName, slot);
 }

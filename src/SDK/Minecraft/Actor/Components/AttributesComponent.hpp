@@ -1,37 +1,54 @@
 //
-// Created by vastrakai on 7/12/2024.
 //
 
 #pragma once
-
+#include <SDK/SigManager.hpp>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 enum AttributeId {
     ZombieSpawnReinforcementsChange = -1,
-    PlayerHunger = 2,
-    PlayerSaturation = 3,
-    PlayerExhaustion = 4,
-    PlayerLevel = 5,
-    PlayerExperience = 6,
-    Health = 7,
-    FollowRange = 8,
-    KnockbackResistance = 9,
-    MovementSpeed = 10,
-    UnderwaterMovementSpeed = 11,
-    LavaMovementSpeed = 12,
-    AttackDamage = 13,
-    Absorption = 14,
-    Luck = 15,
-    JumpStrength = 16, // for horse?
+    PlayerHunger = 0,
+    PlayerSaturation = 1,
+    PlayerExhaustion = 2,
+    PlayerLevel = 3,
+    PlayerExperience = 4,
+    Health = 5,
+    FollowRange = 6,
+    KnockbackResistance = 7,
+    MovementSpeed = 8,
+    UnderwaterMovementSpeed = 9,
+    LavaMovementSpeed = 10,
+    AttackDamage = 11,
+    Absorption = 12,
+    Luck = 13,
+    JumpStrength = 14,
 };
 
 class AttributeInstance {
-    PAD(0x74);
-    float mMinimumValue;
-    float mMaximumValue;
-    float mCurrentValue;
+public:
+    class Attribute* mAttribute;
+    PAD(0x58);
+
+    union {
+        float mDefaultValues[3];
+        struct {
+            float mDefaultMinValue;
+            float mDefaultMaxValue;
+            float mDefaultValue;
+        };
+    };
+
+    union {
+        float mCurrentValues[3];
+        struct {
+            float mCurrentMinValue;
+            float mCurrentMaxValue;
+            float mCurrentValue;
+        };
+    };
+    bool mValueChangedDuringTick;
 
     virtual ~AttributeInstance();
     virtual void tick();
@@ -114,17 +131,33 @@ public:
     PlayerExperienceAttribute() { this->mHash = AttributeHashes::EXPERIENCE; }
 };
 
-
-
-
-class BaseAttributeMap
+class BaseAttributeMap 
 {
 public:
-    std::unordered_map<int, AttributeInstance> mAttributes;
-    std::vector<uint64_t> mDirtyAttributes;
+    std::vector<uint32_t> mids;
+    std::vector<AttributeInstance> minstances;
+private:
+    char pad[0x20];
+public:
+
+    AttributeInstance* getInstance(uint32_t id)
+    {
+        if (id >= minstances.size()) return nullptr;
+        return &minstances[id];
+    }
+
+    AttributeInstance* getInstanceByName(std::string_view needle)
+    {
+        for (auto& inst : minstances) {
+            if (inst.mAttribute && inst.mAttribute->mAttributeName.find(needle) != std::string::npos) {
+                return &inst;
+            }
+        }
+        return nullptr;
+    }
 };
 
-static_assert(sizeof(BaseAttributeMap) == 0x58);
+static_assert(sizeof(BaseAttributeMap) == 0x50); 
 
 
 struct AttributesComponent
@@ -132,4 +165,4 @@ struct AttributesComponent
     BaseAttributeMap mBaseAttributeMap;
 };
 
-static_assert(sizeof(AttributesComponent) == 0x58);
+static_assert(sizeof(AttributesComponent) == 0x50); 

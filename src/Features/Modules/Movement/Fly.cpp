@@ -26,6 +26,33 @@ void Fly::onEnable()
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return;
 
+    if (mMode.mValue == Mode::Vertical) {
+        if (!player->isOnGround()) {
+            displayDebug("Failed to teleport");
+            setEnabled(false);
+            return;
+        }
+        glm::ivec3 playerPos = *player->getPos();
+        bool foundBlock = false;
+        glm::ivec3 top = { 0, 0, 0 };
+        float floorY = floorf(playerPos.y);
+        for (int i = 0; i < 50; i++) {
+            glm::ivec3 blockPos = { playerPos.x, floorY + i, playerPos.z };
+            if (!BlockUtils::isAirBlock(blockPos)) {
+                top = blockPos;
+                foundBlock = true;
+            }
+        }
+        if (foundBlock) {
+            topY = top.y + 1;
+        }
+        else {
+            displayDebug("Failed to teleport");
+            setEnabled(false);
+        }
+        return;
+    }
+
     // return if da mode isnt jump
     if (mMode.mValue != Mode::Jump) return;
 
@@ -39,6 +66,14 @@ void Fly::onDisable()
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &Fly::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->deafen<PacketOutEvent, &Fly::onPacketOutEvent>(this);
     if (mTimerBoost.mValue) ClientInstance::get()->getMinecraftSim()->setSimTimer(20);
+
+    auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return;
+
+    AABBShapeComponent* aabb = player->getAABBShapeComponent();
+    if (aabb->mMax.y != aabb->mMin.y + aabb->mHeight) {
+        aabb->mMax.y = aabb->mMin.y + aabb->mHeight;
+    }
 
     if (mMode.mValue != Mode::Jump) return;
 
@@ -71,8 +106,8 @@ void Fly::onBaseTickEvent(BaseTickEvent& event)
             motion.x = calc.x;
             motion.z = calc.y;
 
-            bool isJumping = player->getMoveInputComponent()->mIsJumping;
-            bool isSneaking = player->getMoveInputComponent()->mIsSneakDown;
+            bool isJumping = player->getMoveInputComponent()->isJumping();
+            bool isSneaking = player->getMoveInputComponent()->isSneaking();
 
             if (isJumping)
                 motion.y += mSpeed.mValue / 10;
@@ -93,8 +128,8 @@ void Fly::onBaseTickEvent(BaseTickEvent& event)
             motion.x = calc.x;
             motion.z = calc.y;
 
-            bool isJumping = player->getMoveInputComponent()->mIsJumping;
-            bool isSneaking = player->getMoveInputComponent()->mIsSneakDown;
+            bool isJumping = player->getMoveInputComponent()->isJumping();
+            bool isSneaking = player->getMoveInputComponent()->isSneaking();
 
             if (isJumping)
                 motion.y += speed;
@@ -107,6 +142,21 @@ void Fly::onBaseTickEvent(BaseTickEvent& event)
     else if (mMode.mValue == Mode::Jump)
     {
         applyTimer = tickJump(player);
+    }
+    else if (mMode.mValue == Mode::Vertical) {
+        const auto state = player->getStateVectorComponent();
+        const auto aabbShape = player->getAABBShapeComponent();
+
+        state->mVelocity = { 0.f, 0.f, 0.f };
+
+        aabbShape->mMin.y += mStep.mValue;
+        aabbShape->mMax.y = aabbShape->mMin.y;
+
+        if (topY <= aabbShape->mMin.y) {
+            displayDebug("Teleported");
+            setEnabled(false);
+            return;
+        }
     }
 
     if (mTimerBoost.mValue && applyTimer)

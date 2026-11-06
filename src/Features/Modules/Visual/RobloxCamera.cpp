@@ -262,7 +262,7 @@ void RobloxCamera::onLookInputEvent(LookInputEvent& event)
 
     // Third person is forced off — this module draws the orbit itself.
     if (auto* options = ci->getOptions())
-        if (options->mThirdPerson) options->mThirdPerson->value = 0;
+        if (options->mThirdPerson) options->mThirdPerson->mValue = 0;
 
     auto* player = ci->getLocalPlayer();
     if (!player || !player->isValid()) return;

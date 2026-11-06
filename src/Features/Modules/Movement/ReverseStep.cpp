@@ -33,7 +33,7 @@ bool ReverseStep::isVoid() {
     for (int checkOffsetY = 1; checkOffsetY <= 255; ++checkOffsetY) {
         glm::vec3 blockPos = {pos.x, pos.y - (float)checkOffsetY, pos.z};
         Block* block = ClientInstance::get()->getBlockSource()->getBlock(blockPos);
-        if (block->mLegacy->mMaterial->mIsBlockingMotion) {
+        if (block && block->mLegacy && block->mLegacy->mMaterial.mIsBlockingMotion) {
             return false;
         }
     }

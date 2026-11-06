@@ -7,7 +7,7 @@
 #include <Utils/Buffer.hpp>
 #include <Utils/MemUtils.hpp>
 
-static uintptr_t func;
+static uintptr_t func = 0;
 
 void FastEat::onInit()
 {
@@ -16,9 +16,12 @@ void FastEat::onInit()
 
 void FastEat::onEnable()
 {
+    if (!func) return;
+
     MemUtils::ReadBytes((void*)func, mOriginalData, sizeof(mOriginalData));
 
     mDetour = AllocateBuffer((void*)func);
+    if (!mDetour) return;
     MemUtils::writeBytes((uintptr_t)mDetour, mDetourBytes, sizeof(mDetourBytes));
 
     auto toOriginalAddrRip1 = MemUtils::GetRelativeAddress((uintptr_t)mDetour + sizeof(mDetourBytes) + 1, func + 8);
@@ -39,12 +42,16 @@ void FastEat::onDisable()
 {
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &FastEat::onBaseTickEvent>(this);
 
-    MemUtils::writeBytes(func, mOriginalData, sizeof(mOriginalData));
-    FreeBuffer(mDetour);
+    if (func && mDetour) {
+        MemUtils::writeBytes(func, mOriginalData, sizeof(mOriginalData));
+        FreeBuffer(mDetour);
+        mDetour = nullptr;
+    }
 }
 
 void FastEat::onBaseTickEvent(BaseTickEvent& event)
 {
+    if (!mDetour) return;
     int32_t speed = mSpeed.as<int>();
     byte eatSpeed = (speed >= 1 && speed <= 10) ? static_cast<byte>(0x00 + speed) : 0x01;
     MemUtils::writeBytes(reinterpret_cast<uintptr_t>(mDetour), &eatSpeed, sizeof(byte));

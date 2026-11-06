@@ -24,9 +24,10 @@ void SkinBlinker::onEnable()
         return;
     }
     auto currentSkin = player->getSkin();
-    mId = currentSkin->mId;
-    mPlayFabId = currentSkin->mPlayFabId;
-    mFullId = currentSkin->mFullId;
+    if (currentSkin) {
+        mId = currentSkin->mId;
+        mFullId = currentSkin->mFullId;
+    }
 }
 
 void SkinBlinker::onDisable()
@@ -167,7 +168,7 @@ std::unique_ptr<SkinCapePair> getRandSkinCapePair()
 // I hate you Tozic.
 void SkinBlinker::onBaseTickEvent(BaseTickEvent& event)
 {
-    if (mLastSkinChange + mDelay.mValue * 1000 > NOW)
+    if (mLastSkinChange + (mDelay.mValue * 1000) > NOW)
         return;
     static std::unique_ptr<SkinCapePair> skinCapePair = nullptr;
 
@@ -182,37 +183,38 @@ void SkinBlinker::onBaseTickEvent(BaseTickEvent& event)
     auto player = event.mActor;
 
     auto currentSkin = player->getSkin();
+    mId = currentSkin->mId;
+    mFullId = currentSkin->mFullId;
 
     auto skinpacket = MinecraftPackets::createPacket<PlayerSkinPacket>();
+    auto skin = &skinpacket->mSkin.impl->Object;
 
-
-    skinpacket->mSkin.mId = mId;
-    skinpacket->mSkin.mPlayFabId = mPlayFabId;
-    skinpacket->mSkin.mFullId = mFullId;
+    skin->mId = mId;
+    skin->mFullId = mFullId;
 
     if (skinCapePair->slimSkin)
     {
-        skinpacket->mSkin.mResourcePatch = "{\n   \"geometry\" : {\n      \"default\" : \"geometry.humanoid.customSlim\"\n   }\n}";
-        skinpacket->mSkin.mDefaultGeometryName = "geometry.humanoid.customSlim";
+        skin->mResourcePatch = "{\n   \"geometry\" : {\n      \"default\" : \"geometry.humanoid.customSlim\"\n   }\n}";
+        skin->mDefaultGeometryName = "geometry.humanoid.customSlim";
     }
     else
     {
-        skinpacket->mSkin.mResourcePatch = "{\n   \"geometry\" : {\n      \"default\" : \"geometry.humanoid.custom\"\n   }\n}";
-        skinpacket->mSkin.mDefaultGeometryName = "geometry.humanoid.custom";
+        skin->mResourcePatch = "{\n   \"geometry\" : {\n      \"default\" : \"geometry.humanoid.custom\"\n   }\n}";
+        skin->mDefaultGeometryName = "geometry.humanoid.custom";
     }
 
-    skinpacket->mSkin.mSkinImage.mImageBytes = mce::Blob::fromVector(skinCapePair->skinData);
-    skinpacket->mSkin.mSkinImage.mWidth = skinCapePair->skinWidth;
-    skinpacket->mSkin.mSkinImage.mHeight = skinCapePair->skinHeight;
-    skinpacket->mSkin.mSkinImage.mDepth = skinCapePair->skinDepth;
-    skinpacket->mSkin.mSkinImage.mUsage = currentSkin->mSkinImage.mUsage;
-    skinpacket->mSkin.mSkinImage.imageFormat = currentSkin->mSkinImage.imageFormat;
-    skinpacket->mSkin.mCapeImage.mImageBytes = mce::Blob::fromVector(skinCapePair->capeData);
-    skinpacket->mSkin.mCapeImage.mWidth = skinCapePair->capeWidth;
-    skinpacket->mSkin.mCapeImage.mHeight = skinCapePair->capeHeight;
-    skinpacket->mSkin.mCapeImage.mDepth = skinCapePair->capeDepth;
-    skinpacket->mSkin.mCapeImage.mUsage = currentSkin->mCapeImage.mUsage;
-    skinpacket->mSkin.mCapeImage.imageFormat = currentSkin->mCapeImage.imageFormat;
+    skin->mSkinImage.mImageBytes = mce::Blob::fromVector(skinCapePair->skinData);
+    skin->mSkinImage.mWidth = skinCapePair->skinWidth;
+    skin->mSkinImage.mHeight = skinCapePair->skinHeight;
+    skin->mSkinImage.mDepth = skinCapePair->skinDepth;
+    skin->mSkinImage.mUsage = currentSkin->mSkinImage.mUsage;
+    skin->mSkinImage.imageFormat = currentSkin->mSkinImage.imageFormat;
+    skin->mCapeImage.mImageBytes = mce::Blob::fromVector(skinCapePair->capeData);
+    skin->mCapeImage.mWidth = skinCapePair->capeWidth;
+    skin->mCapeImage.mHeight = skinCapePair->capeHeight;
+    skin->mCapeImage.mDepth = skinCapePair->capeDepth;
+    skin->mCapeImage.mUsage = currentSkin->mCapeImage.mUsage;
+    skin->mCapeImage.imageFormat = currentSkin->mCapeImage.imageFormat;
 
     ClientInstance::get()->getPacketSender()->send(skinpacket.get());
 }

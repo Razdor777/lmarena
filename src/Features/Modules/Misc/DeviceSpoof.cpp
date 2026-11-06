@@ -71,18 +71,20 @@ void DeviceSpoof::spoofMboard() {
         DeviceModel = StringUtils::generateMboard(editionFaker->mOs.as<int>());
     }
 
-    auto newDeviceModel = reinterpret_cast<uintptr_t>(&DeviceModel);
-    MemUtils::writeBytes((uintptr_t) patchPtr + 2, (void *) &newDeviceModel, sizeof(uintptr_t));
+    if (patchPtr) {
+        auto newDeviceModel = reinterpret_cast<uintptr_t>(&DeviceModel);
+        MemUtils::writeBytes((uintptr_t) patchPtr + 2, (void *) &newDeviceModel, sizeof(uintptr_t));
+    }
 }
 
 void DeviceSpoof::onEnable()
 {
-    if (!inject()) return;
-
-    // inject() allocated patchPtr, so the model pointer can be filled in now.
-    // This guarantees the very first connection request after injection is
-    // already spoofed, instead of only the ones that follow a manual toggle.
-    spoofMboard();
+    if (inject()) {
+        // inject() allocated patchPtr, so the model pointer can be filled in now.
+        // This guarantees the very first connection request after injection is
+        // already spoofed, instead of only the ones that follow a manual toggle.
+        spoofMboard();
+    }
 
     gFeatureManager->mDispatcher->listen<ConnectionRequestEvent, &DeviceSpoof::onConnectionRequestEvent>(this);
 }
@@ -106,9 +108,9 @@ void DeviceSpoof::onConnectionRequestEvent(ConnectionRequestEvent& event)
     }
 
     event.mClientRandomId = StringUtils::generateCID();
-    *event.mDeviceId = deviceId;
-    *event.mSkinId = "Custom" + deviceId;
-    *event.mSelfSignedId = StringUtils::generateUUID(7);
+    event.mDeviceId = deviceId;
+    event.mSkinId = "Custom" + deviceId;
+    event.mSelfSignedId = StringUtils::generateUUID(7);
 
     spoofMboard();
 }
