@@ -3,7 +3,7 @@
 
 #include "LevelRenderer.hpp"
 
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <SDK/OffsetProvider.hpp>
 
 glm::vec3* LevelRendererPlayer::getCameraPos()

@@ -5,11 +5,8 @@
 #define _AMD64_
 #include <minwindef.h>
 #include <unordered_map>
-<<<<<<< HEAD:26.62/src/Utils/MemUtils.hpp
 #include <Features/Events/SendImmediateEvent.hpp>
 #include <source_location>
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Utils/MemUtils.hpp
 //
 //
 

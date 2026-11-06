@@ -4,7 +4,7 @@
 #include "MinecraftGame.hpp"
 #include <map>
 #include <memory>
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <Utils/MemUtils.hpp>
 

@@ -11,6 +11,7 @@
 
 #include "Commands/BindCommand.hpp"
 #include "Commands/BuildInfoCommand.hpp"
+#include "Commands/ScriptsCommand.hpp"
 #include "Commands/ConfigCommand.hpp"
 #include "Commands/CopyNameCommand.hpp"
 #include "Commands/FlingCommand.hpp"
@@ -51,6 +52,7 @@ void CommandManager::init()
     ADD_COMMAND(FriendCommand);
     ADD_COMMAND(GamemodeCommand);
     ADD_COMMAND(BuildInfoCommand);
+    ADD_COMMAND(ScriptsCommand);
     ADD_COMMAND(HiveStatsCommand);
     ADD_COMMAND(IrcCommand);
     ADD_COMMAND(FlingCommand);
@@ -122,9 +124,12 @@ void CommandManager::handleCommand(ChatEvent& event)
 
     if (it == mCommands.end())
     {
-        /*
-        bool found = gFeatureManager->mScriptManager->findAndExecCommand(std::string(commandName), args);
-        if (!found && !event.mSpecial) ChatUtils::displayClientMessage("§cThe command " + std::string(commandName) + " was not found!");*/
+        if (gFeatureManager->mScriptManager &&
+            gFeatureManager->mScriptManager->findAndExecCommand(std::string(commandName), args))
+            return;
+
+        if (!event.mSpecial)
+            ChatUtils::displayClientMessage("§cThe command " + std::string(commandName) + " was not found!");
         return;
     }
 

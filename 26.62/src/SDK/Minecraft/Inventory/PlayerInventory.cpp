@@ -3,7 +3,7 @@
 
 #include "PlayerInventory.hpp"
 
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>

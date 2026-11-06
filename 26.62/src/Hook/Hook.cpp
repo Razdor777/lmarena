@@ -3,7 +3,7 @@
 
 #include "Hook.hpp"
 
-#include <Dexko.hpp>
+#include <Solstice.hpp>
 
 void Hook::init()
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include <Dexko.hpp>
+#include <Solstice.hpp>
 #include <Features/FeatureManager.hpp>
 #include <Features/Command/Command.hpp>
 #include <Features/Command/CommandManager.hpp>

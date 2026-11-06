@@ -51,7 +51,7 @@ public: \
 static constexpr inline int (name) = offset;
 
 #include <future>
-#include <libhat/Scanner.hpp>
+#include <libhat/scanner.hpp>
 
 class OffsetProvider {
 	static hat::scan_result scanSig(hat::signature_view sig, const std::string& name, int offset = 0);

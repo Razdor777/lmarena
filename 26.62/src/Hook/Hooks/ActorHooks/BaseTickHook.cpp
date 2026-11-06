@@ -6,6 +6,7 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
+#include <Features/Modules/ModuleToggle.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Inventory/PlayerInventory.hpp>
@@ -44,6 +45,11 @@ void BaseTickHook::onBaseTick(Actor* actor)
         mQueuedPackets.clear();
     }
 
+
+    // onEnable/onDisable модулей — здесь, в потоке игры (см. ModuleToggle.hpp).
+    // Раньше это делал фоновый поток Solstice::shutdownThread, из-за чего
+    // включение/выключение модулей иногда роняло игру.
+    ModuleToggle::fromGameThread();
 
     auto holder = nes::make_holder<BaseTickEvent>(actor);
     gFeatureManager->mDispatcher->trigger(holder);

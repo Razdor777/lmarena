@@ -12,6 +12,9 @@ std::unique_ptr<Detour> ItemRendererHook::mDetour;
 void ItemRendererHook::render(ItemRenderer *_this, BaseActorRenderContext *renderContext, ActorRenderData *actorRenderData) {
     auto original = mDetour->getOriginal<&ItemRendererHook::render>();
 
+    if (_this) sItemRenderer = _this;
+    if (renderContext) sBarContext = renderContext;
+
 
 
     auto holder = nes::make_holder<ItemRendererEvent>(_this, renderContext, actorRenderData);

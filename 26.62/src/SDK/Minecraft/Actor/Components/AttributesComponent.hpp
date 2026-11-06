@@ -8,8 +8,22 @@
 #include <vector>
 
 enum AttributeId {
-    Health = 5,
-    Absorption = 12,
+    ZombieSpawnReinforcementsChange = -1,
+    PlayerHunger = 2,
+    PlayerSaturation = 3,
+    PlayerExhaustion = 4,
+    PlayerLevel = 5,
+    PlayerExperience = 6,
+    Health = 7,
+    FollowRange = 8,
+    KnockbackResistance = 9,
+    MovementSpeed = 10,
+    UnderwaterMovementSpeed = 11,
+    LavaMovementSpeed = 12,
+    AttackDamage = 13,
+    Absorption = 14,
+    Luck = 15,
+    JumpStrength = 16,
 };
 
 class AttributeInstance {

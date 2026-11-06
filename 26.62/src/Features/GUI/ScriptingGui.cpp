@@ -4,6 +4,12 @@
 
 #include "ScriptingGui.hpp"
 
+#include <Features/FeatureManager.hpp>
+#include <Utils/FontHelper.hpp>
+#include <Utils/MiscUtils/ColorUtils.hpp>
+#include <Utils/MiscUtils/ImRenderUtils.hpp>
+#include <Utils/MiscUtils/MathUtils.hpp>
+
 void ScriptingGui::render(float inScale, float animation, ImVec2 screen, float blurStrength)
 {
     FontHelper::pushPrefFont();
@@ -31,50 +37,63 @@ void ScriptingGui::render(float inScale, float animation, ImVec2 screen, float b
 
     ImGui::Begin("Scripting");
 
-    ImGui::Text("NOTE: This GUI is NOT finished and should absolutely not be used for release builds.");
-
     ImGui::Text("Scripts:");
-    /*
     auto& sm = gFeatureManager->mScriptManager;
-    auto& scripts = sm->getScripts();
-
-
+    if (!sm)
+    {
+        ImGui::TextDisabled("Script manager is not running.");
+        FontHelper::popPrefFont();
+        ImGui::End();
+        return;
+    }
 
     if (sm->mLoadingScripts)
     {
         ImGui::Text("Loading scripts...");
-        ImGui::End();
         FontHelper::popPrefFont();
+        ImGui::End();
         return;
     }
 
+    auto& scripts = sm->getScripts();
+    ImGui::SameLine();
+    ImGui::TextDisabled("(%zu)", scripts.size());
 
+    if (ImGui::Button("Reload all"))
+        sm->reloadAll();
+
+    ImGui::Separator();
 
     int i = 0;
-    for (auto& psc : scripts) {
-        if (psc->type != SolsticeScriptType::MODULE) continue;
+    for (auto& script : scripts)
+    {
+        if (!script || script->mType != ScriptType::Module) continue;
         i++;
 
-        std::shared_ptr<ModuleScript> script = std::reinterpret_pointer_cast<ModuleScript>(psc);
+        bool enabled = script->mEnabled;
+        const std::string label = "##enabled" + std::to_string(i);
+        if (ImGui::Checkbox(label.c_str(), &enabled))
+            sm->setScriptEnabled(script, enabled);
 
-        bool enabled = script->enabled;
-        std::string name = "##enabled" + std::to_string(i);
-        if (ImGui::Checkbox(name.c_str(), &enabled)) {
-            script->enabled = enabled;
-            script->triggerStateChangeEvent();
+        ImGui::SameLine();
+        ImGui::TextUnformatted(script->mName.c_str());
+        ImGui::SameLine();
+
+        std::string desc = "- " + script->mDescription;
+        ImGui::TextDisabled("%s", desc.c_str());
+
+        if (!script->mAuthor.empty())
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImColor(1.0f, 0.84f, 0.0f, 1.0f), "made by");
+            ImGui::SameLine();
+            ImGui::TextColored(ImColor(0.0f, 0.5f, 1.0f, 1.0f), "%s", script->mAuthor.c_str());
         }
-        ImGui::SameLine();
-        ImGui::Text(script->moduleName.c_str());
-        ImGui::SameLine();
-        std::string desc = "- " + script->moduleDescription + (script->moduleAuthor == "" ? "" : " -");
-        ImGui::Text(desc.c_str());
-        ImGui::SameLine();
-        ImGui::TextColored(ImColor(1.0f, 0.84f, 0.0f, 1.0f), "made by");
-        // blue
-        ImGui::SameLine();
-        ImGui::TextColored(ImColor(0.0f, 0.5f, 1.0f, 1.0f), script->moduleAuthor.c_str());
     }
-    */
+
+    if (i == 0)
+        ImGui::TextDisabled("No module scripts found in Scripts\\Modules");
+
     FontHelper::popPrefFont();
     ImGui::End();
 }

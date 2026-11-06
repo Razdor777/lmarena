@@ -87,6 +87,17 @@ void PacketSendHook::sendPacket(PlayerAuthInputPacket* packet) {
     sender->sendToServer(packet);
 }
 
+// vtable layout (LoopbackPacketSender):
+//   0 -> destructor
+//   1 -> isInitialized()
+//   2 -> send()          <- hooked here: fires for every packet routed through the sender
+//   3 -> sendTo()
+//   4 -> sendToServer()  <- bypasses this hook on purpose (PacketUtils::queueSend bypass=true)
+static constexpr int kSendVtableIndex = 2;
+
 void PacketSendHook::init() {
-    mDetour = std::make_unique<Detour>("LoopbackPacketSender::send", reinterpret_cast<void*>(ClientInstance::get()->getPacketSender()->vtable[2]), &PacketSendHook::onPacketSend);
+    mDetour = std::make_unique<Detour>(
+        "LoopbackPacketSender::send",
+        reinterpret_cast<void*>(ClientInstance::get()->getPacketSender()->vtable[kSendVtableIndex]),
+        &PacketSendHook::onPacketSend);
 }

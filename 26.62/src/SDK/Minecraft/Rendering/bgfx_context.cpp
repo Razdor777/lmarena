@@ -4,7 +4,7 @@
 #include "bgfx_context.hpp"
 
 #include <d3d12.h>
-#include <libhat/Access.hpp>
+#include <libhat/access.hpp>
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/SigManager.hpp>
 

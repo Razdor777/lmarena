@@ -33,7 +33,7 @@
 #include "Misc/Disabler.hpp"
 #include "Misc/EditionFaker.hpp"
 #include "Misc/Friends.hpp"
-//#include "Misc/IRC.hpp"
+#include "Misc/IRC.hpp"
 #include "Misc/KickSounds.hpp"
 #include "Misc/Killsults.hpp"
 #include "Misc/NetSkip.hpp"
@@ -95,7 +95,6 @@
 #include "Player/Nuker.hpp"
 #include "Player/OreMiner.hpp"
 //#include "Player/Regen.hpp"
-//#include "Player/RegenRecode.hpp"
 #include "Player/Scaffold.hpp"
 #include "Player/Surround.hpp"
 #include "Player/ZipLine.hpp"
@@ -142,10 +141,99 @@
 #include "Visual/Watermark.hpp"
 #include "Visual/Zoom.hpp"
 
+// --- ported (batch 2) ---
+#include "Combat/GhostMode.hpp"
+#include "Misc/ItemDupe.hpp"
+#include "Misc/ItemUseDelayFix.hpp"
+#include "Misc/PlayerLogger.hpp"
+#include "Misc/SkinChanger.hpp"
+#include "Misc/SkinSpoofer.hpp"
+#include "Misc/SpectatorDetector.hpp"
+#include "Misc/VoiceChat.hpp"
+#include "Player/ChainTP.hpp"
+#include "Player/SwitchBallAim.hpp"
+
+// --- modules ported from the 1.21.44 tree ---
+#include "Combat/Aimbot.hpp"
+#include "Combat/ArrowTP.hpp"
+#include "Combat/InfiniteChestAura.hpp"
+#include "Combat/LastTP.hpp"
+#include "Combat/PearlStopper.hpp"
+#include "Misc/AdminPanel.hpp"
+#include "Misc/ArmorSlotUnlock.hpp"
+#include "Misc/AutoContract.hpp"
+#include "Misc/AutoLoot.hpp"
+#include "Misc/FakeChat.hpp"
+#include "Misc/JavaInventory.hpp"
+#include "Misc/JavaInventoryHotkeys.hpp"
+#include "Misc/WhoisCollector.hpp"
+#include "Movement/AutoPatrol.hpp"
+#include "Movement/AutoSneak.hpp"
+#include "Movement/NoClip.hpp"
+#include "Player/AutoArmor.hpp"
+#include "Player/Cage.hpp"
+#include "Player/ContainerActions.hpp"
+#include "Player/OreMinerV2.hpp"
+#include "Player/PlayerTracker.hpp"
+#include "Player/RegionFill.hpp"
+#include "Player/SchematicBuilder.hpp"
+#include "Player/SpawnerAura.hpp"
+#include "Visual/AfterImage.hpp"
+#include "Visual/Ambience.hpp"
+#include "Visual/AmbientCubes.hpp"
+#include "Visual/ArmorHUD.hpp"
+#include "Visual/ArrowRecovery.hpp"
+#include "Visual/BoneEsp.hpp"
+#include "Visual/BowHitMarker.hpp"
+#include "Visual/CustomCrosshair.hpp"
+#include "Visual/CustomFog.hpp"
+#include "Visual/DamageLog.hpp"
+#include "Visual/EnemyIndicator.hpp"
+#include "Visual/EntityRadar.hpp"
+#include "Visual/FakePlayer.hpp"
+#include "Visual/Goofy.hpp"
+#include "Visual/HealthBar.hpp"
+#include "Visual/HealthDisplay.hpp"
+#include "Visual/HitColor.hpp"
+#include "Visual/HitEffects.hpp"
+#include "Visual/HitParticles.hpp"
+#include "Visual/InventoryHUD.hpp"
+#include "Visual/Kagune.hpp"
+#include "Visual/NearbyPlayers.hpp"
+#include "Visual/OpponentReach.hpp"
+#include "Visual/PathTracer.hpp"
+#include "Visual/PlayerHUD.hpp"
+#include "Visual/PlayerPositionOffset.hpp"
+#include "Visual/PotionHUD.hpp"
+#include "Visual/ProjectileTracer.hpp"
+#include "Visual/ReachCounter.hpp"
+#include "Visual/SkyPack.hpp"
+#include "Visual/SmartXRay.hpp"
+#include "Visual/SoulSpiral.hpp"
+#include "Visual/TazikHat.hpp"
+#include "Visual/TeamHealthBars.hpp"
+#include "Visual/Trails.hpp"
+#include "Visual/VSync.hpp"
+#include "Visual/WorldParticles.hpp"
+
 void ModuleManager::init()
 {
 	// Visual (must be initialized first)
 	mModules.emplace_back(std::make_shared<HudEditor>());
+
+
+	// ported (batch 2)
+	mModules.emplace_back(std::make_shared<ChainTP>());
+	mModules.emplace_back(std::make_shared<Regen>());
+	mModules.emplace_back(std::make_shared<SwitchBallAim>());
+	mModules.emplace_back(std::make_shared<GhostMode>());
+	mModules.emplace_back(std::make_shared<ItemDupe>());
+	mModules.emplace_back(std::make_shared<ItemUseDelayFix>());
+	mModules.emplace_back(std::make_shared<PlayerLogger>());
+	mModules.emplace_back(std::make_shared<SkinChanger>());
+	mModules.emplace_back(std::make_shared<SkinSpoofer>());
+	mModules.emplace_back(std::make_shared<SpectatorDetector>());
+	mModules.emplace_back(std::make_shared<VoiceChat>());
 
 	// Combat
 	mModules.emplace_back(std::make_shared<Aura>());
@@ -156,6 +244,14 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<InfiniteAura>());
 	mModules.emplace_back(std::make_shared<HitBoxes>());
 
+
+
+	// ported from the 1.21.44 tree
+	mModules.emplace_back(std::make_shared<Aimbot>());
+	mModules.emplace_back(std::make_shared<ArrowTP>());
+	mModules.emplace_back(std::make_shared<InfiniteChestAura>());
+	mModules.emplace_back(std::make_shared<LastTP>());
+	mModules.emplace_back(std::make_shared<PearlStopper>());
 
 	// Movement
 	mModules.emplace_back(std::make_shared<Fly>());
@@ -182,13 +278,17 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<DamageBoost>());
 	mModules.emplace_back(std::make_shared<AutoWalk>());
 
+
+	// ported from the 1.21.44 tree
+	mModules.emplace_back(std::make_shared<AutoPatrol>());
+	mModules.emplace_back(std::make_shared<AutoSneak>());
+	mModules.emplace_back(std::make_shared<NoClip>());
+
 	// Player
 	mModules.emplace_back(std::make_shared<AutoSpellBook>());
 	mModules.emplace_back(std::make_shared<Timer>());
 	mModules.emplace_back(std::make_shared<ChestStealer>());
 	mModules.emplace_back(std::make_shared<InvManager>());
-	//   mModules.emplace_back(std::make_shared<Regen>());
-	 //  mModules.emplace_back(std::make_shared<RegenRecode>());
 	mModules.emplace_back(std::make_shared<Scaffold>());
 	mModules.emplace_back(std::make_shared<Surround>());
 	mModules.emplace_back(std::make_shared<ZipLine>());
@@ -209,6 +309,17 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<NoRotate>());
 	//mModules.emplace_back(std::make_shared<FastEat>());
 	mModules.emplace_back(std::make_shared<AutoEat>());
+
+
+	// ported from the 1.21.44 tree
+	mModules.emplace_back(std::make_shared<AutoArmor>());
+	mModules.emplace_back(std::make_shared<Cage>());
+	mModules.emplace_back(std::make_shared<ContainerActions>());
+	mModules.emplace_back(std::make_shared<OreMinerV2>());
+	mModules.emplace_back(std::make_shared<PlayerTracker>());
+	mModules.emplace_back(std::make_shared<RegionFill>());
+	mModules.emplace_back(std::make_shared<SchematicBuilder>());
+	mModules.emplace_back(std::make_shared<SpawnerAura>());
 
 	// Misc
 	mModules.emplace_back(std::make_shared<ToggleSounds>());
@@ -232,7 +343,7 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<AutoAccept>());
 	mModules.emplace_back(std::make_shared<PartySpammer>());
 	mModules.emplace_back(std::make_shared<Spammer>());
-	//   mModules.emplace_back(std::make_shared<IRC>());
+	mModules.emplace_back(std::make_shared<IRC>());
 	mModules.emplace_back(std::make_shared<SkinStealer>());
 	mModules.emplace_back(std::make_shared<AutoLootbox>());
 	mModules.emplace_back(std::make_shared<AutoDodge>());
@@ -241,6 +352,17 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<CostumeSpammer>());
 	mModules.emplace_back(std::make_shared<TestModule>());
 
+
+
+	// ported from the 1.21.44 tree
+	mModules.emplace_back(std::make_shared<AdminPanel>());
+	mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
+	mModules.emplace_back(std::make_shared<AutoContract>());
+	mModules.emplace_back(std::make_shared<AutoLoot>());
+	mModules.emplace_back(std::make_shared<FakeChat>());
+	mModules.emplace_back(std::make_shared<JavaInventory>());
+	mModules.emplace_back(std::make_shared<JavaInventoryHotkeys>());
+	mModules.emplace_back(std::make_shared<WhoisCollector>());
 
 	// Visual
 	mModules.emplace_back(std::make_shared<Watermark>());
@@ -276,6 +398,46 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<Freelook>());
 	mModules.emplace_back(std::make_shared<NoRender>());
 
+
+
+	// ported from the 1.21.44 tree
+	mModules.emplace_back(std::make_shared<AfterImage>());
+	mModules.emplace_back(std::make_shared<Ambience>());
+	mModules.emplace_back(std::make_shared<AmbientCubes>());
+	mModules.emplace_back(std::make_shared<ArmorHUD>());
+	mModules.emplace_back(std::make_shared<ArrowRecovery>());
+	mModules.emplace_back(std::make_shared<BoneEsp>());
+	mModules.emplace_back(std::make_shared<BowHitMarker>());
+	mModules.emplace_back(std::make_shared<CustomCrosshair>());
+	mModules.emplace_back(std::make_shared<CustomFog>());
+	mModules.emplace_back(std::make_shared<DamageLog>());
+	mModules.emplace_back(std::make_shared<EnemyIndicator>());
+	mModules.emplace_back(std::make_shared<EntityRadar>());
+	mModules.emplace_back(std::make_shared<FakePlayer>());
+	mModules.emplace_back(std::make_shared<Goofy>());
+	mModules.emplace_back(std::make_shared<HealthBar>());
+	mModules.emplace_back(std::make_shared<HealthDisplay>());
+	mModules.emplace_back(std::make_shared<HitColor>());
+	mModules.emplace_back(std::make_shared<HitEffects>());
+	mModules.emplace_back(std::make_shared<HitParticles>());
+	mModules.emplace_back(std::make_shared<InventoryHUD>());
+	mModules.emplace_back(std::make_shared<Kagune>());
+	mModules.emplace_back(std::make_shared<NearbyPlayers>());
+	mModules.emplace_back(std::make_shared<OpponentReach>());
+	mModules.emplace_back(std::make_shared<PathTracer>());
+	mModules.emplace_back(std::make_shared<PlayerHUD>());
+	mModules.emplace_back(std::make_shared<PlayerPositionOffset>());
+	mModules.emplace_back(std::make_shared<PotionHUD>());
+	mModules.emplace_back(std::make_shared<ProjectileTracer>());
+	mModules.emplace_back(std::make_shared<ReachCounter>());
+	mModules.emplace_back(std::make_shared<SkyPack>());
+	mModules.emplace_back(std::make_shared<SmartXRay>());
+	mModules.emplace_back(std::make_shared<SoulSpiral>());
+	mModules.emplace_back(std::make_shared<TazikHat>());
+	mModules.emplace_back(std::make_shared<TeamHealthBars>());
+	mModules.emplace_back(std::make_shared<Trails>());
+	mModules.emplace_back(std::make_shared<VSync>());
+	mModules.emplace_back(std::make_shared<WorldParticles>());
 
 #ifdef __PRIVATE_BUILD__
 	mModules.emplace_back(std::make_shared<HiveFly>()); // Flareon V2 boombox fly
@@ -593,6 +755,23 @@ void ModuleManager::deserialize(const nlohmann::json& j, bool showMessages)
 					{
 						spdlog::warn("Failed to load setting {} for module {}: {}", setting.key(), name, e.what());
 						if (showMessages) ChatUtils::displayClientMessage("§cFailed to load setting §6" + setting.key() + "§c for module §6" + name + "§c.");
+					}
+				}
+
+				// Modules may carry state that does not fit into settings (customData in config)
+				if (mod->hasCustomData())
+				{
+					try
+					{
+						if (module.contains("customData") && !module["customData"].is_null())
+							mod->deserializeCustomData(module["customData"]);
+						else
+							mod->deserializeCustomData(nlohmann::json());
+					}
+					catch (const std::exception& e)
+					{
+						spdlog::warn("Failed to load custom data for {}: {}", name, e.what());
+						if (showMessages) ChatUtils::displayClientMessage("§cFailed to load custom data for §6" + name + "§c.");
 					}
 				}
 
