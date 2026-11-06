@@ -23,6 +23,9 @@ using winrt::com_ptr;
 static decltype(&D3DHook::present) oPresent = nullptr; 
 static decltype(&D3DHook::resizeBuffers) oResizeBuffers = nullptr;
 static decltype(&D3DHook::resizeBuffers1) oResizeBuffers1 = nullptr;
+// Какой бэкенд реально подняли в kiero: D3D12 → ResizeBuffers1, D3D11 → ResizeBuffers.
+// Нужно, чтобы Present не создавал D3D11-девайс поверх D3D12-свапчейна.
+static bool isd3d12 = false;
 
 static com_ptr<ID3D11Device> gDevice11;
 static com_ptr<ID3D11DeviceContext> gContext11;
@@ -582,7 +585,6 @@ void D3DHook::init()
     mName = "D3DHook";
     s_init();
 }
-static inline bool isd3d12 = false;
 void D3DHook::s_init()
 {
     Solstice::console->info("Initializing D3DHook");
@@ -610,6 +612,7 @@ void D3DHook::s_init()
 
         oPresent = reinterpret_cast<decltype(oPresent)>(_oPresent);
         oResizeBuffers1 = reinterpret_cast<decltype(oResizeBuffers1)>(_oResize1);
+        isd3d12 = true;
 
         MH_EnableHook(_present);
         MH_EnableHook(_resize1);
@@ -637,7 +640,11 @@ void D3DHook::s_init()
         }
 
         oPresent = reinterpret_cast<decltype(oPresent)>(_oPresent);
-        oResizeBuffers1 = reinterpret_cast<decltype(oResizeBuffers1)>(_oResize);
+        // D3D11: ResizeBuffers принимает 5 аргументов, а не 7 как ResizeBuffers1.
+        // Раньше результат писался в oResizeBuffers1 — детур вызывался как
+        // 7-аргументный и падал при первом же ресайзе окна.
+        oResizeBuffers = reinterpret_cast<decltype(oResizeBuffers)>(_oResize);
+        isd3d12 = false;
 
         MH_EnableHook(_present);
         MH_EnableHook(_resize);
@@ -655,20 +662,23 @@ void D3DHook::s_shutdown()
 {
     Solstice::console->info("Shutting down D3DHook");
     FrameTransforms.reset();
-    void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>();
-    void* _resize1 = kiero::getMethod<&IDXGISwapChain3::ResizeBuffers1, void*>();
-    void* _resize = kiero::getMethod<&IDXGISwapChain::ResizeBuffers, void*>();
-    if (_resize) {
-        MH_DisableHook(_resize);
-        MH_RemoveHook(_resize);
+    // Снимаем только тот метод, который реально перехватывали: второй адрес
+    // может быть невалиден (D3D11-свапчейн не имеет ResizeBuffers1), и
+    // MH_RemoveHook по нему падал при выгрузке клиента.
+    if (isd3d12) {
+        if (void* _resize1 = kiero::getMethod<&IDXGISwapChain3::ResizeBuffers1, void*>()) {
+            MH_DisableHook(_resize1);
+            MH_RemoveHook(_resize1);
+        }
+    } else {
+        if (void* _resize = kiero::getMethod<&IDXGISwapChain::ResizeBuffers, void*>()) {
+            MH_DisableHook(_resize);
+            MH_RemoveHook(_resize);
+        }
     }
-    if (_present) {
+    if (void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>()) {
         MH_DisableHook(_present);
         MH_RemoveHook(_present);
-    }
-    if (_resize1) {
-        MH_DisableHook(_resize1);
-        MH_RemoveHook(_resize1);
     }
     /*
     kiero::unbind<&IDXGISwapChain::Present>();
