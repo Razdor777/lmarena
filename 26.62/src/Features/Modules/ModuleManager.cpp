@@ -312,6 +312,9 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<ClickTp>());
 	mModules.emplace_back(std::make_shared<ChestAura>());
 	mModules.emplace_back(std::make_shared<NoRotate>());
+	// FastEat: реализация — патч байтов по адресу, а сигнатура `FastEat` в
+	// SigManager закомментирована (в 1.26.x паттерн не снят). Включение сейчас
+	// дало бы запись по мусорному адресу, поэтому модуль ждёт живую сигнатуру.
 	//mModules.emplace_back(std::make_shared<FastEat>());
 	mModules.emplace_back(std::make_shared<AutoEat>());
 
@@ -337,7 +340,7 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<AutoAccept>());
 	mModules.emplace_back(std::make_shared<PartySpammer>());
 	mModules.emplace_back(std::make_shared<Spammer>());
-	//   mModules.emplace_back(std::make_shared<IRC>());
+	mModules.emplace_back(std::make_shared<IRC>());
 	mModules.emplace_back(std::make_shared<SkinStealer>());
 	mModules.emplace_back(std::make_shared<AutoLootbox>());
 	mModules.emplace_back(std::make_shared<AutoDodge>());
@@ -399,7 +402,7 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<MotionBlur>());
 	mModules.emplace_back(std::make_shared<Animations>());
 	mModules.emplace_back(std::make_shared<NoCameraClip>());
-	//mModules.emplace_back(std::make_shared<RobloxCamera>());
+	mModules.emplace_back(std::make_shared<RobloxCamera>());
 	mModules.emplace_back(std::make_shared<TargetHUD>());
 	mModules.emplace_back(std::make_shared<ItemESP>());
 	mModules.emplace_back(std::make_shared<Nametags>());
@@ -435,6 +438,10 @@ void ModuleManager::init()
 
 	mModules.emplace_back(std::make_shared<AutoKick>()); // LMAO
 
+	// ItemPhysics: весь модуль закомментирован (детур glm_rotate по байтовому
+	// патчу, а сигнатуры glm_rotate/glm_rotateRef сняты с 1.21.44 и под 1.26.x
+	// не сканировались). Включать его раньше сигнатур нельзя — патч уйдёт в
+	// случайный код.
 	//mModules.emplace_back(std::make_shared<ItemPhysics>());
 	mModules.emplace_back(std::make_shared<CustomChat>());
 
