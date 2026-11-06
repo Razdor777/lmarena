@@ -39,6 +39,10 @@ STL_MEMBERS = {
     'compare', 'replace', 'front', 'back', 'at', 'contains', 'ends_with',
     'starts_with', 'lower_bound', 'upper_bound', 'try_emplace', 'emplace',
     'lock', 'unlock', 'load', 'store', 'exchange', 'fetch_add', 'fetch_sub',
+    # nlohmann::json
+    'is_null', 'is_object', 'is_array', 'is_string', 'is_number', 'is_boolean',
+    'is_discarded', 'dump', 'get', 'value', 'contains', 'items', 'parse',
+    'push_back', 'emplace_back', 'operator[]', 'begin', 'end', 'type', 'size',
 }
 RE_IGNORE = re.compile(
     r'^(?:'
@@ -144,7 +148,8 @@ def main():
         # the member may live in Schematic.hpp, CombatantGuiImpl.hpp, ...
         cands = [path, stem + '.hpp', stem + '.h']
         hdr = ''
-        for c in (stem + '.hpp', stem + '.h'):
+        # инклюды ищем и в самом .cpp: AutoCosmetic.cpp включает AutoVote.hpp
+        for c in (path, stem + '.hpp', stem + '.h'):
             try:
                 hdr += open(c, encoding='utf-8', errors='ignore').read()
             except OSError:
@@ -152,6 +157,9 @@ def main():
         # the header may sit next to the .cpp (Modules/Player/<name>.hpp) OR one
         # level up when the source lives in a sub-folder -- cover both
         parent = os.path.dirname(os.path.dirname(path))
+        # #include <Features/Modules/Misc/AutoVote.hpp> -- путь от корня src
+        for inc in re.findall(r'#include\s*[<"]([^>"]+)[>"]', hdr):
+            cands.append(os.path.join(NEW, inc))
         for inc in re.findall(r'#include\s*"([^"]+)"', hdr):
             cands.append(os.path.join(parent, inc))
         for inc in re.findall(r'#include\s*"([^"]+)"', hdr):

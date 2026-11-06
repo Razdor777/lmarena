@@ -12,6 +12,7 @@
 #include "Combat/Criticals.hpp"
 #include "Combat/HitBoxes.hpp"
 #include "Combat/InfiniteAura.hpp"
+#include "Combat/GhostMode.hpp"
 #include "Combat/Reach.hpp"
 #include "Combat/TriggerBot.hpp"
 #include "Combat/Aimbot.hpp"
@@ -100,6 +101,7 @@
 #include "Misc/VoiceChat.hpp"
 #include "Misc/WhoisCollector.hpp"
 #include "Player/AntiVoid.hpp"
+#include "Player/PlayerTracker.hpp"
 #include "Player/AutoArmor.hpp"
 #include "Player/Cage.hpp"
 #include "Player/ChainTP.hpp"
@@ -174,6 +176,43 @@
 #include "Visual/ViewModel.hpp"
 #include "Visual/Watermark.hpp"
 #include "Visual/Zoom.hpp"
+#include "Visual/AfterImage.hpp"
+#include "Visual/Ambience.hpp"
+#include "Visual/AmbientCubes.hpp"
+#include "Visual/ArmorHUD.hpp"
+#include "Visual/ArrowRecovery.hpp"
+#include "Visual/BoneEsp.hpp"
+#include "Visual/BowHitMarker.hpp"
+#include "Visual/CustomCrosshair.hpp"
+#include "Visual/CustomFog.hpp"
+#include "Visual/DamageLog.hpp"
+#include "Visual/EnemyIndicator.hpp"
+#include "Visual/EntityRadar.hpp"
+#include "Visual/FakePlayer.hpp"
+#include "Visual/Goofy.hpp"
+#include "Visual/HealthBar.hpp"
+#include "Visual/HealthDisplay.hpp"
+#include "Visual/HitColor.hpp"
+#include "Visual/HitEffects.hpp"
+#include "Visual/HitParticles.hpp"
+#include "Visual/InventoryHUD.hpp"
+#include "Visual/Kagune.hpp"
+#include "Visual/NearbyPlayers.hpp"
+#include "Visual/OpponentReach.hpp"
+#include "Visual/PathTracer.hpp"
+#include "Visual/PlayerHUD.hpp"
+#include "Visual/PlayerPositionOffset.hpp"
+#include "Visual/PotionHUD.hpp"
+#include "Visual/ProjectileTracer.hpp"
+#include "Visual/ReachCounter.hpp"
+#include "Visual/SkyPack.hpp"
+#include "Visual/SmartXRay.hpp"
+#include "Visual/SoulSpiral.hpp"
+#include "Visual/TazikHat.hpp"
+#include "Visual/TeamHealthBars.hpp"
+#include "Visual/Trails.hpp"
+#include "Visual/VSync.hpp"
+#include "Visual/WorldParticles.hpp"
 
 void ModuleManager::init()
 {
@@ -184,6 +223,7 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<Aura>());
 	mModules.emplace_back(std::make_shared<TriggerBot>());
 	mModules.emplace_back(std::make_shared<AutoClicker>());
+	mModules.emplace_back(std::make_shared<GhostMode>());
 	mModules.emplace_back(std::make_shared<Reach>());
 	mModules.emplace_back(std::make_shared<Aimbot>());
 	mModules.emplace_back(std::make_shared<ArrowTP>());
@@ -253,6 +293,7 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<SpectatorDetector>());
 	mModules.emplace_back(std::make_shared<VoiceChat>());
 	mModules.emplace_back(std::make_shared<WhoisCollector>());
+	mModules.emplace_back(std::make_shared<PlayerTracker>());
 	mModules.emplace_back(std::make_shared<AutoArmor>());
 	mModules.emplace_back(std::make_shared<Cage>());
 	mModules.emplace_back(std::make_shared<ChainTP>());
@@ -314,6 +355,43 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<AutoScale>());
 	mModules.emplace_back(std::make_shared<Interface>());
 	mModules.emplace_back(std::make_shared<Arraylist>());
+	mModules.emplace_back(std::make_shared<AfterImage>());
+	mModules.emplace_back(std::make_shared<Ambience>());
+	mModules.emplace_back(std::make_shared<AmbientCubes>());
+	mModules.emplace_back(std::make_shared<ArmorHUD>());
+	mModules.emplace_back(std::make_shared<ArrowRecovery>());
+	mModules.emplace_back(std::make_shared<BoneEsp>());
+	mModules.emplace_back(std::make_shared<BowHitMarker>());
+	mModules.emplace_back(std::make_shared<CustomCrosshair>());
+	mModules.emplace_back(std::make_shared<CustomFog>());
+	mModules.emplace_back(std::make_shared<DamageLog>());
+	mModules.emplace_back(std::make_shared<EnemyIndicator>());
+	mModules.emplace_back(std::make_shared<EntityRadar>());
+	mModules.emplace_back(std::make_shared<FakePlayer>());
+	mModules.emplace_back(std::make_shared<Goofy>());
+	mModules.emplace_back(std::make_shared<HealthBar>());
+	mModules.emplace_back(std::make_shared<HealthDisplay>());
+	mModules.emplace_back(std::make_shared<HitColor>());
+	mModules.emplace_back(std::make_shared<HitEffects>());
+	mModules.emplace_back(std::make_shared<HitParticles>());
+	mModules.emplace_back(std::make_shared<InventoryHUD>());
+	mModules.emplace_back(std::make_shared<Kagune>());
+	mModules.emplace_back(std::make_shared<NearbyPlayers>());
+	mModules.emplace_back(std::make_shared<OpponentReach>());
+	mModules.emplace_back(std::make_shared<PathTracer>());
+	mModules.emplace_back(std::make_shared<PlayerHUD>());
+	mModules.emplace_back(std::make_shared<PlayerPositionOffset>());
+	mModules.emplace_back(std::make_shared<PotionHUD>());
+	mModules.emplace_back(std::make_shared<ProjectileTracer>());
+	mModules.emplace_back(std::make_shared<ReachCounter>());
+	mModules.emplace_back(std::make_shared<SkyPack>());
+	mModules.emplace_back(std::make_shared<SmartXRay>());
+	mModules.emplace_back(std::make_shared<SoulSpiral>());
+	mModules.emplace_back(std::make_shared<TazikHat>());
+	mModules.emplace_back(std::make_shared<TeamHealthBars>());
+	mModules.emplace_back(std::make_shared<Trails>());
+	mModules.emplace_back(std::make_shared<VSync>());
+	mModules.emplace_back(std::make_shared<WorldParticles>());
 	mModules.emplace_back(std::make_shared<LevelInfo>());
 	mModules.emplace_back(std::make_shared<Notifications>());
 	mModules.emplace_back(std::make_shared<DestroyProgress>());
