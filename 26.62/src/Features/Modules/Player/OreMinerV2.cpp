@@ -997,7 +997,8 @@ void OreMinerV2::syncDebugSession() {
 void OreMinerV2::debugStart() {
   debugCloseFiles();
 
-  mDebugDir = FileUtils::getsolsticeDir() + "Dumps\\";
+  // Регистр: в базе метод называется getSolsticeDir (была опечатка).
+  mDebugDir = FileUtils::getSolsticeDir() + "Dumps\\";
   try {
     FileUtils::createDirectory(mDebugDir);
   } catch (const std::exception &e) {

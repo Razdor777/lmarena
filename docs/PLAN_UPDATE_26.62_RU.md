@@ -32,7 +32,8 @@
 базе не существует), `tools/check_undefined.py` (объявлено, но без тела —
 линковка), `tools/check_event_visibility.py` (виден ли тип события в `listen<>`)
 , `tools/check_enums.py` (значение перечисления, которого нет) и
-`tools/check_sig_names.py` (есть ли вообще такое имя в `SigManager`/`OffsetProvider`).
+`tools/check_sig_names.py` (есть ли вообще такое имя в `SigManager`/`OffsetProvider`),
+`tools/check_method_case.py` (регистр имени метода).
 
 ```bash
 python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сломалось в SDK
@@ -43,6 +44,7 @@ python3 tools/check_undefined.py 26.62/src                          # объяв
 python3 tools/check_event_visibility.py                             # listen<> видит тип события
 python3 tools/check_enums.py 26.62/src                              # Mode::X, где X не объявлен
 python3 tools/check_sig_names.py                                    # SigManager::X / OffsetProvider::X объявлены
+python3 tools/check_method_case.py                                  # Class::Method с другим регистром
 python3 tools/gen_resources.py --check                              # ресурсы актуальны
 ```
 
