@@ -1,0 +1,1495 @@
+[
+ {
+  "name": "ActorAnimationControllerPlayer_applyToPose",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/ActorHooks/ActorModelHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/ActorHooks/ActorModelHook.cpp"
+  ]
+ },
+ {
+  "name": "ActorRenderDispatcher_render",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/ActorRenderDispatcherHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/ActorRenderDispatcherHook.cpp"
+  ]
+ },
+ {
+  "name": "ActorShaderManager_setupShaderParameters",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/SetupShaderParameterHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/SetupShaderParameterHook.cpp"
+  ]
+ },
+ {
+  "name": "Actor_canSee",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "Actor_getNameTag",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "Actor_getStatusFlag",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "Actor_setNameTag",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "Actor_setPosition",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "BlockReach",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Combat/Reach.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Combat/Reach.cpp"
+  ]
+ },
+ {
+  "name": "BlockSource_fireBlockChanged",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/MiscHooks/FireBlockChangedHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/MiscHooks/FireBlockChangedHook.cpp"
+  ]
+ },
+ {
+  "name": "BobHurt",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/ActorHooks/AnimationHooks.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/ActorHooks/AnimationHooks.cpp"
+  ]
+ },
+ {
+  "name": "CameraComponent_applyRotation",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/NoHurtcam.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/NoHurtcam.cpp"
+  ]
+ },
+ {
+  "name": "CameraDirectLookSystemUtil_handleLookInput",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/LookInputHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/LookInputHook.cpp"
+  ]
+ },
+ {
+  "name": "ClientInputCallbacks_handleBuildAction_onAttack_setNoBlockBreakUntil",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/ItemUseDelayFix.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/ItemUseDelayFix.cpp"
+  ]
+ },
+ {
+  "name": "ClientInstance_grabMouse",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/ClientInstance.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ClientInstance_isPreGame",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/MiscHooks/PreGameHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/MiscHooks/PreGameHook.cpp"
+  ]
+ },
+ {
+  "name": "ClientInstance_mBgfx",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/ClientInstance.cpp",
+   "SDK/Minecraft/Rendering/bgfx_context.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ClientInstance_releaseMouse",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/ClientInstance.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ColorTint_set",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "ComplexInventoryTransaction_vtable",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ConcreteBlockLegacy_getCollisionShapeForCamera",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/Jesus.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/Jesus.cpp"
+  ]
+ },
+ {
+  "name": "ConnectionRequest_create",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/NetworkHooks/ConnectionRequestHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/NetworkHooks/ConnectionRequestHook.cpp"
+  ]
+ },
+ {
+  "name": "ConnectionRequest_create_CurrentInputMode",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ]
+ },
+ {
+  "name": "ConnectionRequest_create_DefaultInputMode",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ]
+ },
+ {
+  "name": "ConnectionRequest_create_DeviceModel",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/DeviceSpoof.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/DeviceSpoof.cpp"
+  ]
+ },
+ {
+  "name": "ConnectionRequest_create_DeviceOS",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ]
+ },
+ {
+  "name": "ContainerScreenController_handleAutoPlace",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Inventory/ContainerScreenController.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ContainerScreenController_onContainerSlotHovered",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp"
+  ]
+ },
+ {
+  "name": "ContainerScreenController_tick",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp"
+  ]
+ },
+ {
+  "name": "ContainerScreenController_tryBeginTransition",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Inventory/ContainerScreenController.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ContainerValidation_handlePlace_jnz",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "ContainerValidation_handlePlace_test",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "ContainerValidation_handleTransfer_jnz",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "EnchantUtils_getEnchantLevel",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "FastEat",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/ModuleManager.cpp",
+   "Features/Modules/Player/FastEat.cpp",
+   "Features/Modules/Player/FastEat.hpp"
+  ],
+  "real_users": [
+   "Features/Modules/ModuleManager.cpp",
+   "Features/Modules/Player/FastEat.cpp",
+   "Features/Modules/Player/FastEat.hpp"
+  ]
+ },
+ {
+  "name": "FireRender",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/NoRender.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/NoRender.cpp"
+  ]
+ },
+ {
+  "name": "FluxSwing",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ]
+ },
+ {
+  "name": "GameMode_baseUseItem",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/GameMode.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "GameMode_getDestroyRate",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/GameMode.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "GetCollisionShapeActorProxy_getFeetAttachPos",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "GetSpeedInAirWithSprint",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/AirSpeed.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/AirSpeed.cpp"
+  ]
+ },
+ {
+  "name": "GuiData_displayClientMessage",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Rendering/GuiData.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "HoverTextRenderer_render",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/HoverTextRendererHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/HoverTextRendererHook.cpp"
+  ]
+ },
+ {
+  "name": "HudCursorRenderer_render",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/CustomCrosshair.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/CustomCrosshair.cpp"
+  ]
+ },
+ {
+  "name": "HurtColor",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/HitColor.hpp",
+   "Hook/Hooks/RenderHooks/HurtColorHook.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/HitColor.hpp",
+   "Hook/Hooks/RenderHooks/HurtColorHook.cpp"
+  ]
+ },
+ {
+  "name": "InputModeBypass",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ]
+ },
+ {
+  "name": "InputModeBypassFix",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Misc/EditionFaker.cpp"
+  ]
+ },
+ {
+  "name": "InventoryTransaction_addAction",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemEntityRenderer_render",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "ItemInHandRenderer_renderItem",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "ItemInHandRenderer_renderItem_bytepatch",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ]
+ },
+ {
+  "name": "ItemInHandRenderer_renderItem_bytepatch2",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Solstice.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemInHandRenderer_render_bytepatch",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ]
+ },
+ {
+  "name": "ItemPositionConst",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ]
+ },
+ {
+  "name": "ItemReleaseInventoryTransaction_vtable",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemRenderer_getAtlasIconInfo",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Rendering/ItemRenderer.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemRenderer_getIconUV",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Rendering/ItemRenderer.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemRenderer_iconBlit",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Rendering/ItemRenderer.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemRenderer_render",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/ItemRendererHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/ItemRendererHook.cpp"
+  ]
+ },
+ {
+  "name": "ItemRenderer_renderGuiItem",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "ItemRenderer_renderGuiItemNew",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Rendering/ItemRenderer.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemStack_fromDescriptor",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Inventory/ItemStack.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemStack_getCustomName",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Inventory/ItemStack.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemStack_vTable",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Inventory/ItemStack.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemUseInventoryTransaction_vtable",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "ItemUseOnActorInventoryTransaction_vtable",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "JSON_parse",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/JSON.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "JSON_toStyledString",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/JSON.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "Keyboard_feed",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/MiscHooks/KeyHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/MiscHooks/KeyHook.cpp"
+  ]
+ },
+ {
+  "name": "LevelRenderer_renderLevel",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/LevelRendererHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/LevelRendererHook.cpp"
+  ]
+ },
+ {
+  "name": "Level_getRuntimeActorList",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/World/Level.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "MainView_instance",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/UWP/MainView.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "MinecraftGame_instance",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/MinecraftGame.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "MinecraftPackets_createPacket",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Network/MinecraftPackets.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "Mob_JumpFromGroundRequestComponentPatch",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/NoJumpDelay.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/NoJumpDelay.cpp"
+  ]
+ },
+ {
+  "name": "Mob_getCurrentSwingDuration",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/ActorHooks/AnimationHooks.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/ActorHooks/AnimationHooks.cpp"
+  ]
+ },
+ {
+  "name": "Mob_getJumpControlComponent",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "MouseDevice_feed",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/MiscHooks/MouseHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/MiscHooks/MouseHook.cpp"
+  ]
+ },
+ {
+  "name": "NetherNetConnector_runEvents",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/NetworkHooks/NetherNetHooks.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/NetworkHooks/NetherNetHooks.cpp"
+  ]
+ },
+ {
+  "name": "NetworkStackItemDescriptor_ctor",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Inventory/NetworkItemStackDescriptor.hpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "PlayerMovement_clearInputStateInlined",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/InventoryMove.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/InventoryMove.cpp"
+  ]
+ },
+ {
+  "name": "PlayerMovement_clearInputStateInlined2",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/InventoryMove.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/InventoryMove.cpp"
+  ]
+ },
+ {
+  "name": "PlayerMovement_clearInputStateInlined3",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/InventoryMove.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/InventoryMove.cpp"
+  ]
+ },
+ {
+  "name": "RakNet_RakPeer_runUpdateCycle",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/NetworkHooks/RakPeerHooks.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/NetworkHooks/RakPeerHooks.cpp"
+  ]
+ },
+ {
+  "name": "RakNet_RakPeer_sendImmediate",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/NetworkHooks/RakPeerHooks.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/NetworkHooks/RakPeerHooks.cpp"
+  ]
+ },
+ {
+  "name": "Reach",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Combat/Reach.cpp",
+   "Features/Modules/Combat/Reach.hpp",
+   "Features/Modules/ModuleManager.cpp",
+   "Features/Modules/Visual/OpponentReach.cpp",
+   "Features/Modules/Visual/OpponentReach.hpp",
+   "Features/Modules/Visual/ReachCounter.hpp"
+  ],
+  "real_users": [
+   "Features/Modules/Combat/Reach.cpp",
+   "Features/Modules/Combat/Reach.hpp",
+   "Features/Modules/ModuleManager.cpp",
+   "Features/Modules/Visual/OpponentReach.cpp",
+   "Features/Modules/Visual/OpponentReach.hpp",
+   "Features/Modules/Visual/ReachCounter.hpp"
+  ]
+ },
+ {
+  "name": "ResourcePackManager_composeFullStackBp",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/Interface.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/Interface.cpp"
+  ]
+ },
+ {
+  "name": "ScreenView_setupAndRender",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/SetupAndRenderHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/SetupAndRenderHook.cpp"
+  ]
+ },
+ {
+  "name": "SimulatedPlayer_simulateJump",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/Actor/Actor.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "SneakMovementSystem_tickSneakMovementSystem",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/SafeWalk.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/SafeWalk.cpp"
+  ]
+ },
+ {
+  "name": "SneakMovementSystem_tickSneakMovementSystem2",
+  "in_target": true,
+  "in_base": false,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/SafeWalk.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/SafeWalk.cpp"
+  ]
+ },
+ {
+  "name": "TapSwingAnim",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/Animations.cpp"
+  ]
+ },
+ {
+  "name": "Unknown_renderBlockOverlay",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/NoRender.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/NoRender.cpp"
+  ]
+ },
+ {
+  "name": "Unknown_renderNametag",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/ActorHooks/NametagRenderHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/ActorHooks/NametagRenderHook.cpp"
+  ]
+ },
+ {
+  "name": "Unknown_updatePlayerFromCamera",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "WaterBlockLegacy_getCollisionShapeForCamera",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/Jesus.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/Jesus.cpp"
+  ]
+ },
+ {
+  "name": "checkBlocks",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "SDK/Minecraft/World/BlockSource.cpp"
+  ],
+  "real_users": []
+ },
+ {
+  "name": "glm_rotate",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/ItemPhysics.cpp",
+   "Features/Modules/Visual/ItemPhysics.hpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/ItemPhysics.cpp",
+   "Features/Modules/Visual/ItemPhysics.hpp"
+  ]
+ },
+ {
+  "name": "glm_rotateRef",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ]
+ },
+ {
+  "name": "glm_translateRef",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ]
+ },
+ {
+  "name": "glm_translateRef2",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Visual/ItemPhysics.cpp"
+  ]
+ },
+ {
+  "name": "isCriticalHit",
+  "in_target": false,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [],
+  "real_users": []
+ },
+ {
+  "name": "mce_framebuilder_RenderItemInHandDescription_ctor",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Hook/Hooks/RenderHooks/RenderItemInHandHook.cpp"
+  ],
+  "real_users": [
+   "Hook/Hooks/RenderHooks/RenderItemInHandHook.cpp"
+  ]
+ },
+ {
+  "name": "name",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Command/Command.cpp",
+   "Features/Command/Command.hpp",
+   "Features/Command/CommandManager.cpp",
+   "Features/Command/Commands/BindCommand.cpp",
+   "Features/Command/Commands/ConfigCommand.cpp",
+   "Features/Command/Commands/CopyNameCommand.cpp",
+   "Features/Command/Commands/FakeChatCommand.cpp",
+   "Features/Command/Commands/FriendCommand.cpp",
+   "Features/Command/Commands/HelpCommand.cpp",
+   "Features/Command/Commands/IrcCommand.cpp",
+   "Features/Command/Commands/NameProtectCommand.cpp",
+   "Features/Command/Commands/PlayerOffsetCommand.cpp",
+   "Features/Command/Commands/TeleportCommand.cpp",
+   "Features/Command/Commands/TestCommand.cpp",
+   "Features/Configs/ConfigManager.cpp",
+   "Features/Configs/ConfigManager.hpp",
+   "Features/GUI/ModernDropdown.cpp",
+   "Features/GUI/ScriptingGui.cpp",
+   "Features/Modules/Combat/Aimbot.cpp",
+   "Features/Modules/Combat/ArrowTP.cpp",
+   "Features/Modules/Combat/Aura.cpp",
+   "Features/Modules/Combat/InfiniteAura.cpp",
+   "Features/Modules/Combat/LastTP.cpp",
+   "Features/Modules/Misc/AntiBot.hpp",
+   "Features/Modules/Misc/ArmorSlotUnlock.cpp",
+   "Features/Modules/Misc/AutoMessage.hpp",
+   "Features/Modules/Misc/AutoQueue.cpp",
+   "Features/Modules/Misc/AutoReport.cpp",
+   "Features/Modules/Misc/FakeChat.cpp",
+   "Features/Modules/Misc/Friends.cpp",
+   "Features/Modules/Misc/Friends.hpp",
+   "Features/Modules/Misc/Killsults.cpp",
+   "Features/Modules/Misc/Killsults.hpp",
+   "Features/Modules/Misc/PlayerLogger.cpp",
+   "Features/Modules/Misc/PlayerLogger.hpp",
+   "Features/Modules/Misc/SkinBlinker.cpp",
+   "Features/Modules/Misc/Spammer.cpp",
+   "Features/Modules/Misc/SpectatorDetector.cpp",
+   "Features/Modules/Misc/StaffAlert.cpp",
+   "Features/Modules/Misc/StaffAlert.hpp",
+   "Features/Modules/Misc/TestModule.cpp",
+   "Features/Modules/Misc/WhoisCollector.cpp",
+   "Features/Modules/Misc/WhoisCollector.hpp",
+   "Features/Modules/Module.cpp",
+   "Features/Modules/Module.hpp",
+   "Features/Modules/ModuleManager.cpp",
+   "Features/Modules/ModuleManager.hpp",
+   "Features/Modules/Movement/DebugFly.hpp",
+   "Features/Modules/Player/AutoArmor.cpp",
+   "Features/Modules/Player/ClickTp.cpp",
+   "Features/Modules/Player/ClickTp.hpp",
+   "Features/Modules/Player/ContainerActions.cpp",
+   "Features/Modules/Player/OreMiner.cpp",
+   "Features/Modules/Player/OreMiner.hpp",
+   "Features/Modules/Player/OreMinerV2.cpp",
+   "Features/Modules/Player/PlayerTracker.hpp",
+   "Features/Modules/Player/RegionFill.cpp",
+   "Features/Modules/Player/Schematic.hpp",
+   "Features/Modules/Player/SchematicBuilder.cpp",
+   "Features/Modules/Player/Teams.cpp",
+   "Features/Modules/Setting.hpp",
+   "Features/Modules/Visual/ArmorHUD.cpp",
+   "Features/Modules/Visual/ArmorHUD.hpp",
+   "Features/Modules/Visual/Arraylist.cpp",
+   "Features/Modules/Visual/Arraylist.hpp",
+   "Features/Modules/Visual/ArrowRecovery.cpp",
+   "Features/Modules/Visual/FakePlayer.hpp",
+   "Features/Modules/Visual/HealthDisplay.cpp",
+   "Features/Modules/Visual/HealthDisplay.hpp",
+   "Features/Modules/Visual/InventoryHUD.cpp",
+   "Features/Modules/Visual/ItemESP.cpp",
+   "Features/Modules/Visual/ItemESP.hpp",
+   "Features/Modules/Visual/LevelInfo.cpp",
+   "Features/Modules/Visual/NameProtect.cpp",
+   "Features/Modules/Visual/NameProtect.hpp",
+   "Features/Modules/Visual/Nametags.cpp",
+   "Features/Modules/Visual/Nametags.hpp",
+   "Features/Modules/Visual/NearbyPlayers.cpp",
+   "Features/Modules/Visual/NearbyPlayers.hpp",
+   "Features/Modules/Visual/PlayerHUD.cpp",
+   "Features/Modules/Visual/PlayerHUD.hpp",
+   "Features/Modules/Visual/PlayerPositionOffset.cpp",
+   "Features/Modules/Visual/PlayerPositionOffset.hpp",
+   "Features/Modules/Visual/PotionHUD.cpp",
+   "Features/Modules/Visual/ProjectileTracer.cpp",
+   "Features/Modules/Visual/SkyPack.cpp",
+   "Features/Modules/Visual/TargetHUD.cpp",
+   "Features/Modules/Visual/TargetHUD.hpp",
+   "Hook/Detour.cpp",
+   "Hook/Detour.hpp",
+   "Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp",
+   "Hook/Hooks/RenderHooks/AmbienceHook.cpp",
+   "SDK/Minecraft/Actor/Actor.cpp",
+   "SDK/Minecraft/Actor/Actor.hpp",
+   "SDK/Minecraft/Actor/Components/FlagComponent.hpp",
+   "SDK/Minecraft/Actor/EntityContext.hpp",
+   "SDK/Minecraft/ClientInstance.cpp",
+   "SDK/Minecraft/Inventory/ContainerScreenController.cpp",
+   "SDK/Minecraft/Inventory/ContainerScreenController.hpp",
+   "SDK/Minecraft/Inventory/Item.cpp",
+   "SDK/Minecraft/Inventory/ItemStack.hpp",
+   "SDK/Minecraft/Network/LoopbackPacketSender.hpp",
+   "SDK/Minecraft/World/BlockLegacy.cpp",
+   "SDK/OffsetProvider.cpp",
+   "SDK/SigManager.cpp",
+   "Utils/AudioUtils.cpp",
+   "Utils/FontHelper.hpp",
+   "Utils/GameUtils/HealthTracker.hpp",
+   "Utils/GameUtils/ItemUtils.cpp",
+   "Utils/GameUtils/PlatformTracker.hpp",
+   "Utils/ItemTextures.cpp",
+   "Utils/MemUtils.hpp",
+   "Utils/MiscUtils/ClientPack.cpp",
+   "Utils/MiscUtils/DataStore.hpp",
+   "Utils/StringUtils.cpp",
+   "Utils/SysUtils/ExceptionHandler.cpp",
+   "Utils/SysUtils/StackWalker.cpp",
+   "glm/detail/_features.hpp",
+   "glm/detail/setup.hpp"
+  ],
+  "real_users": [
+   "Features/Command/Command.cpp",
+   "Features/Command/Command.hpp",
+   "Features/Command/CommandManager.cpp",
+   "Features/Command/Commands/BindCommand.cpp",
+   "Features/Command/Commands/ConfigCommand.cpp",
+   "Features/Command/Commands/CopyNameCommand.cpp",
+   "Features/Command/Commands/FakeChatCommand.cpp",
+   "Features/Command/Commands/FriendCommand.cpp",
+   "Features/Command/Commands/HelpCommand.cpp",
+   "Features/Command/Commands/IrcCommand.cpp",
+   "Features/Command/Commands/NameProtectCommand.cpp",
+   "Features/Command/Commands/PlayerOffsetCommand.cpp",
+   "Features/Command/Commands/TeleportCommand.cpp",
+   "Features/Command/Commands/TestCommand.cpp",
+   "Features/Configs/ConfigManager.cpp",
+   "Features/Configs/ConfigManager.hpp",
+   "Features/GUI/ModernDropdown.cpp",
+   "Features/GUI/ScriptingGui.cpp",
+   "Features/Modules/Combat/Aimbot.cpp",
+   "Features/Modules/Combat/ArrowTP.cpp",
+   "Features/Modules/Combat/Aura.cpp",
+   "Features/Modules/Combat/InfiniteAura.cpp",
+   "Features/Modules/Combat/LastTP.cpp",
+   "Features/Modules/Misc/AntiBot.hpp",
+   "Features/Modules/Misc/ArmorSlotUnlock.cpp",
+   "Features/Modules/Misc/AutoMessage.hpp",
+   "Features/Modules/Misc/AutoQueue.cpp",
+   "Features/Modules/Misc/AutoReport.cpp",
+   "Features/Modules/Misc/FakeChat.cpp",
+   "Features/Modules/Misc/Friends.cpp",
+   "Features/Modules/Misc/Friends.hpp",
+   "Features/Modules/Misc/Killsults.cpp",
+   "Features/Modules/Misc/Killsults.hpp",
+   "Features/Modules/Misc/PlayerLogger.cpp",
+   "Features/Modules/Misc/PlayerLogger.hpp",
+   "Features/Modules/Misc/SkinBlinker.cpp",
+   "Features/Modules/Misc/Spammer.cpp",
+   "Features/Modules/Misc/SpectatorDetector.cpp",
+   "Features/Modules/Misc/StaffAlert.cpp",
+   "Features/Modules/Misc/StaffAlert.hpp",
+   "Features/Modules/Misc/TestModule.cpp",
+   "Features/Modules/Misc/WhoisCollector.cpp",
+   "Features/Modules/Misc/WhoisCollector.hpp",
+   "Features/Modules/Module.cpp",
+   "Features/Modules/Module.hpp",
+   "Features/Modules/ModuleManager.cpp",
+   "Features/Modules/ModuleManager.hpp",
+   "Features/Modules/Movement/DebugFly.hpp",
+   "Features/Modules/Player/AutoArmor.cpp",
+   "Features/Modules/Player/ClickTp.cpp",
+   "Features/Modules/Player/ClickTp.hpp",
+   "Features/Modules/Player/ContainerActions.cpp",
+   "Features/Modules/Player/OreMiner.cpp",
+   "Features/Modules/Player/OreMiner.hpp",
+   "Features/Modules/Player/OreMinerV2.cpp",
+   "Features/Modules/Player/PlayerTracker.hpp",
+   "Features/Modules/Player/RegionFill.cpp",
+   "Features/Modules/Player/Schematic.hpp",
+   "Features/Modules/Player/SchematicBuilder.cpp",
+   "Features/Modules/Player/Teams.cpp",
+   "Features/Modules/Setting.hpp",
+   "Features/Modules/Visual/ArmorHUD.cpp",
+   "Features/Modules/Visual/ArmorHUD.hpp",
+   "Features/Modules/Visual/Arraylist.cpp",
+   "Features/Modules/Visual/Arraylist.hpp",
+   "Features/Modules/Visual/ArrowRecovery.cpp",
+   "Features/Modules/Visual/FakePlayer.hpp",
+   "Features/Modules/Visual/HealthDisplay.cpp",
+   "Features/Modules/Visual/HealthDisplay.hpp",
+   "Features/Modules/Visual/InventoryHUD.cpp",
+   "Features/Modules/Visual/ItemESP.cpp",
+   "Features/Modules/Visual/ItemESP.hpp",
+   "Features/Modules/Visual/LevelInfo.cpp",
+   "Features/Modules/Visual/NameProtect.cpp",
+   "Features/Modules/Visual/NameProtect.hpp",
+   "Features/Modules/Visual/Nametags.cpp",
+   "Features/Modules/Visual/Nametags.hpp",
+   "Features/Modules/Visual/NearbyPlayers.cpp",
+   "Features/Modules/Visual/NearbyPlayers.hpp",
+   "Features/Modules/Visual/PlayerHUD.cpp",
+   "Features/Modules/Visual/PlayerHUD.hpp",
+   "Features/Modules/Visual/PlayerPositionOffset.cpp",
+   "Features/Modules/Visual/PlayerPositionOffset.hpp",
+   "Features/Modules/Visual/PotionHUD.cpp",
+   "Features/Modules/Visual/ProjectileTracer.cpp",
+   "Features/Modules/Visual/SkyPack.cpp",
+   "Features/Modules/Visual/TargetHUD.cpp",
+   "Features/Modules/Visual/TargetHUD.hpp",
+   "Hook/Detour.cpp",
+   "Hook/Detour.hpp",
+   "Hook/Hooks/ContainerHooks/ContainerScreenControllerHook.cpp",
+   "Hook/Hooks/RenderHooks/AmbienceHook.cpp",
+   "SDK/OffsetProvider.cpp",
+   "SDK/SigManager.cpp",
+   "Utils/AudioUtils.cpp",
+   "Utils/FontHelper.hpp",
+   "Utils/GameUtils/HealthTracker.hpp",
+   "Utils/GameUtils/ItemUtils.cpp",
+   "Utils/GameUtils/PlatformTracker.hpp",
+   "Utils/ItemTextures.cpp",
+   "Utils/MemUtils.hpp",
+   "Utils/MiscUtils/ClientPack.cpp",
+   "Utils/MiscUtils/DataStore.hpp",
+   "Utils/StringUtils.cpp",
+   "Utils/SysUtils/ExceptionHandler.cpp",
+   "Utils/SysUtils/StackWalker.cpp",
+   "glm/detail/_features.hpp",
+   "glm/detail/setup.hpp"
+  ]
+ },
+ {
+  "name": "tickEntity_ItemUseSlowdownModifierComponent",
+  "in_target": true,
+  "in_base": true,
+  "target_version": "",
+  "base_version": "",
+  "users": [
+   "Features/Modules/Movement/NoSlowDown.cpp"
+  ],
+  "real_users": [
+   "Features/Modules/Movement/NoSlowDown.cpp"
+  ]
+ }
+]

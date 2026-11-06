@@ -243,6 +243,12 @@ SimpleContainer* Actor::getArmorContainer()
 	return mContext.getComponent<ActorEquipmentComponent>()->mArmorContainer;
 }
 
+SimpleContainer* Actor::getOffhandContainer()
+{
+	auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+	return equipment ? equipment->mOffhandContainer : nullptr;
+}
+
 PlayerInventory* Actor::getSupplies()
 {
 	return hat::member_at<PlayerInventory*>(this, OffsetProvider::Actor_mSupplies);
@@ -422,6 +428,13 @@ float Actor::getHealth()
 	auto health = getAttribute(Health);
 	if (!health) return 0;
 	return health->mCurrentValue;
+}
+
+float Actor::getHunger()
+{
+	auto hunger = getAttribute(PlayerHunger);
+	if (!hunger) return 20.f;
+	return hunger->mCurrentValue;
 }
 
 float Actor::getAbsorption()

@@ -13,7 +13,7 @@
 #include <SDK/Minecraft/World/BlockSource.hpp>
 #include <SDK/Minecraft/World/HitResult.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
-#include <SDK/Minecraft/Network/Packets/PlayerAuthinputPacket.hpp>
+#include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 
 void AutoBoombox::onEnable()
 {

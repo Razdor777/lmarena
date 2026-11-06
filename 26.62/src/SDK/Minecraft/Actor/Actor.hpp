@@ -199,6 +199,7 @@ public:
     MaxAutoStepComponent* getMaxAutoStepComponent();
     MobHurtTimeComponent* getMobHurtTimeComponent();
     class SimpleContainer* getArmorContainer();
+    class SimpleContainer* getOffhandContainer();
     class PlayerInventory* getSupplies();
     class Level* getLevel();
     class SerializedSkinImpl* getSkin();
@@ -220,6 +221,7 @@ public:
     AttributesComponent* getAttributesComponent();
     float getMaxHealth();
     float getHealth();
+    float getHunger();
     float getAbsorption();
     float getMaxAbsorption();
     AttributeInstance* getAttribute(AttributeId id);

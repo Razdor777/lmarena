@@ -3,6 +3,9 @@
 
 #include "BaseTickHook.hpp"
 
+#include <Features/ChatBinds/ChatBinds.hpp>
+#include <Features/Modules/ModuleToggle.hpp>
+
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Features/Events/BaseTickEvent.hpp>
@@ -18,6 +21,9 @@ void BaseTickHook::onBaseTick(Actor* actor)
 {
     auto oFunc = mDetour->getOriginal<&onBaseTick>();
     if (actor != ClientInstance::get()->getLocalPlayer()) return oFunc(actor);
+
+    // onEnable/onDisable модулей — здесь, в потоке игры (см. ModuleToggle.hpp).
+    ModuleToggle::fromGameThread();
 
     mQueueMutex.lock();
     auto messages = mQueuedMessages;
@@ -44,6 +50,10 @@ void BaseTickHook::onBaseTick(Actor* actor)
         mQueuedPackets.clear();
     }
 
+
+    // Чат-бинды: клавишу ловит KeyHook, а сама отправка — здесь, в потоке
+    // игры, как и обычный чат.
+    ChatBinds::flushPending();
 
     auto holder = nes::make_holder<BaseTickEvent>(actor);
     gFeatureManager->mDispatcher->trigger(holder);

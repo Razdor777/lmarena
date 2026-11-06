@@ -29,4 +29,6 @@ public:
     void onEnable() override;
     void onDisable() override;
     void onConnectionRequestEvent(class ConnectionRequestEvent& event);
+    // Определение было в .cpp, а объявления не было — файл не компилировался.
+    void onPacketOutEvent(class PacketOutEvent& event);
 };

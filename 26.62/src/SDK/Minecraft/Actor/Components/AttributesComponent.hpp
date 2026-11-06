@@ -9,6 +9,7 @@
 
 enum AttributeId {
     Health = 5,
+    PlayerHunger = 2,
     Absorption = 12,
 };
 

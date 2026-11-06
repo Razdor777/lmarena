@@ -2,7 +2,7 @@
 //
 //
 
-#include <Dexko.hpp>
+#include <Solstice.hpp>
 #include <Features/FeatureManager.hpp>
 
 class ToggleCommand : public Command {

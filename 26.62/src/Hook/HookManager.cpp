@@ -8,6 +8,8 @@
 
 #include "Hooks/ActorHooks/ActorModelHook.hpp"
 #include "Hooks/ActorHooks/AnimationHooks.hpp"
+#include "Hooks/ActorHooks/HealthHooks.hpp"
+#include "Hooks/ActorHooks/ProjectileHooks.hpp"
 #include "Hooks/ActorHooks/NametagRenderHook.hpp"
 #include "Hooks/ContainerHooks/ContainerScreenControllerHook.hpp"
 #include "Hooks/MiscHooks/FireBlockChangedHook.hpp"
@@ -28,6 +30,8 @@
 #include "Hooks/RenderHooks/SetupShaderParameterHook.hpp"
 #include "Hooks/RenderHooks/SetupAndRenderHook.hpp"
 #include "Hooks/RenderHooks/LevelRendererHook.hpp"
+#include "Hooks/RenderHooks/AmbienceHook.hpp"
+#include "Hooks/RenderHooks/HurtColorHook.hpp"
 #include "Hooks/WindowsAPIHooks/WndProcHook.hpp"
 #include "Hooks/ClientInstanceHooks/GrabMouseHook.hpp"
 
@@ -49,7 +53,7 @@ void HookManager::init(bool initLp)
 	else
 	{
 		std::vector<std::shared_ptr<Hook>> hooks;
-		//ADD_HOOK(KeyHook);
+		ADD_HOOK(KeyHook);
 		ADD_HOOK(SetupAndRenderHook);
 		ADD_HOOK(D3DHook);
 		ADD_HOOK(ContainerScreenControllerHook);
@@ -73,6 +77,10 @@ void HookManager::init(bool initLp)
 		ADD_HOOK(WndProcHook);
 		ADD_HOOK(GrabMouseHook);
 		ADD_HOOK(LevelRendererHook);
+		ADD_HOOK(HealthHooks);
+		ADD_HOOK(ProjectileHooks);
+		ADD_HOOK(AmbienceHook);
+		ADD_HOOK(HurtColorHook);
 
 		
 

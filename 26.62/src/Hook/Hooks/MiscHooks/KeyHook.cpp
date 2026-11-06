@@ -3,14 +3,19 @@
 
 #include "KeyHook.hpp"
 
-<<<<<<< HEAD:26.62/src/Hook/Hooks/MiscHooks/KeyHook.cpp
 #include <Solstice.hpp>
+#include <Features/ChatBinds/ChatBinds.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
-=======
-#include <Dexko.hpp>
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/MiscHooks/KeyHook.cpp
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
+#include <Utils/GameUtils/ChatUtils.hpp>
+
+#include <unordered_set>
+
+// Клавиши, которые игра реально видела зажатыми (oFunc вызван с isDown=true).
+// Нужно, чтобы во время набора в CustomChat пропускать игре ОТПУСКАНИЯ этих
+// клавиш: иначе зажатая до открытия чата W «залипла» бы.
+static std::unordered_set<int> gGameSeenKeysDown;
 
 std::unique_ptr<Detour> KeyHook::mDetour = nullptr;
 
@@ -128,11 +133,66 @@ ImGuiKey ImGui_ImplWin32_VirtualKeyToImGuiKey(WPARAM wParam)
 void KeyHook::onKey(uint32_t key, bool isDown)
 {
     mCurrentCancel = true;
-    //auto oFunc = mDetour->getOriginal<&onKey>();
+
+    auto oFunc = mDetour->getOriginal<&onKey>();
+
+    // ── ImGui получает клавиши ДО всего остального ───────────────────────────
+    // Пока игрок печатает в нашем чате, игре нажатия не отдаются, но самому
+    // чату символы нужны — он читает их из io.InputQueueCharacters.
+    if (ImGui::GetCurrentContext())
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        ImGuiKey imKey = ImGui_ImplWin32_VirtualKeyToImGuiKey(key);
+        io.AddKeyEvent(imKey, isDown);
+        if (isDown)
+        {
+            // ToUnicode, а НЕ ToAscii: ToAscii отдаёт байт в ANSI-кодировке, и
+            // для русской раскладки это 0xE0 (CP1251), а не код символа 'а'.
+            int scanCode = MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
+            BYTE keyState[256] = { 0 };
+            GetKeyboardState(keyState);
+
+            WCHAR translation[8] = { 0 };
+            int result = ToUnicode(key, scanCode, keyState, translation, 8, 0);
+
+            // result < 0 — мёртвая клавиша: символ появится при следующем нажатии
+            for (int i = 0; i < result; ++i)
+            {
+                if (translation[i] >= 32)
+                    io.AddInputCharacter(static_cast<unsigned int>(translation[i]));
+            }
+        }
+    }
+
+    // ── Пока игрок печатает в нашем чате, клавиатуру держит он ───────────────
+    if (ChatUtils::sChatInputActive)
+    {
+        Keyboard::mPressedKeys[key] = false;
+
+        // Отпускание клавиши, которую игра видела зажатой, обязано до неё доехать,
+        // иначе она останется «зажатой» навсегда (стрибун, бег и т.д.).
+        if (!isDown && gGameSeenKeysDown.count(static_cast<int>(key)) > 0)
+        {
+            gGameSeenKeysDown.erase(static_cast<int>(key));
+            oFunc(key, false);
+        }
+        return;
+    }
+
+    // Отпускание клавиши, закрывшей наш чат, тоже гасим: Bedrock открывает
+    // ванильный чат по ОТПУСКАНИЮ Enter.
+    if (ChatUtils::sChatSwallowKey == static_cast<int>(key) && ImGui::GetCurrentContext() &&
+        ImGui::GetTime() < ChatUtils::sChatSwallowDeadline)
+    {
+        Keyboard::mPressedKeys[key] = false;
+        if (!isDown) ChatUtils::sChatSwallowKey = 0;
+        return;
+    }
 
     if (key == VK_END && isDown && ClientInstance::get()->getScreenName() != "chat_screen" && !ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantTextInput)
     {
-        Dexko::mRequestEject = true;
+        Solstice::mRequestEject = true;
     }
 
     Keyboard::mPressedKeys[key] = isDown;
@@ -154,35 +214,20 @@ void KeyHook::onKey(uint32_t key, bool isDown)
     if (!ImGui::GetCurrentContext()) return;
     ImGuiIO& io = ImGui::GetIO();
 
-    ImGuiKey imKey = ImGui_ImplWin32_VirtualKeyToImGuiKey(key);
-    io.AddKeyEvent(imKey, isDown);
-    if (isDown)
-    {
-        HKL layout = GetKeyboardLayout(0);
-        int scanCode = MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
-        BYTE translation[2];
-        BYTE keyState[256] = { 0 };
-        GetKeyboardState(keyState);
-        int result = ToAscii(key, scanCode, keyState, (LPWORD)translation, 0);
-
-        if (result == 1) {
-            // If a single character is returned, return it
-            char c = static_cast<char>(translation[0]);
-            io.AddInputCharacter(c);
-        }
-        else if (result == 2) {
-            // If a dead key or a special character is returned, return the second character in the buffer
-            char sc = static_cast<char>(translation[1]);
-            io.AddInputCharacter(sc);
-        }
-    }
-
     // Return and don't call oFunc if ImGui wants to capture keyboard or text input
     if (io.WantCaptureKeyboard || io.WantTextInput)
     {
         return;
     }
-    //oFunc(key, isDown);
+    // Чат-бинды (ClickGui -> Chat Binds): клавиша забиндена — текст ушёл в чат,
+    // а игре клавиша не отдаётся ни нажатием, ни отпусканием.
+    if (ChatBinds::handleKey(static_cast<int>(key), isDown))
+        return;
+
+    if (isDown) gGameSeenKeysDown.insert(static_cast<int>(key));
+    else        gGameSeenKeysDown.erase(static_cast<int>(key));
+
+    oFunc(key, isDown);
     mCurrentCancel = false;
 
     // Look for modules
@@ -224,5 +269,12 @@ void KeyHook::onKey(uint32_t key, bool isDown)
 
 void KeyHook::init()
 {
-   // mDetour = std::make_unique<Detour>("Keyboard::feed", reinterpret_cast<void*>(SigManager::Keyboard_feed), &KeyHook::onKey);
+    // Keyboard_feed перенесена из 1.21.44 (UNVERIFIED, см. docs/SIGNATURE_TODO_RU.md).
+    // Если на 1.26.62 паттерн не найдётся, адрес будет 0 — проверяем явно,
+    // чтобы не ставить детур на нулевой адрес.
+    if (!SigManager::Keyboard_feed) {
+        spdlog::warn("[KeyHook] Keyboard_feed не найдена — хук клавиатуры отключён");
+        return;
+    }
+    mDetour = std::make_unique<Detour>("Keyboard::feed", reinterpret_cast<void*>(SigManager::Keyboard_feed), &KeyHook::onKey);
 }

@@ -21,10 +21,17 @@ std::string FileUtils::getRoamingStatePath()
     return std::string(appdata) + "\\..\\Local\\Packages\\Microsoft.MinecraftUWP_8wekyb3d8bbwe\\RoamingState\\";
 }
 
-std::string FileUtils::getSolsticeDir()
+// Папка данных клиента — та же, что была у Solstice 1.21.44 ("Juzdex"),
+// чтобы при переходе на 1.26 сохранились конфиги, скины и настройки.
+std::string FileUtils::getJuzdexDir()
 {
-    return getRoamingStatePath() + xorstr_("Solstice\\");
+    return getRoamingStatePath() + xorstr_("Juzdex\\");
 }
+
+std::string FileUtils::getSolsticeDir() { return getJuzdexDir(); }
+
+// Совместимость: часть кода обращается к старому имени Dexko.
+std::string FileUtils::getDexkoDir() { return getJuzdexDir(); }
 
 bool FileUtils::fileExists(const std::string& path)
 {

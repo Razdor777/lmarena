@@ -11,7 +11,7 @@ public:
     }
 
     static std::unique_ptr<Detour> mDetour;
-    static inline bool mCurrentCancel = false;
+    static inline bool mCurrentCancel = false; // состояние перехвата текущего нажатия
 
     static void onKey(uint32_t key, bool isDown);
     void init() override;

@@ -19,3 +19,12 @@ void* ContainerScreenController::_tryExit()
     // TODO: implement index signature instead of raw index
     return MemUtils::callVirtualFunc<void*>(OffsetProvider::ContainerScreenController_tryExit, this);
 }
+
+void ContainerScreenController::_tryBeginTransition(int targetState, unsigned int flags, const std::string& collectionName, int slot)
+{
+    // UNVERIFIED для 1.26.62: сигнатура снята с 1.21.44
+    // (docs/SIGNATURE_TODO_RU.md). Если контейнерные действия «не срабатывают» —
+    // начинать проверку надо отсюда.
+    static auto func = SigManager::ContainerScreenController_tryBeginTransition;
+    return MemUtils::callFastcall<void>(func, this, targetState, flags, collectionName, slot);
+}

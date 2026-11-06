@@ -42,6 +42,10 @@ public:
 	static inline bool mIsInitialized = false;
 	static inline std::unordered_map<std::string, uintptr_t> mSigs;
 
+	// Перенесено из Solstice 1.21.44: нужны модулям CustomCrosshair и ItemUseDelayFix.
+	// ВНИМАНИЕ: паттерны сняты с 1.21.44 — на 1.26.62 требуют проверки (см. docs/SIGNATURE_TODO_RU.md).
+	DEFINE_SIG(HudCursorRenderer_render, "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 89 8D", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(ClientInputCallbacks_handleBuildAction_onAttack_setNoBlockBreakUntil, "FF 15 ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 32 DB", SigType::Sig, 0); // UNVERIFIED (1.21.44)
 	//DEFINE_SIG(Actor_setPosition, "48 89 5C 24 ? 57 48 83 EC ? 48 8B 59 ? 48 8B FA 48 8B 8B ? ? ? ? 48 85 C9", SigType::Sig, 0);
 	DEFINE_SIG(Actor_getNameTag, "56 48 83 EC ? 48 8B 81 ? ? ? ? 48 85 C0 74 ? 8B 50 ? ? ? ? 29 CA 81 E2 ? ? ? ? 48 8D 05", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(Actor_setNameTag, "56 57 48 83 EC ? 48 89 CE 48 8B 89 ? ? ? ? 48 85 C9 0F 84 ? ? ? ? 48 89 D7", SigType::Sig, 0); //26.51
@@ -52,6 +56,8 @@ public:
 	//DEFINE_SIG(ClientInstance_grabMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 40", SigType::Sig, 0); // 1.21.51
 	//DEFINE_SIG(ClientInstance_releaseMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 48 89", SigType::Sig, 0); // 1.21.51
 	DEFINE_SIG(ContainerScreenController_tick, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 0F 29 75 ? 48 C7 45 ? ? ? ? ? 48 89 CE 48 8D B9 ? ? ? ? C6 45", SigType::Sig, 0); // 26.51
+	DEFINE_SIG(ContainerScreenController_onContainerSlotHovered, "48 89 ? ? ? 57 41 ? 41 ? 48 83 EC ? 45 8B ? 48 8B ? 48 8B ? 44 39", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(ContainerScreenController_tryBeginTransition, "40 53 56 57 41 56 41 57 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B FA", SigType::Sig, 0); // UNVERIFIED (1.21.44)
 	DEFINE_SIG(ContainerScreenController_handleAutoPlace, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? 44 89 CE 4C 89 C7 41 89 D6", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(ComplexInventoryTransaction_vtable, "48 8D 05 ? ? ? ? ? ? ? 48 83 C1 ? E8 ? ? ? ? 40 F6 C7 ? 74 ? BA ? ? ? ? 48 89 F1 E8 ? ? ? ? 48 89 F0 48 83 C4 ? 5F 5E C3 ? ? ? ? ? 56 57 48 83 EC ? 89 D7 48 89 CE E8 ? ? ? ? 40 F6 C7 ? 74 ? BA ? ? ? ? 48 89 F1 E8 ? ? ? ? 48 89 F0 48 83 C4 ? 5F 5E C3 ? ? ? 56 48 83 EC", SigType::RefSig, 3); //26.51
 	DEFINE_SIG(EnchantUtils_getEnchantLevel, "56 57 53 48 81 EC ? ? ? ? 89 CB 48 8B 4A ? 31 F6", SigType::Sig, 0); // 1.26.51
@@ -135,6 +141,64 @@ public:
 	DEFINE_SIG(Unknown_updatePlayerFromCamera, "41 57 41 56 41 55 41 54 56 57 55 53 48 81 EC ? ? ? ? 44 0F 29 94 24 ? ? ? ? 44 0F 29 8C 24 ? ? ? ? 44 0F 29 84 24 ? ? ? ? 0F 29 BC 24 ? ? ? ? 0F 29 B4 24 ? ? ? ? 4C 89 C6", SigType::Sig, 0);
 
 	DEFINE_SIG(FluxSwing, "41 0F 11 47 ? E9 ? ? ? ? 48 89 9E", SigType::Sig, 0);
+
+	// Иконки предметов в HUD (ItemAtlas / ItemTextures / InventoryHUD / ArmorHUD / PotionHUD).
+	// UNVERIFIED для 1.26.62: паттерны сняты с 1.21.44 (см. src/суперважно.txt).
+	DEFINE_SIG(ItemRenderer_getAtlasIconInfo, "48 89 5C 24 ? 57 48 83 EC ? 48 8B FA 48 8B D9 E8 ? ? ? ? 80 7F ? 00 48 8D 8B", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(ItemRenderer_getIconUV, "40 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 45 0F B6 C8 44 8B C2", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(ItemRenderer_renderGuiItemNew, "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 D8 48 81 EC 28 01 00 00 0F 29 B4 24 10 01 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 00 44", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(ItemRenderer_iconBlit, "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? F3 0F 11 5D", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+
+	// ---- Перенесено из Solstice 1.21.44: эти сигнатуры отсутствовали в базе 26.62,
+	// ---- но на них ссылается код. Все паттерны сняты с 1.21.44.
+	DEFINE_SIG(ActorRenderDispatcher_render,
+	             "E8 ? ? ? ? 8B 43 ? 89 44 ? ? 48 8D ? ? ? 48 8B ? ? E8 ? ? ? ? 48 "
+	             "85 ? 0F 84 ? ? ? ? F3 44",
+	             SigType::RefSig, 1); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(
+	             ConnectionRequest_create_CurrentInputMode,
+	             "48 63 ? ? ? ? ? 48 89 ? ? ? 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? "
+	             "48 8B ? 33 D2 48 8D ? ? ? E8 ? ? ? ? 0F B6 ? ? 0F B6 ? ? ? 88 44 ? ? 48 "
+	             "8B ? 48 8B ? ? ? 48 89 ? ? ? C6 43 08 ? 88 54 ? ? 48 89 ? 48 89 ? ? ? "
+	             "48 8D ? ? ? E8 ? ? ? ? 90 48 8D ? ? ? E8 ? ? ? ? C6 44 24 58 ? 48 63 ? "
+	             "? ? ? ? 48 89 ? ? ? 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 48 8B ? "
+	             "33 D2 48 8D ? ? ? E8 ? ? ? ? 0F B6 ? ? 0F B6 ? ? ? 88 44 ? ? 48 8B ? 48 "
+	             "8B ? ? ? 48 89 ? ? ? C6 43 08 ? 88 54 ? ? 48 89 ? 48 89 ? ? ? 48 8D ? ? "
+	             "? E8 ? ? ? ? 90 48 8D ? ? ? E8 ? ? ? ? C6 44 24 58",
+	             SigType::Sig, 0); // this shit is so fat; // UNVERIFIED (1.21.44)
+	DEFINE_SIG(FastEat, "FF C8 89 87 ? ? ? ? 83 F8", SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(
+	             FireRender,
+	             "48 8B ? 55 53 56 57 41 ? 41 ? 41 ? 41 ? 48 8D ? ? ? ? ? 48 81 EC ? ? ? "
+	             "? 0F 29 ? ? 0F 29 ? ? 44 0F ? ? ? 44 0F ? ? ? ? ? ? 44 0F ? ? ? ? ? ? "
+	             "44 0F ? ? ? ? ? ? 48 8B ? ? ? ? ? 48 33 ? 48 89 ? ? ? ? ? 4D 8B ? 4D 8B",
+	             SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(InputModeBypass,
+	             "8b d7 48 8b ce 48 8b 80 ? ? ? ? ff 15 ? ? ? ? 49 8b 07",
+	             SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(InputModeBypassFix,
+	             "49 8b 07 8b d7 49 8b cf 48 8b 80 ? ? ? ? ff 15 ? ? ? ? 49 8b 07",
+	             SigType::Sig,; // UNVERIFIED (1.21.44)
+	DEFINE_SIG(ItemInHandRenderer_renderItem_bytepatch,
+	             "F3 0F ? ? ? ? ? ? 0F 57 ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F 2F ? 73 "
+	             "? F3 41",
+	             SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(
+	             ItemPositionConst,
+	             "F3 0F ? ? ? ? ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F B7",
+	             SigType::Sig, 0); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(Keyboard_feed,
+	             "E8 ? ? ? ? E9 ? ? ? ? 41 0F ? ? ? 45 0F ? ? ? 45 0F",
+	             SigType::RefSig, 1); // UNVERIFIED (1.21.44)
+	DEFINE_SIG(mce_framebuilder_RenderItemInHandDescription_ctor,
+	             "48 89 ? ? ? 48 89 ? ? ? 55 56 57 41 ? 41 ? 41 ? 41 ? 48 83 EC ? "
+	             "4D 8B ? 4D 8B ? 4C 8B ? 48 8B ? 45 33",
+	             SigType::Sig, 0); // UNVERIFIED (1.21.44)
+
+	// HurtColor — RenderController::getOverlayColor (цвет вспышки при уроне).
+	// UNVERIFIED для 1.26.62: паттерн снят с 1.21.44 (у Flarial — init2140).
+	// Нет совпадения — хук просто выключается, клиент не падает.
+	DEFINE_SIG(HurtColor, "E8 ? ? ? ? 0F 28 05 ? ? ? ? 0F 11 85 68 02 00 00", SigType::RefSig, 1); // UNVERIFIED (1.21.44)
 	DEFINE_SIG(BobHurt, "56 57 55 53 48 81 EC ? ? ? ? 44 0F 29 8C 24 ? ? ? ? 44 0F 29 84 24 ? ? ? ? 0F 29 BC 24 ? ? ? ? 0F 29 B4 24 ? ? ? ? 0F 28 F2", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(CameraComponent_applyRotation, "7E ? 0F 57 FF F3 0F 2A F8", SigType::Sig, 0); // Guessed func name
 	DEFINE_SIG(GetCollisionShapeActorProxy_getFeetAttachPos, "41 57 41 56 41 55 41 54 56 57 55 53 48 83 EC ? 0F 29 74 24 ? 48 89 D6 41 8D 40", SigType::Sig, 0); //getFeetAttachPosY@GetCollisionShapeActorProxy@@QEBAMXZ BUT GETTING VEC3 WHY Y = VEC3?

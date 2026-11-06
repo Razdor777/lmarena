@@ -11,11 +11,24 @@
 #include "Combat/AutoClicker.hpp"
 #include "Combat/Criticals.hpp"
 #include "Combat/HitBoxes.hpp"
+#include "Combat/Aimbot.hpp"
+#include "Combat/ArrowTP.hpp"
+#include "Combat/InfiniteChestAura.hpp"
+#include "Combat/LastTP.hpp"
+#include "Combat/PearlStopper.hpp"
 #include "Combat/InfiniteAura.hpp"
 #include "Combat/Reach.hpp"
 #include "Combat/TriggerBot.hpp"
 
 #include "Misc/AntiBot.hpp"
+#include "Misc/AdminPanel.hpp"
+#include "Misc/ArmorSlotUnlock.hpp"
+#include "Misc/AutoContract.hpp"
+#include "Misc/AutoLoot.hpp"
+#include "Misc/FakeChat.hpp"
+#include "Misc/JavaInventory.hpp"
+#include "Misc/JavaInventoryHotkeys.hpp"
+#include "Misc/WhoisCollector.hpp"
 #include "Misc/Anticheat.hpp"
 #include "Misc/AntiCheatDetector.hpp"
 #include "Misc/AutoAccept.hpp"
@@ -49,6 +62,9 @@
 #include "Misc/ToggleSounds.hpp"
 
 #include "Movement/AirJump.hpp"
+#include "Movement/AutoPatrol.hpp"
+#include "Movement/AutoSneak.hpp"
+#include "Movement/NoClip.hpp"
 #include "Movement/AirSpeed.hpp"
 #include "Movement/AntiImmobile.hpp"
 #include "Movement/AutoPath.hpp"
@@ -76,6 +92,15 @@
 #include "Movement/Velocity.hpp"
 
 #include "Player/AntiVoid.hpp"
+#include "Player/AutoArmor.hpp"
+#include "Player/Cage.hpp"
+#include "Player/ContainerActions.hpp"
+#include "Player/OreMinerV2.hpp"
+#include "Player/PlayerTracker.hpp"
+#include "Player/RegionFill.hpp"
+#include "Player/Schematic.hpp"
+#include "Player/SchematicBuilder.hpp"
+#include "Player/SpawnerAura.hpp"
 #include "Player/AutoBoombox.hpp"
 #include "Player/AutoEat.hpp"
 #include "Player/AutoKick.hpp"
@@ -106,6 +131,31 @@
 #include "spdlog/spdlog.h"
 
 #include "Visual/Animations.hpp"
+#include "Visual/AfterImage.hpp"
+#include "Visual/Ambience.hpp"
+#include "Visual/AmbientCubes.hpp"
+#include "Visual/ArmorHUD.hpp"
+#include "Visual/CustomCrosshair.hpp"
+#include "Visual/DamageLog.hpp"
+#include "Visual/EnemyIndicator.hpp"
+#include "Visual/EntityRadar.hpp"
+#include "Visual/HealthBar.hpp"
+#include "Visual/HealthDisplay.hpp"
+#include "Visual/HitColor.hpp"
+#include "Visual/HitParticles.hpp"
+#include "Visual/InventoryHUD.hpp"
+#include "Visual/Kagune.hpp"
+#include "Visual/NearbyPlayers.hpp"
+#include "Visual/OpponentReach.hpp"
+#include "Visual/PlayerHUD.hpp"
+#include "Visual/PlayerPositionOffset.hpp"
+#include "Visual/PotionHUD.hpp"
+#include "Visual/ProjectileTracer.hpp"
+#include "Visual/ReachCounter.hpp"
+#include "Visual/SkyPack.hpp"
+#include "Visual/TazikHat.hpp"
+#include "Visual/Trails.hpp"
+#include "Visual/WorldParticles.hpp"
 #include "Visual/Arraylist.hpp"
 #include "Visual/AutoScale.hpp"
 #include "Visual/BlockESP.hpp"
@@ -146,6 +196,32 @@ void ModuleManager::init()
 {
 	// Visual (must be initialized first)
 	mModules.emplace_back(std::make_shared<HudEditor>());
+	mModules.emplace_back(std::make_shared<HitParticles>());
+	mModules.emplace_back(std::make_shared<Arraylist>());
+	mModules.emplace_back(std::make_shared<PlayerHUD>());
+	mModules.emplace_back(std::make_shared<InventoryHUD>());
+	mModules.emplace_back(std::make_shared<HitColor>());
+	mModules.emplace_back(std::make_shared<PlayerPositionOffset>());
+	mModules.emplace_back(std::make_shared<ArmorHUD>());
+	mModules.emplace_back(std::make_shared<CustomCrosshair>());
+	mModules.emplace_back(std::make_shared<ReachCounter>());
+	mModules.emplace_back(std::make_shared<OpponentReach>());
+	mModules.emplace_back(std::make_shared<Kagune>());
+	mModules.emplace_back(std::make_shared<Ambience>());
+	mModules.emplace_back(std::make_shared<SkyPack>());
+	mModules.emplace_back(std::make_shared<AmbientCubes>());
+	mModules.emplace_back(std::make_shared<TazikHat>());
+	mModules.emplace_back(std::make_shared<Trails>());
+	mModules.emplace_back(std::make_shared<WorldParticles>());
+	mModules.emplace_back(std::make_shared<EntityRadar>());
+	mModules.emplace_back(std::make_shared<AfterImage>());
+	mModules.emplace_back(std::make_shared<PotionHUD>());
+	mModules.emplace_back(std::make_shared<NearbyPlayers>());
+	mModules.emplace_back(std::make_shared<EnemyIndicator>());
+	mModules.emplace_back(std::make_shared<ProjectileTracer>());
+	mModules.emplace_back(std::make_shared<HealthBar>());
+	mModules.emplace_back(std::make_shared<HealthDisplay>());
+	mModules.emplace_back(std::make_shared<DamageLog>());
 
 	// Combat
 	mModules.emplace_back(std::make_shared<Aura>());
@@ -155,6 +231,11 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<Criticals>());
 	mModules.emplace_back(std::make_shared<InfiniteAura>());
 	mModules.emplace_back(std::make_shared<HitBoxes>());
+	mModules.emplace_back(std::make_shared<InfiniteChestAura>());
+	mModules.emplace_back(std::make_shared<LastTP>());
+	mModules.emplace_back(std::make_shared<Aimbot>());
+	mModules.emplace_back(std::make_shared<ArrowTP>());
+	mModules.emplace_back(std::make_shared<PearlStopper>());
 
 
 	// Movement
@@ -181,6 +262,9 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<Jetpack>());
 	mModules.emplace_back(std::make_shared<DamageBoost>());
 	mModules.emplace_back(std::make_shared<AutoWalk>());
+	mModules.emplace_back(std::make_shared<AutoSneak>());
+	mModules.emplace_back(std::make_shared<AutoPatrol>());
+	mModules.emplace_back(std::make_shared<NoClip>());
 
 	// Player
 	mModules.emplace_back(std::make_shared<AutoSpellBook>());
@@ -192,6 +276,15 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<Scaffold>());
 	mModules.emplace_back(std::make_shared<Surround>());
 	mModules.emplace_back(std::make_shared<ZipLine>());
+	mModules.emplace_back(std::make_shared<PlayerTracker>());
+	mModules.emplace_back(std::make_shared<SchematicBuilder>());
+	mModules.emplace_back(std::make_shared<ContainerActions>());
+	mModules.emplace_back(std::make_shared<RegionFill>());
+	mModules.emplace_back(std::make_shared<OreMinerV2>());
+	mModules.emplace_back(std::make_shared<AutoArmor>());
+	mModules.emplace_back(std::make_shared<SpawnerAura>());
+	mModules.emplace_back(std::make_shared<AutoLoot>());
+	mModules.emplace_back(std::make_shared<Cage>());
 	mModules.emplace_back(std::make_shared<Nuker>());
 	mModules.emplace_back(std::make_shared<OreMiner>());
 	mModules.emplace_back(std::make_shared<AutoBoombox>());
@@ -232,6 +325,14 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<AutoAccept>());
 	mModules.emplace_back(std::make_shared<PartySpammer>());
 	mModules.emplace_back(std::make_shared<Spammer>());
+	// NoPause: файлы-заглушки (0 строк) — модуль не реализован
+	mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
+	mModules.emplace_back(std::make_shared<AdminPanel>());
+	mModules.emplace_back(std::make_shared<FakeChat>());
+	mModules.emplace_back(std::make_shared<JavaInventory>());
+	mModules.emplace_back(std::make_shared<JavaInventoryHotkeys>());
+	mModules.emplace_back(std::make_shared<AutoContract>());
+	mModules.emplace_back(std::make_shared<WhoisCollector>());
 	//   mModules.emplace_back(std::make_shared<IRC>());
 	mModules.emplace_back(std::make_shared<SkinStealer>());
 	mModules.emplace_back(std::make_shared<AutoLootbox>());
@@ -301,7 +402,7 @@ void ModuleManager::init()
 	//  gFeatureManager->mDispatcher->listen<FovEvent, &Zoom::onFov>(getModule<Zoom>());
 
 	std::string oldHash = OAuthUtils::getLastCommitHash();
-	std::string latestHash = SOLSTICE_BUILD_VERSION;
+	std::string latestHash = DEXKO_BUILD_VERSION;
 	if (oldHash != latestHash && oldHash != "")
 	{
 		spdlog::info("Adding UpdateForm module, oldHash: {}, latestHash: {}", oldHash, latestHash);

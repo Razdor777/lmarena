@@ -109,6 +109,35 @@ public:
         return out;
     }
 
+    // =====================================================
+    // DURABILITY / DAMAGE (перенесено из Solstice 1.21.44,
+    // не зависит от версии игры: считается через Item::getMaxDamage)
+    // =====================================================
+    int getDamage() const {
+        return static_cast<int>(mAuxValue);
+    }
+
+    int getMaxDamage() const {
+        Item* item = getItem();
+        if (!item) return 0;
+        return item->getMaxDamage();
+    }
+
+    int getRemainingDurability() const {
+        int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 0;
+        return maxDmg - getDamage();
+    }
+
+    float getDurabilityPercent() const {
+        int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 1.0f;
+        return static_cast<float>(getRemainingDurability()) / static_cast<float>(maxDmg);
+    }
+
+    bool isArmorEnchantable() const { return getMaxDamage() > 0; }
+    bool hasDurability() const { return getMaxDamage() > 0; }
+
     std::map<int, int> gatherEnchants()
     {
         if (!mCompoundTag) return {};

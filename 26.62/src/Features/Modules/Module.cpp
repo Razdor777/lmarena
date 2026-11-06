@@ -108,7 +108,24 @@ nlohmann::json Module::serialize()
             // use the serialize() from the color setting
             j["settings"].push_back(colorSetting->serialize());
         }
+        else if (setting->mType == SettingType::String)
+        {
+            auto* stringSetting = reinterpret_cast<StringSetting*>(setting);
+            j["settings"].push_back(stringSetting->serialize());
+        }
     }
+
+    // Автоматически добавляем customData, если модуль его объявляет
+    if (hasCustomData())
+    {
+        try {
+            j["customData"] = serializeCustomData();
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to serialize custom data for {}: {}", mName, e.what());
+            j["customData"] = nlohmann::json::object();
+        }
+    }
+
     return j;
 }
 

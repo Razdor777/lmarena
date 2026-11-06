@@ -25,6 +25,16 @@ public:
     CLASS_FIELD(short, mItemId, 0xAA);
     CLASS_FIELD(std::string, mName, 0xD8);
 
+    // UNVERIFIED для 1.26.62: индексы vtable сняты с 1.21.44.
+    // Если HUD прочности показывает нули — перепроверить индексы 35/15.
+    int getMaxDamage() const {
+        return MemUtils::callVirtualFunc<short>(35, const_cast<Item*>(this));
+    }
+
+    bool isBlockItem() const {
+        return MemUtils::callVirtualFunc<bool>(15, const_cast<Item*>(this));
+    }
+
     int getArmorSlot();
     bool isHelmet();
     bool isChestplate();

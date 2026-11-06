@@ -6,6 +6,7 @@
 
 #include <Features/Events/MouseEvent.hpp>
 #include <Features/Events/KeyEvent.hpp>
+#include <Features/GUI/CombatantGui.hpp>
 #include <Features/GUI/ModernDropdown.hpp>
 #include <Features/GUI/ScriptingGui.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
@@ -15,6 +16,7 @@
 static bool lastMouseState = false;
 static bool isPressingShift = false;
 static ModernGui modernGui = ModernGui();
+static CombatantGui combatantGui = CombatantGui();
 
 
 void ClickGui::onEnable()
@@ -28,6 +30,9 @@ void ClickGui::onEnable()
     gFeatureManager->mDispatcher->listen<MouseEvent, &ClickGui::onMouseEvent>(this);
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &ClickGui::onBaseTickEvent>(this);
     gFeatureManager->mDispatcher->listen<KeyEvent, &ClickGui::onKeyEvent, nes::event_priority::FIRST>(this);
+
+    modernGui.onOpen();
+    combatantGui.onOpen();
 }
 
 void ClickGui::onDisable()
@@ -46,11 +51,15 @@ void ClickGui::onDisable()
         ClientInstance::get()->grabMouse();
     }
     GrabMouseHook::ShitNow = false;
+
+    modernGui.onClose();
+    combatantGui.onClose();
 }
 
 void ClickGui::onWindowResizeEvent(WindowResizeEvent& event)
 {
     modernGui.onWindowResizeEvent(event); // are you okay in the head 😭
+    combatantGui.onWindowResizeEvent(event);
 }
 
 
@@ -61,6 +70,14 @@ void ClickGui::onMouseEvent(MouseEvent& event)
 
 void ClickGui::onKeyEvent(KeyEvent& event)
 {
+    // Стиль Combatant сам обрабатывает биндинги/стрелки и сообщает, поглотил ли клавишу
+    if (mStyle.mValue == ClickGuiStyle::Combatant) {
+        if (combatantGui.onKey(event.mKey, event.mPressed)) {
+            event.mCancelled = true;
+            return;
+        }
+    }
+
     if (event.mKey == VK_ESCAPE) {
         if (!modernGui.isBinding && event.mPressed) this->toggle();
         event.mCancelled = true;
@@ -145,7 +162,9 @@ void ClickGui::onRenderEvent(RenderEvent& event)
     switch (currentTab)
     {
     case Tab::ClickGui:
-        if (mStyle.mValue == ClickGuiStyle::Modern)
+        if (mStyle.mValue == ClickGuiStyle::Combatant)
+            combatantGui.render(animation, inScale, mUiScale.mValue);
+        else
             modernGui.render(animation, inScale, scrollDirection, h, mBlurStrength.mValue, mMidclickRounding.mValue, isPressingShift);
         break;
     case Tab::HudEditor:

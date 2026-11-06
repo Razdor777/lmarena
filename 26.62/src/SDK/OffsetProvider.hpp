@@ -176,6 +176,12 @@ public:
 	DEFINE_FIELD(ClientInstance_mGuiData, 0x668);
 	DEFINE_FIELD(ClientInstance_mMinecraftSim, 0x1D0);
 	DEFINE_FIELD(ClientInstance_mViewMatrix, 0x438);
+	// FOV камеры. Оффсеты взяты из комментариев 26.62 ClientInstance::getFov
+	// (0x6F0 / 0x704). В корне 1.21.44 было 0x728 / 0x73C — сдвиг на 0x38
+	// из-за новых полей. UNVERIFIED: проверяется по FOV в CustomCrosshair /
+	// Zoom; если FOV считается неверно — начинать отсюда.
+	DEFINE_FIELD(ClientInstance_mFovX, 0x6F0);
+	DEFINE_FIELD(ClientInstance_mFovY, 0x704);
 
 	DEFINE_FIELD(ClientInputMappingFactory_mKeyboardRemappingLayout, 0x110);
 	DEFINE_FIELD(Level_getPlayerList, 319);
