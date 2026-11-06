@@ -222,6 +222,13 @@ void ModernGui::render(float animation, float inScale, int& scrollDirection, cha
                             settingsHeight = MathUtils::lerp(settingsHeight, settingsHeight + modHeight, mod->cAnim);
                             break;
                         }
+                    case SettingType::String:
+                        {
+                            // Раньше String-настройки не попадали ни в один case и
+                            // высоту не добавляли — они просто не рисовались.
+                            settingsHeight = MathUtils::lerp(settingsHeight, settingsHeight + modHeight, mod->cAnim);
+                            break;
+                        }
                     }
                 }
             }
@@ -755,6 +762,104 @@ void ModernGui::render(float animation, float inScale, int& scrollDirection, cha
                                         ImVec2 colorRect = ImVec2(rect.z - 20, rect.y + 5);
                                         ImRenderUtils::fillRectangle(ImVec4(rect.z - 20, rect.y + 5, rect.z - 5, rect.w - 5),
                                                                      colorSetting->getAsImColor(), animation);
+                                    }
+                                    break;
+                                }
+                            case SettingType::String:
+                                {
+                                    // Строковая настройка: клик открывает невидимое
+                                    // ImGui-поле ввода (оно же ловит клавиатуру), а
+                                    // рисуем мы сами — как остальные настройки.
+                                    StringSetting* stringSetting = reinterpret_cast<StringSetting*>(setting);
+                                    std::string setName = lowercase ? StringUtils::toLower(setting->mName) : setting->mName;
+                                    moduleY = MathUtils::lerp(moduleY, moduleY + modHeight, mod->cAnim);
+
+                                    ImVec4 rect = ImVec4(
+                                            modRect.x, catPositions[i].y + catHeight + moduleY + setPadding, modRect.z,
+                                            catPositions[i].y + catHeight + moduleY + modHeight)
+                                        .scaleToPoint(
+                                            ImVec4(modRect.x, screen.y / 2,
+                                                           modRect.z, screen.y / 2),
+                                            inScale);
+                                    rect.y = std::floor(rect.y);
+                                    if (rect.y < modRect.y)
+                                    {
+                                        rect.y = modRect.y;
+                                    }
+
+                                    if (rect.y > catRect.y + 0.5f)
+                                    {
+                                        ImRenderUtils::fillRectangle(rect, ImColor(30, 30, 30), animation);
+
+                                        bool editingThis = (textFieldSetting == stringSetting);
+
+                                        if (ImRenderUtils::isMouseOver(rect) && isEnabled && catPositions[i].isExtended)
+                                        {
+                                            tooltip = setting->mDescription;
+                                            if (ImGui::IsMouseClicked(0) && !displayColorPicker && mod->showSettings)
+                                            {
+                                                // Клик по строке — начать ввод; повторный клик
+                                                // по той же строке — закончить.
+                                                if (editingThis) endStringEdit();
+                                                else beginStringEdit(stringSetting);
+                                            }
+                                        }
+
+                                        // Текст: имя слева, значение справа (или поле ввода).
+                                        float cSetRectCentreY = rect.y + ((rect.w - rect.y) - textHeight) / 2;
+
+                                        if (editingThis)
+                                        {
+                                            // Невидимое ImGui-поле ввода прямо поверх строки:
+                                            // ImGui сам обрабатывает ввод, backspace и Ctrl+V,
+                                            // а отрисовку мы оставляем себе.
+                                            ImGui::SetCursorScreenPos(ImVec2(rect.x, rect.y));
+                                            ImGui::SetNextItemWidth(rect.z - rect.x);
+                                            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+                                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 0));
+                                            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                                            if (stringEditJustOpened)
+                                            {
+                                                ImGui::SetKeyboardFocusHere();
+                                                stringEditJustOpened = false;
+                                            }
+                                            if (ImGui::InputText("##str", stringSetting->mBuffer, sizeof(stringSetting->mBuffer)))
+                                                stringSetting->syncValue();
+                                            ImGui::PopStyleVar();
+                                            ImGui::PopStyleColor(2);
+
+                                            // Enter или уход фокуса — заканчиваем ввод.
+                                            if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter)) ||
+                                                (ImGui::IsItemDeactivated() && !ImGui::IsItemActive()))
+                                                endStringEdit();
+                                        }
+                                        else
+                                        {
+                                            std::string shown = stringSetting->mIsPassword
+                                                ? std::string(stringSetting->mValue.size(), '*')
+                                                : stringSetting->mValue;
+
+                                            float valueWidth = ImRenderUtils::getTextWidth(&shown, textSize);
+                                            float maxValueWidth = (rect.z - rect.x) * 0.6f;
+                                            if (valueWidth > maxValueWidth && !shown.empty())
+                                            {
+                                                // Длинное значение подрезаем многоточием, чтобы
+                                                // оно не наезжало на название.
+                                                std::string cut = shown;
+                                                while (!cut.empty() &&
+                                                       ImRenderUtils::getTextWidth(&cut, textSize) > maxValueWidth)
+                                                    cut.pop_back();
+                                                shown = cut.empty() ? shown : cut + "...";
+                                                valueWidth = ImRenderUtils::getTextWidth(&shown, textSize);
+                                            }
+
+                                            ImRenderUtils::drawText(
+                                                ImVec2((rect.z - 5.f) - valueWidth, cSetRectCentreY), shown,
+                                                ImColor(170, 170, 170), textSize, animation, true);
+                                        }
+
+                                        ImRenderUtils::drawText(ImVec2(rect.x + 5.f, cSetRectCentreY), setName,
+                                                               ImColor(255, 255, 255), textSize, animation, true);
                                     }
                                     break;
                                 }

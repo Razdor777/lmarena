@@ -40,6 +40,28 @@ public:
     bool resetPosition = false;
     uint64_t lastReset = 0;
 
+    // --- Редактирование строковых настроек (StringSetting) ---
+    // Активное поле ввода держим по указателю: StringSetting-ы живут внутри
+    // модулей и никуда не переезжают.
+    StringSetting* textFieldSetting = nullptr;
+    bool stringEditJustOpened = false;
+
+    void beginStringEdit(StringSetting* setting)
+    {
+        if (!setting) return;
+        textFieldSetting = setting;
+        stringEditJustOpened = true;
+        setting->syncBuffer();
+    }
+
+    void endStringEdit()
+    {
+        if (textFieldSetting)
+            textFieldSetting->syncValue();
+        textFieldSetting = nullptr;
+        stringEditJustOpened = false;
+    }
+
     // Colour
     ImColor textColor = ImColor(255, 255, 255);
     ImColor darkBlack = ImColor(24, 24, 24 );
