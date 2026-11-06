@@ -31,7 +31,8 @@
 `#include`), `tools/check_members.py` (нет ли обращений к членам, которых в новой
 базе не существует), `tools/check_undefined.py` (объявлено, но без тела —
 линковка), `tools/check_event_visibility.py` (виден ли тип события в `listen<>`)
-и `tools/check_enums.py` (значение перечисления, которого нет).
+, `tools/check_enums.py` (значение перечисления, которого нет) и
+`tools/check_sig_names.py` (есть ли вообще такое имя в `SigManager`/`OffsetProvider`).
 
 ```bash
 python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сломалось в SDK
@@ -41,6 +42,7 @@ python3 tools/sig_checklist.py --out docs/SIGS_26.62_RU.md          # что ж�
 python3 tools/check_undefined.py 26.62/src                          # объявлено, но не определено
 python3 tools/check_event_visibility.py                             # listen<> видит тип события
 python3 tools/check_enums.py 26.62/src                              # Mode::X, где X не объявлен
+python3 tools/check_sig_names.py                                    # SigManager::X / OffsetProvider::X объявлены
 python3 tools/gen_resources.py --check                              # ресурсы актуальны
 ```
 

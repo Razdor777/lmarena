@@ -125,6 +125,16 @@ public:
 
 	//DEFINE_INDEX_FIELD_TYPED(uint8_t, ClientInputHandler_mMappingFactory, "48 8B ? ? EB ? 48 8D ? ? 48 85 ? 74 ? 48 8B ? E8 ? ? ? ? 48 8B ? 48 8B ? ? ? 48 33 ? E8 ? ? ? ? 48 8B ? ? ? 48 8B ? ? ? 48 83 C4 ? 5F C3 E8 ? ? ? ? CC CC CC CC CC CC 48 89", 3, OffsetType::FieldOffset);
 
+	// Имена, которые код зовёт как OffsetProvider::X. Эти четыре объявлены
+	// выше в этой же шапке голыми DEFINE_FIELD/INDEX_FIELD (вне класса) — из-за
+	// этого ClientInstance::getViewMatrix() и MinecraftGame::playUi() не
+	// компилировались. Значения — те же, что в корневой базе.
+	DEFINE_FIELD(ClientInstance_mFovX, 0x728);
+	DEFINE_FIELD(ClientInstance_mFovY, 0x73C);
+	// playUi: индекс, а не смещение (OffsetType::Index, 3-й аргумент — сдвиг).
+	DEFINE_FIELD(MinecraftGame_playUi, 3);
+	DEFINE_FIELD(MinecraftGame_mClientInstances, 3);
+
 	// TODO: Move all CLASS_FIELD declarations and hat::member_at offsets to here
 	DEFINE_FIELD(ContainerScreenController_tryExit, 12);
 	DEFINE_FIELD(ItemStack_reInit, 3);

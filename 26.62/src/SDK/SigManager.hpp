@@ -42,6 +42,10 @@ public:
 	static inline bool mIsInitialized = false;
 	static inline std::unordered_map<std::string, uintptr_t> mSigs;
 
+	// Паттерн снят с 1.21.44, под 1.26.x не проверялся. Имя нужно коду
+	// (ClickTp/Regen/Scaffold двигают актора), поэтому объявлено нулём, а не
+	// удалено: когда паттерн подтвердится — вернуть строку DEFINE_SIG.
+	static inline uintptr_t Actor_setPosition = 0;
 	//DEFINE_SIG(Actor_setPosition, "48 89 5C 24 ? 57 48 83 EC ? 48 8B 59 ? 48 8B FA 48 8B 8B ? ? ? ? 48 85 C9", SigType::Sig, 0);
 	DEFINE_SIG(Actor_getNameTag, "56 48 83 EC ? 48 8B 81 ? ? ? ? 48 85 C0 74 ? 8B 50 ? ? ? ? 29 CA 81 E2 ? ? ? ? 48 8D 05", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(Actor_setNameTag, "56 57 48 83 EC ? 48 89 CE 48 8B 89 ? ? ? ? 48 85 C9 0F 84 ? ? ? ? 48 89 D7", SigType::Sig, 0); //26.51
@@ -51,6 +55,36 @@ public:
 	//vtable better :ultra_retard:
 	//DEFINE_SIG(ClientInstance_grabMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 40", SigType::Sig, 0); // 1.21.51
 	//DEFINE_SIG(ClientInstance_releaseMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 48 89", SigType::Sig, 0); // 1.21.51
+	// ── Объявлены, но под 1.26.x ещё не сняты ───────────────────────────────
+	// Сигнатуры сняты с 1.21.44/1.21.51. Пока они закомментированы, код ниже
+	// должен видеть сами ИМЕНА: без них `SigManager::ItemRenderer_getIconUV`
+	// — это ошибка компиляции («нет такого члена»), а не «сигнатура не
+	// нашлась». Значение 0 означает «не сканировали»: хуки проверяют это и не
+	// встают, игра работает.
+	//
+	// ItemRenderer (иконки предметов из атласа; см. Rendering/ItemRenderer.hpp):
+	//   getAtlasIconInfo  — sub_140CF46C0, node+0x18 (TexturePtr по +0x10)
+	//   getIconUV         — sub_141738690, float* на (u0,v0,u1,v1)
+	//   renderGuiItemNew  — sub_140CF8460, требует BaseActorRenderContext*
+	//   iconBlit          — sub_140CF9BE0, 16 аргументов
+	static inline uintptr_t ItemRenderer_getAtlasIconInfo = 0;
+	static inline uintptr_t ItemRenderer_getIconUV = 0;
+	static inline uintptr_t ItemRenderer_renderGuiItemNew = 0;
+	static inline uintptr_t ItemRenderer_iconBlit = 0;
+	// Прицел: CustomCrosshair правит первый байт функции на ret.
+	static inline uintptr_t HudCursorRenderer_render = 0;
+	// ItemUseDelayFix: setNoBlockBreakUntil в обработчике атаки.
+	static inline uintptr_t ClientInputCallbacks_handleBuildAction_onAttack_setNoBlockBreakUntil = 0;
+
+	// ── Дальше по списку из docs/SIGS_26.62_RU.md ───────────────────────────
+	// Паттерны сняты с 1.21.44 и под 1.26.x не проверялись; сам паттерн
+	// остаётся рядом закомментированным. Имена нужны коду прямо сейчас.
+	static inline uintptr_t ClientInstance_getScreenName = 0;   // ClientInstance::getScreenName()
+	static inline uintptr_t ItemPositionConst = 0;              // ItemPhysics: позиция предмета+4
+	static inline uintptr_t JSON_toStyledString = 0;            // JSON.hpp, RefSig 1
+	static inline uintptr_t MainView_instance = 0;              // MainView::getInstance(), RefSig 3
+	static inline uintptr_t mce_framebuilder_RenderItemInHandDescription_ctor = 0; // RenderItemInHandHook
+
 	// ── Ambience (кастомное небо / туман / облака / солнце-луна) ──
 	// В базе 1.21.44 эти пять функций были прописаны абсолютными адресами
 	// (0x14438FD10 и т.д.) — они живут один билд. Под 26.62 сигнатур пока нет,

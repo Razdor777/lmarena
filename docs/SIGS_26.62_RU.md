@@ -5,7 +5,7 @@
 
 - живых `DEFINE_SIG`: **74**
 - закомментированных: **29**
-- объявленных заглушек (`= 0`, детур не встанет): **5**
+- объявленных заглушек (`= 0`, детур не встанет): **17**
 - имён, на которые реально ссылается код: **102**
 
 ## Что сломается без сигнатуры
@@ -40,17 +40,11 @@
 | Имя | Почему нет | Где |
 |---|---|---|
 | `ActorRenderDispatcher_render` | паттерн закомментирован | Hook/Hooks/RenderHooks/ActorRenderDispatcherHook.cpp |
-| `Actor_setPosition` | паттерн закомментирован | SDK/Minecraft/Actor/Actor.cpp |
-| `ClientInstance_getScreenName` | паттерн закомментирован | SDK/Minecraft/ClientInstance.cpp |
 | `FastEat` | паттерн закомментирован | Features/Modules/Player/FastEat.cpp |
 | `InputModeBypass` | паттерн закомментирован | Features/Modules/Misc/EditionFaker.cpp |
 | `InputModeBypassFix` | паттерн закомментирован | Features/Modules/Misc/EditionFaker.cpp |
-| `ItemPositionConst` | паттерн закомментирован | Features/Modules/Visual/ItemPhysics.cpp |
-| `JSON_toStyledString` | паттерн закомментирован | SDK/Minecraft/JSON.hpp |
 | `Keyboard_feed` | паттерн закомментирован | Hook/Hooks/MiscHooks/KeyHook.cpp |
 | `Level_getRuntimeActorList` | паттерн закомментирован | SDK/Minecraft/World/Level.cpp |
-| `MainView_instance` | паттерн закомментирован | SDK/Minecraft/UWP/MainView.cpp |
-| `mce_framebuilder_RenderItemInHandDescription_ctor` | паттерн закомментирован | Hook/Hooks/RenderHooks/RenderItemInHandHook.cpp |
 
 ## Порядок скана, когда появится exe
 
