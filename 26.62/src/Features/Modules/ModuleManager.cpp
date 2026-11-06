@@ -14,6 +14,11 @@
 #include "Combat/InfiniteAura.hpp"
 #include "Combat/Reach.hpp"
 #include "Combat/TriggerBot.hpp"
+#include "Combat/Aimbot.hpp"
+#include "Combat/ArrowTP.hpp"
+#include "Combat/InfiniteChestAura.hpp"
+#include "Combat/LastTP.hpp"
+#include "Combat/PearlStopper.hpp"
 
 #include "Misc/AntiBot.hpp"
 #include "Misc/Anticheat.hpp"
@@ -75,7 +80,35 @@
 #include "Movement/TargetStrafe.hpp"
 #include "Movement/Velocity.hpp"
 
+#include "Movement/AutoPatrol.hpp"
+#include "Movement/AutoSneak.hpp"
+#include "Movement/NoClip.hpp"
+#include "Misc/AdminPanel.hpp"
+#include "Misc/ArmorSlotUnlock.hpp"
+#include "Misc/AutoContract.hpp"
+#include "Misc/AutoLoot.hpp"
+#include "Misc/FakeChat.hpp"
+#include "Misc/ItemDupe.hpp"
+#include "Misc/ItemUseDelayFix.hpp"
+#include "Misc/JavaInventory.hpp"
+#include "Misc/JavaInventoryHotkeys.hpp"
+#include "Misc/NoPause.hpp"
+#include "Misc/PlayerLogger.hpp"
+#include "Misc/SkinChanger.hpp"
+#include "Misc/SkinSpoofer.hpp"
+#include "Misc/SpectatorDetector.hpp"
+#include "Misc/VoiceChat.hpp"
+#include "Misc/WhoisCollector.hpp"
 #include "Player/AntiVoid.hpp"
+#include "Player/AutoArmor.hpp"
+#include "Player/Cage.hpp"
+#include "Player/ChainTP.hpp"
+#include "Player/ContainerActions.hpp"
+#include "Player/OreMinerV2.hpp"
+#include "Player/RegionFill.hpp"
+#include "Player/SchematicBuilder.hpp"
+#include "Player/SpawnerAura.hpp"
+#include "Player/SwitchBallAim.hpp"
 #include "Player/AutoBoombox.hpp"
 #include "Player/AutoEat.hpp"
 #include "Player/AutoKick.hpp"
@@ -152,6 +185,11 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<TriggerBot>());
 	mModules.emplace_back(std::make_shared<AutoClicker>());
 	mModules.emplace_back(std::make_shared<Reach>());
+	mModules.emplace_back(std::make_shared<Aimbot>());
+	mModules.emplace_back(std::make_shared<ArrowTP>());
+	mModules.emplace_back(std::make_shared<InfiniteChestAura>());
+	mModules.emplace_back(std::make_shared<LastTP>());
+	mModules.emplace_back(std::make_shared<PearlStopper>());
 	mModules.emplace_back(std::make_shared<Criticals>());
 	mModules.emplace_back(std::make_shared<InfiniteAura>());
 	mModules.emplace_back(std::make_shared<HitBoxes>());
@@ -196,6 +234,34 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<OreMiner>());
 	mModules.emplace_back(std::make_shared<AutoBoombox>());
 	mModules.emplace_back(std::make_shared<AutoTool>());
+	mModules.emplace_back(std::make_shared<AutoPatrol>());
+	mModules.emplace_back(std::make_shared<AutoSneak>());
+	mModules.emplace_back(std::make_shared<NoClip>());
+	mModules.emplace_back(std::make_shared<AdminPanel>());
+	mModules.emplace_back(std::make_shared<ArmorSlotUnlock>());
+	mModules.emplace_back(std::make_shared<AutoContract>());
+	mModules.emplace_back(std::make_shared<AutoLoot>());
+	mModules.emplace_back(std::make_shared<FakeChat>());
+	mModules.emplace_back(std::make_shared<ItemDupe>());
+	mModules.emplace_back(std::make_shared<ItemUseDelayFix>());
+	mModules.emplace_back(std::make_shared<JavaInventory>());
+	mModules.emplace_back(std::make_shared<JavaInventoryHotkeys>());
+	mModules.emplace_back(std::make_shared<NoPause>());
+	mModules.emplace_back(std::make_shared<PlayerLogger>());
+	mModules.emplace_back(std::make_shared<SkinChanger>());
+	mModules.emplace_back(std::make_shared<SkinSpoofer>());
+	mModules.emplace_back(std::make_shared<SpectatorDetector>());
+	mModules.emplace_back(std::make_shared<VoiceChat>());
+	mModules.emplace_back(std::make_shared<WhoisCollector>());
+	mModules.emplace_back(std::make_shared<AutoArmor>());
+	mModules.emplace_back(std::make_shared<Cage>());
+	mModules.emplace_back(std::make_shared<ChainTP>());
+	mModules.emplace_back(std::make_shared<ContainerActions>());
+	mModules.emplace_back(std::make_shared<OreMinerV2>());
+	mModules.emplace_back(std::make_shared<RegionFill>());
+	mModules.emplace_back(std::make_shared<SchematicBuilder>());
+	mModules.emplace_back(std::make_shared<SpawnerAura>());
+	mModules.emplace_back(std::make_shared<SwitchBallAim>());
 	mModules.emplace_back(std::make_shared<MidclickAction>());
 	mModules.emplace_back(std::make_shared<Derp>());
 	mModules.emplace_back(std::make_shared<Freecam>());
@@ -301,7 +367,7 @@ void ModuleManager::init()
 	//  gFeatureManager->mDispatcher->listen<FovEvent, &Zoom::onFov>(getModule<Zoom>());
 
 	std::string oldHash = OAuthUtils::getLastCommitHash();
-	std::string latestHash = SOLSTICE_BUILD_VERSION;
+	std::string latestHash = DEXKO_BUILD_VERSION;
 	if (oldHash != latestHash && oldHash != "")
 	{
 		spdlog::info("Adding UpdateForm module, oldHash: {}, latestHash: {}", oldHash, latestHash);
@@ -580,6 +646,12 @@ void ModuleManager::deserialize(const nlohmann::json& j, bool showMessages)
 									colorSetting->mValue[i] = settingValue["colorValue"][i];
 								}
 							}
+							else if (set->mType == SettingType::String)
+							{
+								auto* stringSetting = static_cast<StringSetting*>(set);
+								if (settingValue.contains("stringValue") && settingValue["stringValue"].is_string())
+									stringSetting->setValue(settingValue["stringValue"].get<std::string>());
+							}
 
 							settingsLoaded++;
 						}
@@ -593,6 +665,21 @@ void ModuleManager::deserialize(const nlohmann::json& j, bool showMessages)
 					{
 						spdlog::warn("Failed to load setting {} for module {}: {}", setting.key(), name, e.what());
 						if (showMessages) ChatUtils::displayClientMessage("§cFailed to load setting §6" + setting.key() + "§c for module §6" + name + "§c.");
+					}
+				}
+
+				// Extra per-module state: locked targets, bind tables, loot patterns ...
+				// (InfiniteAura, JavaInventoryHotkeys, ClickTp, InfiniteChestAura override
+				// these; every other module inherits the no-op.)
+				if (mod->hasCustomData())
+				{
+					try {
+						if (module.contains("customData") && !module["customData"].is_null())
+							mod->deserializeCustomData(module["customData"]);
+						else
+							mod->deserializeCustomData(nlohmann::json());
+					} catch (const std::exception& e) {
+						spdlog::error("Failed to deserialize custom data for {}: {}", name, e.what());
 					}
 				}
 

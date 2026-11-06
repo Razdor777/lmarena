@@ -1088,7 +1088,6 @@ void Kagune::onRenderEvent(RenderEvent& event)
     {
         const auto& st = mTentacles[ac.ti];
         const KMat km{cBlade, cShade, cGlow, iT, ac.flash, pulseK, blocky ? 3.f : 0.f};
-<<<<<<< HEAD
 
         auto proj = [&](const glm::vec3& w, ImVec2& out) -> bool {
             glm::vec2 sp;
@@ -1148,8 +1147,6 @@ void Kagune::onRenderEvent(RenderEvent& event)
                 }
             }
         }
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
         // 0. след кончика (под телом щупальца)
         if (detail) {

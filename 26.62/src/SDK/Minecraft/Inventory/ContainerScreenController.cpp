@@ -19,3 +19,9 @@ void* ContainerScreenController::_tryExit()
     // TODO: implement index signature instead of raw index
     return MemUtils::callVirtualFunc<void*>(OffsetProvider::ContainerScreenController_tryExit, this);
 }
+
+void ContainerScreenController::_tryBeginTransition(int targetState, unsigned int flags, const std::string& collectionName, int slot)
+{
+    static auto func = SigManager::ContainerScreenController_tryBeginTransition;
+    MemUtils::callFastcall<void>(func, this, targetState, flags, collectionName, slot);
+}

@@ -9,6 +9,7 @@
 #include <Utils/GameUtils/ChatUtils.hpp>
 #include <Utils/StringUtils.hpp>
 
+#include "Commands/AimbotCommand.hpp"
 #include "Commands/BindCommand.hpp"
 #include "Commands/BuildInfoCommand.hpp"
 #include "Commands/ConfigCommand.hpp"
@@ -39,6 +40,7 @@ void CommandManager::init()
     //ADD_COMMAND(TestCommand);
 #endif
 
+    ADD_COMMAND(AimbotCommand);
     ADD_COMMAND(HelpCommand);
     ADD_COMMAND(ToggleCommand);
     ADD_COMMAND(BindCommand);

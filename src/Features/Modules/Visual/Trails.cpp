@@ -89,10 +89,6 @@ namespace TrailsImpl
     }
 }
 
-<<<<<<< HEAD
-=======
-using namespace TrailsImpl;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 // =========================================================
 // Enable / disable
@@ -120,22 +116,14 @@ void Trails::onDisable()
 
 void Trails::spawnParticle(glm::vec3 pos, float motionScale, int colorIndex)
 {
-<<<<<<< HEAD
     if (mParticles.size() >= TrailsImpl::PARTICLE_MAX) {
-=======
-    if (mParticles.size() >= PARTICLE_MAX) {
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         mParticles.erase(mParticles.begin());
     }
 
     const float motion = 0.06f * motionScale;
     Particle p{};
     p.pos = pos;
-<<<<<<< HEAD
     p.velocity = glm::vec3(TrailsImpl::randomRange(-motion, motion), TrailsImpl::randomRange(-0.015f, 0.015f), TrailsImpl::randomRange(-motion, motion));
-=======
-    p.velocity = glm::vec3(randomRange(-motion, motion), randomRange(-0.015f, 0.015f), randomRange(-motion, motion));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     p.spawnedAtMs = NOW;
     p.lifeMs = std::max<uint64_t>(1, static_cast<uint64_t>(mParticleLifeMs.mValue));
     p.fadeInMs = std::min<uint64_t>(200, p.lifeMs / 4);
@@ -144,20 +132,12 @@ void Trails::spawnParticle(glm::vec3 pos, float motionScale, int colorIndex)
 
     if (mParticleRandomColor.mValue) {
         ImVec4 rgb{};
-<<<<<<< HEAD
         ImGui::ColorConvertHSVtoRGB(TrailsImpl::randomRange(0.f, 1.f), TrailsImpl::randomRange(0.7f, 1.f), TrailsImpl::randomRange(0.8f, 1.f),
-=======
-        ImGui::ColorConvertHSVtoRGB(randomRange(0.f, 1.f), randomRange(0.7f, 1.f), randomRange(0.8f, 1.f),
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                                     rgb.x, rgb.y, rgb.z);
         rgb.w = 1.f;
         p.color = ImColor(rgb);
     } else {
-<<<<<<< HEAD
         p.color = TrailsImpl::colorFor(static_cast<int>(static_cast<ColorMode>(mColorMode.mValue)), mColorSpeed.mValue, colorIndex,
-=======
-        p.color = colorFor(static_cast<int>(mColorMode.mValue), mColorSpeed.mValue, colorIndex,
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                            mColor.getAsImColor(), mColor2.getAsImColor());
     }
     mParticles.push_back(p);
@@ -167,15 +147,9 @@ void Trails::spawnParticlesAround(glm::vec3 feet, int count, float radius, float
 {
     for (int i = 0; i < count; i++) {
         glm::vec3 pos(
-<<<<<<< HEAD
             feet.x + TrailsImpl::randomRange(0.f, 1.f) * radius - radius * 0.5f,
             feet.y + TrailsImpl::randomRange(0.f, 1.f) * std::max(0.1f, height),
             feet.z + TrailsImpl::randomRange(0.f, 1.f) * radius - radius * 0.5f);
-=======
-            feet.x + randomRange(0.f, 1.f) * radius - radius * 0.5f,
-            feet.y + randomRange(0.f, 1.f) * std::max(0.1f, height),
-            feet.z + randomRange(0.f, 1.f) * radius - radius * 0.5f);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         spawnParticle(pos, motionScale, colorIndex);
     }
 }
@@ -218,11 +192,7 @@ void Trails::onBaseTickEvent(BaseTickEvent& event)
             TrailPoint point{};
             point.from = last;
             point.to = pos;
-<<<<<<< HEAD
             point.color = TrailsImpl::colorFor(static_cast<int>(static_cast<ColorMode>(mColorMode.mValue)), mColorSpeed.mValue, colorIndex,
-=======
-            point.color = colorFor(static_cast<int>(mColorMode.mValue), mColorSpeed.mValue, colorIndex,
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                                    mColor.getAsImColor(), mColor2.getAsImColor());
             point.maxTicks = std::max(1, static_cast<int>(mLifeTimeTicks.mValue));
             point.ticks = point.maxTicks;
@@ -267,11 +237,7 @@ void Trails::onBaseTickEvent(BaseTickEvent& event)
     });
     for (Particle& p : mParticles) {
         p.pos += p.velocity;
-<<<<<<< HEAD
         p.velocity = p.velocity * TrailsImpl::PARTICLE_DRAG + glm::vec3(0.f, -TrailsImpl::PARTICLE_GRAVITY, 0.f);
-=======
-        p.velocity = p.velocity * PARTICLE_DRAG + glm::vec3(0.f, -PARTICLE_GRAVITY, 0.f);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 }
 
@@ -300,23 +266,14 @@ void Trails::onRenderEvent(RenderEvent& event)
             if (p.fadeOutMs > 0 && now - p.spawnedAtMs >= p.lifeMs - p.fadeOutMs) {
                 alpha = std::min(alpha, static_cast<float>(p.lifeMs - (now - p.spawnedAtMs)) / static_cast<float>(p.fadeOutMs));
             }
-<<<<<<< HEAD
             alpha = TrailsImpl::clamp01(alpha);
-=======
-            alpha = clamp01(alpha);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
             if (alpha <= 0.01f) continue;
 
             ImVec2 screen;
             if (!RenderUtils::worldToScreen(p.pos, screen)) continue;
             const float dist = glm::distance(p.pos, camera);
-<<<<<<< HEAD
             const float radius = TrailsImpl::screenRadius(p.size, dist, display.y);
             TrailsImpl::drawGlow(drawList, screen, radius, TrailsImpl::withAlpha(static_cast<ImU32>(p.color), alpha));
-=======
-            const float radius = screenRadius(p.size, dist, display.y);
-            drawGlow(drawList, screen, radius, withAlpha(static_cast<ImU32>(p.color), alpha));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         }
     }
 
@@ -334,19 +291,11 @@ void Trails::onRenderEvent(RenderEvent& event)
 
         ImU32 animated = pt.color;
         if (mColorMode.mValue != ColorMode::Static) {
-<<<<<<< HEAD
             animated = TrailsImpl::colorFor(static_cast<int>(static_cast<ColorMode>(mColorMode.mValue)), mColorSpeed.mValue, phase,
                                 mColor.getAsImColor(), mColor2.getAsImColor());
         }
         const float lift = std::pow(1.f - position, 2.f) * 0.45f;
         return TrailsImpl::liftToWhite(animated, lift);
-=======
-            animated = colorFor(static_cast<int>(mColorMode.mValue), mColorSpeed.mValue, phase,
-                                mColor.getAsImColor(), mColor2.getAsImColor());
-        }
-        const float lift = std::pow(1.f - position, 2.f) * 0.45f;
-        return liftToWhite(animated, lift);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     };
 
     for (Actor* actor : ActorUtils::getActorList(true, true)) {
@@ -364,28 +313,17 @@ void Trails::onRenderEvent(RenderEvent& event)
             for (int i = 0; i < size; i++) {
                 const TrailPoint& pt = trail[i];
                 const float animation = pt.maxTicks > 0 ? static_cast<float>(pt.ticks) / static_cast<float>(pt.maxTicks) : 1.f;
-<<<<<<< HEAD
                 const ImU32 col = TrailsImpl::withAlpha(pointColor(pt, i, size), animation);
 
                 const int steps = connect ? std::min(TrailsImpl::CONNECT_MAX_STEPS, static_cast<int>(std::ceil(glm::distance(pt.from, pt.to) / step))) : 0;
-=======
-                const ImU32 col = withAlpha(pointColor(pt, i, size), animation);
-
-                const int steps = connect ? std::min(CONNECT_MAX_STEPS, static_cast<int>(std::ceil(glm::distance(pt.from, pt.to) / step))) : 0;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                 const int count = steps <= 1 ? 1 : steps + 1;
                 for (int s = 0; s < count; s++) {
                     const float t = count == 1 ? 1.f : s / static_cast<float>(count - 1);
                     const glm::vec3 p = glm::mix(pt.from, pt.to, t) + glm::vec3(0.f, 0.9f, 0.f);
                     ImVec2 screen;
                     if (!RenderUtils::worldToScreen(p, screen)) continue;
-<<<<<<< HEAD
                     const float radius = TrailsImpl::screenRadius(mScale.mValue, glm::distance(p, camera), display.y);
                     TrailsImpl::drawGlow(drawList, screen, radius, col);
-=======
-                    const float radius = screenRadius(mScale.mValue, glm::distance(p, camera), display.y);
-                    drawGlow(drawList, screen, radius, col);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                 }
             }
         } else {
@@ -393,15 +331,9 @@ void Trails::onRenderEvent(RenderEvent& event)
             for (int i = 1; i < size; i++) {
                 const TrailPoint& prev = trail[i - 1];
                 const TrailPoint& cur = trail[i];
-<<<<<<< HEAD
                 const ImU32 col0 = TrailsImpl::withAlpha(pointColor(prev, i - 1, size),
                     prev.maxTicks > 0 ? static_cast<float>(prev.ticks) / static_cast<float>(prev.maxTicks) : 1.f);
                 const ImU32 col1 = TrailsImpl::withAlpha(pointColor(cur, i, size),
-=======
-                const ImU32 col0 = withAlpha(pointColor(prev, i - 1, size),
-                    prev.maxTicks > 0 ? static_cast<float>(prev.ticks) / static_cast<float>(prev.maxTicks) : 1.f);
-                const ImU32 col1 = withAlpha(pointColor(cur, i, size),
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                     cur.maxTicks > 0 ? static_cast<float>(cur.ticks) / static_cast<float>(cur.maxTicks) : 1.f);
 
                 const glm::vec3 p0 = prev.to;
@@ -415,28 +347,15 @@ void Trails::onRenderEvent(RenderEvent& event)
                 if (!RenderUtils::worldToScreen(p1 + down, b1)) continue;
                 if (!RenderUtils::worldToScreen(p1 + up, t1)) continue;
 
-<<<<<<< HEAD
                 drawList->AddQuadFilled(b0, b1, t1, t0, TrailsImpl::averageColor(col0, col1));
-=======
-                drawList->AddQuadFilled(b0, b1, t1, t0, averageColor(col0, col1));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
                 if (mTrailStroke.mValue) {
                     const float alphaMul = mTrailStrokeAlpha.mValue;
                     const float width = std::max(0.5f, mTrailStrokeWidth.mValue);
-<<<<<<< HEAD
                     drawList->AddLine(b0, b1, TrailsImpl::withAlpha(col0, alphaMul), width);
                     drawList->AddLine(t0, t1, TrailsImpl::withAlpha(col1, alphaMul), width);
-=======
-                    drawList->AddLine(b0, b1, withAlpha(col0, alphaMul), width);
-                    drawList->AddLine(t0, t1, withAlpha(col1, alphaMul), width);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                 }
             }
         }
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de

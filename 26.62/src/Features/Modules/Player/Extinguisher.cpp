@@ -16,9 +16,9 @@ bool Extinguisher::isValidBlock(glm::ivec3 blockPos)
     Block* block = ClientInstance::get()->getBlockSource()->getBlock(blockPos);
     if (!block) return false;
 
-    if (block->getmLegacy()->isAir()) return false;
+    if (block->mLegacy->isAir()) return false;
 
-    int blockId = block->getmLegacy()->getBlockId();
+    int blockId = block->mLegacy->getBlockId();
     if(blockId != 51) return false;
 
     AABB blockAABB = AABB(blockPos, glm::vec3(1, 1, 1));

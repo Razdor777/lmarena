@@ -87,6 +87,53 @@ public:
         MemUtils::callVirtualFunc<void>(OffsetProvider::ItemStack_reInit, this, item, count, itemData);
     }
 
+    // =====================================================
+    // DURABILITY / DAMAGE -- carried over from the 1.21.44 SDK
+    // =====================================================
+    // Two things differ from the new base:
+    //  * damage lives in ItemStackBase::mAuxValue (same place as before), but the
+    //    field used to be reachable as a member, so keep the accessors;
+    //  * the new base renamed `valid` to `mValid_DeprecatedSeeComment`, so the
+    //    old check is provided here instead of editing 48 call sites.
+    bool valid() const {
+        return const_cast<ItemStack*>(this)->mValid_DeprecatedSeeComment;
+    }
+
+    int getDamage() const {
+        return static_cast<int>(const_cast<ItemStack*>(this)->mAuxValue);
+    }
+
+    int getMaxDamage() const {
+        Item* item = const_cast<ItemStack*>(this)->getItem();
+        if (!item) return 0;
+        return item->getMaxDamage();
+    }
+
+    int getRemainingDurability() const {
+        const int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 0;
+        return maxDmg - getDamage();
+    }
+
+    float getDurabilityPercent() const {
+        const int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 1.0f;
+        return static_cast<float>(getRemainingDurability()) / static_cast<float>(maxDmg);
+    }
+
+    bool hasDurability() const {
+        return getMaxDamage() > 0;
+    }
+
+    bool isArmorEnchantable() const {
+        return getMaxDamage() > 0;
+    }
+
+    // 1.21.44 SDK: build an ItemStack from a network descriptor (ChestStealer /
+    // TestModule use it). Implementation is unchanged, the signature still has to
+    // be confirmed on the 1.26.x binary -- see the SigManager entry.
+    static ItemStack fromDescriptor(class NetworkItemStackDescriptor const& desc);
+
     std::string getCustomName() {
         static auto func = SigManager::ItemStack_getCustomName;
         std::string str;

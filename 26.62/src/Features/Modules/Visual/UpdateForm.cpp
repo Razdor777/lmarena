@@ -13,10 +13,10 @@
 void UpdateForm::getCommits()
 {
     std::string latestHash = mOldHash;
-    /*HttpRequest request(HttpMethod::GET, OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + SOLSTICE_BUILD_VERSION, "", "", &UpdateForm::onHttpResponse, nullptr);
+    /*HttpRequest request(HttpMethod::GET, OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + DEXKO_BUILD_VERSION, "", "", &UpdateForm::onHttpResponse, nullptr);
     request.sendAsync();*/
     mRequest.mMethod = HttpMethod::GET;
-    mRequest.mUrl = OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + SOLSTICE_BUILD_VERSION;
+    mRequest.mUrl = OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + DEXKO_BUILD_VERSION;
     mRequest.mCallback = &UpdateForm::onHttpResponse;
     mRequest.mSender = this;
     mRequest.sendAsync();
@@ -45,7 +45,7 @@ void UpdateForm::onHttpResponse(HttpResponseEvent event)
 void UpdateForm::onEnable()
 {
     mOldHash = OAuthUtils::getLastCommitHash();
-    std::string latestHash = SOLSTICE_BUILD_VERSION;
+    std::string latestHash = DEXKO_BUILD_VERSION;
     OAuthUtils::saveCommitHash(latestHash);
 
     if (!mGatheredCommits)

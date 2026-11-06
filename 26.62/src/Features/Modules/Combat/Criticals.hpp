@@ -1,59 +1,53 @@
-//
-// Created by alteik on 04/10/2024.
-//
-#include <Features/Modules/Module.hpp>
-#include <Features/Modules/Setting.hpp>
 #pragma once
+#include <Features/Modules/Module.hpp>
+#include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
+
+class PacketOutEvent;
 
 class Criticals : public ModuleBase<Criticals> {
 public:
+    enum class Mode { PocketMine, AuthInput };
 
-    enum class Mode {
-        Sentinel,
-    };
+    EnumSettingT<Mode> mMode = EnumSettingT<Mode>(
+        "Mode", "How to fake the fall", Mode::PocketMine, "PocketMine", "AuthInput");
+    NumberSetting mHeight = NumberSetting(
+        "Height", "Fake jump height (PMMP ~0.1, AuthInput try 0.1-0.42)", 0.1f, 0.01f, 0.5f, 0.01f);
+    BoolSetting mOnlyOnGround = BoolSetting(
+        "Only On Ground", "Send only when you are standing on the ground", true);
 
-    enum class AnimationState {
-        START,
-        MID_AIR,
-        MID_AIR2,
-        LANDING,
-        FINISHED
-    };
-
-    EnumSettingT<Mode> mMode = EnumSettingT<Mode>("Mode", "The critical mode", Mode::Sentinel, "Sentinel");
-    BoolSetting mVelocity = BoolSetting("Use Velocity", "Whether to use velocity change", true);
-    BoolSetting mPositionChange = BoolSetting("Position Change", "Whether to change pos", true);
-    BoolSetting mBiggerPositionChange = BoolSetting("Bigger Position Change", "Whether to change more pos", true);
-    BoolSetting mSendJumping = BoolSetting("Send Jumping", "Whether to send jumping", true);
-    BoolSetting mOffSprint = BoolSetting("Disable Sprint", "Whether to disable sprint", true);
-    NumberSetting mPositionChangePersent = NumberSetting("Position Change Percent", "Changes delta", 1.5, 0, 2, 0.01);
-
-    Criticals() : ModuleBase("Criticals", "Makes you always get a critical hit on your opponent", ModuleCategory::Combat, 0, false) {
-
-        addSetting(&mMode);
-        addSetting(&mVelocity);
-        addSetting(&mPositionChange);
-        addSetting(&mBiggerPositionChange);
-        addSetting(&mSendJumping);
-        addSetting(&mOffSprint);
-        addSetting(&mPositionChangePersent);
-
-        mNames = {
-                {Lowercase, "criticals"},
-                {LowercaseSpaced, "criticals"},
-                {Normal, "Criticals"},
-                {NormalSpaced, "Criticals"}
-        };
+    Criticals() : ModuleBase("Criticals", "Always deal critical hits", ModuleCategory::Combat, 0, false,
+        {
+            {Lowercase,       "criticals"},
+            {LowercaseSpaced, "criticals"},
+            {Normal,          "Criticals"},
+            {NormalSpaced,    "Criticals"}
+        })
+    {
+        addSettings(&mMode, &mHeight, &mOnlyOnGround);
     }
-
-    bool mWasSprinting = true;
-    AnimationState mAnimationState = AnimationState::START;
-
-    float mJumpPositions[4] = {0, 0.8200100660324097 - 0.6200100183486938, 0.741610050201416 - 0.6200100183486938, 0}; // glide down with 0.01 persision
-    float mJumpPositionsMini[4] = {0, 0.02, 0.01, 0}; // 0.05
-    float mJumpVelocities[4] = {-0.07840000092983246, -0.07840000092983246, -0.1552319973707199f, -0.07840000092983246};
 
     void onEnable() override;
     void onDisable() override;
-    void onPacketOutEvent(class PacketOutEvent& event);
+    void onPacketOutEvent(PacketOutEvent& event);
+
+private:
+    // Снимок последнего настоящего PlayerAuthInput
+    struct AuthSnapshot {
+        bool                valid = false;
+        glm::vec2           rot{};
+        glm::vec3           pos{};
+        float               headRot = 0.f;
+        glm::vec2           interactRots{};
+        glm::vec2           cameraOrientation{};
+        InputMode           inputMode = InputMode::Mouse;
+        ClientPlayMode      playMode = ClientPlayMode::Normal;
+        NewInteractionModel interaction = NewInteractionModel::Touch;
+        int64_t             tick = 0;
+        uint64_t            predictedVehicle = 0;
+    } mSnap;
+
+    bool    mSending = false;      // защита от рекурсии (ловим свои же пакеты)
+    int64_t mLastFakeTick = -1;    // чтобы не слать фейки несколько раз за один тик
+
+    void sendFake(float yOffset, float yDelta, AuthInputAction flags);
 };

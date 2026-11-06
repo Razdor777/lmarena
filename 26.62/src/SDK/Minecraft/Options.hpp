@@ -24,6 +24,11 @@ public:
     int32_t mDefaultValue;
     bool mClampToRange;
     PAD(0x58);
+
+    // NOTE: 1.21.44 code said `->value` / `->minimum` / `->maximum`. Those are NOT
+    // aliased here on purpose: reference members would change sizeof() and trip the
+    // static_asserts below. Rename at the call site instead:
+    //   ->value => ->mValue,  ->minimum => ->mMinValue,  ->maximum => ->mMaxValue
 };  
 
 
@@ -36,6 +41,8 @@ public:
     float mValue;
     float mDefaultValue;
     float mDelta;
+
+    // see the note in IntOption above (->minimum => ->mMinValue, ...)
 };  
 
 static_assert(sizeof(IntOption) == 0x80);

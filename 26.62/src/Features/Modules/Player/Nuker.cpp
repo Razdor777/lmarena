@@ -38,7 +38,7 @@ bool Nuker::isValidBlock(glm::ivec3 blockPos) {
     if (!block) return false;
 
     //
-    if (block->getmLegacy()->isAir()) return false;
+    if (block->mLegacy->isAir()) return false;
 
     // Distance Check
     AABB blockAABB = AABB(blockPos, glm::vec3(1, 1, 1));
@@ -57,11 +57,11 @@ bool Nuker::isValidBlock(glm::ivec3 blockPos) {
         glm::ivec3 newPos = blockPos + offset;
         Block* newBlock = ClientInstance::get()->getBlockSource()->getBlock(newPos);
         if (!newBlock) continue;
-        if (newBlock->getmLegacy()->getBlockId() == 73 || newBlock->getmLegacy()->getBlockId() == 74)
+        if (newBlock->mLegacy->getBlockId() == 73 || newBlock->mLegacy->getBlockId() == 74)
         {
             hasRedstone = true;
         }
-        if (newBlock->getmLegacy()->isAir()) {
+        if (newBlock->mLegacy->isAir()) {
             hasRedstone = false;
             break;
         }
@@ -127,7 +127,7 @@ void Nuker::onBaseTickEvent(BaseTickEvent& event)
     BlockSource* source = ClientInstance::get()->getBlockSource();
     if (!source) return;
     PlayerInventory* supplies = player->getSupplies();
-    mPreviousSlot = supplies->getmSelectedSlot();
+    mPreviousSlot = supplies->mSelectedSlot;
 
     // Return without reset breaking progress
     if (mLastBlockPlace + 100 > NOW) {
@@ -165,7 +165,7 @@ void Nuker::onBaseTickEvent(BaseTickEvent& event)
         std::vector<BlockInfo> blockList = BlockUtils::getBlockList(*player->getPos(), mRange.mValue);
 
         for (int i = 0; i < blockList.size(); i++) {
-            if (!isValidBlock(blockList[i].mPosition) || (mBlockType.mValue == BlockType::Specified && blockList[i].mBlock->getmLegacy()->getmName() != specifiedBlockID)) continue;
+            if (!isValidBlock(blockList[i].mPosition) || (mBlockType.mValue == BlockType::Specified && blockList[i].mBlock->mLegacy->getmName() != specifiedBlockID)) continue;
             queueBlock(blockList[i].mPosition);
             return;
         }

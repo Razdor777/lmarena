@@ -200,7 +200,7 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
     BlockSource* source = ClientInstance::get()->getBlockSource();
     if (!source) return;
     PlayerInventory* supplies = player->getSupplies();
-    mPreviousSlot = supplies->getmSelectedSlot();
+    mPreviousSlot = supplies->mSelectedSlot;
 
     auto chestStealer = gFeatureManager->mModuleManager->getModule<ChestStealer>();
     bool mStealing = chestStealer && chestStealer->mEnabled && chestStealer->mIsStealing;
@@ -254,7 +254,7 @@ void OreMiner::onBaseTickEvent(BaseTickEvent& event)
             mCurrentDestroySpeed = mDestroySpeed.mValue;
         }
         else if (mCalcMode.mValue == CalcMode::Dynamic) {
-            std::string blockName = currentBlock->getmLegacy()->getmName();
+            std::string blockName = currentBlock->mLegacy->getmName();
             bool found = false;
             for (auto& c : BlockUtils::mDynamicSpeeds) {
                 if (c.blockName == blockName) {

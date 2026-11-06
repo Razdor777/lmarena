@@ -51,7 +51,35 @@ public:
 	//vtable better :ultra_retard:
 	//DEFINE_SIG(ClientInstance_grabMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 40", SigType::Sig, 0); // 1.21.51
 	//DEFINE_SIG(ClientInstance_releaseMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 48 89", SigType::Sig, 0); // 1.21.51
+	// ── Ambience (кастомное небо / туман / облака / солнце-луна) ──
+	// В базе 1.21.44 эти пять функций были прописаны абсолютными адресами
+	// (0x14438FD10 и т.д.) — они живут один билд. Под 26.62 сигнатур пока нет,
+	// поэтому хуки не встают: в логе будет "signature not resolved", модуль
+	// молчит, игра работает. Когда сигнатуры снимутся — вернуть пять строк
+	// DEFINE_SIG и убрать объявления ниже, хуки подхватят их без правок.
+	//   DEFINE_SIG(Ambience_SkyRender,     "<sig>", SigType::Sig, 0);
+	//   DEFINE_SIG(Ambience_EndSkyRender,  "<sig>", SigType::Sig, 0);
+	//   DEFINE_SIG(Ambience_ChunkRender,   "<sig>", SigType::Sig, 0);
+	//   DEFINE_SIG(Ambience_SunMoonRender, "<sig>", SigType::Sig, 0);
+	//   DEFINE_SIG(Ambience_CloudRender,   "<sig>", SigType::Sig, 0);
+public:
+	static inline uintptr_t Ambience_SkyRender = 0;
+	static inline uintptr_t Ambience_EndSkyRender = 0;
+	static inline uintptr_t Ambience_ChunkRender = 0;
+	static inline uintptr_t Ambience_SunMoonRender = 0;
+	static inline uintptr_t Ambience_CloudRender = 0;
+private:
+	// ── Урон / снаряды: источники EntityHurtEvent и ProjectileHitEvent ──
+	// Пока сигнатуры не сняты с бинарника 26.62, соответствующие хуки не
+	// встают, и DamageLog/BowHitMarker/ArrowRecovery молча ждут событий.
+	DEFINE_SIG(Actor_hurt, "48 89 ? ? ? 55 56 57 41 ? 41 ? 41 ? 48 8D ? ? ? ? ? 48 81 EC ? ? ? ? 48 8B ? ? ? ? ? 48 33 ? 48 89 ? ? ? ? 8B ? ? ? ? ? 89", SigType::Sig, 0);
+	DEFINE_SIG(Projectile_onHit, "48 89 ? ? ? 55 56 57 41 ? 41 ? 41 ? 48 8D ? ? ? ? ? 48 81 EC ? ? ? ? 48 8B ? ? ? ? ? 48 33 ? 48 89 ? ? ? ? 8B 42", SigType::Sig, 0);
+	// RenderController::getOverlayColor — RefSig на вызов, как и в базе 1.21.44.
+	DEFINE_SIG(HurtColor, "E8 ? ? ? ? 0F 28 05 ? ? ? ? 0F 11 85 68 02 00 00", SigType::RefSig, 1);
 	DEFINE_SIG(ContainerScreenController_tick, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 0F 29 75 ? 48 C7 45 ? ? ? ? ? 48 89 CE 48 8D B9 ? ? ? ? C6 45", SigType::Sig, 0); // 26.51
+	// _handleSlotHovered(collectionName, slot) — вызывается при смене слота под курсором.
+	// Нужна для JavaInventory/JavaInventoryHotkeys; без неё ховер-трек выключен.
+	DEFINE_SIG(ContainerScreenController_onContainerSlotHovered, "48 89 ? ? ? 57 41 ? 41 ? 48 83 EC ? 45 8B ? 48 8B ? 48 8B ? 44 39", SigType::Sig, 0);
 	DEFINE_SIG(ContainerScreenController_handleAutoPlace, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? 44 89 CE 4C 89 C7 41 89 D6", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(ComplexInventoryTransaction_vtable, "48 8D 05 ? ? ? ? ? ? ? 48 83 C1 ? E8 ? ? ? ? 40 F6 C7 ? 74 ? BA ? ? ? ? 48 89 F1 E8 ? ? ? ? 48 89 F0 48 83 C4 ? 5F 5E C3 ? ? ? ? ? 56 57 48 83 EC ? 89 D7 48 89 CE E8 ? ? ? ? 40 F6 C7 ? 74 ? BA ? ? ? ? 48 89 F1 E8 ? ? ? ? 48 89 F0 48 83 C4 ? 5F 5E C3 ? ? ? 56 48 83 EC", SigType::RefSig, 3); //26.51
 	DEFINE_SIG(EnchantUtils_getEnchantLevel, "56 57 53 48 81 EC ? ? ? ? 89 CB 48 8B 4A ? 31 F6", SigType::Sig, 0); // 1.26.51
@@ -62,6 +90,16 @@ public:
 	DEFINE_SIG(InventoryTransaction_addAction, "55 41 57 41 56 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? 48 89 D7 48 89 CE ? ? 41 89 C7", SigType::Sig, 0);
 	DEFINE_SIG(ItemStack_vTable, "48 8D 05 ? ? ? ? ? ? ? 0F B6 81 ? ? ? ? FE C8 3C ? 77 ? 48 8D 91 ? ? ? ? 48 8B 81 ? ? ? ? ? ? ? 48 89 CE 48 89 D1 31 D2 FF 15 ? ? ? ? 48 89 F1 48 83 C4 ? 5E E9 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 48 8B 80", SigType::RefSig, 3); // ?$dtor@ItemStack@@QEAAXXZ is inlined :joy:
 	DEFINE_SIG(ItemStack_getCustomName, "56 57 48 83 EC 28 48 89 D6 48 8B 41 ? 48 85 C0 74 ? 48 89 CF", SigType::Sig, 0); // 1.26.0
+	// Carried over from the 1.21.44 SDK. The .44 pattern is very likely still
+	// a prefix of ItemStack::ItemStack(NetworkItemStackDescriptor const&, BlockPalette&, bool)
+	// in 1.26.x, but re-verify against the new binary before shipping.
+	DEFINE_SIG(ItemStack_fromDescriptor, "48 89 ? ? ? 48 89 ? ? ? 48 89 ? ? ? 57 48 83 EC ? 0F 57 ? 48 8B", SigType::Sig, 0);
+	// Carried over from .44 -- ContainerActions uses it for the container
+	// open/close transition. Re-verify the prologue on the 1.26.x binary.
+	DEFINE_SIG(ContainerScreenController_tryBeginTransition,
+	           "40 53 56 57 41 56 41 57 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 "
+	           "89 44 24 ? 8B FA",
+	           SigType::Sig, 0);
 	DEFINE_SIG(ItemUseInventoryTransaction_vtable, "48 8D 05 ? ? ? ? 48 89 85 ? ? ? ? 8B 45 ? 89 85 ? ? ? ? C6 85", SigType::RefSig, 3);
 	DEFINE_SIG(ItemUseOnActorInventoryTransaction_vtable, "48 8D 05 ? ? ? ? ? ? ? 0F 10 43 ? 0F 11 47", SigType::RefSig, 3);
 	DEFINE_SIG(ItemReleaseInventoryTransaction_vtable, "4C 8D 3D ? ? ? ? 4C 8D A6", SigType::RefSig, 3); // 26.51 need check

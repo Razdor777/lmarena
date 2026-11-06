@@ -8,6 +8,8 @@
 
 #include "Hooks/ActorHooks/ActorModelHook.hpp"
 #include "Hooks/ActorHooks/AnimationHooks.hpp"
+#include "Hooks/ActorHooks/HealthHooks.hpp"
+#include "Hooks/ActorHooks/ProjectileHooks.hpp"
 #include "Hooks/ActorHooks/NametagRenderHook.hpp"
 #include "Hooks/ContainerHooks/ContainerScreenControllerHook.hpp"
 #include "Hooks/MiscHooks/FireBlockChangedHook.hpp"
@@ -20,8 +22,10 @@
 #include "Hooks/NetworkHooks/RakPeerHooks.hpp"
 #include "Hooks/NetworkHooks/NetherNetHooks.hpp"
 #include "Hooks/RenderHooks/ActorRenderDispatcherHook.hpp"
+#include "Hooks/RenderHooks/AmbienceHook.hpp"
 #include "Hooks/RenderHooks/D3DHook.hpp"
 #include "Hooks/RenderHooks/HoverTextRendererHook.hpp"
+#include "Hooks/RenderHooks/HurtColorHook.hpp"
 #include "Hooks/RenderHooks/ItemRendererHook.hpp"
 #include "Hooks/RenderHooks/LookInputHook.hpp"
 #include "Hooks/RenderHooks/RenderItemInHandHook.hpp"
@@ -61,6 +65,9 @@ void HookManager::init(bool initLp)
 		//ADD_HOOK(NetherNetHooks); //fucking test
 		//ADD_HOOK(ActorRenderDispatcherHook); //die
 		ADD_HOOK(AnimationHooks);
+		ADD_HOOK(HealthHooks);
+		ADD_HOOK(ProjectileHooks);
+		ADD_HOOK(HurtColorHook);
 		ADD_HOOK(HoverTextRendererHook);
 		ADD_HOOK(LookInputHook);
 		ADD_HOOK(ActorModelHook);
@@ -73,6 +80,7 @@ void HookManager::init(bool initLp)
 		ADD_HOOK(WndProcHook);
 		ADD_HOOK(GrabMouseHook);
 		ADD_HOOK(LevelRendererHook);
+		ADD_HOOK(AmbienceHook);
 
 		
 

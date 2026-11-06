@@ -43,8 +43,11 @@ static void patchSafeWalk(bool v) {
 
     }
     else {
+        // Каждому адресу — своя сохранённая копия пролога: в adr писали Bytes1
+        // (13 байт), в adr2 — Bytes2 (25 байт). Раньше здесь обе строки брали
+        // mOriginalData2, из-за чего первый патч восстанавливался чужими байтами.
         MemUtils::writeBytes(adr, SafeWalk::mOriginalData, sizeof(SafeWalk::mOriginalData));
-        MemUtils::writeBytes(adr2, SafeWalk::mOriginalData, sizeof(SafeWalk::mOriginalData));
+        MemUtils::writeBytes(adr2, SafeWalk::mOriginalData2, sizeof(SafeWalk::mOriginalData2));
         current = v;
 
     }

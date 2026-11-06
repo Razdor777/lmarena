@@ -60,6 +60,14 @@ public:
 	//CLASS_FIELD(class BlockPalette*, mBlockPalette, 0x1C8);
 	///CLASS_FIELD(std::unordered_map<mce::UUID, PlayerListEntry>, pl, 0x1BC8); // class_field doesn't support std::unordered_map lol
 
+	// Virtual (vector deleting dtor is slot 0, so this lands on slot 1 in the
+	// 1.26.x layout). In the .44 SDK it was a sig-resolved vtable index; the new
+	// base never needed it, but ChestStealer/OreMiner do when they get ported.
+	class BlockPalette* getBlockPalette()
+	{
+		return MemUtils::callVirtualFunc<class BlockPalette*>(1, this);
+	}
+
 	std::unordered_map<mce::UUID, PlayerListEntry>* getPlayerList();
 	class HitResult* getHitResult();
 	class SyncedPlayerMovementSettings* getPlayerMovementSettings();

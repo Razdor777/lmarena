@@ -35,6 +35,14 @@ public:
     {
         return MemUtils::callVirtualFunc<bool, Actor&, glm::vec3>(15, this, Entity, AttackPos);
     }
+    // 1.21.44 had a separate `useItem(ItemStack*)` virtual. In 1.26.x the game
+    // routes "use whatever is in hand" through baseUseItem, so the old name is
+    // kept as a thin alias -- Speed / MidclickAction / ItemUtils call it.
+    void useItem(ItemStack* targetStack)
+    {
+        baseUseItem(targetStack);
+    }
+
     void releaseUsingItem()
     {
         MemUtils::callVirtualFunc<void>(16, this);

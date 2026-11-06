@@ -108,6 +108,24 @@ nlohmann::json Module::serialize()
             // use the serialize() from the color setting
             j["settings"].push_back(colorSetting->serialize());
         }
+        else if (setting->mType == SettingType::String)
+        {
+            auto* stringSetting = reinterpret_cast<StringSetting*>(setting);
+            j["settings"].push_back(stringSetting->serialize());
+        }
+    }
+
+    // Modules may carry extra state that is not a Setting (locked targets, loot
+    // patterns, bind tables ...). Same shape as the 1.21.44 build: customData
+    // travels inside the module object, never in its own file.
+    if (hasCustomData())
+    {
+        try {
+            j["customData"] = serializeCustomData();
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to serialize custom data for {}: {}", mName, e.what());
+            j["customData"] = nlohmann::json::object();
+        }
     }
     return j;
 }

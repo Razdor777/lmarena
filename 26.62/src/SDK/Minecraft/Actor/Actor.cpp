@@ -243,6 +243,24 @@ SimpleContainer* Actor::getArmorContainer()
 	return mContext.getComponent<ActorEquipmentComponent>()->mArmorContainer;
 }
 
+// Carried over from the 1.21.44 SDK: the component field is unchanged in 1.26.x,
+// it was just dropped from the class. 10 call sites rely on it (ArmorSlotUnlock,
+// JavaInventory, AutoArmor, InfiniteAura, ...).
+SimpleContainer* Actor::getOffhandContainer()
+{
+	auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+	return equipment ? equipment->mOffhandContainer : nullptr;
+}
+
+// PlayerHunger (AttributeId 2) still exists as a player attribute; the enum in
+// AttributesComponent.hpp just lost the member name.
+float Actor::getHunger()
+{
+	auto* hunger = getAttribute(static_cast<AttributeId>(2));
+	if (!hunger) return 20.f;
+	return hunger->mCurrentValue;
+}
+
 PlayerInventory* Actor::getSupplies()
 {
 	return hat::member_at<PlayerInventory*>(this, OffsetProvider::Actor_mSupplies);

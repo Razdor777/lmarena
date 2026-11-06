@@ -1,189 +1,159 @@
 #pragma once
-//
-// Created by vastrakai on 7/8/2024.
-//
 
 #include <Features/Modules/Module.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 
-
 class Aura : public ModuleBase<Aura> {
 public:
-    enum class Mode {
-        Single,
-        Multi,
-        Switch
-    };
 
-    enum class AttackMode {
-        Earliest,
-        Synched
-    };
-
-    enum class RotateMode {
+    enum class AttackMode  { Earliest, Synched };
+    enum class RotateMode  { None, Normal, Flick };
+    enum class SwitchMode  { None, Full, Spoof };
+    enum class BypassMode  { None, Raycast };
+    
+    enum class ESPStyle    { 
         None,
-        Normal,
-        Flick
+        Wireframe3D,
+        Chams,
+        Trail
     };
 
-    enum class SwitchMode {
-        None,
-        Full,
-        Spoof
-    };
+    NumberSetting mAttackRange   = NumberSetting("Attack Range",  "Distance to attack target",        3.5f, 0.f, 10.f, 0.01f);
+    NumberSetting mAimRange      = NumberSetting("Aim Range",     "Distance to start aiming",         5.f,  0.f, 15.f, 0.01f);
+    NumberSetting mAPS           = NumberSetting("APS",           "Attacks per second",               10.f, 1.f, 20.f, 0.01f);
+    BoolSetting   mRandomizeAPS  = BoolSetting  ("Randomize APS", "Randomize attacks per second",     false);
+    NumberSetting mAPSMin        = NumberSetting("APS Min",       "Minimum APS",                      8.f,  1.f, 20.f, 0.01f);
+    NumberSetting mAPSMax        = NumberSetting("APS Max",       "Maximum APS",                      12.f, 1.f, 20.f, 0.01f);
+    EnumSettingT<AttackMode> mAttackMode = EnumSettingT("Attack Mode", "How to send attack",
+        AttackMode::Earliest, "Earliest", "Synched");
+    BoolSetting mThroughWalls    = BoolSetting("Through Walls",   "Attack through walls",             true);
 
-    enum class BypassMode {
-        None,
-        FlareonV2,
-        Raycast
-    };
+    EnumSettingT<SwitchMode> mSwitchMode = EnumSettingT("Switch Mode", "Weapon switching mode",
+        SwitchMode::None, "None", "Full", "Spoof");
+    BoolSetting mHotbarOnly      = BoolSetting("Hotbar Only",     "Only use hotbar items",            true);
+    BoolSetting mFistFriends     = BoolSetting("Fist Friends",    "Use fists on friends",             false);
+    BoolSetting mSwing           = BoolSetting("Swing",           "Animate arm swing",                true);
 
-    EnumSettingT<Mode> mMode = EnumSettingT("Mode", "The mode of the aura", Mode::Switch, "Single", "Multi", "Switch");
-    EnumSettingT<AttackMode> mAttackMode = EnumSettingT("Attack Mode", "The mode of attack", AttackMode::Earliest, "Earliest", "Synched");
-    EnumSettingT<RotateMode> mRotateMode = EnumSettingT("Rotate Mode", "The mode of rotation", RotateMode::Normal, "None", "Normal", "Flick");
-    BoolSetting mHeadYaw = BoolSetting("Head Yaw", "Whether or not to desync head yaw", false);
-    EnumSettingT<SwitchMode> mSwitchMode = EnumSettingT("Switch Mode", "The mode of switching", SwitchMode::None, "None", "Full", "Spoof");
-    EnumSettingT<BypassMode> mBypassMode = EnumSettingT("Bypass Mode", "The type of bypass", BypassMode::Raycast, "None", "FlareonV2", "Raycast");
-    BoolSetting mAutoFireSword = BoolSetting("Auto Fire Sword", "Whether or not to automatically use the fire sword", false);
-    BoolSetting mFireSwordSpoof = BoolSetting("Fire Sword Spoof", "Whether or not to spoof the fire sword", false);
-    BoolSetting mHotbarOnly = BoolSetting("Hotbar Only", "Whether or not to only attack with items in the hotbar", false);
-    BoolSetting mFistFriends = BoolSetting("Fist Friends", "Whether or not to fist friends", false);
-    NumberSetting mRange = NumberSetting("Range", "The range at which to attack enemies", 5, 0, 10, 0.01);
-    BoolSetting mDynamicRange = BoolSetting("Dynamic Range", "Sets the range to the specified value when not moving", false);
-    NumberSetting mDynamicRangeValue = NumberSetting("Dynamic Value", "The value for the dynamic range", 3, 0, 10, 0.01);
-    BoolSetting mRandomizeAPS = BoolSetting("Randomize APS", "Whether or not to randomize the APS", false);
-    NumberSetting mAPS = NumberSetting("APS", "The amount of attacks per second", 10, 0, 20, 0.01);
-    NumberSetting mAPSMin = NumberSetting("APS Min", "The minimum APS to randomize", 10, 0, 20, 0.01);
-    NumberSetting mAPSMax = NumberSetting("APS Max", "The maximum APS to randomize", 20, 0, 20, 0.01);
-    BoolSetting mInteract = BoolSetting("Interact", "Whether or not to interact with the target", false);
-    BoolSetting mThrowProjectiles = BoolSetting("Throw Projectiles", "Whether or not to throw projectiles at the target", false);
-    NumberSetting mThrowDelay = NumberSetting("Throw Delay", "The delay between throwing projectiles (in ticks)", 1, 0, 20, 0.01);
-    BoolSetting mAutoBow = BoolSetting("Auto Bow", "Whether or not to automatically shoot the bow", false);
-    BoolSetting mSwing = BoolSetting("Swing", "Whether or not to swing the arm", true);
-    BoolSetting mSwingDelay = BoolSetting("Swing Delay", "Whether or not to delay the swing", false);
-    NumberSetting mSwingDelayValue = NumberSetting("Swing Delay Value", "The delay between swings (in seconds)", 4.5f, 0.f, 10.f, 0.01f);
-    BoolSetting mStrafe = BoolSetting("Strafe", "Whether or not to strafe around the target", true);
-    BoolSetting mAttackThroughWalls = BoolSetting("Attack through walls", "Whether or not to attack through walls", true);
-    BoolSetting mThirdPerson = BoolSetting("Third Person", "Whether or not switch to third-person camera view on enable", false);
-    BoolSetting mThirdPersonOnlyOnAttack = BoolSetting("Only On Attack", "Switch to third-person view only when attacking", false);
-    BoolSetting mVisuals = BoolSetting("Visuals", "Whether or not to render visuals around the target", true);
-    NumberSetting mUpDownSpeed = NumberSetting("Up-Down Speed", "Speed of spheres rotate", 1.2, 0, 20, 0.01);
-    NumberSetting mSpheresAmount = NumberSetting("Spheres Amount", "Amount of spheres to draw", 12, 0, 20, 1);
-    NumberSetting mSpheresSizeMultiplier = NumberSetting("Spheres Size multiplier", "Multiplied size of spheres", 0.2, 0, 3, 0.01);
-    NumberSetting mSpheresSize = NumberSetting("Spheres Size", "Size of spheres", 4, 0, 20, 0.01);
-    NumberSetting mSpheresMinSize = NumberSetting("Spheres Min Size", "Min size of spheres", 2.60, 0, 20, 0.01);
-    NumberSetting mSpheresRadius = NumberSetting("Spheres radius", "Distance from speheres to target", 0.9, 0, 2, 0.1);
-    BoolSetting mDisableOnDimensionChange = BoolSetting("Auto Disable", "Whether or not to disable the aura on dimension change", true);
-    BoolSetting mDebug = BoolSetting("Debug", "Whether or not to display debug information", false);
+    EnumSettingT<RotateMode> mRotateMode = EnumSettingT("Rotate Mode", "Rotation mode",
+        RotateMode::Normal, "None", "Normal", "Flick");
+    NumberSetting mAimY          = NumberSetting("Aim Y", "Vertical aim point (0=feet, 1=head)",      0.85f, 0.f, 1.f, 0.01f);
+    NumberSetting mAimRandom     = NumberSetting("Aim Random",    "Randomize aim point in hitbox",    0.25f, 0.f, 1.f, 0.01f);
+    NumberSetting mRotSpeed      = NumberSetting("Rot Speed",     "Max deg/sec (0=instant)",          55.f,  0.f, 180.f, 1.f);
+    NumberSetting mReactionDelay = NumberSetting("Reaction",      "Delay before aim ms",              80.f,  0.f, 500.f, 10.f);
+
+    EnumSettingT<BypassMode> mBypassMode = EnumSettingT("Bypass Mode", "Attack bypass mode",
+        BypassMode::Raycast, "None", "Raycast");
+
+    BoolSetting mShowESP         = BoolSetting("Show ESP",        "Draw visuals around target",       true);
+    EnumSettingT<ESPStyle> mESPStyle = EnumSettingT("ESP Style", "Visual style around target",
+        ESPStyle::Wireframe3D, "None", "Wireframe 3D", "Chams", "Trail");
+    NumberSetting mESPAlpha      = NumberSetting("ESP Alpha",     "Transparency of ESP effects",      0.8f, 0.1f, 1.f, 0.01f);
+    NumberSetting mTrailLength   = NumberSetting("Trail Length",  "How long trail persists (sec)",    2.f, 0.5f, 5.f, 0.1f);
+
+    BoolSetting mTargetStrafe    = BoolSetting("TargetStrafe",    "Enable TargetStrafe module when fighting", false);
+    BoolSetting mAutoDisable     = BoolSetting("Auto Disable",    "Disable on dimension change",      true);
 
     Aura() : ModuleBase("Aura", "Automatically attacks nearby enemies", ModuleCategory::Combat, 0, false) {
         addSettings(
-               /* &mUpDownSpeed,
-                &mSpheresAmount,
-                &mSpheresSizeMultiplier,
-                &mSpheresSize,
-                &mSpheresMinSize,
-                &mSpheresRadius,*/
-            &mMode,
-            &mAttackMode,
-            &mRotateMode,
-            &mHeadYaw,
-            &mSwitchMode,
-            &mBypassMode,
-#ifdef __PRIVATE_BUILD__
-            &mAutoFireSword,
-            &mFireSwordSpoof,
-#endif
-            &mHotbarOnly,
-            &mFistFriends,
-            &mVisuals,
-            &mRange,
-            &mDynamicRange,
-            &mDynamicRangeValue,
-            &mRandomizeAPS,
+            &mAttackRange,
+            &mAimRange,
             &mAPS,
+            &mRandomizeAPS,
             &mAPSMin,
             &mAPSMax,
-            //&mInteract, // TODO: Implement this
-            &mThrowProjectiles,
-            &mThrowDelay,
-#ifdef __PRIVATE_BUILD__
-            &mAutoBow,
-#endif
-            &mAttackThroughWalls,
+            &mAttackMode,
+            &mThroughWalls,
+            &mSwitchMode,
+            &mHotbarOnly,
+            &mFistFriends,
             &mSwing,
-            &mSwingDelay,
-            &mSwingDelayValue,
-            &mStrafe,
-            &mThirdPerson,
-            &mThirdPersonOnlyOnAttack,
-            &mDisableOnDimensionChange,
-            &mDebug
+            &mRotateMode,
+            &mAimY,
+            &mAimRandom,
+            &mRotSpeed,
+            &mReactionDelay,
+            &mBypassMode,
+            &mShowESP,
+            &mESPStyle,
+            &mESPAlpha,
+            &mTrailLength,
+            &mTargetStrafe,
+            &mAutoDisable
         );
 
-        VISIBILITY_CONDITION(mAutoFireSword, mSwitchMode.mValue != SwitchMode::None);
-        VISIBILITY_CONDITION(mFireSwordSpoof, mAutoFireSword.mValue);
-        VISIBILITY_CONDITION(mAPS, !mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mAPSMin, mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mAPSMax, mRandomizeAPS.mValue);
-        VISIBILITY_CONDITION(mThrowDelay, mThrowProjectiles.mValue);
-        VISIBILITY_CONDITION(mDynamicRangeValue, mDynamicRange.mValue);
-
-        VISIBILITY_CONDITION(mSwingDelay, mSwing.mValue);
-        VISIBILITY_CONDITION(mSwingDelayValue, mSwingDelay.mValue && mSwing.mValue);
-
-        VISIBILITY_CONDITION(mThirdPersonOnlyOnAttack, mThirdPerson.mValue);
-
-        // vis conditions for visuals
-        VISIBILITY_CONDITION(mUpDownSpeed, mVisuals.mValue);
-        VISIBILITY_CONDITION(mSpheresAmount, mVisuals.mValue);
-        VISIBILITY_CONDITION(mSpheresSizeMultiplier, mVisuals.mValue);
-        VISIBILITY_CONDITION(mSpheresSize, mVisuals.mValue);
-        VISIBILITY_CONDITION(mSpheresMinSize, mVisuals.mValue);
-        VISIBILITY_CONDITION(mSpheresRadius, mVisuals.mValue);
-
-
+        VISIBILITY_CONDITION(mAPSMin,         mRandomizeAPS.mValue);
+        VISIBILITY_CONDITION(mAPSMax,         mRandomizeAPS.mValue);
+        VISIBILITY_CONDITION(mAPS,            !mRandomizeAPS.mValue);
+        VISIBILITY_CONDITION(mAimY,           mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mAimRandom,      mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mRotSpeed,       mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mReactionDelay,  mRotateMode.mValue != RotateMode::None);
+        VISIBILITY_CONDITION(mESPStyle,       mShowESP.mValue);
+        VISIBILITY_CONDITION(mESPAlpha,       mShowESP.mValue && mESPStyle.mValue != ESPStyle::None);
+        VISIBILITY_CONDITION(mTrailLength,    mShowESP.mValue && mESPStyle.mValue == ESPStyle::Trail);
 
         mNames = {
-            {Lowercase, "aura"},
+            {Lowercase,       "aura"},
             {LowercaseSpaced, "aura"},
-            {Normal, "Aura"},
-            {NormalSpaced, "Aura"}
+            {Normal,          "Aura"},
+            {NormalSpaced,    "Aura"}
         };
     }
 
-    AABB mTargetedAABB = AABB();
-    bool mRotating = false;
-    static inline bool sHasTarget = false;
-    static inline Actor* sTarget = nullptr;
-    static inline int64_t sTargetRuntimeID = 0;
-    int64_t mLastSwing = 0;
-    int64_t mLastTransaction = 0;
-    int mLastSlot = 0;
-    bool mIsThirdPerson = false;
+    int64_t  mTargetRuntimeID = 0;
+    bool     mRotating        = false;
+    bool     mLmbHeld         = false;
+    bool     mRmbClicked      = false;
+    bool     mAutoTargeted    = false;
+    int64_t  mLastAttack      = 0;
+    int      mLastSlot        = 0;
 
+    static inline int64_t  sTargetRuntimeID = 0;
+    static inline bool     sHasTarget       = false;
+    static inline Actor*   sTarget          = nullptr;
 
+    glm::vec3 mCurrentAimOffset = glm::vec3(0.f);
+    glm::vec2 mCurrentRotations = glm::vec2(0.f);
+    int64_t   mTargetLockTime   = 0;
 
-    int getSword(Actor* target);
-    bool shouldUseFireSword(Actor* target);
-    void onEnable() override;
+    struct TrailPoint {
+        glm::vec3 pos;
+        int64_t   timestamp;
+        float     alpha;
+    };
+    static inline std::vector<TrailPoint> sTrailHistory;
+    static inline int64_t sLastTrailUpdate = 0;
+
+    void resetState();
+    void resetTarget();
+
+    bool isValidTarget(Actor* actor, Actor* player) const;
+    bool isInAimRange(Actor* actor, Actor* player) const;
+    bool isInAttackRange(Actor* actor, Actor* player) const;
+
+    Actor* resolveTarget(Actor* player);
+    Actor* findBestTarget(Actor* player);
+    Actor* findObstructor(Actor* player, Actor* target);
+
+    int       getBestWeapon(Actor* target);
+    glm::vec2 calcRotations(Actor* player);
+
+    void drawWireframe3D(Actor* target, Actor* player, ImColor color, float alpha);
+    void drawTrail(Actor* target, ImColor color);
+    void drawChams(Actor* target, ImColor color, float alpha);
+
+    void onEnable()  override;
     void onDisable() override;
-    void rotate(Actor* target);
-    void shootBow(Actor* target);
-    void throwProjectiles(Actor* target);
 
-    void onRenderEvent(class RenderEvent& event);
-    void onBaseTickEvent(class BaseTickEvent& event);
-    void onPacketOutEvent(class PacketOutEvent& event);
-
-    void onPacketInEvent(class PacketInEvent& event);
-    void onBobHurtEvent(class BobHurtEvent& event);
-    void onBoneRenderEvent(class BoneRenderEvent& event);
-
-
-    Actor* findObstructingActor(Actor* player, Actor* target);
+    void onMouseEvent      (class MouseEvent&      event);
+    void onBaseTickEvent   (class BaseTickEvent&   event);
+    void onPacketOutEvent  (class PacketOutEvent&  event);
+    void onPacketInEvent   (class PacketInEvent&   event);
+    void onRenderEvent     (class RenderEvent&     event);
+    void onBobHurtEvent    (class BobHurtEvent&    event);
+    void onBoneRenderEvent (class BoneRenderEvent& event);
 
     std::string getSettingDisplay() override {
-        return mMode.mValues[mMode.as<int>()];
+        return mRotateMode.mValues[mRotateMode.as<int>()];
     }
 };

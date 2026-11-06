@@ -77,10 +77,6 @@ namespace TracersImpl
     }
 }
 
-<<<<<<< HEAD
-=======
-using namespace TracersImpl;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 void Tracers::onEnable()
 {
@@ -108,13 +104,8 @@ void Tracers::onRenderEvent(RenderEvent& event)
 
     if (mMode.mValue == Mode::Lines)
     {
-<<<<<<< HEAD
         const float yaw = yawDeg * TracersImpl::kPi / 180.f;
         const float pitch = pitchDeg * TracersImpl::kPi / 180.f;
-=======
-        const float yaw = yawDeg * kPi / 180.f;
-        const float pitch = pitchDeg * kPi / 180.f;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         const glm::vec3 look(-std::sin(yaw) * std::cos(pitch),
                              -std::sin(pitch),
                              std::cos(yaw) * std::cos(pitch));
@@ -125,93 +116,6 @@ void Tracers::onRenderEvent(RenderEvent& event)
         // Стрелки имеют смысл только от первого лица (как в combatant).
         if (ClientInstance::get()->getOptions()->mThirdPerson->value != 0) return;
         drawArrows(localPlayer, camPos, yawDeg, dt);
-<<<<<<< HEAD
-=======
-    }
-}
-
-void Tracers::drawLines(Actor* localPlayer, const glm::vec3& camPos, const glm::vec3& look)
-{
-    ImDrawList* dl = ImGui::GetBackgroundDrawList();
-
-    ImVec2 start;
-    if (!RenderUtils::worldToScreen(camPos + look * kLineStartDist, start)) return;
-
-    for (Actor* actor : ActorUtils::getActorList(true, false))
-    {
-        if (actor == localPlayer) continue;
-
-        const bool friendly = gFriendManager->isFriend(actor);
-        if (friendly && !mTraceFriends.mValue) continue;
-
-        auto* pos = actor->getPos();
-        if (!pos) continue;
-
-        // getPos() — на высоте глаз; линия идёт к ногам, как getPosition() в combatant.
-        const glm::vec3 feet = *pos - PLAYER_HEIGHT_VEC;
-
-        ImVec2 end;
-        if (!RenderUtils::worldToScreen(feet, end)) continue;
-
-        const ImVec4 color = friendly ? ImVec4(0.f, 1.f, 0.f, 1.f) : ColorUtils::getThemedColor(0).Value;
-        dl->AddLine(start, end, toU32(color, kLineAlpha), kLineWidth);
-    }
-}
-
-void Tracers::drawArrows(Actor* localPlayer, const glm::vec3& camPos, float yawDeg, float dt)
-{
-    ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    const ImVec2 display = ImGui::GetIO().DisplaySize;
-    const ImVec2 center = { display.x * 0.5f, display.y * 0.5f };
-
-    glm::vec2 move(0.f, 0.f);
-    if (mMoveRadiusBonus.mValue)
-    {
-        if (auto* input = localPlayer->getMoveInputComponent()) move = input->mMoveVector;
-    }
-    const bool moving = move.x != 0.f || move.y != 0.f;
-
-    // Сдвиг круга при движении и сглаженная камера.
-    const float moveScale = mMoveRadiusBonus.mValue ? kMoveOffset : 0.f;
-    mAnimYaw = approach(mAnimYaw, move.x * moveScale, dt, 5.f);
-    mAnimPitch = approach(mAnimPitch, move.y * moveScale, dt, 5.f);
-    mYaw = approach(mYaw, yawDeg, dt, 10.f);
-
-    float size = kBaseRadius;
-    if (mMoveRadiusBonus.mValue && moving) size += kMoveRadius;
-    mAnimStep = approach(mAnimStep, size, dt, 6.f);
-
-    const float yawRad = mYaw * kPi / 180.f;
-    const float cosY = std::cos(yawRad);
-    const float sinY = std::sin(yawRad);
-
-    for (Actor* actor : ActorUtils::getActorList(true, false))
-    {
-        if (actor == localPlayer) continue;
-
-        const bool friendly = gFriendManager->isFriend(actor);
-        if (friendly && !mTraceFriends.mValue) continue;
-
-        auto* pos = actor->getPos();
-        if (!pos) continue;
-        const glm::vec3 feet = *pos - PLAYER_HEIGHT_VEC;
-
-        // Угол цели относительно взгляда камеры (формула из Tracers.java).
-        const float relX = feet.x - camPos.x;
-        const float relZ = feet.z - camPos.z;
-        const float rotY = -(relZ * cosY - relX * sinY);
-        const float rotX = -(relX * cosY + relZ * sinY);
-        const float angle = std::atan2(rotY, rotX);
-
-        const double dist = glm::distance(camPos, feet);
-        const double radius = mAnimStep * radiusFactor(dist);
-
-        const ImVec2 p = { static_cast<float>(radius * std::cos(angle)) + center.x + mAnimYaw,
-                           static_cast<float>(radius * std::sin(angle)) + center.y + mAnimPitch };
-
-        const ImVec4 color = friendly ? ImVec4(0.f, 1.f, 0.f, 1.f) : ColorUtils::getThemedColor(0).Value;
-        drawArrow(dl, p, angle, toU32(color, kArrowAlpha));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 }
 

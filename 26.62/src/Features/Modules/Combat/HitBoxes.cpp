@@ -8,6 +8,7 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Features/Modules/Misc/AntiBot.hpp>
+#include <Features/Modules/Misc/Friends.hpp>
 
 void HitBoxes::onEnable() {
     gFeatureManager->mDispatcher->listen<BaseTickEvent, &HitBoxes::onBaseTickEvent>(this);
@@ -45,9 +46,25 @@ void HitBoxes::onBaseTickEvent(class BaseTickEvent& event) {
     if (!localPlayer)
         return;
 
+    auto lpShape = localPlayer->getAABBShapeComponent();
+    if (!lpShape)
+        return;
+
     for (auto actor : actors) {
         if (actor == localPlayer)
             continue;
+
+        // Skip friends — don't expand their hitboxes
+        if (mIgnoreFriends.mValue && gFriendManager && gFriendManager->isFriend(actor)) {
+            auto shape = actor->getAABBShapeComponent();
+            if (shape) {
+                // Restore friend's hitbox to normal
+                shape->mHeight = lpShape->mHeight;
+                shape->mWidth = lpShape->mWidth;
+            }
+            continue;
+        }
+
         auto shape = actor->getAABBShapeComponent();
         if (!shape)
             continue;
