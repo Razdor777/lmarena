@@ -1,6 +1,5 @@
 #pragma once
 //
-// Created by vastrakai on 6/29/2024.
 //
 #include <d2d1_3.h>
 #include <d3d11on12.h>

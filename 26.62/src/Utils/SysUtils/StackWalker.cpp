@@ -1,8 +1,9 @@
 //
-// Created by vastrakai on 7/7/2024.
 //
 
 #include "StackWalker.hpp"
+
+#include <Dexko.hpp>
 #define _AMD64_
 #include <DbgHelp.h>
 #include <spdlog/spdlog.h>
@@ -35,7 +36,7 @@ StackWalker::~StackWalker()
 static std::vector<std::wstring> gModulePaths;
 
 void StackWalker::LoadModuleSymbols(const std::vector<std::wstring>& modulePaths) {
-    HMODULE mainModule = Solstice::mModule;
+    HMODULE mainModule = Dexko::mModule;
     std::string modulePathStr = MemUtils::getModulePath(mainModule);
     if (!modulePathStr.empty()) {
         gModulePaths.emplace_back(modulePathStr.begin(), modulePathStr.end());
@@ -45,13 +46,13 @@ void StackWalker::LoadModuleSymbols(const std::vector<std::wstring>& modulePaths
         symOptions |= SYMOPT_UNDNAME;
         SymSetOptions(symOptions);
 
-        DWORD64 result = SymLoadModuleEx(GetCurrentProcess(), Solstice::mModule, modulePathStr.c_str(), nullptr, 0, 0,
+        DWORD64 result = SymLoadModuleEx(GetCurrentProcess(), Dexko::mModule, modulePathStr.c_str(), nullptr, 0, 0,
                                          nullptr, 0);
 
         if (result == 0) {
             spdlog::error("Failed to load symbols for the main module.");
         } else {
-            spdlog::info("Loaded symbols for Solstice.dll.");
+            spdlog::info("Loaded symbols for Dexko.dll.");
         }
 
 

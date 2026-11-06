@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/25/2024.
 //
 
 #include "BaseTickHook.hpp"
@@ -45,15 +44,6 @@ void BaseTickHook::onBaseTick(Actor* actor)
         mQueuedPackets.clear();
     }
 
-
-    static bool once = false;
-    if (!once)
-    {
-        once = true;
-
-        auto holder = nes::make_holder<BaseTickInitEvent>(actor);
-        gFeatureManager->mDispatcher->trigger(holder);
-    }
 
     auto holder = nes::make_holder<BaseTickEvent>(actor);
     gFeatureManager->mDispatcher->trigger(holder);

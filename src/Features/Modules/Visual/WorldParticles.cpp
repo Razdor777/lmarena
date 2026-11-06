@@ -113,6 +113,10 @@ namespace WorldParticlesImpl
     }
 }
 
+<<<<<<< HEAD
+=======
+using namespace WorldParticlesImpl;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 // =========================================================
 // Particle state
@@ -127,10 +131,17 @@ namespace
     float particleAlpha(const WorldParticles::Particle& p) {
         const uint64_t age = particleAgeMs(p.spawnMs);
         if (age == 0) return 0.f;
+<<<<<<< HEAD
         if (age < WorldParticlesImpl::ALPHA_ANIM_MS) return WorldParticlesImpl::smoothstep(static_cast<float>(age) / WorldParticlesImpl::ALPHA_ANIM_MS);
         if (age < p.lifeMs) return 1.f;
         const float fade = 1.f - static_cast<float>(age - p.lifeMs) / WorldParticlesImpl::ALPHA_ANIM_MS;
         return WorldParticlesImpl::smoothstep(WorldParticlesImpl::clamp01(fade));
+=======
+        if (age < ALPHA_ANIM_MS) return smoothstep(static_cast<float>(age) / ALPHA_ANIM_MS);
+        if (age < p.lifeMs) return 1.f;
+        const float fade = 1.f - static_cast<float>(age - p.lifeMs) / ALPHA_ANIM_MS;
+        return smoothstep(clamp01(fade));
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 
     // Funnel pulse: opens in, closes out, breathes
@@ -141,11 +152,19 @@ namespace
         const float appear = 1.f - (1.f - t) * (1.f - t) * (1.f - t);
         float disappear = 1.f;
         if (age > p.lifeMs) {
+<<<<<<< HEAD
             const float u = std::min(1.f, static_cast<float>(age - p.lifeMs) / WorldParticlesImpl::ALPHA_ANIM_MS);
             disappear = 1.f - u * u * u;
         }
         const float breath = 0.88f + 0.12f * std::sin(static_cast<float>(age) * 0.0032f + p.visualPhase);
         return WorldParticlesImpl::clamp01(appear * disappear * breath);
+=======
+            const float u = std::min(1.f, static_cast<float>(age - p.lifeMs) / ALPHA_ANIM_MS);
+            disappear = 1.f - u * u * u;
+        }
+        const float breath = 0.88f + 0.12f * std::sin(static_cast<float>(age) * 0.0032f + p.visualPhase);
+        return clamp01(appear * disappear * breath);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 
     float funnelScale(const WorldParticles::Particle& p) {
@@ -153,7 +172,11 @@ namespace
         const float appear = std::min(1.f, static_cast<float>(age) / 900.f);
         float disappear = 1.f;
         if (age > p.lifeMs) {
+<<<<<<< HEAD
             disappear = 1.f - WorldParticlesImpl::smoothstep(static_cast<float>(age - p.lifeMs) / WorldParticlesImpl::ALPHA_ANIM_MS);
+=======
+            disappear = 1.f - smoothstep(static_cast<float>(age - p.lifeMs) / ALPHA_ANIM_MS);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         }
         const float open = 0.68f + (1.04f - 0.68f) * appear;
         const float close = 0.82f + (1.0f - 0.82f) * disappear;
@@ -190,6 +213,7 @@ WorldParticles::Particle WorldParticles::createParticle(glm::vec3 feet)
 
     Particle p{};
     p.pos = glm::vec3(
+<<<<<<< HEAD
         feet.x + WorldParticlesImpl::randomRange(-range, range),
         feet.y + WorldParticlesImpl::randomRange(0.f, heightRange),
         feet.z + WorldParticlesImpl::randomRange(-range, range));
@@ -214,6 +238,32 @@ WorldParticles::Particle WorldParticles::createParticle(glm::vec3 feet)
     p.visualPhase = WorldParticlesImpl::randomRange(0.f, 2.f * 3.14159265f);
     p.eyeSpin = WorldParticlesImpl::randomRange(0.38f, 0.72f);
     p.distortionSpin = WorldParticlesImpl::randomRange(-0.28f, -0.12f);
+=======
+        feet.x + randomRange(-range, range),
+        feet.y + randomRange(0.f, heightRange),
+        feet.z + randomRange(-range, range));
+    p.prevPos = p.pos;
+
+    if (bubbles) {
+        p.motion = glm::vec3(randomRange(-0.42f, 0.42f), randomRange(1.10f, 2.55f), randomRange(-0.42f, 0.42f)) * MOTION_SCALE;
+    } else {
+        p.motion = glm::vec3(randomRange(-1.f, 1.f), randomRange(0.f, 2.f), randomRange(-1.f, 1.f)) * MOTION_SCALE;
+    }
+    p.rotationMotion = glm::vec3(randomRange(-1.f, 1.f), randomRange(-1.f, 1.f), randomRange(-1.f, 1.f)) * MOTION_SCALE;
+
+    const float minLife = std::max(1.f, std::min(mLifeMinMs.mValue, mLifeMaxMs.mValue));
+    const float maxLife = std::max(minLife, std::max(mLifeMinMs.mValue, mLifeMaxMs.mValue));
+    p.lifeMs = static_cast<uint64_t>(randomRange(minLife, maxLife));
+
+    const float minSize = std::max(0.02f, std::min(mSizeMin.mValue, mSizeMax.mValue));
+    const float maxSize = std::max(minSize, std::max(mSizeMin.mValue, mSizeMax.mValue));
+    p.size = randomRange(minSize, maxSize);
+
+    p.spawnMs = NOW;
+    p.visualPhase = randomRange(0.f, 2.f * 3.14159265f);
+    p.eyeSpin = randomRange(0.38f, 0.72f);
+    p.distortionSpin = randomRange(-0.28f, -0.12f);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     return p;
 }
 
@@ -225,7 +275,11 @@ void WorldParticles::onBaseTickEvent(BaseTickEvent& event)
 
     const uint64_t now = NOW;
     std::erase_if(mParticles, [now](const Particle& p) {
+<<<<<<< HEAD
         return now - p.spawnMs >= p.lifeMs + WorldParticlesImpl::ALPHA_ANIM_MS;
+=======
+        return now - p.spawnMs >= p.lifeMs + ALPHA_ANIM_MS;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     });
 
     for (Particle& p : mParticles) {
@@ -233,8 +287,13 @@ void WorldParticles::onBaseTickEvent(BaseTickEvent& event)
         p.prevRotation = p.rotation;
         p.pos += p.motion;
         p.rotation += p.rotationMotion;
+<<<<<<< HEAD
         p.motion *= WorldParticlesImpl::DRAG;
         p.rotationMotion *= WorldParticlesImpl::DRAG;
+=======
+        p.motion *= DRAG;
+        p.rotationMotion *= DRAG;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     }
 
     const int target = std::max(1, static_cast<int>(mMaxParticles.mValue));
@@ -261,7 +320,11 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
     const float displayHeight = ImGui::GetIO().DisplaySize.y;
     const glm::vec3 camera = RenderUtils::transform.mOrigin;
     const float lineWidth = std::max(0.5f, mLineWidth.mValue);
+<<<<<<< HEAD
     const int colorModeIndex = static_cast<int>(static_cast<ColorMode>(mColorMode.mValue));
+=======
+    const int colorModeIndex = static_cast<int>(mColorMode.mValue);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     const float speed = mColorSpeed.mValue;
     const ImColor c1 = mColor.getAsImColor();
     const ImColor c2 = mColor2.getAsImColor();
@@ -278,6 +341,7 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
         const int phase = static_cast<int>(mColorPhase.mValue)
                         + static_cast<int>(std::lround(static_cast<float>(i) * mColorSpread.mValue / 90.f))
                         + static_cast<int>(std::lround(p.visualPhase * 57.29578f));
+<<<<<<< HEAD
         const ImU32 base = WorldParticlesImpl::colorFor(colorModeIndex, speed, phase, c1, c2);
 
         switch (static_cast<Mode>(mMode.mValue)) {
@@ -285,12 +349,22 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
                 // Glow sprite
                 const float spriteRadius = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::SPRITE_SIZE_MULTIPLIER, dist, displayHeight);
                 WorldParticlesImpl::drawGlow(drawList, screen, spriteRadius, WorldParticlesImpl::withAlpha(base, alpha * WorldParticlesImpl::SPRITE_ALPHA_MULTIPLIER));
+=======
+        const ImU32 base = colorFor(colorModeIndex, speed, phase, c1, c2);
+
+        switch (mMode.mValue) {
+            case Mode::Quads: {
+                // Glow sprite
+                const float spriteRadius = screenRadius(p.size * SPRITE_SIZE_MULTIPLIER, dist, displayHeight);
+                drawGlow(drawList, screen, spriteRadius, withAlpha(base, alpha * SPRITE_ALPHA_MULTIPLIER));
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
                 // Wireframe cube with body diagonals
                 const glm::vec3 rot = p.rotation;
                 ImVec2 corners[8];
                 bool ok[8];
                 for (int c = 0; c < 8; c++) {
+<<<<<<< HEAD
                     const glm::vec3 world = p.pos + WorldParticlesImpl::rotateEuler(WorldParticlesImpl::CUBE_CORNERS[c] * p.size, rot);
                     ok[c] = RenderUtils::worldToScreen(world, corners[c]);
                 }
@@ -300,11 +374,23 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
                     if (ok[e[0]] && ok[e[1]]) drawList->AddLine(corners[e[0]], corners[e[1]], outline, lineWidth);
                 }
                 for (const auto& d : WorldParticlesImpl::BODY_DIAGONALS) {
+=======
+                    const glm::vec3 world = p.pos + rotateEuler(CUBE_CORNERS[c] * p.size, rot);
+                    ok[c] = RenderUtils::worldToScreen(world, corners[c]);
+                }
+                const ImU32 outline = withAlpha(base, alpha * OUTLINE_ALPHA_MULTIPLIER);
+                const ImU32 diagonal = withAlpha(base, alpha * DIAGONAL_ALPHA_MULTIPLIER);
+                for (const auto& e : CUBE_EDGES) {
+                    if (ok[e[0]] && ok[e[1]]) drawList->AddLine(corners[e[0]], corners[e[1]], outline, lineWidth);
+                }
+                for (const auto& d : BODY_DIAGONALS) {
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                     if (ok[d[0]] && ok[d[1]]) drawList->AddLine(corners[d[0]], corners[d[1]], diagonal, lineWidth);
                 }
                 break;
             }
             case Mode::AirBubbles: {
+<<<<<<< HEAD
                 const float fillR = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::BUBBLE_FILL_SIZE_MULTIPLIER, dist, displayHeight);
                 const float glowR = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::BUBBLE_GLOW_SIZE_MULTIPLIER, dist, displayHeight);
                 const float highlightR = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::BUBBLE_HIGHLIGHT_SIZE_MULTIPLIER, dist, displayHeight);
@@ -316,11 +402,25 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
                 // Highlight, offset toward the upper-left like light on a bubble
                 const ImVec2 hl(screen.x - fillR * 0.35f, screen.y - fillR * 0.35f);
                 drawList->AddCircleFilled(hl, std::max(1.f, highlightR), WorldParticlesImpl::withAlpha(IM_COL32_WHITE, alpha * WorldParticlesImpl::BUBBLE_HIGHLIGHT_ALPHA_MULTIPLIER), 8);
+=======
+                const float fillR = screenRadius(p.size * BUBBLE_FILL_SIZE_MULTIPLIER, dist, displayHeight);
+                const float glowR = screenRadius(p.size * BUBBLE_GLOW_SIZE_MULTIPLIER, dist, displayHeight);
+                const float highlightR = screenRadius(p.size * BUBBLE_HIGHLIGHT_SIZE_MULTIPLIER, dist, displayHeight);
+
+                drawList->AddCircleFilled(screen, glowR, withAlpha(base, alpha * BUBBLE_GLOW_ALPHA_MULTIPLIER), 20);
+                drawList->AddCircleFilled(screen, fillR, withAlpha(base, alpha * BUBBLE_FILL_ALPHA_MULTIPLIER), 20);
+                drawList->AddCircle(screen, fillR, withAlpha(base, alpha * OUTLINE_ALPHA_MULTIPLIER), 20, lineWidth);
+
+                // Highlight, offset toward the upper-left like light on a bubble
+                const ImVec2 hl(screen.x - fillR * 0.35f, screen.y - fillR * 0.35f);
+                drawList->AddCircleFilled(hl, std::max(1.f, highlightR), withAlpha(IM_COL32_WHITE, alpha * BUBBLE_HIGHLIGHT_ALPHA_MULTIPLIER), 8);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                 break;
             }
             case Mode::Funnel: {
                 const float s = funnelScale(p);
                 const float fa = funnelAlpha(p);
+<<<<<<< HEAD
                 const float eyeR = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::FUNNEL_EYE_SIZE_MULTIPLIER * s, dist, displayHeight);
                 const float outerR = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::FUNNEL_DISTORTION_OUTER_SIZE_MULTIPLIER * s, dist, displayHeight);
                 const float innerR = WorldParticlesImpl::screenRadius(p.size * WorldParticlesImpl::FUNNEL_DISTORTION_INNER_SIZE_MULTIPLIER * s, dist, displayHeight);
@@ -330,11 +430,26 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
                 drawList->AddCircle(screen, outerR, WorldParticlesImpl::withAlpha(base, fa * WorldParticlesImpl::FUNNEL_DISTORTION_OUTER_ALPHA_MULTIPLIER), 28, lineWidth);
                 drawList->AddCircle(screen, innerR, WorldParticlesImpl::withAlpha(base, fa * WorldParticlesImpl::FUNNEL_DISTORTION_INNER_ALPHA_MULTIPLIER), 24, lineWidth);
                 drawList->AddCircle(screen, rimR, WorldParticlesImpl::withAlpha(base, fa * WorldParticlesImpl::FUNNEL_RIM_ALPHA_MULTIPLIER), 28, lineWidth);
+=======
+                const float eyeR = screenRadius(p.size * FUNNEL_EYE_SIZE_MULTIPLIER * s, dist, displayHeight);
+                const float outerR = screenRadius(p.size * FUNNEL_DISTORTION_OUTER_SIZE_MULTIPLIER * s, dist, displayHeight);
+                const float innerR = screenRadius(p.size * FUNNEL_DISTORTION_INNER_SIZE_MULTIPLIER * s, dist, displayHeight);
+                const float rimR = screenRadius(p.size * FUNNEL_DISTORTION_SIZE_MULTIPLIER * s, dist, displayHeight);
+
+                drawGlow(drawList, screen, eyeR, withAlpha(base, fa * FUNNEL_EYE_ALPHA_MULTIPLIER));
+                drawList->AddCircle(screen, outerR, withAlpha(base, fa * FUNNEL_DISTORTION_OUTER_ALPHA_MULTIPLIER), 28, lineWidth);
+                drawList->AddCircle(screen, innerR, withAlpha(base, fa * FUNNEL_DISTORTION_INNER_ALPHA_MULTIPLIER), 24, lineWidth);
+                drawList->AddCircle(screen, rimR, withAlpha(base, fa * FUNNEL_RIM_ALPHA_MULTIPLIER), 28, lineWidth);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
                 // Spokes spin with the funnel
                 const float seconds = static_cast<float>(NOW) / 1000.f;
                 const float spin = seconds * (p.eyeSpin + p.distortionSpin);
+<<<<<<< HEAD
                 const ImU32 spoke = WorldParticlesImpl::withAlpha(base, fa * WorldParticlesImpl::FUNNEL_SPOKE_ALPHA_MULTIPLIER);
+=======
+                const ImU32 spoke = withAlpha(base, fa * FUNNEL_SPOKE_ALPHA_MULTIPLIER);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                 for (int k = 0; k < 3; k++) {
                     const float a = spin + k * 2.094395f;
                     const ImVec2 dir(std::cos(a), std::sin(a));
@@ -345,4 +460,8 @@ void WorldParticles::onRenderEvent(RenderEvent& event)
             }
         }
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de

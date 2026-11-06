@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <thread>
 #include <Windows.h>
 #include <Utils/Logger.hpp>
@@ -18,8 +18,13 @@ bool __stdcall DllMain(const HMODULE hModule, const DWORD fdwReason, [[maybe_unu
         /* // GDK Moment
         winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [hModule]()
         {
+<<<<<<< HEAD:26.62/src/dllmain.cpp
             Solstice::init(hModule);
         });*/
+=======
+            Dexko::init(hModule);
+        });
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/dllmain.cpp
     }
     return true;  // Successful DLL_PROCESS_ATTACH
 }

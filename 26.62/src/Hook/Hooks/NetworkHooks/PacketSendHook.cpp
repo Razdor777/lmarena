@@ -1,5 +1,4 @@
 //
-// Created by vastrakai on 6/28/2024.
 //
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Network/LoopbackPacketSender.hpp>

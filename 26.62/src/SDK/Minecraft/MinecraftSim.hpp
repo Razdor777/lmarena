@@ -1,7 +1,6 @@
 #pragma once
 #include <Utils/MemUtils.hpp>
 //
-// Created by vastrakai on 6/25/2024.
 //
 
 class Simulation {

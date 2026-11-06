@@ -1,11 +1,14 @@
 //
-// Created by vastrakai on 6/25/2024.
 //
 
 #include "KeyHook.hpp"
 
+<<<<<<< HEAD:26.62/src/Hook/Hooks/MiscHooks/KeyHook.cpp
 #include <Solstice.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
+=======
+#include <Dexko.hpp>
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/MiscHooks/KeyHook.cpp
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 
@@ -129,7 +132,7 @@ void KeyHook::onKey(uint32_t key, bool isDown)
 
     if (key == VK_END && isDown && ClientInstance::get()->getScreenName() != "chat_screen" && !ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantTextInput)
     {
-        Solstice::mRequestEject = true;
+        Dexko::mRequestEject = true;
     }
 
     Keyboard::mPressedKeys[key] = isDown;

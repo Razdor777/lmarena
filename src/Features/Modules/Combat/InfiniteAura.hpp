@@ -73,11 +73,14 @@ public:
     BoolSetting              mHitSparks      = BoolSetting("Hit Sparks", "Spark burst flying out of the hit point", true);
     BoolSetting              mPathFlow       = BoolSetting("Path Flow", "Animated dots running along the teleport path", true);
     NumberSetting            mPathWidth      = NumberSetting("Path Width", "Teleport path line thickness", 2.f, 1.f, 6.f, 0.5f);
+<<<<<<< HEAD
 
     // --- Debug ---
     // Одна настройка: показывает, что реально происходит с ударами. Нужна,
     // чтобы измерить настоящую задержку сервера, а не гадать по CPS.
     BoolSetting              mDebug          = BoolSetting("Debug", "Sent vs confirmed hits: real delay, real APS, interval history", false);
+=======
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
     InfiniteAura() : ModuleBase("InfiniteAura", "Attack players at any distance via chain TP",
         ModuleCategory::Combat, 0, false)
@@ -94,8 +97,12 @@ public:
             &mAutoShield,
             &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked,
             &mTargetInfo, &mHitTrail, &mTrailPoints, &mHitSparks,
+<<<<<<< HEAD
             &mPathFlow, &mPathWidth,
             &mDebug
+=======
+            &mPathFlow, &mPathWidth
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
         );
 
         VISIBILITY_CONDITION(mTrailPoints, mHitTrail.mValue);

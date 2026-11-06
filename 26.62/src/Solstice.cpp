@@ -1,8 +1,12 @@
 //
-// Created by vastrakai on 6/24/2024.
 //
+<<<<<<<< HEAD:26.62/src/Solstice.cpp
 //Test commit
 #include "Solstice.hpp"
+========
+
+#include "Dexko.hpp"
+>>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 
 
 #include <fstream>
@@ -30,19 +34,21 @@
 #include <Features/IRC/IrcClient.hpp>
 #include <Features/Modules/Misc/IRC.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
-#include <Utils/OAuthUtils.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
 
+<<<<<<<< HEAD:26.62/src/Solstice.cpp
 #include <wininet.h>
 #pragma comment(lib, "wininet.lib")
 
 
+========
+>>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 #ifdef __DEBUG__
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [debug]";
+std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "] [debug]";
 #elif __PRIVATE_BUILD__
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "] [private]";
+std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "] [private]";
 #else
-std::string title = "[" + std::string(SOLSTICE_BUILD_VERSION_SHORT) + "-" + std::string(SOLSTICE_BUILD_BRANCH) + "]";
+std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "]";
 #endif
 
 
@@ -71,7 +77,7 @@ std::vector<unsigned char> gBpBytes = {0x1c}; // Defines the new offset for mInH
 DEFINE_PATCH_FUNC(patchInHandSlot, SigManager::ItemInHandRenderer_renderItem_bytepatch2+2, gBpBytes);
 
 // called using winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [&]()
-void Solstice::init(HMODULE hModule)
+void Dexko::init(HMODULE hModule)
 {
     Solstice::GameWindow = FindWindowA(NULL, "Minecraft"); 
 
@@ -91,8 +97,13 @@ void Solstice::init(HMODULE hModule)
     console = spdlog::stdout_color_mt(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
 
     // Create a file logger sink
+<<<<<<<< HEAD:26.62/src/Solstice.cpp
     std::string logFile = FileUtils::getSolsticeDir() + xorstr_("solstice.log");
 
+========
+    std::string logFile = FileUtils::getDexkoDir() + xorstr_("dexko.log");
+ 
+>>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
     // Don't use the file sink if the log file doesn't exist
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
@@ -118,9 +129,6 @@ void Solstice::init(HMODULE hModule)
 
     setTitle(title);
 
-
-    sHWID = GET_HWID().toString();
-    spdlog::info("HWID: {}", sHWID);
 
     if (MH_Initialize() != MH_OK)
     {
@@ -233,17 +241,17 @@ void Solstice::init(HMODULE hModule)
     console->info("Press END to eject dll.");
     mLastTick = NOW;
 
-    mThread = std::thread(&Solstice::shutdownThread);
+    mThread = std::thread(&Dexko::shutdownThread);
     mThread.detach();
 }
 
-void Solstice::shutdownThread()
+void Dexko::shutdownThread()
 {
-    // Wait for the user to press END
-    bool firstCall = true;
+    // Runs on its own thread: pumps client ticks until the eject key is hit.
     bool isLpValid = false;
     while (!mRequestEject)
     {
+<<<<<<<< HEAD:26.62/src/Solstice.cpp
         if (firstCall)
         {
             NotifyUtils::notify("Solstice initialized!", 5.0f, Notification::Type::Info);
@@ -272,6 +280,8 @@ void Solstice::shutdownThread()
                 __fastfail(1);
             }
         }
+========
+>>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 
         if (!isLpValid && ClientInstance::get()->getLocalPlayer())
         {
@@ -287,7 +297,6 @@ void Solstice::shutdownThread()
                 else
                 {
                     console->warn("Default config does not exist! Clearing default config...");
-                    NotifyUtils::notify("Default config does not exist! Clearing default config...", 10.0f, Notification::Type::Warning);
                     Prefs->mDefaultConfigName = "";
                     PreferenceManager::save(Prefs);
                 }
@@ -331,5 +340,39 @@ void Solstice::shutdownThread()
     Sleep(1000); // Give the user time to read the message
 
     Logger::deinitialize();
+<<<<<<<< HEAD:26.62/src/Solstice.cpp
     FreeLibrary(mModule); // i don't understand this
+========
+
+    // ---- unload ---------------------------------------------------------
+    //
+    // This used to be a plain `FreeLibrary(mModule)` right here, and that is the
+    // uninject crash: the DLL gets unmapped while *this* thread is still
+    // executing code inside it, so the very next instruction (the function
+    // epilogue, the std::thread teardown, the CRT) jumps into freed memory.
+    //
+    // A dedicated thread owns the unload instead. It waits until this thread is
+    // definitely gone, then calls FreeLibraryAndExitThread, which frees the
+    // module and terminates the thread inside kernel32 without ever returning
+    // into unmapped code. This thread ends with ExitThread for the same reason.
+    HANDLE unloader = CreateThread(nullptr, 0, &Dexko::unloadThreadProc, mModule, 0, nullptr);
+    if (unloader)
+    {
+        CloseHandle(unloader);
+        ExitThread(0);
+    }
+
+    // Thread creation failed: unload from here, but still never return.
+    FreeLibraryAndExitThread(mModule, 0);
+}
+
+DWORD WINAPI Dexko::unloadThreadProc(LPVOID module)
+{
+    // Give the ejecting thread time to actually terminate (it calls ExitThread,
+    // so nothing of ours is left running by then).
+    Sleep(250);
+
+    FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
+    return 0;
+>>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 }

@@ -1,9 +1,7 @@
 #pragma once
 #include <string>
-#include <Features/Events/MouseEvent.hpp>
 #include <Features/Modules/Setting.hpp>
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 struct ImVec4;

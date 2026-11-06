@@ -38,11 +38,16 @@ public:
     int mKey;
     int mEnableWhileHeld = false;
 
+<<<<<<< HEAD:26.62/src/Features/Modules/Module.hpp
     BoolSetting mVisibleInArrayList = BoolSetting("Visible", "Whether the module is visible in the Arraylist", true);
 
     std::vector<class Setting*> mSettings = {
         &mVisibleInArrayList
     };
+=======
+    BoolSetting mVisibleInArrayList = BoolSetting("Visible", "Whether the module is visible in the arraylist.", true);
+    std::vector<class Setting*> mSettings = { &mVisibleInArrayList };
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Module.hpp
 
     Module(std::string name, std::string description, const ModuleCategory category, const int key, const bool enabled, std::unordered_map<NamingStyle, std::string> names = {})
         : mName(std::move(name)), mDescription(std::move(description)), mCategory(category), mWantedState(enabled), mKey(key), mNames(std::move(names)) {}
@@ -84,6 +89,20 @@ public:
     float cScale = 0;
 
     float mArrayListAnim = 0.f;
+<<<<<<< HEAD:26.62/src/Features/Modules/Module.hpp
+=======
+    float toggleBurst = 0.f;
+
+    // Hover / pulse animations
+    float hoverAnim = 0.f;
+    float togglePulse = 0.f;
+
+    // Ripple effect
+    float rippleX      = 0.f;
+    float rippleY      = 0.f;
+    float rippleRadius = 0.f;
+    float rippleAlpha  = 0.f;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Module.hpp
 };
 
 template <typename T>

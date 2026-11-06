@@ -6,7 +6,6 @@
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <Utils/Structs.hpp>
 //
-// Created by vastrakai on 6/29/2024.
 //
 
 
@@ -23,6 +22,7 @@ public:
     static inline int transformDelay = 3;
     static inline bool forceFallback = false;
 
+<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.hpp
     static bool loadTextureFromEmbeddedResource(const char* resourceName, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height);
     static bool createTextureFromFile(const char* filename, ID3D11ShaderResourceView** out_srv, int* out_width,
                                       int* out_height);
@@ -31,6 +31,10 @@ public:
     static HRESULT present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags);
     static HRESULT resizeBuffers(IDXGISwapChain* swapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
     static HRESULT resizeBuffers1(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height,DXGI_FORMAT format, UINT flags, const UINT* creationNodeMask, IUnknown* const* presentQueue);
+=======
+    static HRESULT present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT flags);
+    static HRESULT resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.hpp
     static void initImGui(ID3D11Device* device, ID3D11DeviceContext* deviceContext);
     static void shutdownImGui();
     static void igNewFrame();

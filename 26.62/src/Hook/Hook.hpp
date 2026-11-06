@@ -3,7 +3,6 @@
 #include "Detour.hpp"
 #include "spdlog/spdlog.h"
 //
-// Created by vastrakai on 6/25/2024.
 //
 
 

@@ -242,6 +242,10 @@ namespace TazikHatImpl
     }
 }
 
+<<<<<<< HEAD
+=======
+using namespace TazikHatImpl;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
 // =========================================================
 // Mode helpers
@@ -301,7 +305,11 @@ void TazikHat::onBaseTickEvent(BaseTickEvent& event)
     }
 
     std::erase_if(mHandledDeaths, [now](const auto& entry) {
+<<<<<<< HEAD
         return now - entry.second > TazikHatImpl::DEATH_HANDLED_RESET_MS;
+=======
+        return now - entry.second > DEATH_HANDLED_RESET_MS;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     });
 
     for (auto it = mFlying.begin(); it != mFlying.end();) {
@@ -315,9 +323,15 @@ void TazikHat::onBaseTickEvent(BaseTickEvent& event)
 
 void TazikHat::spawnFlying(Actor* actor)
 {
+<<<<<<< HEAD
     const bool helmet = TazikHatImpl::hasHelmet(actor);
     const float size = mScale.mValue * (helmet ? mHelmetScale.mValue : 1.0f);
     const TazikHatImpl::TazikAnchor anchor = TazikHatImpl::headAnchor(actor, mHeadTopOffset.mValue, mHeadForwardOffset.mValue, mHeadRightOffset.mValue);
+=======
+    const bool helmet = hasHelmet(actor);
+    const float size = mScale.mValue * (helmet ? mHelmetScale.mValue : 1.0f);
+    const TazikAnchor anchor = headAnchor(actor, mHeadTopOffset.mValue, mHeadForwardOffset.mValue, mHeadRightOffset.mValue);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
     const glm::vec3 base = anchor.origin;
 
     glm::vec3 away(0.f);
@@ -326,9 +340,15 @@ void TazikHat::spawnFlying(Actor* actor)
         away = base - *local->getPos();
     }
     if (glm::dot(away, away) < 1.0e-5f) {
+<<<<<<< HEAD
         away = glm::vec3(TazikHatImpl::randomRange(-1.f, 1.f), 0.f, TazikHatImpl::randomRange(-1.f, 1.f));
     }
     away = TazikHatImpl::safeNormalize(away, glm::vec3(1.f, 0.f, 0.f));
+=======
+        away = glm::vec3(randomRange(-1.f, 1.f), 0.f, randomRange(-1.f, 1.f));
+    }
+    away = safeNormalize(away, glm::vec3(1.f, 0.f, 0.f));
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
     const float power = mDeathFlightPower.mValue;
     FlyingTazik tazik{};
@@ -337,6 +357,7 @@ void TazikHat::spawnFlying(Actor* actor)
     tazik.createdAtMs = NOW;
     tazik.pos = base;
     tazik.velocity = glm::vec3(
+<<<<<<< HEAD
         away.x * TazikHatImpl::randomRange(0.18f, 0.34f) * power + TazikHatImpl::randomRange(-0.08f, 0.08f),
         TazikHatImpl::randomRange(0.34f, 0.58f) * power,
         away.z * TazikHatImpl::randomRange(0.18f, 0.34f) * power + TazikHatImpl::randomRange(-0.08f, 0.08f));
@@ -346,6 +367,17 @@ void TazikHat::spawnFlying(Actor* actor)
     tazik.yawVelocity = TazikHatImpl::randomRange(-18.f, 18.f) * power;
     tazik.pitchVelocity = TazikHatImpl::randomRange(-22.f, 22.f) * power;
     tazik.rollVelocity = TazikHatImpl::randomRange(-24.f, 24.f) * power;
+=======
+        away.x * randomRange(0.18f, 0.34f) * power + randomRange(-0.08f, 0.08f),
+        randomRange(0.34f, 0.58f) * power,
+        away.z * randomRange(0.18f, 0.34f) * power + randomRange(-0.08f, 0.08f));
+    tazik.yaw = randomRange(0.f, 360.f);
+    tazik.pitch = randomRange(-20.f, 20.f);
+    tazik.roll = randomRange(-20.f, 20.f);
+    tazik.yawVelocity = randomRange(-18.f, 18.f) * power;
+    tazik.pitchVelocity = randomRange(-22.f, 22.f) * power;
+    tazik.rollVelocity = randomRange(-24.f, 24.f) * power;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
     mFlying[actor->getRuntimeID()] = tazik;
 }
@@ -353,7 +385,11 @@ void TazikHat::spawnFlying(Actor* actor)
 bool TazikHat::updateFlying(FlyingTazik& tazik)
 {
     const uint64_t age = NOW - tazik.createdAtMs;
+<<<<<<< HEAD
     if (age > TazikHatImpl::DEATH_LIFE_MS) return true;
+=======
+    if (age > DEATH_LIFE_MS) return true;
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
     tazik.velocity += glm::vec3(0.f, -0.034f, 0.f);
     tazik.velocity = glm::vec3(tazik.velocity.x * 0.985f, tazik.velocity.y * 0.965f, tazik.velocity.z * 0.985f);
@@ -395,9 +431,15 @@ bool TazikHat::updateFlying(FlyingTazik& tazik)
 
 void TazikHat::renderAttached(ImDrawList* drawList, Actor* actor)
 {
+<<<<<<< HEAD
     const bool helmet = TazikHatImpl::hasHelmet(actor);
     const float size = mScale.mValue * (helmet ? mHelmetScale.mValue : 1.0f);
     const TazikHatImpl::TazikAnchor anchor = TazikHatImpl::headAnchor(actor, mHeadTopOffset.mValue, mHeadForwardOffset.mValue, mHeadRightOffset.mValue);
+=======
+    const bool helmet = hasHelmet(actor);
+    const float size = mScale.mValue * (helmet ? mHelmetScale.mValue : 1.0f);
+    const TazikAnchor anchor = headAnchor(actor, mHeadTopOffset.mValue, mHeadForwardOffset.mValue, mHeadRightOffset.mValue);
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
 
     // Idle sway only (hit wobble needs hurt-time data Juzdex does not expose)
     const int64_t rid = actor->getRuntimeID();
@@ -406,7 +448,11 @@ void TazikHat::renderAttached(ImDrawList* drawList, Actor* actor)
     const float pitch = std::sin(time * 1.2f) * idle;
     const float roll = std::cos(time * 0.9f) * idle;
 
+<<<<<<< HEAD
     TazikHatImpl::drawBowl(drawList, anchor, size, 0.f, pitch, roll, 1.0f, static_cast<int>(rid),
+=======
+    drawBowl(drawList, anchor, size, 0.f, pitch, roll, 1.0f, static_cast<int>(rid),
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
              colorModeIndex(mColorMode.mValue), mColorSpeed.mValue,
              mPrimaryColor.getAsImColor(), mSecondaryColor.getAsImColor(), mRimColor.getAsImColor());
 }
@@ -416,9 +462,15 @@ void TazikHat::renderFlying(ImDrawList* drawList)
     const uint64_t now = NOW;
     for (auto& [rid, tazik] : mFlying) {
         const uint64_t age = now - tazik.createdAtMs;
+<<<<<<< HEAD
         const float life = static_cast<float>(age) / static_cast<float>(TazikHatImpl::DEATH_LIFE_MS);
         const float fade = 1.0f - TazikHatImpl::smoothstep((std::max(0.f, life - 0.65f)) / 0.35f);
         TazikHatImpl::drawBowl(drawList, TazikHatImpl::worldAnchor(tazik.pos), tazik.scale, tazik.yaw, tazik.pitch, tazik.roll, fade, tazik.seed,
+=======
+        const float life = static_cast<float>(age) / static_cast<float>(DEATH_LIFE_MS);
+        const float fade = 1.0f - smoothstep((std::max(0.f, life - 0.65f)) / 0.35f);
+        drawBowl(drawList, worldAnchor(tazik.pos), tazik.scale, tazik.yaw, tazik.pitch, tazik.roll, fade, tazik.seed,
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
                  colorModeIndex(mColorMode.mValue), mColorSpeed.mValue,
                  mPrimaryColor.getAsImColor(), mSecondaryColor.getAsImColor(), mRimColor.getAsImColor());
     }
@@ -451,4 +503,8 @@ void TazikHat::onRenderEvent(RenderEvent& event)
     }
 
     renderFlying(drawList);
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de
