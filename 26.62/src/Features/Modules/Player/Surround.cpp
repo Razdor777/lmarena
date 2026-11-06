@@ -178,18 +178,24 @@ void Surround::onBaseTickEvent(BaseTickEvent& event)
     for (glm::ivec3 placePos : placePositions) {
         if (BlockUtils::isAirBlock(placePos)) {
             glm::ivec3 blockPos = getClosestPlacePos(placePos, 1, collidingBlocks);
-            if (blockPos.x == INT_MAX)
-                continue;
+            int face = 1;
+            if (blockPos.x == INT_MAX) {
+                if (!mAirPlace.mValue)
+                    continue;
+                blockPos = placePos;
+                face = 1;
+            }
             if (BlockUtils::isAirBlock(blockPos)) {
                 int blockSlot = ItemUtils::getPlaceableItemOnBlock(placePos, mHotbarOnly.mValue, false);
                 if (blockSlot == -1)
                     continue;
                 supplies->mSelectedSlot = blockSlot;
 
-                int face = 1;
                 glm::ivec3 hitPos = { blockPos.x, blockPos.y - 1, blockPos.z };
                 if (BlockUtils::isAirBlock(hitPos)) {
-                    face = BlockUtils::getBlockPlaceFace(blockPos);
+                    int detectedFace = BlockUtils::getBlockPlaceFace(blockPos);
+                    if (detectedFace != -1) face = detectedFace;
+                    else face = 1;
                 }
                 BlockUtils::placeBlock(blockPos, face);
                 if (mDebug.mValue) {

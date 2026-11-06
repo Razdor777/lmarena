@@ -1,6 +1,7 @@
 #pragma once
 #include <Hook/Hook.hpp>
 //
+// Created by vastrakai on 6/25/2024.
 //
 
 
@@ -11,9 +12,9 @@ public:
     }
 
     static std::unique_ptr<Detour> mDetour;
-    static inline bool mCurrentCancel = false;
 
-    static void onKey(uint32_t key, bool isDown);
+    // true — клавишу погасить (игра её не увидит). См. комментарий в .cpp.
+    static bool onKey(uint32_t key, bool isDown);
     void init() override;
 };
 

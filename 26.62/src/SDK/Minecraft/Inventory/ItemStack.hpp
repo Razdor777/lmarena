@@ -87,6 +87,34 @@ public:
         MemUtils::callVirtualFunc<void>(OffsetProvider::ItemStack_reInit, this, item, count, itemData);
     }
 
+    // ==== ported from the 1.21.44 master ====
+    int getDamage() const {
+        return static_cast<int>(mAuxValue);
+    }
+
+    int getMaxDamage() const {
+        Item* item = getItem();
+        if (!item) return 0;
+        return item->getMaxDamage();
+    }
+
+    int getRemainingDurability() const {
+        const int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 0;
+        return maxDmg - getDamage();
+    }
+
+    float getDurabilityPercent() const {
+        const int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 1.0f;
+        return static_cast<float>(getRemainingDurability()) / static_cast<float>(maxDmg);
+    }
+
+    bool hasDurability() const {
+        return getMaxDamage() > 0;
+    }
+    // ==== end ported ====
+
     std::string getCustomName() {
         static auto func = SigManager::ItemStack_getCustomName;
         std::string str;
@@ -151,6 +179,11 @@ public:
         memset(this, 0x0, sizeof(ItemStack));
         reinit(item, count, itemData);
     }
+
+    // ==== ported from the 1.21.44 master ====
+    // Собирает ItemStack из сетевого дескриптора (ChestStealer и др.).
+    static ItemStack fromDescriptor(class NetworkItemStackDescriptor const& desc);
+    // ==== end of ported block ====
 
     std::string getEnchantName(Enchant enchant) const {
         std::string name = std::string(magic_enum::enum_name(enchant));

@@ -9,6 +9,10 @@
 
 void TeleportCommand::execute(const std::vector<std::string>& args)
 {
+    // ==== ported from the 1.21.44 master ====
+    sLastUse.store(static_cast<uint64_t>(NOW));
+    // ==== end of ported block ====
+
     auto player = ClientInstance::get()->getLocalPlayer();
 
     if (args.size() < 2)

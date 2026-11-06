@@ -42,15 +42,29 @@ public:
 	static inline bool mIsInitialized = false;
 	static inline std::unordered_map<std::string, uintptr_t> mSigs;
 
-	//DEFINE_SIG(Actor_setPosition, "48 89 5C 24 ? 57 48 83 EC ? 48 8B 59 ? 48 8B FA 48 8B 8B ? ? ? ? 48 85 C9", SigType::Sig, 0);
+  DEFINE_SIG(Actor_setPosition,
+             "48 89 ? ? ? 57 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? 48 85 "
+             "? 74 ? 48 8B ? 48 8B ? ? ? ? ? FF 15",
+             SigType::Sig, 0);
 	DEFINE_SIG(Actor_getNameTag, "56 48 83 EC ? 48 8B 81 ? ? ? ? 48 85 C0 74 ? 8B 50 ? ? ? ? 29 CA 81 E2 ? ? ? ? 48 8D 05", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(Actor_setNameTag, "56 57 48 83 EC ? 48 89 CE 48 8B 89 ? ? ? ? 48 85 C9 0F 84 ? ? ? ? 48 89 D7", SigType::Sig, 0); //26.51
 	//DEFINE_SIG(ClientInstance_getScreenName, "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B F2 33 ED 48 8B 01 48 8D 54 24 ? 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 90 48 8B 48 ? 48 8B 01 48 8B D6 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 90 48 89 6C 24 ? 48 8B 5C 24 ? 48 89 6C 24 ? BF ? ? ? ? 48 85 DB 74 ? 8B C7 F0 0F C1 43 ? 83 F8 ? 75 ? 48 8B 03 48 8B CB 48 8B 00 FF 15 ? ? ? ? 8B C7 F0 0F C1 43 ? 83 F8 ? 75 ? 48 8B 03 48 8B CB 48 8B 40 ? FF 15 ? ? ? ? 48 89 6C 24 ? 48 8B 5C 24 ? 48 85 DB 74 ? 8B C7 F0 0F C1 43 ? 83 F8 ? 75 ? 48 8B 03 48 8B CB 48 8B 00 FF 15 ? ? ? ? F0 0F C1 7B ? 83 FF ? 75 ? 48 8B 03 48 8B CB 48 8B 40 ? FF 15 ? ? ? ? 48 8B C6 48 8B 5C 24 ? 48 8B 6C 24 ? 48 8B 74 24 ? 48 83 C4 ? 5F C3 CC CC CC CC CC CC CC CC CC CC CC CC CC 48 89 5C 24 ? 48 89 6C 24", SigType::Sig, 0);
-	//DEFINE_SIG(ActorRenderDispatcher_render, "48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 0F 29 B4 24 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 F7 4C 89 4C 24 ?", SigType::Sig, 0); // 1.21.51
+  DEFINE_SIG(ActorRenderDispatcher_render,
+             "E8 ? ? ? ? 8B 43 ? 89 44 ? ? 48 8D ? ? ? 48 8B ? ? E8 ? ? ? ? 48 "
+             "85 ? 0F 84 ? ? ? ? F3 44",
+             SigType::RefSig, 1);
 	DEFINE_SIG(ClientInstance_mBgfx, "4C 8B 35 ? ? ? ? 49 8D 8E", SigType::RefSig, 3); //maybe
 	//vtable better :ultra_retard:
-	//DEFINE_SIG(ClientInstance_grabMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 40", SigType::Sig, 0); // 1.21.51
-	//DEFINE_SIG(ClientInstance_releaseMouse, "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 FF ? ? ? ? ? 48 83 C4 ? 5B C3 48 89", SigType::Sig, 0); // 1.21.51
+  DEFINE_SIG(ClientInstance_grabMouse,
+             "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 "
+             "C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 "
+             "FF ? ? ? ? ? 48 83 C4 ? 5B C3 40",
+             SigType::Sig, 0);
+  DEFINE_SIG(ClientInstance_releaseMouse,
+             "40 ? 48 83 EC ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 84 "
+             "C0 74 ? 48 8B ? ? ? ? ? 48 8B ? 48 8B ? ? ? ? ? 48 83 C4 ? 5B 48 "
+             "FF ? ? ? ? ? 48 83 C4 ? 5B C3 48 89",
+             SigType::Sig, 0);
 	DEFINE_SIG(ContainerScreenController_tick, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 0F 29 75 ? 48 C7 45 ? ? ? ? ? 48 89 CE 48 8D B9 ? ? ? ? C6 45", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(ContainerScreenController_handleAutoPlace, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? 44 89 CE 4C 89 C7 41 89 D6", SigType::Sig, 0); // 26.51
 	DEFINE_SIG(ComplexInventoryTransaction_vtable, "48 8D 05 ? ? ? ? ? ? ? 48 83 C1 ? E8 ? ? ? ? 40 F6 C7 ? 74 ? BA ? ? ? ? 48 89 F1 E8 ? ? ? ? 48 89 F0 48 83 C4 ? 5F 5E C3 ? ? ? ? ? 56 57 48 83 EC ? 89 D7 48 89 CE E8 ? ? ? ? 40 F6 C7 ? 74 ? BA ? ? ? ? 48 89 F1 E8 ? ? ? ? 48 89 F0 48 83 C4 ? 5F 5E C3 ? ? ? 56 48 83 EC", SigType::RefSig, 3); //26.51
@@ -65,12 +79,17 @@ public:
 	DEFINE_SIG(ItemUseInventoryTransaction_vtable, "48 8D 05 ? ? ? ? 48 89 85 ? ? ? ? 8B 45 ? 89 85 ? ? ? ? C6 85", SigType::RefSig, 3);
 	DEFINE_SIG(ItemUseOnActorInventoryTransaction_vtable, "48 8D 05 ? ? ? ? ? ? ? 0F 10 43 ? 0F 11 47", SigType::RefSig, 3);
 	DEFINE_SIG(ItemReleaseInventoryTransaction_vtable, "4C 8D 3D ? ? ? ? 4C 8D A6", SigType::RefSig, 3); // 26.51 need check
-	//DEFINE_SIG(Keyboard_feed, "E8 ? ? ? ? E9 ? ? ? ? 41 0F ? ? ? 45 0F ? ? ? 45 0F", SigType::RefSig, 1);
-	//DEFINE_SIG(MainView_instance, "48 8B 05 ? ? ? ? C6 40 ? ? 0F 95 C0", SigType::RefSig, 3);
+  DEFINE_SIG(Keyboard_feed,
+             "E8 ? ? ? ? E9 ? ? ? ? 41 0F ? ? ? 45 0F ? ? ? 45 0F",
+             SigType::RefSig, 1);
+  DEFINE_SIG(MainView_instance, "48 8B 05 ? ? ? ? C6 40 ? ? 0F 95 C0",
+             SigType::RefSig, 3);
 	DEFINE_SIG(MinecraftGame_instance, "48 89 15 ? ? ? ? 49 8B 40", SigType::RefSig, 3);
 	DEFINE_SIG(MinecraftPackets_createPacket, "56 48 83 EC ? 48 89 CE 81 FA", SigType::Sig, 0); // 1.26.51
 	//hate ms
-	//DEFINE_SIG(Mob_getJumpControlComponent, "E8 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? ? ? ? E9 ? ? ? ? F3 0F 10 43", SigType::RefSig, 1); //iguess
+  DEFINE_SIG(Mob_getJumpControlComponent,
+             "E8 ? ? ? ? 48 85 C0 74 ? C6 40 ? ? 48 83 C4 ? 5B",
+             SigType::RefSig, 1);
 	DEFINE_SIG(Mob_JumpFromGroundRequestComponentPatch, "C7 46 ? ? ? ? ? 48 83 C4 ? 5E C3 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 41 57", SigType::Sig, 0); // guess name :joy:
 	DEFINE_SIG(Mob_getCurrentSwingDuration, "56 57 53 48 83 EC 20 89 D3 48 89 CE BA 03 00 00 00 E8 ? ? ? ? 48 85 C0", SigType::Sig, 0); // some anotherone class
 	DEFINE_SIG(MouseDevice_feed, "41 57 41 56 41 55 41 54 56 57 55 53 48 83 EC ? 44 89 CF 44 89 C3 89 D5 48 89 CE 44 0F B7 A4 24", SigType::Sig, 0);
@@ -91,7 +110,10 @@ public:
 	//DEFINE_SIG(ConnectionRequest_getdeviceos, "48 83 ec ? 48 8b 01 48 8b 80 ? ? ? ? ff 15 ? ? ? ? 83 e8", SigType::Sig, 0);
 	DEFINE_SIG(CameraDirectLookSystemUtil_handleLookInput, "56 48 83 EC 30 0F 29 74 24 ? 4C 89 C6 F3 0F 10 05", SigType::Sig, 0); // 26.51 maybe
 	DEFINE_SIG(ItemRenderer_render, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 95 ? ? ? ? 44 0F 29 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD ? ? ? ? 0F 29 B5 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? ? ? ? 48 85 F6", SigType::Sig, 0);
-	//DEFINE_SIG(ItemPositionConst, "F3 0F ? ? ? ? ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F B7", SigType::Sig, 0);
+  DEFINE_SIG(
+      ItemPositionConst,
+      "F3 0F ? ? ? ? ? ? F3 0F ? ? F3 0F ? ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F B7",
+      SigType::Sig, 0);
 	/*DEFINE_SIG(glm_rotate, "40 53 48 83 EC ? F3 0F 59 0D ? ? ? ? 4C 8D 4C 24", SigType::Sig, 0);
 	DEFINE_SIG(glm_rotateRef, "E8 ? ? ? ? 0F 28 ? ? ? ? ? 48 8B ? C6 40 38", SigType::Sig, 0);
 	DEFINE_SIG(glm_translateRef, "E8 ? ? ? ? E9 ? ? ? ? 40 84 ? 0F 84 ? ? ? ? 83 FF", SigType::Sig, 0);
@@ -100,12 +122,19 @@ public:
 	DEFINE_SIG(ActorAnimationControllerPlayer_applyToPose, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 9D ? ? ? ? 44 0F 29 95 ? ? ? ? 44 0F 29 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD ? ? ? ? 0F 29 B5 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? 4D 89 C5 48 89 D6", SigType::Sig, 0); // 1.21.80
 	DEFINE_SIG(JSON_parse, "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC ? 48 83 7A", SigType::Sig, 0);
 	// who using this
-	// DEFINE_SIG(Actor_getStatusFlag, "48 83 EC ? 8B 41 ? 48 8B 49 ? 4C 63 DA", SigType::Sig, 1); // 8
-	//DEFINE_SIG(Level_getRuntimeActorList, "48 89 ? ? ? 55 56 57 48 83 EC ? 48 8B ? 48 89 ? ? ? 33 D2", SigType::Sig, 0); // 1.21.51
+  DEFINE_SIG(Actor_getStatusFlag, "E8 ? ? ? ? 84 C0 0F 84 ? ? ? ? F3 0F 10 BF",
+             SigType::RefSig,
+             1); // bro the amount of references for this went from 43 to 4.
+  DEFINE_SIG(Level_getRuntimeActorList,
+             "48 89 ? ? ? 55 56 57 48 83 EC ? 48 8B ? 48 89 ? ? ? 33 D2",
+             SigType::Sig, 0);
 	DEFINE_SIG(ConcreteBlockLegacy_getCollisionShapeForCamera, "41 56 56 57 53 48 83 EC ? 0F 29 7C 24 ? 0F 29 74 24 ? 48 89 D6 48 8B BC 24", SigType::Sig, 0); 
 	DEFINE_SIG(WaterBlockLegacy_getCollisionShapeForCamera, "48 89 D0 0F 57 C0 ? ? ? 48 C7 42 ? 00 00 00 00 C3", SigType::Sig, 0); //who name this fucking
 	DEFINE_SIG(ActorShaderManager_setupShaderParameters, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 BD ? ? ? ? 44 0F 29 B5 ? ? ? ? 44 0F 29 AD ? ? ? ? 44 0F 29 A5 ? ? ? ? 44 0F 29 9D ? ? ? ? 44 0F 29 95 ? ? ? ? 66 44 0F 7F 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD", SigType::Sig, 0);
-	//DEFINE_SIG(mce_framebuilder_RenderItemInHandDescription_ctor, "48 89 5C 24 ? 48 89 4C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 83 EC ? 4D 8B E1 4D 8B E8 4C 8B FA 48 8B F9", SigType::Sig, 0);
+  DEFINE_SIG(mce_framebuilder_RenderItemInHandDescription_ctor,
+             "48 89 ? ? ? 48 89 ? ? ? 55 56 57 41 ? 41 ? 41 ? 41 ? 48 83 EC ? "
+             "4D 8B ? 4D 8B ? 4C 8B ? 48 8B ? 45 33",
+             SigType::Sig, 0);
 
 	//41 57 41 56 41 55 41 54 56 57 55 53 48 83 EC ? 4D 89 CC 4D 89 C6 48 89 D6 need check latter
 	DEFINE_SIG(ResourcePackManager_composeFullStackBp, "0F 85 ? ? ? ? 48 83 BD ? ? ? ? ? 75 ? 48 83 BD", SigType::Sig, 0);
@@ -114,12 +143,15 @@ public:
 	DEFINE_SIG(tickEntity_ItemUseSlowdownModifierComponent, "56 57 53 48 83 EC 40 0F 29 74 24 ? 4C 89 C6 48 89 CF", SigType::Sig, 0); 
 
 	DEFINE_SIG(checkBlocks, "48 8D 1D ? ? ? ? 48 89 5C 24 ? C6 44 24 ? 00 48 C7 44 24 ? 00 00 00 00", SigType::Sig, 0);
-	//DEFINE_SIG(JSON_toStyledString, "E8 ? ? ? ? 90 0F B7 ? ? ? ? ? 66 89 ? ? ? ? ? 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 0F 57 ? 0F 11 ? ? ? ? ? 48 8D ? ? ? ? ? 48 89 ? ? ? ? ? 8B 85 ? ? ? ? 89 85 ? ? ? ? 4C 8B ? ? ? ? ? 49 8B ? 48 8D ? ? ? ? ? E8 ? ? ? ? 48 8B ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 48 8B ? 48 8D ? ? ? ? ? E8 ? ? ? ? 90 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 90 0F 57 ? 33 C0 0F 11 ? ? ? ? ? 48 89 ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 90 48 8D", SigType::RefSig, 1);
+  DEFINE_SIG(JSON_toStyledString,
+             "48 89 5C 24 ? 56 57 41 56 48 83 EC ? 33 C0 0F 57 C0 ? ? ? 48 89 "
+             "41 ? 4C 8B F2 48 89 41 ? 48 8B F9",
+             SigType::RefSig, 1);
 
 	// TODO: Identify proper function names for these and refactor them accordingly
 	// need check this
 	DEFINE_SIG(Unknown_renderBlockOverlay, "0F 84 ? ? ? ? 48 8D 45 ? 48 89 44 24 ? 48 8D 4D ? 48 8B 55", SigType::Sig, 0);
-	//DEFINE_SIG(FastEat, "41 B6 ? 48 8D 4F", SigType::Sig, 0); //8
+  DEFINE_SIG(FastEat, "FF C8 89 87 ? ? ? ? 83 F8", SigType::Sig, 0);
 	DEFINE_SIG(Unknown_renderNametag, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 95 ? ? ? ? 44 0F 29 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD ? ? ? ? 0F 29 B5 ? ? ? ? 48 C7 85 ? ? ? ? ? ? ? ? 4C 89 8D ? ? ? ? 4D 89 C7", SigType::Sig, 0);
 	DEFINE_SIG(Reach, "F3 0F 10 3D ? ? ? ? EB ? F3 0F 10 3D ? ? ? ? ? ? ? 48 8B 80", SigType::Sig, 0);
 	DEFINE_SIG(BlockReach, "F3 0F 10 05 ? ? ? ? EB ? 48 8B 79", SigType::Sig, 0);
@@ -127,10 +159,25 @@ public:
 	DEFINE_SIG(ConnectionRequest_create_DeviceModel, "? ? ? 48 83 C2 ? 48 8D 8D ? ? ? ? E8 ? ? ? ? 90 48 8D 15", SigType::Sig, 0);
 	DEFINE_SIG(ConnectionRequest_create_DeviceOS, "FF 15 ? ? ? ? 90 89 C2 48 8D 8D ? ? ? ? E8 ? ? ? ? 90 48 8D 15 ? ? ? ? 48 8D 8D ? ? ? ? E8 ? ? ? ? 90 48 89 C1", SigType::Sig, 0); //maybe
 	DEFINE_SIG(ConnectionRequest_create_DefaultInputMode, "? ? ? 48 8B 80 ? ? ? ? FF 15 ? ? ? ? 31 C9 83 F8 ? 0F 94 C1 8D 0C 4D", SigType::Sig, 0);
-	//DEFINE_SIG(ConnectionRequest_create_CurrentInputMode, "48 8D 4C 24 ? E8 ? ? ? ? 90 48 8D 15 ? ? ? ? 48 8D 8D ? ? ? ? E8 ? ? ? ? 48 8B C8 48 8D 54 24 ? E8 ? ? ? ? 90 48 8D 4C 24 ? E8 ? ? ? ? 8B 54 24 ? 48 8D 4C 24 ? E8 ? ? ? ? 90 48 8D 15 ? ? ? ? 48 8D 8D ? ? ? ? E8 ? ? ? ? 48 8B C8 48 8D 54 24 ? E8 ? ? ? ? 90 48 8D 4C 24 ? E8 ? ? ? ? 48 8B 55", SigType::Sig, 0); // its shit lawl gg xd
+  DEFINE_SIG(
+      ConnectionRequest_create_CurrentInputMode,
+      "48 63 ? ? ? ? ? 48 89 ? ? ? 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? "
+      "48 8B ? 33 D2 48 8D ? ? ? E8 ? ? ? ? 0F B6 ? ? 0F B6 ? ? ? 88 44 ? ? 48 "
+      "8B ? 48 8B ? ? ? 48 89 ? ? ? C6 43 08 ? 88 54 ? ? 48 89 ? 48 89 ? ? ? "
+      "48 8D ? ? ? E8 ? ? ? ? 90 48 8D ? ? ? E8 ? ? ? ? C6 44 24 58 ? 48 63 ? "
+      "? ? ? ? 48 89 ? ? ? 48 8D ? ? ? ? ? 48 8D ? ? ? ? ? E8 ? ? ? ? 48 8B ? "
+      "33 D2 48 8D ? ? ? E8 ? ? ? ? 0F B6 ? ? 0F B6 ? ? ? 88 44 ? ? 48 8B ? 48 "
+      "8B ? ? ? 48 89 ? ? ? C6 43 08 ? 88 54 ? ? 48 89 ? 48 89 ? ? ? 48 8D ? ? "
+      "? E8 ? ? ? ? 90 48 8D ? ? ? E8 ? ? ? ? C6 44 24 58",
+      SigType::Sig, 0); // this shit is so fat
 	//func = 48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 4D 8B E0 4C 8B EA//  but mov edx, 1 no need to make patch(default by mouse input) thanks shit shit clang
-	//DEFINE_SIG(InputModeBypass, "48 8B 82 ? ? ? ? 8B D3 FF 15 ? ? ? ? 49 8B 0C 24", SigType::Sig, 0);
-	//DEFINE_SIG(InputModeBypassFix, "8B D3 49 8B CC FF 15 ? ? ? ? 49 8B 04 24", SigType::Sig, 0); // fixes gui bugs, withot it ur inv will works like on mobile
+  DEFINE_SIG(InputModeBypass,
+             "8b d7 48 8b ce 48 8b 80 ? ? ? ? ff 15 ? ? ? ? 49 8b 07",
+             SigType::Sig, 0);
+  DEFINE_SIG(InputModeBypassFix,
+             "49 8b 07 8b d7 49 8b cf 48 8b 80 ? ? ? ? ff 15 ? ? ? ? 49 8b 07",
+             SigType::Sig,
+             0); // fixes gui bugs, withot it ur inv will works like on mobile
 	DEFINE_SIG(TapSwingAnim, "F3 44 0F 59 05 ? ? ? ? F3 0F 10 05 ? ? ? ? 0F 13 85", SigType::RefSig, 5);
 	DEFINE_SIG(Unknown_updatePlayerFromCamera, "41 57 41 56 41 55 41 54 56 57 55 53 48 81 EC ? ? ? ? 44 0F 29 94 24 ? ? ? ? 44 0F 29 8C 24 ? ? ? ? 44 0F 29 84 24 ? ? ? ? 0F 29 BC 24 ? ? ? ? 0F 29 B4 24 ? ? ? ? 4C 89 C6", SigType::Sig, 0);
 
@@ -142,7 +189,10 @@ public:
 	//INLINED BY FUCKING CLANG but its just vector :joy:
 	//DEFINE_SIG(BaseAttributeMap_getInstance, "48 89 5C 24 ? 48 89 6C 24 ? 56 57 41 56 48 83 EC ? 48 8B 2A 4D 8B D8 4C 8B 72 ? 48 8B F2 4D 8B C6 48 8B F9 4C 2B C5 4C 8B D5 49 C1 F8 ? 4D 85 C0 7E ? 45 8B 1B 66 0F 1F 84 00 ? ? ? ? 49 8B C8 48 D1 E9 48 8D 14 8D ? ? ? ? 46 39 1C 12 4A 8D 1C 12 73", SigType::Sig, 0);
 
-	//DEFINE_SIG(ItemInHandRenderer_renderItem_bytepatch, "F3 0F ? ? ? ? ? ? 0F 57 ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F 2F ? 73 ? F3 41", SigType::Sig, 0);
+  DEFINE_SIG(ItemInHandRenderer_renderItem_bytepatch,
+             "F3 0F ? ? ? ? ? ? 0F 57 ? F3 0F ? ? ? ? ? ? F3 0F ? ? 0F 2F ? 73 "
+             "? F3 41",
+             SigType::Sig, 0);
 	// caller = ?onTick@ClientInstance@@QEAAXHH@Z
 	DEFINE_SIG(ItemInHandRenderer_renderItem_bytepatch2, "8B 40 ? 89 86 ? ? ? ? 48 8D BE", SigType::Sig, 0); //8
 	//DEFINE_SIG(GammaSig, "48 83 EC ? 80 B9 ? ? ? ? ? 48 8D 54 24 ? 48 8B 01 48 8B 40 ? 74 ? 41 B8 ? ? ? ? FF 15 ? ? ? ? 48 8B 10 48 85 D2 74 ? 48 8B 42 ? 48 8B 88 ? ? ? ? 48 85 C9 74 ? E8 ? ? ? ? 48 83 C4 ? C3 F3 0F 10 42 ? 48 83 C4 ? C3 41 B8 ? ? ? ? FF 15 ? ? ? ? 48 8B 10 48 85 D2 75 ? E8 ? ? ? ? CC E8 ? ? ? ? CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 48 89 5C 24", SigType::Sig, 0); //8
@@ -152,6 +202,96 @@ public:
 	//DEFINE_SIG(Try, "48 8B C4 48 89 58 ? 48 89 70 ? 57 48 83 EC ? F3 41 0F 10 40", SigType::Sig, 0);
 
 	DEFINE_SIG(LevelRenderer_renderLevel, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 9D ? ? ? ? 44 0F 29 95 ? ? ? ? 66 44 0F 7F 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD", SigType::Sig, 0);
+	// ==== ported from the 1.21.44 master (Solstice) — re-verify on 1.26.62 ====
+  DEFINE_SIG(HudCursorRenderer_render,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 89 8D",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_renderGuiItemNew,
+             "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 D8 48 81 EC 28 01 00 00 0F 29 B4 24 10 01 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 00 44",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_getAtlasIconInfo,
+             "48 89 5C 24 ? 57 48 83 EC ? 48 8B FA 48 8B D9 E8 ? ? ? ? 80 7F ? 00 48 8D 8B",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_getIconUV,
+             "40 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 45 0F B6 C8 44 8B C2",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_iconBlit,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? F3 0F 11 5D",
+             SigType::Sig, 0);
+  DEFINE_SIG(ContainerScreenController_tryBeginTransition,
+             "40 53 56 57 41 56 41 57 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 "
+             "89 44 24 ? 8B FA",
+             SigType::Sig, 0);
+  DEFINE_SIG(ContainerValidation_handleTransfer_jnz,
+             "85 FF 75 ? 48 8B 4D ? 48 8B 01 41 8B D4 48 8B 40 38",
+             SigType::Sig, 0);
+  DEFINE_SIG(
+      isCriticalHit,
+      "48 89 5C 24 ? 57 48 83 EC ? 8B 41 ? 48 8B FA 48 8B D9 89 44 24 ? 48 8B "
+      "49 ? 48 8D 54 24 ? E8 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0",
+      SigType::Sig, 0);
+  DEFINE_SIG(ContainerValidation_handlePlace_jnz, "41 8B 5F 18 41 0F B6 47 1C",
+             SigType::Sig, 0);
+  DEFINE_SIG(ContainerValidation_handlePlace_test, "45 85 FF 74 44 41 83 FF 06",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemStack_fromDescriptor,
+             "48 89 ? ? ? 48 89 ? ? ? 48 89 ? ? ? 57 48 83 EC ? 0F 57 ? 48 8B",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemInHandRenderer_renderItem,
+             "48 8B C4 55 53 57 41 55 41 56",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemEntityRenderer_render,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 49 8B F0 4C 89 44 24",
+             SigType::Sig, 0);
+  DEFINE_SIG(ColorTint_set,
+             "40 53 48 83 EC ? F3 0F 59 0D ? ? ? ? 4C 8D 4C 24",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_renderGuiItem,
+             "48 89 5C 24 ? 55 56 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 49 8B E8 4C 8B 84 24",
+             SigType::Sig, 0);
+  DEFINE_SIG(ClientInputCallbacks_handleBuildAction_onAttack_setNoBlockBreakUntil,
+             "FF 15 ? ? ? ? 48 8B ? 48 8B ? 48 8B ? ? ? ? ? FF 15 ? ? ? ? 32 DB",
+             SigType::Sig, 0);
+  DEFINE_SIG(
+      FireRender,
+      "48 8B ? 55 53 56 57 41 ? 41 ? 41 ? 41 ? 48 8D ? ? ? ? ? 48 81 EC ? ? ? "
+      "? 0F 29 ? ? 0F 29 ? ? 44 0F ? ? ? 44 0F ? ? ? ? ? ? 44 0F ? ? ? ? ? ? "
+      "44 0F ? ? ? ? ? ? 48 8B ? ? ? ? ? 48 33 ? 48 89 ? ? ? ? ? 4D 8B ? 4D 8B",
+      SigType::Sig, 0);
+  DEFINE_SIG(HurtColor,
+             "E8 ? ? ? ? 0F 28 05 ? ? ? ? 0F 11 85 68 02 00 00",
+             SigType::RefSig, 1);
+  // DEFINE_SIG(Font_drawTransformed, "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 18 57 41 54 41 55 41 56 41 57 48 81 EC B0 01", SigType::Sig, 0);
+  // DEFINE_SIG(BaseActorRenderer_renderText, "E8 ? ? ? ? 48 83 C3 70 48 3B DE 75 D3", SigType::RefSig, 1);
+  // DEFINE_SIG(ThirdPersonNametag, "0F 84 B5 05 00 00 49 8B 07 49 8B CF 48 8B 80 00 01 00 00", SigType::Sig, 0);
+  // DEFINE_SIG(ScreenRenderer_blit, "48 89 5C 24 08 57 48 83 EC 60 0F 57", SigType::Sig, 0);
+  // DEFINE_SIG(mce_RenderMaterialGroup_ui, "48 8B 05 ? ? ? ? 48 8D 55 90 48 8D 0D ? ? ? ? 48 8B 40 08 FF 15 ? ? ? ? 48 8B D8", SigType::RefSig, 3);
+  // DEFINE_SIG(blockHighlightColor, "? ? ? ? 0F 11 85 78 02 00 00 0F 11 00", SigType::Sig, 0);
+  // DEFINE_SIG(mce_Color_BLACK, "? ? ? ? 0F 11 00 C6 40 10 ? 0F 57 C9", SigType::Sig, 0);
+  // DEFINE_SIG(LevelRendererPlayer_renderOutlineSelection, "E8 ? ? ? ? 90 48 8D 8D ? ? ? ? E8 ? ? ? ? 48 8B 86 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 80 38 ? 0F 84 ? ? ? ? 48 8B 86 ? ? ? ? 48 85 C0 74 ? F0 FF 40 ? 48 8B 86", SigType::RefSig, 1);
+  // DEFINE_SIG(Tessellator_begin, "40 53 55 48 83 EC 28 80 B9", SigType::Sig, 0);
+  // DEFINE_SIG(MeshHelpers_renderMeshImmediately, "E8 ? ? ? ? 41 C6 44 24 38 01 F3 0F 10 1D", SigType::RefSig, 1);
+  // DEFINE_SIG(MeshHelpers_renderMeshImmediately2, "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 98 FC FF FF 48 81 EC 68 04 00 00 49", SigType::Sig, 0);
+  // DEFINE_SIG(CameraYaw, "F3 0F 11 00 F3 0F 11 70 04", SigType::Sig, 0);
+  // DEFINE_SIG(CameraYaw2, "F3 0F 11 10 48 8B 8F 30 02 00 00", SigType::Sig, 0);
+  // DEFINE_SIG(UpdatePlayer, "48 89 5C 24 08 57 48 83 EC 70 0F 29 74 24 60 49", SigType::Sig, 0);
+  // DEFINE_SIG(Dimension_getBrightnessDependentFogColor, "41 0F 10 00 48 8B C2 0F", SigType::Sig, 0);
+  // DEFINE_SIG(BlockSource_getBiome, "48 89 5C 24 18 57 48 83 EC 60 48 8B DA 48 8B F9 48 8B", SigType::Sig, 0);
+  // DEFINE_SIG(ItemStack_getDamageValue, "40 53 48 83 EC 30 48 8B 51 08 33", SigType::Sig, 0);
+  // DEFINE_SIG(ItemStack_isEnchanted, "48 83 EC 38 48 8B 49 10 48 85 C9 74 60", SigType::Sig, 0);
+  // DEFINE_SIG(Actor_vtable, "48 8D 05 ? ? ? ? 48 89 01 ? ? ? ? 00 44 8D 4A 04 44 8D 42 02 66 C7 44 24 20 37 00 E8 ? ? ? ? 48 8B 8F 80 11 00 00", SigType::RefSig, 3);
+  // DEFINE_SIG(HitResult_getEntity, "40 55 57 41 54 41 56 41 57 48 83", SigType::Sig, 0);
+  // DEFINE_SIG(RaknetTick, "4C 8B DC 49 89 5B 10 49 89 6B 18 56 57 41 56 48 81 EC 10", SigType::Sig, 0);
+  // DEFINE_SIG(Options_getSensitivity, "48 83 EC 18 48 8B 41 08 4C 8B C9", SigType::Sig, 0);
+  // DEFINE_SIG(UIControl_getPosition, "48 89 5C 24 10 48 89 74 24 18 57 48 83 EC 60 0F 29 74 24 50 0F 29 7C 24 40 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 30", SigType::Sig, 0);
+  // DEFINE_SIG(ClientInstance_updateScreenSizeVariables, "48 8B C4 48 89 58 18 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 28 FF FF FF 48 81 EC A0 01 00 00 0F 29 70 B8 0F 29 78 A8 44 0F 29 40 98 44 0F 29 48 88 44 0F 29 90 78 FF FF FF 44 0F 29 98 68 FF FF FF 44 0F 29 A0 58 FF FF FF 48", SigType::Sig, 0);
+  // DEFINE_SIG(GeneralSettingsScreenController_ctor, "48 89 5C 24 18 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 30 FB FF FF 48 81 EC D0 05 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 C0 04 00 00 45", SigType::Sig, 0);
+  // DEFINE_SIG(SettingsScreenOnExit, "40 57 48 83 EC 40 48 8B 79", SigType::Sig, 0);
+  // DEFINE_SIG(SettingsScreenOnExit_Patch, "74 ? 48 8b 8f ? ? ? ? e8 ? ? ? ? 33 c0", SigType::Sig, 0);
+  DEFINE_SIG(ContainerScreenController_onContainerSlotHovered, "48 89 ? ? ? 57 41 ? 41 ? 48 83 EC ? 45 8B ? 48 8B ? 48 8B ? 44 39", SigType::Sig, 0);
+  // DEFINE_SIG(MinecraftGame_onResumeWaitReloadActors, "48 89 5C 24 10 48 89 74 24 18 55 57 41 54 41 56 41 57 48 8D 6C 24 C9 48 81 EC D0 00 00 00 4C 8B F9 48", SigType::Sig, 0);
+  // DEFINE_SIG(BoneOrientation_computeBoneTransform, "48 8B C4 53 57 48 81 EC 38 01 00 00 80 B9 DE 00 00 00 00", SigType::Sig, 0);
+	// ==== end of ported block ====
 
 
 	static void initialize();

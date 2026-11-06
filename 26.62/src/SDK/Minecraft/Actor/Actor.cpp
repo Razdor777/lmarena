@@ -243,6 +243,21 @@ SimpleContainer* Actor::getArmorContainer()
 	return mContext.getComponent<ActorEquipmentComponent>()->mArmorContainer;
 }
 
+// ==== ported from the 1.21.44 master ====
+SimpleContainer* Actor::getOffhandContainer()
+{
+	auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+	return equipment ? equipment->mOffhandContainer : nullptr;
+}
+
+float Actor::getHunger()
+{
+	auto hunger = getAttribute(PlayerHunger);
+	if (!hunger) return 20.f;
+	return hunger->mCurrentValue;
+}
+// ==== end ported ====
+
 PlayerInventory* Actor::getSupplies()
 {
 	return hat::member_at<PlayerInventory*>(this, OffsetProvider::Actor_mSupplies);

@@ -33,6 +33,7 @@ enum struct EventPriorities {
 #include <Windows.h>
 
 #include "spdlog/logger.h"
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <array>
 #include <libhat.hpp>

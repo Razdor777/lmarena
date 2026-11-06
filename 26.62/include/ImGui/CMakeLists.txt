@@ -1,8 +1,9 @@
-# Dexko renders through D3D11 + the Win32 platform only. There is no ClickGui
-# (so no imgui_toggle) and no demo window, so those files are deliberately left
-# out of the build — compiling them used to add about a megabyte to the DLL for
-# nothing. Add them back here if the feature ever returns.
-target_sources(Dexko PRIVATE
+# ==== ported from the 1.21.44 master ====
+# target был Dexko — переименован в Solstice вместе с проектом.
+# imgui_freetype.cpp НЕ собираем: он требует ft2build.h + lunasvg, которых в дереве нет.
+# Флаг ImGuiFreeTypeBuilderFlags_NoHinting из pch работать не будет, но он и не обязателен —
+# ImGui просто игнорирует FontBuilderFlags без IMGUI_ENABLE_FREETYPE.
+target_sources(Solstice PRIVATE
         "imgui.cpp"
         "imgui_draw.cpp"
         "imgui_impl_dx11.cpp"
@@ -12,4 +13,4 @@ target_sources(Dexko PRIVATE
         "stb_image.h"
 )
 
-target_include_directories(Dexko PUBLIC "${CMAKE_CURRENT_LIST_DIR}")
+target_include_directories(Solstice PUBLIC "${CMAKE_CURRENT_LIST_DIR}")

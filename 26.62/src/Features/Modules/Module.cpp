@@ -109,6 +109,11 @@ nlohmann::json Module::serialize()
             j["settings"].push_back(colorSetting->serialize());
         }
     }
+
+    // ==== ported from the 1.21.44 master ====
+    if (hasCustomData())
+        j["customData"] = serializeCustomData();
+
     return j;
 }
 

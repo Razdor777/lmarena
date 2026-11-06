@@ -84,13 +84,8 @@ void Arraylist::onRenderEvent(RenderEvent& event)
     static auto daInterface = gFeatureManager->mModuleManager->getModule<Interface>();
     if (!daInterface) return;
 
-    auto fontSel = daInterface->mFont.as<Interface::FontType>();
-    if (fontSel == Interface::FontType::ProductSans) {
-        FontHelper::pushPrefFont(true, true);
-    }
-    else {
-        FontHelper::pushPrefFont(true);
-    }
+    // ==== ported: шрифт теперь один (mntsb), FontHelper сам мержит кириллицу ====
+    FontHelper::pushPrefFont(true, true);
 
 
     if (module.empty())

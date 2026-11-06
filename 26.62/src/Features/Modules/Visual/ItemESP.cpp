@@ -9,8 +9,10 @@
 #include <SDK/Minecraft/Actor/ItemActor.hpp>
 #include <SDK/Minecraft/Inventory/Item.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
-#include <Features/Events/BaseTickEvent.hpp>
 #include <Features/Modules/Player/InvManager.hpp>
+
+static std::vector<ItemInfo> gItems;
+static std::mutex            gItemMutex;
 
 void ItemESP::onEnable()
 {
@@ -24,50 +26,45 @@ void ItemESP::onDisable()
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &ItemESP::onBaseTickEvent>(this);
 }
 
-struct ItemInfo
-{
-    glm::vec3* pos;
-    glm::vec2 size;
-    std::string name;
-    bool isUseful;
-    std::vector<std::pair<std::string, int>> enchants;
-};
-
-std::vector<ItemInfo> items;
-std::mutex itemMutex;
-
 void ItemESP::onBaseTickEvent(BaseTickEvent& event)
 {
     auto player = event.mActor;
-    std::lock_guard<std::mutex> lock(itemMutex);
+    if (!player) return;
 
-    items.clear();
+    std::vector<ItemInfo> newItems;
+
     auto actors = ActorUtils::getActorsTyped<ItemActor>(ActorType::ItemEntity);
 
     for (auto actor : actors)
     {
         if (!actor) continue;
-        if (!actor->mItem.getItem()) continue;
         if (!actor->getStateVectorComponent()) continue;
-        if (mDistanceLimited.mValue && player->distanceTo(actor) > mDistance.mValue) continue;
+
+        if (mDistanceLimited.mValue && player->distanceTo(actor) > mDistance.mValue)
+            continue;
 
         auto renderPosComp = actor->getRenderPositionComponent();
         if (!renderPosComp) continue;
+
         auto shape = actor->getAABBShapeComponent();
         if (!shape) continue;
 
-        glm::vec3 pos = renderPosComp->mPosition;
-        glm::vec3 origin = RenderUtils::transform.mOrigin;
-        float aabbHeight = shape->mHeight;
-        float aabbWidth = shape->mWidth;
+        // Защита от nullptr: проверяем И указатель, И объект
+        if (!actor->mItem.mItem) continue;
+        Item* itemPtr = actor->mItem.getItem();
+        if (!itemPtr) continue;
+
+        glm::vec3 pos        = renderPosComp->mPosition;
+        float     aabbHeight = shape->mHeight;
+        float     aabbWidth  = shape->mWidth;
 
         ItemStack* stack = &actor->mItem;
-        if (!stack || !stack->getItem()) continue;
+        bool        isUseful = !InvManager::isItemUseless(stack, -1);
+        std::string name     = itemPtr->mName;
 
-        bool isUseful = !InvManager::isItemUseless(stack, -1);
-        std::string name = actor->mItem.getItem()->mName;
-        if (name.empty()) return;
-        name += " x" + std::to_string(stack->mCount);
+        if (name.empty()) continue;
+
+        name += " x" + std::to_string(static_cast<int>(stack->mCount));
 
         std::vector<std::pair<std::string, int>> enchants;
         for (int i = 0; i <= static_cast<int>(Enchant::SWIFT_SNEAK); ++i)
@@ -75,80 +72,117 @@ void ItemESP::onBaseTickEvent(BaseTickEvent& event)
             int enchantValue = stack->getEnchantValue(i);
             if (enchantValue > 0)
             {
-                enchants.emplace_back(stack->getEnchantName(static_cast<Enchant>(i)), enchantValue);
+                enchants.emplace_back(
+                    stack->getEnchantName(static_cast<Enchant>(i)),
+                    enchantValue
+                );
             }
         }
 
-        items.push_back({&renderPosComp->mPosition, {aabbWidth, aabbHeight}, name, isUseful, enchants});
+        newItems.push_back({ pos, { aabbWidth, aabbHeight }, name, isUseful, enchants });
     }
+
+    std::lock_guard<std::mutex> lock(gItemMutex);
+    gItems = std::move(newItems);
 }
 
 void ItemESP::onRenderEvent(RenderEvent& event)
 {
-    std::lock_guard<std::mutex> lock(itemMutex);
     if (!ClientInstance::get()->getLevelRenderer()) return;
 
-    auto ci = ClientInstance::get();
+    auto ci     = ClientInstance::get();
     auto player = ci->getLocalPlayer();
     if (!player) return;
-    if (!ci->getLevelRenderer()) return;
+
+    std::vector<ItemInfo> localItems;
+    {
+        std::lock_guard<std::mutex> lock(gItemMutex);
+        localItems = gItems;
+    }
 
     auto drawList = ImGui::GetBackgroundDrawList();
+    if (!drawList) return;
 
-    for (auto actor : items)
+    for (const auto& item : localItems)
     {
+        glm::vec3 ppos = item.pos;
+        ppos -= glm::vec3(item.size.x / 2.f, 0.f, item.size.x / 2.f);
+
         AABB aabb;
-
-        glm::vec3 ppos = *actor.pos;
-        ppos = ppos - glm::vec3(actor.size.x / 2, 0, actor.size.x / 2);
         aabb.mMin = ppos;
-        aabb.mMax = ppos + glm::vec3(actor.size.x, actor.size.y, actor.size.x);
-
+        aabb.mMax = ppos + glm::vec3(item.size.x, item.size.y, item.size.x);
 
         std::vector<ImVec2> imPoints = MathUtils::getImBoxPoints(aabb);
+        if (imPoints.empty()) continue;
 
-        ImColor themeColor = mThemedColor.mValue ? ColorUtils::getThemedColor(0) : ImColor(1.0f, 1.0f, 1.0f);
+        ImColor themeColor = mThemedColor.mValue
+            ? ColorUtils::getThemedColor(0)
+            : ImColor(1.0f, 1.0f, 1.0f);
 
-        if (mRenderFilled.mValue) drawList->AddConvexPolyFilled(imPoints.data(), imPoints.size(), ImColor(themeColor.Value.x, themeColor.Value.y, themeColor.Value.z, 0.25f));
-        drawList->AddPolyline(imPoints.data(), imPoints.size(), themeColor, 0, 2.0f);
+        if (mRenderFilled.mValue)
+            drawList->AddConvexPolyFilled(
+                imPoints.data(),
+                static_cast<int>(imPoints.size()),
+                ImColor(themeColor.Value.x, themeColor.Value.y, themeColor.Value.z, 0.25f)
+            );
 
-        glm::vec3 pos = *actor.pos;
-        glm::vec3 origin = RenderUtils::transform.mOrigin;
-        glm::vec2 screen = glm::vec2(0, 0);
-
-        if (!RenderUtils::transform.mMatrix.OWorldToScreen(origin, pos, screen, ci->getFov(), ci->getGuiData()->mResolution)) continue;
+        drawList->AddPolyline(
+            imPoints.data(),
+            static_cast<int>(imPoints.size()),
+            themeColor,
+            ImDrawFlags_Closed,
+            2.0f
+        );
 
         if (!mShowNames.mValue) continue;
-        std::string name = actor.name;
 
-        if (mShowEnchant.mValue && !actor.enchants.empty()) {
+        glm::vec3 pos    = item.pos;
+        glm::vec3 origin = RenderUtils::transform.mOrigin;
+        ImVec2 screen;
+
+        if (!RenderUtils::worldToScreen(pos, screen))
+            continue;
+
+        if (std::isnan(screen.x) || std::isnan(screen.y)) continue;
+
+        std::string name = item.name;
+
+        if (mShowEnchant.mValue && !item.enchants.empty())
+        {
             std::string enchantText;
-            for (const auto& enchant : actor.enchants) {
-                if (!enchantText.empty()) {
-                    enchantText += ", ";
-                }
+            for (const auto& enchant : item.enchants)
+            {
+                if (!enchantText.empty()) enchantText += ", ";
                 enchantText += "[" + enchant.first + "]";
             }
             name += " " + enchantText;
         }
 
-        FontHelper::pushPrefFont(true, true);
-
+        // === Расчёт размера шрифта (с защитой от NaN и взрыва) ===
         float fontSize = mFontSize.mValue;
 
         if (mDistanceScaledFont.mValue)
         {
-            // use distance to origin, not actor
             float distance = glm::distance(origin, pos) + 2.5f;
-            if (distance < 0) distance = 0;
-            fontSize = 1.0f / distance * 100.0f * mScalingMultiplier.mValue;
+
+            if (std::isnan(distance) || distance < 0.001f)
+                distance = 0.001f;
+
+            fontSize = (1.0f / distance) * 100.0f * mScalingMultiplier.mValue;
+
             if (fontSize < 1.0f) fontSize = 1.0f;
+            if (fontSize > mFontSize.mValue * 2.0f) fontSize = mFontSize.mValue * 2.0f;
         }
 
+        // === Пушим шрифт ТОЛЬКО после всех проверок ===
+        FontHelper::pushPrefFont(true, true);
+
         ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0, name.c_str());
-        ImVec2 textPos = ImVec2(screen.x - textSize.x / 2, screen.y - textSize.y - 5);
-        //drawList->AddText(ImGui::GetFont(), fontSize, textPos, ImColor(1.0f, 1.0f, 1.0f, 1.0f), name.c_str());
-        ImColor textCol = actor.isUseful && mHighlightUsefulItems.mValue ? ImColor(0.0f, 1.0f, 0.0f) : ImColor(1.0f, 1.0f, 1.0f); // Green for useful and white for others
+        ImVec2 textPos  = ImVec2(screen.x - textSize.x / 2.f, screen.y - textSize.y - 5.f);
+
+        ImColor textCol = (item.isUseful && mHighlightUsefulItems.mValue)
+            ? ImColor(0.0f, 1.0f, 0.0f)
+            : ImColor(1.0f, 1.0f, 1.0f);
 
         ImRenderUtils::drawShadowText(drawList, name, textPos, textCol, fontSize, true);
 

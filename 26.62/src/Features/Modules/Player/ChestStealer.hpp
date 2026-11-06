@@ -10,10 +10,11 @@ class ChestStealer : public ModuleBase<ChestStealer> {
 public:
     enum class Mode
     {
-        Normal
+        Normal,
+        Silent
     };
 
-    EnumSettingT<Mode> mMode = EnumSettingT("Mode", "The mode of the chest stealer", Mode::Normal, "Normal");
+    EnumSettingT<Mode> mMode = EnumSettingT("Mode", "The mode of the chest stealer", Mode::Normal, "Normal", "Silent");
     BoolSetting mRandomizeDelay = BoolSetting("Randomize Delay", "Randomizes the delay between stealing items", false);
     NumberSetting mDelay = NumberSetting("Delay", "The delay between stealing items (in milliseconds)", 50, 0, 500, 1);
     NumberSetting mRandomizeMin = NumberSetting("Randomize Min", "The minimum delay to randomize", 50, 0, 500, 1);
@@ -49,6 +50,7 @@ public:
     bool mIsStealing = false;
     uint64_t mLastItemTaken = 0;
     bool mIsChestOpen = false;
+    std::vector<ItemStack> mItemsToTake = {};
     bool mTotalDirty = false;
     int mTotalItems = 0;
     int mRemainingItems = 0;
@@ -62,9 +64,12 @@ public:
     void onEnable() override;
     void onDisable() override;
     void takeItem(int slot, ItemStack& item);
+    void takeItems(std::map<int, ItemStack>& items);
     void onBaseTickEvent(class BaseTickEvent& event);
     bool doDelay();
+    void onRenderEvent(class RenderEvent& event);
     void onPacketOutEvent(class PacketOutEvent& event);
+    void onPacketInEvent(class PacketInEvent& event);
     uint64_t getDelay() const;
 
     std::string getSettingDisplay() override {

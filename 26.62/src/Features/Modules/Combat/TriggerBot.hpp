@@ -14,6 +14,7 @@ public:
     NumberSetting mAPSMax = NumberSetting("APS Max", "The maximum APS to randomize", 16, 1, 20, 1);
     BoolSetting mUseAntibot = BoolSetting("Use Antibot", "Whether or not to use antibot for exclude actors", true);
     BoolSetting mHive = BoolSetting("Hive", "Attempts to bypass hive's anticheat", true);
+    BoolSetting mIgnoreFriends = BoolSetting("Ignore Friends", "Don't attack players in your friends list", true);  // <-- Новая настройка
 
     TriggerBot() : ModuleBase<TriggerBot>("TriggerBot", "Automatically attacks the entity that you're aiming at", ModuleCategory::Combat, 0, false) {
         mNames = {
@@ -23,7 +24,7 @@ public:
                 {NormalSpaced, "Trigger Bot"}
         };
 
-        addSettings(&mAPSMin, &mAPSMax, &mUseAntibot, &mHive);
+        addSettings(&mAPSMin, &mAPSMax, &mUseAntibot, &mHive, &mIgnoreFriends);  // <-- Добавить &mIgnoreFriends
     }
     Actor* getActorFromEntityId(EntityId entityId);
     void onEnable() override;

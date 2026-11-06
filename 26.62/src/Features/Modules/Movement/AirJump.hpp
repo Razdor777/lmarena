@@ -1,6 +1,3 @@
-//
-// Created by alteik on 04/09/2024.
-//
 #pragma once
 
 #include "Features/Modules/Module.hpp"
@@ -8,14 +5,19 @@
 class AirJump : public ModuleBase<AirJump>
 {
 public:
-    AirJump() : ModuleBase<AirJump>("AirJump", "allow u jump on air", ModuleCategory::Movement, 0, false) {
+    AirJump() : ModuleBase<AirJump>("AirJump",
+        "Allows you to jump in the air",
+        ModuleCategory::Movement, 0, false)
+    {
         mNames = {
-                {Lowercase, "airjump"},
-                {LowercaseSpaced, "air jump"},
-                {Normal, "AirJump"},
-                {NormalSpaced, "Air Jump"}
+            {Lowercase, "airjump"},
+            {LowercaseSpaced, "air jump"},
+            {Normal, "AirJump"},
+            {NormalSpaced, "Air Jump"}
         };
     }
+
+    bool mOldSpacePressed = false;
 
     void onEnable() override;
     void onDisable() override;

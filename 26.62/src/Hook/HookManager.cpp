@@ -30,6 +30,11 @@
 #include "Hooks/RenderHooks/LevelRendererHook.hpp"
 #include "Hooks/WindowsAPIHooks/WndProcHook.hpp"
 #include "Hooks/ClientInstanceHooks/GrabMouseHook.hpp"
+#include "Hooks/RenderHooks/AmbienceHook.hpp"
+#include "Hooks/RenderHooks/HurtColorHook.hpp"
+#include "Hooks/ActorHooks/HealthHooks.hpp"
+#include "Hooks/ActorHooks/ProjectileHooks.hpp"
+#include "Hooks/ActorHooks/BaseTickHook.hpp"
 
 
 #define ADD_HOOK(hook) hooks.emplace_back(std::make_shared<hook>())
@@ -76,6 +81,10 @@ void HookManager::init(bool initLp)
 
 		
 
+		ADD_HOOK(AmbienceHook);
+		ADD_HOOK(HurtColorHook);
+		ADD_HOOK(HealthHooks);
+		ADD_HOOK(ProjectileHooks);
 		for (auto& hook : hooks)
 		{
 			hook->init();
