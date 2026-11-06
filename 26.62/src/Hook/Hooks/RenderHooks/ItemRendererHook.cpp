@@ -1,25 +1,28 @@
-//
-// Created by jcazm on 7/27/2024.
-//
-
 #include "ItemRendererHook.hpp"
-#include <SDK/Minecraft/Actor/ActorRenderData.hpp>
+
+#include <SDK/Minecraft/Rendering/ItemRenderer.hpp>
 #include <SDK/Minecraft/Rendering/BaseActorRenderContext.hpp>
 #include <Features/Events/ItemRendererEvent.hpp>
 
-std::unique_ptr<Detour> ItemRendererHook::mDetour;
-
-void ItemRendererHook::render(ItemRenderer *_this, BaseActorRenderContext *renderContext, ActorRenderData *actorRenderData) {
-    auto original = mDetour->getOriginal<&ItemRendererHook::render>();
-
-
-
-    auto holder = nes::make_holder<ItemRendererEvent>(_this, renderContext, actorRenderData);
-    gFeatureManager->mDispatcher->trigger(holder);
-
-    original(_this, renderContext, actorRenderData);
+void ItemRendererHook::init()
+{
+    mItemRendererDetour = std::make_unique<Detour>(
+        "ItemRenderer::render",
+        reinterpret_cast<void*>(SigManager::ItemRenderer_render),
+        &ItemRendererHook::onRender);
+    mItemRendererDetour->enable();
 }
 
-void ItemRendererHook::init() {
-    mDetour = std::make_unique<Detour>("ItemRenderer::render", reinterpret_cast<void*>(SigManager::ItemRenderer_render), &render);
+void* ItemRendererHook::onRender(ItemRenderer* _this, BaseActorRenderContext* ctx,
+                                  void* a3, void* a4, void* a5, void* a6)
+{
+    auto original = mItemRendererDetour->getOriginal<&ItemRendererHook::onRender>();
+
+    if (_this) sItemRenderer = _this;
+    if (ctx)   sBarContext   = ctx;
+
+    auto holder = nes::make_holder<ItemRendererEvent>(_this, ctx, a3);
+    gFeatureManager->mDispatcher->trigger(holder);
+
+    return original(_this, ctx, a3, a4, a5, a6);
 }

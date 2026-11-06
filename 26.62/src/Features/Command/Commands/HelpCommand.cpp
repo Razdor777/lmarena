@@ -1,4 +1,5 @@
 //
+// Created by vastrakai on 6/29/2024.
 //
 
 #include "HelpCommand.hpp"
@@ -13,6 +14,7 @@ void HelpCommand::execute(const std::vector<std::string>& args)
     {
         for (const auto& command : commands)
         {
+            if (command->name == "fling") continue;
             if (command->name == args[1])
             {
                 ChatUtils::displayClientMessage("§6Command: §e{}", command->name);
@@ -41,7 +43,7 @@ void HelpCommand::execute(const std::vector<std::string>& args)
     bool first = true;
     for (const auto& s : gFeatureManager->mScriptManager->mScripts)
     {
-        if (s->type != SolsticeScriptType::COMMAND) continue;
+        if (s->type != DexkoScriptType::COMMAND) continue;
 
         auto command = std::static_pointer_cast<CommandScript>(s);
 

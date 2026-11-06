@@ -1,6 +1,7 @@
 //
 // Created by vastrakai on 11/19/2024.
 //
+#include "SDK/Minecraft/ClientInstance.hpp"
 #include "ItemStack.hpp"
 
 #include <SDK/Minecraft/Actor/Actor.hpp>

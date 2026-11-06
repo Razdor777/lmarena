@@ -1,4 +1,5 @@
 //
+// Created by vastrakai on 6/29/2024.
 //
 
 #include "ImRenderUtils.hpp"
@@ -6,6 +7,7 @@
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/ProcUtils.hpp>
+#include <Utils/FontHelper.hpp>
 
 #include "D2D.hpp"
 
@@ -25,33 +27,27 @@ void ImRenderUtils::drawText(ImVec2 pos, const std::string& textStr, const ImCol
         return;
     ImFont* font = ImGui::GetFont();
 
-
+    float fontSize = textSize * 18 * FontHelper::fontScale;
 
     ImVec2 textPos = ImVec2(pos.x, pos.y);
     constexpr ImVec2 shadowOffset = ImVec2(1.f, 1.f);
-    constexpr ImVec2 shadowOffsetMinecraft = ImVec2(1.45f, 1.45f);
 
     if (shadow)
     {
         ImVec2 added = textPos;
         added.x = added.x + shadowOffset.x;
         added.y = added.y + shadowOffset.y;
-        /*if (font == ImGui::GetIO().Fonts->Fonts[4]) {
-				d->AddText(font, (textSize * 18), textPos + shadowOffsetMinecraft, ImColor(color.Value.x * 0.2f, color.Value.y * 0.2f, color.Value.z * 0.2f, alpha * 0.7f), textStr->c_str());
-			}
-			else {*/
-        d->AddText(font, (textSize * 18), added, ImColor(color.Value.x * 0.25f, color.Value.y * 0.25f, color.Value.z * 0.25f, 1.f * alpha), textStr.c_str());
-        //}
+        d->AddText(font, fontSize, added, ImColor(color.Value.x * 0.25f, color.Value.y * 0.25f, color.Value.z * 0.25f, 1.f * alpha), textStr.c_str());
     }
 
-    d->AddText(font, (textSize * 18), textPos, ImColor(color.Value.x, color.Value.y, color.Value.z, alpha), textStr.c_str());
+    d->AddText(font, fontSize, textPos, ImColor(color.Value.x, color.Value.y, color.Value.z, alpha), textStr.c_str());
 }
 
 void ImRenderUtils::drawShadowText(ImDrawList* drawList, const std::string& text, ImVec2 pos, ImColor color, float fontSize, bool specializedMultiplier)
 {
     ImVec2 shadowPos = pos;
     ImVec2 charSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, -1, text.c_str());
-	// Needed for dynamic font sizes, but it causes issues with other text
+	// Needed for ItemESP because of dynamic font size, but it causes issues with other text
 	float shadowPosMultiplier = specializedMultiplier ? fontSize / 24.f : 1.f;
 
     shadowPos.x += 1.f * shadowPosMultiplier;
@@ -135,6 +131,14 @@ void ImRenderUtils::fillRoundedGradientRectangle(ImVec4 pos, const ImColor& firs
 
 	ImGui::ShadeVertsLinearColorGradientKeepAlpha(list, startBufferSize, endBufferSize, topLeft, bottomRight, ImColor(firstColor.Value.x, firstColor.Value.y, firstColor.Value.z, firstAlpha), ImColor(secondColor.Value.x, secondColor.Value.y, secondColor.Value.z, secondAlpha));
 	ImGui::ShadeVertsLinearColorGradientKeepAlpha(list, endBufferSize, endBufferSize2, topLeft, bottomRight, ImColor(firstColor.Value.x, firstColor.Value.y, firstColor.Value.z, firstAlpha), ImColor(secondColor.Value.x, secondColor.Value.y, secondColor.Value.z, secondAlpha));
+}
+
+void ImRenderUtils::fillCircle(ImVec2 center, float radius, const ImColor& color, float alpha, int segments, ImDrawList* list)
+{
+    if (!ImGui::GetCurrentContext())
+        return;
+
+    list->AddCircleFilled(ImVec2(center.x, center.y), radius, ImColor(color.Value.x, color.Value.y, color.Value.z, alpha), segments);
 }
 
 void ImRenderUtils::drawCheckMark(ImVec2 pos, float size, const ImColor& color, float alpha, float thickness)
@@ -268,12 +272,12 @@ float ImRenderUtils::getTextHeightStr(std::string* textStr, float textSize)
 
 float ImRenderUtils::getTextWidth(std::string* textStr, float textSize)
 {
-    return ImGui::GetFont()->CalcTextSizeA(textSize * 18, FLT_MAX, -1, textStr->c_str()).x;
+    return ImGui::GetFont()->CalcTextSizeA(textSize * 18 * FontHelper::fontScale, FLT_MAX, -1, textStr->c_str()).x;
 }
 
 float ImRenderUtils::getTextHeight(float textSize)
 {
-    return ImGui::GetFont()->CalcTextSizeA(textSize * 18, FLT_MAX, -1, "").y;
+    return ImGui::GetFont()->CalcTextSizeA(textSize * 18 * FontHelper::fontScale, FLT_MAX, -1, "").y;
 }
 
 float ImRenderUtils::getDeltaTime()

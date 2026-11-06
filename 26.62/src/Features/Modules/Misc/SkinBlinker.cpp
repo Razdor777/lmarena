@@ -79,7 +79,7 @@ std::vector<unsigned char> convToRGBA(const std::vector<unsigned char>& data, in
 
 std::unique_ptr<SkinCapePair> getRandSkinCapePair()
 {
-    std::string skinPath = FileUtils::getSolsticeDir() + "BlinkerSkins\\";
+    std::string skinPath = FileUtils::getDexkoDir() + "BlinkerSkins\\";
     // capes are suffixed with _cape.png, skins are suffixed with _skin.png
     std::vector<std::string> skinFiles;
     for (const auto& entry : std::filesystem::directory_iterator(skinPath))

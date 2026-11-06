@@ -69,7 +69,7 @@ void Watermark::onRenderEvent(RenderEvent& event)
         FontHelper::pushPrefFont(true);
     }
 
-    static std::string watermarkText = "solstice";
+    static std::string watermarkText = "dexko";
     static float size = 45;
 
     ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, watermarkText.c_str(), nullptr);

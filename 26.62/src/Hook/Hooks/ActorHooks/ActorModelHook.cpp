@@ -8,7 +8,6 @@
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/ActorPartModel.hpp>
 #include <Features/Events/BoneRenderEvent.hpp>
-#include <Features/Modules/Visual/Animations.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 
 std::unique_ptr<Detour> ActorModelHook::mDetour;

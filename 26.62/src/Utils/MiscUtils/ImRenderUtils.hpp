@@ -1,7 +1,9 @@
 #pragma once
 #include <string>
+#include <Features/Events/MouseEvent.hpp>
 #include <Features/Modules/Setting.hpp>
 //
+// Created by vastrakai on 6/29/2024.
 //
 
 struct ImVec4;
@@ -22,6 +24,7 @@ public:
 	static void fillRoundedGradientRectangle(ImVec4 pos, const ImColor& firstColor, const ImColor& secondColor, float radius, float firstAlpha, float secondAlpha, ImDrawFlags flags = 0);
 	static void drawCheckMark(ImVec2 pos, float size, const ImColor& color, float alpha, float thickness = 2.0f);
 	static void fillCircle(ImVec2 center, float radius, const ImColor& color, float alpha, int segments);
+	static void fillCircle(ImVec2 center, float radius, const ImColor& color, float alpha, int segments, ImDrawList* list);
 	static void drawColorPicker(ImVec4& color, ImVec4 canvas_pos);
 	static ImVec2 getScreenSize();
 	static bool isFullScreen();

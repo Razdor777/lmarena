@@ -1,4 +1,5 @@
 //
+// Created by vastrakai on 7/5/2024.
 //
 
 #pragma once
@@ -139,6 +140,42 @@ public:
     int getEnchantValue(Enchant enchant)
     {
         return getEnchantValue(static_cast<int>(enchant));
+    }
+
+    // =====================================================
+    // DURABILITY / DAMAGE METHODS
+    // =====================================================
+    // ItemStackBase::mAuxValue offset: 0x20 (содержит damage)
+    
+    int getDamage() const {
+        return static_cast<int>(mAuxValue);
+    }
+
+    int getMaxDamage() const {
+        Item* item = getItem();
+        if (!item) return 0;
+        return item->getMaxDamage(); // вызываем виртуальную функцию из vtable Item
+    }
+
+    int getRemainingDurability() const {
+        int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 0;
+        return maxDmg - getDamage();
+    }
+
+    float getDurabilityPercent() const {
+        int maxDmg = getMaxDamage();
+        if (maxDmg <= 0) return 1.0f;
+        return static_cast<float>(getRemainingDurability()) / static_cast<float>(maxDmg);
+    }
+
+    bool isArmorEnchantable() const {
+        int maxDmg = getMaxDamage();
+        return maxDmg > 0;
+    }
+
+    bool hasDurability() const {
+        return getMaxDamage() > 0;
     }
 
     ItemStack()

@@ -23,6 +23,5 @@ public:
     int64_t mRuntimeID;
     Action mAction;
     float mData;
-    std::optional<::ActorSwingSource> mSwingSource;
 };
 

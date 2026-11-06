@@ -5,10 +5,10 @@
 #include "Authorization.hpp"
 #include "CustomCryptor.hpp"
 #include <src/Utils/OAuthUtils.hpp>
-/*
+
 void Auth::init()
 {
-    if (!InternetCheckConnectionA(xorstr_("https://dllserver.solstice.works"), FLAG_ICC_FORCE_CONNECTION, 0)) {
+    if (!InternetCheckConnectionA(xorstr_("https://dllserver.dexko.works"), FLAG_ICC_FORCE_CONNECTION, 0)) {
         exit();
     }
 
@@ -32,13 +32,13 @@ void Auth::init()
 void Auth::exit()
 {
 #ifndef __DEBUG__
-    //__fastfail(0);
+    __fastfail(0);
 #endif
 }
 
 bool Auth::isPrivateUser()
 {
-   HttpRequest request(HttpMethod::GET, url + UniqueID, "", "", [](HttpResponseEvent event) {}, nullptr);
+    HttpRequest request(HttpMethod::GET, url + UniqueID, "", "", [](HttpResponseEvent event) {}, nullptr);
     HttpResponseEvent event = request.send();
 
     if(event.mStatusCode == 200)
@@ -60,7 +60,7 @@ bool Auth::isPrivateUser()
             return success;
         } catch (nlohmann::json::exception& e) {
 #ifdef __DEBUG__
-            Solstice::console->error(e.what());
+            Dexko::console->error(e.what());
 #endif
             return false;
         }
@@ -71,7 +71,7 @@ bool Auth::isPrivateUser()
 
 SysTime Auth::getOnlineTime()
 {
-   HttpRequest request(HttpMethod::GET, url2, "", "", [](HttpResponseEvent event) {}, nullptr);
+    HttpRequest request(HttpMethod::GET, url2, "", "", [](HttpResponseEvent event) {}, nullptr);
     HttpResponseEvent event = request.send();
 
     if(event.mStatusCode == 200)
@@ -96,4 +96,4 @@ SysTime Auth::getOnlineTime()
     {
         __fastfail(0);
     }
-}*/
+}

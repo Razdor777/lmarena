@@ -154,6 +154,61 @@ public:
 	DEFINE_SIG(LevelRenderer_renderLevel, "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 44 0F 29 9D ? ? ? ? 44 0F 29 95 ? ? ? ? 66 44 0F 7F 8D ? ? ? ? 44 0F 29 85 ? ? ? ? 0F 29 BD", SigType::Sig, 0);
 
 
+
+	// ================================================================
+	// DEXKO: кастомные сигнатуры (перенесены с 1.21.44).
+	// TODO(26.62): паттерны сняты со старой версии игры — часть из них НЕ
+	// найдётся на 26.62. Ненайденные надо переснять с нового
+	// Minecraft.Windows.exe (заметки: docs/RE_notes_supervazhno.txt).
+	// Пока сигнатура == 0, зависимые модули не включать!
+	// ================================================================
+  // DEFINE_SIG(Actor_vtable, "48 8D 05 ? ? ? ? 48 89 01 ? ? ? ? 00 44 8D 4A 04 44 8D 42 02 66 C7 44 24 20 37 00 E8 ? ? ? ? 48 8B 8F 80 11 00 00", SigType::RefSig, 3);
+  // DEFINE_SIG(BaseActorRenderer_renderText, "E8 ? ? ? ? 48 83 C3 70 48 3B DE 75 D3", SigType::RefSig, 1);
+  // DEFINE_SIG(BlockSource_getBiome, "48 89 5C 24 18 57 48 83 EC 60 48 8B DA 48 8B F9 48 8B", SigType::Sig, 0);
+  // DEFINE_SIG(BoneOrientation_computeBoneTransform, "48 8B C4 53 57 48 81 EC 38 01 00 00 80 B9 DE 00 00 00 00", SigType::Sig, 0);
+  // DEFINE_SIG(CameraYaw, "F3 0F 11 00 F3 0F 11 70 04", SigType::Sig, 0);
+  // DEFINE_SIG(CameraYaw2, "F3 0F 11 10 48 8B 8F 30 02 00 00", SigType::Sig, 0);
+	// TODO: ClientInputCallbacks_handleBuildAction_onAttack_setNoBlockBreakUntil — строка не найдена в старом SigManager.hpp
+  // DEFINE_SIG(ClientInstance_updateScreenSizeVariables, "48 8B C4 48 89 58 18 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 28 FF FF FF 48 81 EC A0 01 00 00 0F 29 70 B8 0F 29 78 A8 44 0F 29 40 98 44 0F 29 48 88 44 0F 29 90 78 FF FF FF 44 0F 29 98 68 FF FF FF 44 0F 29 A0 58 FF FF FF 48", SigType::Sig, 0);
+	// TODO: ColorTint_set — строка не найдена в старом SigManager.hpp
+	// TODO: ContainerScreenController_onContainerSlotHovered — строка не найдена в старом SigManager.hpp
+	// TODO: ContainerScreenController_tryBeginTransition — строка не найдена в старом SigManager.hpp
+	// TODO: ContainerValidation_handlePlace_jnz — строка не найдена в старом SigManager.hpp
+	// TODO: ContainerValidation_handlePlace_test — строка не найдена в старом SigManager.hpp
+	// TODO: ContainerValidation_handleTransfer_jnz — строка не найдена в старом SigManager.hpp
+  // DEFINE_SIG(Dimension_getBrightnessDependentFogColor, "41 0F 10 00 48 8B C2 0F", SigType::Sig, 0);
+  // DEFINE_SIG(Font_drawTransformed, "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 18 57 41 54 41 55 41 56 41 57 48 81 EC B0 01", SigType::Sig, 0);
+  // DEFINE_SIG(GeneralSettingsScreenController_ctor, "48 89 5C 24 18 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 30 FB FF FF 48 81 EC D0 05 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 C0 04 00 00 45", SigType::Sig, 0);
+  // DEFINE_SIG(HitResult_getEntity, "40 55 57 41 54 41 56 41 57 48 83", SigType::Sig, 0);
+	// TODO: HudCursorRenderer_render — строка не найдена в старом SigManager.hpp
+	// TODO: HurtColor — строка не найдена в старом SigManager.hpp
+	// TODO: ItemEntityRenderer_render — строка не найдена в старом SigManager.hpp
+	// TODO: ItemInHandRenderer_renderItem — строка не найдена в старом SigManager.hpp
+	// TODO: ItemRenderer_getAtlasIconInfo — строка не найдена в старом SigManager.hpp
+	// TODO: ItemRenderer_getIconUV — строка не найдена в старом SigManager.hpp
+	// TODO: ItemRenderer_iconBlit — строка не найдена в старом SigManager.hpp
+	// TODO: ItemRenderer_renderGuiItem — строка не найдена в старом SigManager.hpp
+	// TODO: ItemRenderer_renderGuiItemNew — строка не найдена в старом SigManager.hpp
+	// TODO: ItemStack_fromDescriptor — строка не найдена в старом SigManager.hpp
+  // DEFINE_SIG(ItemStack_getDamageValue, "40 53 48 83 EC 30 48 8B 51 08 33", SigType::Sig, 0);
+  // DEFINE_SIG(ItemStack_isEnchanted, "48 83 EC 38 48 8B 49 10 48 85 C9 74 60", SigType::Sig, 0);
+  // DEFINE_SIG(LevelRendererPlayer_renderOutlineSelection, "E8 ? ? ? ? 90 48 8D 8D ? ? ? ? E8 ? ? ? ? 48 8B 86 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 80 38 ? 0F 84 ? ? ? ? 48 8B 86 ? ? ? ? 48 85 C0 74 ? F0 FF 40 ? 48 8B 86", SigType::RefSig, 1);
+  // DEFINE_SIG(MeshHelpers_renderMeshImmediately, "E8 ? ? ? ? 41 C6 44 24 38 01 F3 0F 10 1D", SigType::RefSig, 1);
+  // DEFINE_SIG(MeshHelpers_renderMeshImmediately2, "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 98 FC FF FF 48 81 EC 68 04 00 00 49", SigType::Sig, 0);
+  // DEFINE_SIG(MinecraftGame_onResumeWaitReloadActors, "48 89 5C 24 10 48 89 74 24 18 55 57 41 54 41 56 41 57 48 8D 6C 24 C9 48 81 EC D0 00 00 00 4C 8B F9 48", SigType::Sig, 0);
+  // DEFINE_SIG(Options_getSensitivity, "48 83 EC 18 48 8B 41 08 4C 8B C9", SigType::Sig, 0);
+  // DEFINE_SIG(RaknetTick, "4C 8B DC 49 89 5B 10 49 89 6B 18 56 57 41 56 48 81 EC 10", SigType::Sig, 0);
+  // DEFINE_SIG(ScreenRenderer_blit, "48 89 5C 24 08 57 48 83 EC 60 0F 57", SigType::Sig, 0);
+  // DEFINE_SIG(SettingsScreenOnExit, "40 57 48 83 EC 40 48 8B 79", SigType::Sig, 0);
+  // DEFINE_SIG(SettingsScreenOnExit_Patch, "74 ? 48 8b 8f ? ? ? ? e8 ? ? ? ? 33 c0", SigType::Sig, 0);
+  // DEFINE_SIG(Tessellator_begin, "40 53 55 48 83 EC 28 80 B9", SigType::Sig, 0);
+  // DEFINE_SIG(ThirdPersonNametag, "0F 84 B5 05 00 00 49 8B 07 49 8B CF 48 8B 80 00 01 00 00", SigType::Sig, 0);
+  // DEFINE_SIG(UIControl_getPosition, "48 89 5C 24 10 48 89 74 24 18 57 48 83 EC 60 0F 29 74 24 50 0F 29 7C 24 40 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 30", SigType::Sig, 0);
+  // DEFINE_SIG(UpdatePlayer, "48 89 5C 24 08 57 48 83 EC 70 0F 29 74 24 60 49", SigType::Sig, 0);
+  // DEFINE_SIG(blockHighlightColor, "? ? ? ? 0F 11 85 78 02 00 00 0F 11 00", SigType::Sig, 0);
+  // DEFINE_SIG(mce_Color_BLACK, "? ? ? ? 0F 11 00 C6 40 10 ? 0F 57 C9", SigType::Sig, 0);
+  // DEFINE_SIG(mce_RenderMaterialGroup_ui, "48 8B 05 ? ? ? ? 48 8D 55 90 48 8D 0D ? ? ? ? 48 8B 40 08 FF 15 ? ? ? ? 48 8B D8", SigType::RefSig, 3);
+
 	static void initialize();
 	static void deinitialize();
 };

@@ -10,12 +10,14 @@ public:
     NumberSetting mRange = NumberSetting("Range", "The range at which to surround entities", 5, 3, 8, 0.1);
     NumberSetting mDelay = NumberSetting("Delay", "The delay in ms to place block", 500, 0, 3000, 50);
     BoolSetting mHotbarOnly = BoolSetting("Hotbar Only", "Only switch to blocks in the hotbar", true);
+    BoolSetting mAirPlace = BoolSetting("Air Place", "Allow placing surround blocks in mid-air", true);
     BoolSetting mDebug = BoolSetting("Debug", "Send debug messages", false);
     Surround() : ModuleBase("Surround", "Surround a player with blocks", ModuleCategory::Player, 0, false)
     {
         addSetting(&mRange);
         addSetting(&mDelay);
         addSetting(&mHotbarOnly);
+        addSetting(&mAirPlace);
         addSetting(&mDebug);
 
         mNames = {

@@ -17,16 +17,16 @@ struct SysTime {
 class Auth
 {
 public:
-    /*
+
     std::string UniqueID = "";
-    std::string uniqueIdFile = FileUtils::getSolsticeDir() + xorstr_("uniqueId.txt");
-    static inline std::string url = xorstr_("https://dllserver.solstice.works/hasPrivateAccess?uniqueId=");
+    std::string uniqueIdFile = FileUtils::getDexkoDir() + xorstr_("uniqueId.txt");
+    static inline std::string url = xorstr_("https://dllserver.dexko.works/hasPrivateAccess?uniqueId=");
     static inline std::string url2 = xorstr_("https://www.timeapi.io/api/Time/current/zone?timeZone=UTC");
 
     void init();
     void exit();
     bool isPrivateUser();
-    static SysTime getOnlineTime();*/
+    static SysTime getOnlineTime();
 };
 
 #define isTimeSyncedCheck() \

@@ -4,12 +4,12 @@
 
 #include "Friends.hpp"
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <Features/Modules/Player/Teams.hpp>
 
 void Friends::onInit()
 {
-    mFriends = Solstice::Prefs->mFriends;
+    mFriends = Dexko::Prefs->mFriends;
 }
 
 bool Friends::isFriend(const std::string& name)
@@ -27,8 +27,8 @@ bool Friends::isFriend(Actor* actor)
 void Friends::addFriend(const std::string& name)
 {
     mFriends.push_back(name);
-    Solstice::Prefs->mFriends = mFriends;
-    PreferenceManager::save(Solstice::Prefs);
+    Dexko::Prefs->mFriends = mFriends;
+    PreferenceManager::save(Dexko::Prefs);
 }
 
 void Friends::addFriend(Actor* actor)
@@ -39,8 +39,8 @@ void Friends::addFriend(Actor* actor)
 void Friends::removeFriend(const std::string& name)
 {
     std::erase(mFriends, name);
-    Solstice::Prefs->mFriends = mFriends;
-    PreferenceManager::save(Solstice::Prefs);
+    Dexko::Prefs->mFriends = mFriends;
+    PreferenceManager::save(Dexko::Prefs);
 }
 
 void Friends::removeFriend(Actor* actor)
@@ -51,6 +51,6 @@ void Friends::removeFriend(Actor* actor)
 void Friends::clearFriends()
 {
     mFriends.clear();
-    Solstice::Prefs->mFriends = mFriends;
-    PreferenceManager::save(Solstice::Prefs);
+    Dexko::Prefs->mFriends = mFriends;
+    PreferenceManager::save(Dexko::Prefs);
 }

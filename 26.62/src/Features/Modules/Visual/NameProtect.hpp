@@ -15,7 +15,7 @@ public:
         };
 
         // god fucking dammit alteik
-        mNewName = Solstice::Prefs->mStreamerName;
+        mNewName = Dexko::Prefs->mStreamerName;
     }
     std::string mNewName = "";
 

@@ -1,4 +1,5 @@
 //
+// Created by vastrakai on 6/29/2024.
 //
 
 #include "D2D.hpp"
@@ -293,10 +294,12 @@ void D2D::blurCallbackOptimized(const ImDrawList* parent_list, const ImDrawCmd* 
         SafeRelease(&cachedBitmap); // Ensure previous bitmap is released
         D2D1_BITMAP_PROPERTIES props = D2D1::BitmapProperties(sourceBitmap->GetPixelFormat());
         d2dDeviceContext->CreateBitmap(bitmapSize, props, &cachedBitmap);
-        auto destPoint = D2D1::Point2U(0, 0);
-        auto rect = D2D1::RectU(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-        cachedBitmap->CopyFromBitmap(&destPoint, sourceBitmap.get(), &rect);
     }
+
+    // FIX: always refresh cachedBitmap from the CURRENT frame so we don't blur old pixels
+    auto destPoint = D2D1::Point2U(0, 0);
+    auto rect = D2D1::RectU(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+    cachedBitmap->CopyFromBitmap(&destPoint, sourceBitmap.get(), &rect);
 
     // Only recreate the clip rect geometry if the clipRect or rounding has changed
     static ImVec4 cachedClipRect;
@@ -311,19 +314,18 @@ void D2D::blurCallbackOptimized(const ImDrawList* parent_list, const ImDrawCmd* 
         d2dFactory->CreateRoundedRectangleGeometry(clipRectRounded, &cachedClipRectGeo);
     }
 
-    // Reuse the image brush if possible
-    if (cachedBrush == nullptr) {
-        ID2D1Image* outImage = nullptr;
-        blurEffect->SetInput(0, cachedBitmap);
-        blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, data->strength);
-        blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
-        blurEffect->GetOutput(&outImage);
+    // FIX: recreate the image brush every frame because the bitmap content changed
+    SafeRelease(&cachedBrush);
+    ID2D1Image* outImage = nullptr;
+    blurEffect->SetInput(0, cachedBitmap);
+    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, data->strength);
+    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
+    blurEffect->GetOutput(&outImage);
 
-        D2D1_IMAGE_BRUSH_PROPERTIES brushProps = D2D1::ImageBrushProperties(D2D1::RectF(0, 0, io.DisplaySize.x, io.DisplaySize.y));
-        d2dDeviceContext->CreateImageBrush(outImage, brushProps, &cachedBrush);
+    D2D1_IMAGE_BRUSH_PROPERTIES brushProps = D2D1::ImageBrushProperties(D2D1::RectF(0, 0, io.DisplaySize.x, io.DisplaySize.y));
+    d2dDeviceContext->CreateImageBrush(outImage, brushProps, &cachedBrush);
 
-        SafeRelease(&outImage); // Release image after use
-    }
+    SafeRelease(&outImage); // Release image after use
 
     ID2D1Image* originalTarget = nullptr;
     d2dDeviceContext->GetTarget(&originalTarget);
@@ -333,6 +335,14 @@ void D2D::blurCallbackOptimized(const ImDrawList* parent_list, const ImDrawCmd* 
     d2dDeviceContext->SetTarget(originalTarget);
     SafeRelease(&originalTarget);
     d2dDeviceContext->Flush();
+
+    // Free the callback data
+    for (auto it = blurCallbacks.begin(); it != blurCallbacks.end(); it++) {
+        if (it->get() == data) {
+            blurCallbacks.erase(it);
+            break;
+        }
+    }
 }
 
 

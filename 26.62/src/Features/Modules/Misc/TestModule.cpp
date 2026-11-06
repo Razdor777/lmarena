@@ -708,7 +708,7 @@ void TestModule::onRenderEvent(RenderEvent& event)
 						j.push_back(sizeComponent.toJson());
 					}
 
-					std::string path = FileUtils::getSolsticeDir() + "\\component_sizes.json";
+					std::string path = FileUtils::getDexkoDir() + "\\component_sizes.json";
 					std::ofstream file(path);
 					file << j.dump(4);
 					file.close();

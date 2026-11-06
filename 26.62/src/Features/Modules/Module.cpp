@@ -1,7 +1,3 @@
-//
-// Created by vastrakai on 6/28/2024.
-//
-
 #include "Module.hpp"
 
 #include <Features/FeatureManager.hpp>
@@ -87,28 +83,41 @@ nlohmann::json Module::serialize()
         if (setting->mType == SettingType::Enum)
         {
             auto* enumSetting = reinterpret_cast<EnumSetting*>(setting);
-            // use the serialize() from the enum setting
             j["settings"].push_back(enumSetting->serialize());
         }
         else if (setting->mType == SettingType::Number)
         {
             auto* numberSetting = reinterpret_cast<NumberSetting*>(setting);
-            // use the serialize() from the number setting
             j["settings"].push_back(numberSetting->serialize());
         }
         else if (setting->mType == SettingType::Bool)
         {
             auto* boolSetting = reinterpret_cast<BoolSetting*>(setting);
-            // use the serialize() from the bool setting
             j["settings"].push_back(boolSetting->serialize());
         }
         else if (setting->mType == SettingType::Color)
         {
             auto* colorSetting = reinterpret_cast<ColorSetting*>(setting);
-            // use the serialize() from the color setting
             j["settings"].push_back(colorSetting->serialize());
         }
+        else if (setting->mType == SettingType::String)
+        {
+            auto* stringSetting = reinterpret_cast<StringSetting*>(setting);
+            j["settings"].push_back(stringSetting->serialize());
+        }
     }
+
+    // === АВТОМАТИЧЕСКИ добавляем customData если модуль имеет кастомные данные ===
+    if (hasCustomData())
+    {
+        try {
+            j["customData"] = serializeCustomData();
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to serialize custom data for {}: {}", mName, e.what());
+            j["customData"] = nlohmann::json::object();
+        }
+    }
+
     return j;
 }
 
@@ -121,7 +130,6 @@ Setting* Module::getSetting(const std::string& string)
             return setting;
         }
     }
-    // Go through again
     for (auto setting : mSettings)
     {
         std::string filteredName = StringUtils::toLower(setting->mName);

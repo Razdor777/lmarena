@@ -110,9 +110,9 @@ void TestCommand::execute(const std::vector<std::string>& args)
     if (arg == "enforcedebug")
     {
 #ifdef __DEBUG__
-        Solstice::Prefs->mEnforceDebugging = !Solstice::Prefs->mEnforceDebugging;
-        PreferenceManager::save(Solstice::Prefs);
-        ChatUtils::displayClientMessage("Enforce debugging set to {}", Solstice::Prefs->mEnforceDebugging ? "true" : "false");
+        Dexko::Prefs->mEnforceDebugging = !Dexko::Prefs->mEnforceDebugging;
+        PreferenceManager::save(Dexko::Prefs);
+        ChatUtils::displayClientMessage("Enforce debugging set to {}", Dexko::Prefs->mEnforceDebugging ? "true" : "false");
         ChatUtils::displayClientMessage("You may need to reinject for this to take effect.");
 #else
         ChatUtils::displayClientMessage("This command is only available in debug builds.");

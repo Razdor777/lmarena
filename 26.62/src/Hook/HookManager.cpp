@@ -30,6 +30,10 @@
 #include "Hooks/RenderHooks/LevelRendererHook.hpp"
 #include "Hooks/WindowsAPIHooks/WndProcHook.hpp"
 #include "Hooks/ClientInstanceHooks/GrabMouseHook.hpp"
+// --- Dexko: свои хуки ---
+#include "Hooks/ActorHooks/ProjectileHooks.hpp"
+#include "Hooks/RenderHooks/AmbienceHook.hpp"
+#include "Hooks/RenderHooks/HurtColorHook.hpp"
 
 
 #define ADD_HOOK(hook) hooks.emplace_back(std::make_shared<hook>())
@@ -73,6 +77,10 @@ void HookManager::init(bool initLp)
 		ADD_HOOK(WndProcHook);
 		ADD_HOOK(GrabMouseHook);
 		ADD_HOOK(LevelRendererHook);
+		// --- Dexko: свои хуки ---
+		ADD_HOOK(ProjectileHooks);
+		ADD_HOOK(AmbienceHook);
+		ADD_HOOK(HurtColorHook);
 
 		
 

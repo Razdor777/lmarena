@@ -52,7 +52,7 @@ void ScriptingGui::render(float inScale, float animation, ImVec2 screen, float b
 
     int i = 0;
     for (auto& psc : scripts) {
-        if (psc->type != SolsticeScriptType::MODULE) continue;
+        if (psc->type != DexkoScriptType::MODULE) continue;
         i++;
 
         std::shared_ptr<ModuleScript> script = std::reinterpret_pointer_cast<ModuleScript>(psc);

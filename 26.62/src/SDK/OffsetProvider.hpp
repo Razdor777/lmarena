@@ -205,6 +205,45 @@ public:
 	DEFINE_FIELD(LevelRendererPlayer_mCameraPos, 0x9C4);
 	DEFINE_FIELD(LevelRenderer_mRendererPlayer, 0x480);
 
-	static void initialize();
+	
+	// ================================================================
+	// DEXKO: кастомные оффсеты (перенесены с 1.21.44).
+	// TODO(26.62): сняты со старой версии — перепроверить на 26.62!
+	// ================================================================
+	// TODO: ClientInstance_mFovX — строка не найдена в старом OffsetProvider.hpp
+	// TODO: ClientInstance_mFovY — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Biome_name — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_camera — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_getBlockSource — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_getFovX — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_getFovY — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_getPacketSender — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_guiData — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_levelRenderer — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_minecraftGame — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ClientInstance_viewMatrix — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_LevelData_worldName — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_LevelRender_getLevelRendererPlayer — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_LevelRendererPlayer_cameraPos — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Level_LevelData — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Level_getPlayerMap — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Level_hitResult — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Level_worldFolderName — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_MinecraftGame_mouseGrabbed — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_MinecraftGame_textureGroup — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_NetherNetConnector_mPeers — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_NetworkSystem_remoteConnectorComposite — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Player_gamemode — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_Player_playerName — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_RaknetConnector_JoinedIp — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_RaknetConnector_getPeer — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_RaknetConnector_port — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_RaknetConnector_rawIp — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_RemoteConnectorComposite_netherNetConnector — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_RemoteConnectorComposite_rakNetConnector — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Flarial_ScreenContext_tessellator — строка не найдена в старом OffsetProvider.hpp
+	// TODO: Level_getBlockPalette — строка не найдена в старом OffsetProvider.hpp
+
+static void initialize();
 	static void deinitialize();
 };

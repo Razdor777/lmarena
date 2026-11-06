@@ -1,8 +1,3 @@
-<<<<<<< HEAD:26.62/CMakeLists.txt
-=======
-# Dexko — standalone Minecraft Bedrock client (x64 / MSVC).
-# Minimal build: only the sources the client actually uses are compiled.
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/CMakeLists.txt
 cmake_minimum_required(VERSION 3.28)
 include(cmake/CPM.cmake)
 project(Dexko)
@@ -74,6 +69,12 @@ CPMAddPackage(
         NAME nlohmann_json
         GITHUB_REPOSITORY nlohmann/json
         VERSION 3.11.3
+)
+
+CPMAddPackage(
+        NAME DirectXTK
+        GITHUB_REPOSITORY microsoft/DirectXTK
+        GIT_TAG main
 )
 
 CPMAddPackage(
@@ -154,8 +155,6 @@ add_compile_options($<$<CONFIG:Debug>:/Zi>)
 add_link_options($<$<CONFIG:Release>:/Zi>) # generate pdb
 add_link_options($<$<CONFIG:Release>:/INCREMENTAL:NO>) # disable incremental linking
 add_link_options($<$<CONFIG:Release>:/LTCG>) # link-time code generation
-add_link_options($<$<CONFIG:Release>:/OPT:REF>) # drop unreferenced code
-add_link_options($<$<CONFIG:Release>:/OPT:ICF>) # fold identical functions (smaller dll)
 add_link_options($<$<CONFIG:Release>:/DEBUG>) # enable debugging
 add_compile_options($<$<CONFIG:Release>:/O2>) # optimize for speed
 add_compile_options($<$<CONFIG:Release>:/Oi>) # enable intrinsic functions
@@ -174,22 +173,18 @@ add_compile_options($<$<CONFIG:Release>:/MP>) # multi-threaded compilation
 add_compile_options($<$<CONFIG:Release>:/Oy->) # omit frame pointers
 
 
-<<<<<<< HEAD:26.62/CMakeLists.txt
-set(SOLSTICE_VERSION "v1.0.0")
-add_compile_definitions(SOLSTICE_VERSION="${SOLSTICE_VERSION}")
-=======
-
-
-
 set(DEXKO_VERSION "v1.0.0")
 add_compile_definitions(DEXKO_VERSION="${DEXKO_VERSION}")
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/CMakeLists.txt
 
 add_definitions(-DWIN32_LEAN_AND_MEAN)
 
 set(KIERO_INCLUDE_D3D11 ON)
 set(KIERO_INCLUDE_D3D12 ON)
 set(KIERO_BUILD_EXAMPLES OFF)
+
+# Dexko (как в старом проекте): __DEBUG__ определён всегда, чтобы ненайденные
+# кастомные сигнатуры не убивали клиент через __fastfail (SigManager::initialize).
+add_compile_definitions(__DEBUG__)
 
 include_directories(.)
 include_directories(src)
@@ -204,20 +199,11 @@ include_directories(include/nes)
 
 file(GLOB_RECURSE sourceFiles "src/*.cpp")
 file(GLOB_RECURSE includeFiles "include/*.hpp")
-<<<<<<< HEAD:26.62/CMakeLists.txt
-=======
-
-# Anything that must not be compiled lives outside src/ — the glob below is
-# the only source list, so an empty src/ means an empty client (by design).
-list(FILTER sourceFiles EXCLUDE REGEX "/1\\.26\\.4x or 1\\.26\\.5x/")
-list(FILTER includeFiles EXCLUDE REGEX "/1\\.26\\.4x or 1\\.26\\.5x/")
-
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/CMakeLists.txt
 set_source_files_properties(${sourceFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 set_source_files_properties(${includeFiles} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
 
-# Resource embedding (resources/* -> .o via ld)
+# Krazy resource embedding code
 
 file(GLOB_RECURSE resource_files_list "resources/*")
 
@@ -248,14 +234,9 @@ endforeach()
 
 add_resources(resource_files ${resource_files})
 
-<<<<<<< HEAD:26.62/CMakeLists.txt
-add_library(Solstice SHARED ${sourceFiles} ${resource_files})
-set_property(TARGET Solstice PROPERTY UNITY_BUILD TRUE)
-add_dependencies(${PROJECT_NAME} generate_build_info SolsticeShaders)
-=======
 add_library(Dexko SHARED ${sourceFiles} ${resource_files})
+set_property(TARGET Dexko PROPERTY UNITY_BUILD TRUE)
 add_dependencies(${PROJECT_NAME} generate_build_info DexkoShaders)
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/CMakeLists.txt
 
 set(RESOURCE_HEADER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.hpp")
 set(RESOURCE_SOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Resources.cpp")
@@ -334,26 +315,17 @@ add_subdirectory(include/ImGui)
 add_subdirectory(include/Kiero)
 add_subdirectory(include/nes)
 
-<<<<<<< HEAD:26.62/CMakeLists.txt
 
 set_property(TARGET DirectXTK PROPERTY UNITY_BUILD FALSE)
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/CMakeLists.txt
 set_property(TARGET minhook PROPERTY UNITY_BUILD FALSE)
 
 target_include_directories(Dexko PRIVATE include/ImGui)
 target_include_directories(Dexko PRIVATE include/Kiero)
 
-<<<<<<< HEAD:26.62/CMakeLists.txt
 
-target_link_libraries(Solstice PRIVATE OpenMP::OpenMP_CXX  DirectXTK spdlog version.lib nlohmann_json glm minhook kiero nuvola_event_system libhat dbghelp.lib winmm.lib magic_enum d3d12.lib d3d11.lib d2d1.lib dxgi.lib dxguid.lib dwrite.lib winmm.lib dbghelp.lib comctl32.lib ws2_32.lib cryptopp ole32.lib Mmdevapi.lib WindowsApp.lib OneCore.lib )
+target_link_libraries(Dexko PRIVATE OpenMP::OpenMP_CXX  DirectXTK spdlog version.lib nlohmann_json glm minhook kiero nuvola_event_system libhat dbghelp.lib winmm.lib magic_enum d3d12.lib d3d11.lib d2d1.lib dxgi.lib dxguid.lib dwrite.lib winmm.lib dbghelp.lib comctl32.lib ws2_32.lib cryptopp ole32.lib Mmdevapi.lib WindowsApp.lib OneCore.lib )
 
-set_property(TARGET Solstice nlohmann_json minhook spdlog cryptopp  DirectXTK glm kiero nuvola_event_system magic_enum libhat PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
-=======
-target_link_libraries(Dexko PRIVATE OpenMP::OpenMP_CXX spdlog version.lib nlohmann_json glm minhook kiero nuvola_event_system libhat dbghelp.lib magic_enum d3d12.lib d3d11.lib d2d1.lib dxgi.lib dxguid.lib dwrite.lib cryptopp ole32.lib RuntimeObject.lib)
-
-set_property(TARGET Dexko nlohmann_json minhook spdlog cryptopp glm kiero nuvola_event_system magic_enum libhat PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/CMakeLists.txt
+set_property(TARGET Dexko nlohmann_json minhook spdlog cryptopp  DirectXTK glm kiero nuvola_event_system magic_enum libhat PROPERTY MSVC_RUNTIME_LIBRARY "$<$<CONFIG:Debug>:MultiThreadedDLL>$<$<CONFIG:Release>:MultiThreaded>")
 
 
 target_precompile_headers(Dexko PRIVATE

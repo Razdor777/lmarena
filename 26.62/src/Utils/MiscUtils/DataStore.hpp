@@ -15,7 +15,7 @@ public:
 
     [[nodiscard]] std::string getPath() const
     {
-        return FileUtils::getSolsticeDir() + "\\Databases\\" + mName + ".json";
+        return FileUtils::getDexkoDir() + "\\Databases\\" + mName + ".json";
     }
 
     void load()

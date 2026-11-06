@@ -4,10 +4,10 @@
 
 #include "BlockUtils.hpp"
 
-//#include <src/Features/Modules/Player/Regen.hpp>
+#include <src/Features/Modules/Player/Regen.hpp>
 #include <src/Features/Modules/Player/OreMiner.hpp>
-
 #include <Features/Events/BlockChangedEvent.hpp>
+#include <Features/FeatureManager.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/GameMode.hpp>
@@ -24,6 +24,7 @@
 #include <SDK/Minecraft/Network/Packets/UpdateBlockPacket.hpp>
 #include <SDK/Minecraft/World/Chunk/LevelChunk.hpp>
 #include <SDK/Minecraft/World/Chunk/SubChunkBlockStorage.hpp>
+#include <Utils/GameUtils/PacketUtils.hpp>
 
 
 bool BlockUtils::isGoodBlock(glm::ivec3 blockPos)
@@ -31,9 +32,20 @@ bool BlockUtils::isGoodBlock(glm::ivec3 blockPos)
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
     Block* block = ClientInstance::get()->getBlockSource()->getBlock(blockPos);
-    int blockId = block->toLegacy()->getBlockId();
-    bool isLiquid = 8 <= blockId && blockId <= 11;
-    return blockId != 0 && !isLiquid && block->toLegacy()->_BlockFlags.mSolid;
+    if (!block) return false;
+    BlockLegacy* legacy = block->toLegacy();
+    if (!legacy) return false;
+
+    // Use isAir() which correctly handles modern blocks (campfire etc.)
+    if (legacy->isAir()) return false;
+
+    int blockId = legacy->getBlockId();
+    bool isLiquid = (8 <= blockId && blockId <= 11);
+    if (isLiquid) return false;
+
+    // Must block motion to be considered a "good" (solid) block
+    if (!legacy->mMaterial || !legacy->mMaterial->mIsBlockingMotion) return false;
+    return true;
 }
 
 
@@ -47,7 +59,7 @@ std::vector<BlockInfo> BlockUtils::getBlockList(const glm::ivec3& position, floa
 
 
     const int radius = static_cast<int>(r);
-    newBlocks.reserve(radius * radius * radius); // reserve enough space for all blocks
+    newBlocks.reserve(radius * radius * radius);
 
     for (int x = position.x - radius; x <= position.x + radius; x++)
         for (int y = position.y - radius; y <= position.y + radius; y++)
@@ -65,14 +77,12 @@ bool BlockUtils::isOverVoid(glm::vec3 vec)
     std::vector<Block*> blocksUntilZero;
 
     auto player = ClientInstance::get()->getLocalPlayer();
-    // get all the blocks from vec.y to 0
     for (int i = vec.y; i >= 0; i--)
     {
         auto block = ClientInstance::get()->getBlockSource()->getBlock({ vec.x, i, vec.z });
         blocksUntilZero.push_back(block);
     }
 
-    // Return false if any of them are not air
     for (auto block : blocksUntilZero)
     {
         if (block->toLegacy()->getBlockId() != 0) return false;
@@ -115,65 +125,6 @@ glm::vec3 BlockUtils::findClosestBlockToPos(glm::vec3 pos)
     return closestBlock;
 }
 
-/*
-std::vector<BlockInfo> BlockUtils::getChunkBasedBlockList(const glm::ivec3& position, float r)
-{
-    std::vector<BlockInfo> blocks = {};
-
-    const auto blockSource = ClientInstance::get()->getBlockSource();
-
-    auto newBlocks = std::vector<BlockInfo>();
-
-
-    const int radius = static_cast<int>(r);
-    newBlocks.reserve(radius * radius * radius); // reserve enough space for all blocks
-
-    glm::ivec3 min = position - glm::ivec3(radius);
-    glm::ivec3 max = position + glm::ivec3(radius);
-    auto chunks = getChunkList(min, max);
-
-    if (chunks.empty()) return newBlocks;
-
-    for (auto chunkPos : chunks)
-    {
-        LevelChunk* chunk = blockSource->getChunk(chunkPos);
-        if (chunk->isLoading) continue; // Skip if chunk is loading
-        if (!chunk) continue;
-
-        int blockFound = 0;
-
-        for (auto subchunk : chunk->subChunks)
-        {
-            auto readah = subchunk.blockReadPtr;
-            if (!readah) continue;
-            uint16_t searchRangeXZ = 16;
-            uint16_t searchRangeY = (blockSource->mBuildHeight - blockSource->mBuildDepth) / chunk->subChunks.size();
-            for(uint16_t x = 0; x < searchRangeXZ; x++)
-            {
-                for(uint16_t z = 0; z < searchRangeXZ; z++)
-                {
-                    for(uint16_t y = 0; y < searchRangeY; y++)
-                    {
-                        uint16_t elementId = (x * 0x10 + z) * 0x10 + (y & 0xf);
-                        Block* found = readah->getElement(elementId);
-                        BlockPos pos;
-                        pos.x = (chunkPos.x * 16) + x;
-                        pos.z = (chunkPos.y * 16) + z;
-                        pos.y = y + (subchunk.subchunkIndex * 16);
-                        //spdlog::debug("Block at ({}, {}, {}) is {}", pos.x, pos.y, pos.z, found->mLegacy->mName);
-                        newBlocks.emplace_back(found, pos);
-                    }
-                }
-            }
-        }
-    }
-
-    return newBlocks;
-}
-*/
-
-
-
 int BlockUtils::getBlockPlaceFace(glm::ivec3 blockPos)
 {
     for (auto& [face, offset] : blockFaceOffsets)
@@ -206,9 +157,21 @@ bool BlockUtils::isAirBlock(glm::ivec3 blockPos)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     if (!player) return false;
-    int blockId = ClientInstance::get()->getBlockSource()->getBlock(blockPos)->toLegacy()->getBlockId();
-    bool isLiquid = 8 <= blockId && blockId <= 11;
-    return blockId == 0 || isLiquid;
+    Block* block = ClientInstance::get()->getBlockSource()->getBlock(blockPos);
+    if (!block) return true;
+    BlockLegacy* legacy = block->toLegacy();
+    if (!legacy) return true;
+
+    // Use BlockLegacy::isAir() which now correctly handles modern blocks
+    // (campfire, soul campfire, etc.) that have legacy ID 0 but are NOT air
+    if (!legacy->isAir()) return false;
+
+    // Also treat liquids (water/lava, legacy IDs 8-11) as non-air for placement purposes
+    int blockId = legacy->getBlockId();
+    bool isLiquid = (8 <= blockId && blockId <= 11);
+    if (isLiquid) return false;
+
+    return true;
 }
 
 glm::ivec3 BlockUtils::getClosestPlacePos(glm::ivec3 pos, float distance)
@@ -233,9 +196,9 @@ glm::ivec3 BlockUtils::getClosestPlacePos(glm::ivec3 pos, float distance)
             {
                 auto blockSel = glm::vec3(x, y, z);
                 if (isValidPlacePos(blockSel) && isAirBlock(blockSel)) {
-                    float distance = glm::distance(playerPos, blockSel);
-                    if (distance < closestDist) {
-                        closestDist = distance;
+                    float dist = glm::distance(playerPos, blockSel);
+                    if (dist < closestDist) {
+                        closestDist = dist;
                         closestBlock = blockSel;
                     }
                 }
@@ -262,7 +225,10 @@ void BlockUtils::placeBlock(glm::vec3 pos, int side)
 {
     auto player = ClientInstance::get()->getLocalPlayer();
     glm::ivec3 blockPos = pos;
-    if (side == -1) side = getBlockPlaceFace(blockPos);
+    if (side == -1) {
+        side = getBlockPlaceFace(blockPos);
+        if (side == -1) side = 1; // AirPlace fallback: fake face 1
+    }
 
     glm::vec3 vec = blockPos;
 
@@ -295,35 +261,6 @@ void BlockUtils::placeBlock(glm::vec3 pos, int side)
     res->mIndirectHit = false;
     res->mRayDir = vec;
     res->mPos = blockPos;
-
-
-    /*auto transac = MinecraftPackets::createPacket<InventoryTransactionPacket>();
-
-    auto cit = std::make_unique<ItemUseInventoryTransaction>();
-    cit->mActionType = ItemUseInventoryTransaction::ActionType::Place;
-    int slot = player->getSupplies()->mSelectedSlot;
-    cit->mSlot = slot;
-    cit->getItem()InHand = *player->getSupplies()->getContainer()->getItem(slot);
-    cit->mBlockPos = blockPos + glm::ivec3(blockFaceOffsets[side]);
-    cit->mFace = side;
-    cit->mTargetBlockRuntimeId = 0;
-    cit->mPlayerPos = *player->getPos();
-
-    glm::vec3 pPos = *player->getPos() - glm::vec3(0, PLAYER_HEIGHT, 0);
-    glm::vec3 clickPos = glm::vec3(blockPos) - pPos;
-
-
-    cit->mClickPos = clickPos;
-
-    transac->mTransaction = std::move(cit);
-    PacketUtils::queueSend(transac, false);
-
-    ItemStack* item = player->getSupplies()->getContainer()->getItem(slot);
-    if (!item->getItem()) return;
-    if (!item->mBlock) return;
-
-    setBlock(blockPos, item->mBlock);*/
-
 }
 
 void BlockUtils::startDestroyBlock(glm::vec3 pos, int side)
@@ -389,7 +326,6 @@ void BlockUtils::setBlock(const glm::ivec3& pos, unsigned int runtimeId) {
         spdlog::warn("setBlock operation failed, block at ({}, {}, {}) is still the same [rtid: {}]", pos.x, pos.y, pos.z, runtimeId);
     }
 
-    // Fire a block update event because sendToSelf doesn't trigger it
     auto holder = nes::make_holder<BlockChangedEvent>(pos, newBlock, oldBlock, 0, ClientInstance::get()->getLocalPlayer());
     gFeatureManager->mDispatcher->trigger(holder);
 }
@@ -435,7 +371,7 @@ void BlockUtils::destroyBlock(glm::vec3 pos, int side, bool useTransac)
     cit->mTargetBlockRuntimeId = 0x92;
     cit->mPlayerPos = *player->getPos();
 
-    cit->mClickPos = glm::vec3(0, 0, 0); // this is correct, i actually checked it this time
+    cit->mClickPos = glm::vec3(0, 0, 0);
     pkt->mTransaction = std::move(cit);
     PacketUtils::queueSend(pkt, false);
     clearBlock(blockPos);
@@ -444,12 +380,11 @@ void BlockUtils::destroyBlock(glm::vec3 pos, int side, bool useTransac)
 
 bool BlockUtils::isMiningPosition(glm::ivec3 blockPos) {
     auto player = ClientInstance::get()->getLocalPlayer();
+    if (!player) return false;
 
-    if (0 < player->getGameMode()->mBreakProgress && player->getLevel()->getHitResult()->mBlockPos == blockPos) return true;
-
-    //if (Regen::mIsMiningBlock && Regen::mCurrentBlockPos == blockPos) return true;
-
-    if (OreMiner::mIsMiningBlock && OreMiner::mCurrentBlockPos == blockPos) return true;
+    // Без OreMiner просто проверяем текущий прогресс
+    if (0 < player->getGameMode()->mBreakProgress && player->getLevel()->getHitResult()->mBlockPos == blockPos) 
+        return true;
 
     return false;
 }

@@ -1,10 +1,12 @@
 //
+// Created by vastrakai on 6/28/2024.
 //
 
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Components/ActorOwnerComponent.hpp>
 #include <SDK/Minecraft/Actor/Components/ActorTypeComponent.hpp>
 #include <SDK/Minecraft/Actor/Components/RuntimeIDComponent.hpp>
+#include <SDK/Minecraft/Actor/Components/AABBShapeComponent.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <entity/registry.hpp>
 
@@ -18,6 +20,7 @@
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
 #include <SDK/Minecraft/Network/Packets/InventoryTransactionPacket.hpp>
 #include <SDK/Minecraft/World/Level.hpp>
+
 static AntiBot* antibot = nullptr;
 
 std::vector<struct Actor *> ActorUtils::getActorList(bool playerOnly, bool excludeBots)
@@ -25,7 +28,6 @@ std::vector<struct Actor *> ActorUtils::getActorList(bool playerOnly, bool exclu
     auto player = ClientInstance::get()->getLocalPlayer();
     if (player == nullptr)
     {
-        //spdlog::warn("ActorUtils::getActorList called when player is nullptr");
         return {};
     }
 
@@ -36,25 +38,25 @@ std::vector<struct Actor *> ActorUtils::getActorList(bool playerOnly, bool exclu
     {
         if (antibot->mEntitylistMode.mValue == AntiBot::EntitylistMode::EnttView)
         {
-            for (auto &&[entId, moduleOwner, type, ridc, balls]: player->mContext.mRegistry->view<ActorOwnerComponent, ActorTypeComponent, RuntimeIDComponent, AABBShapeComponent>().each())
+            for (auto &&[entId, moduleOwner, type, ridc] : player->mContext.mRegistry->view<ActorOwnerComponent, ActorTypeComponent, RuntimeIDComponent>().each())
             {
-                // Check if the entity id exists
                 if (!player->mContext.mRegistry->valid(entId))
                 {
                     spdlog::critical("Found invalid entity id [{}]", entId);
-#ifdef __DEBUG__
-                    ChatUtils::displayClientMessage("§cCHECK CONSOLE");
-#endif
                     return actors;
                 }
 
-                // Continue if the actor is null
                 if (!moduleOwner.mActor)
                 {
                     spdlog::critical("Found null actor pointer for entity!");
                     continue;
                 };
-                // Continue if the actor is a bot and we want to exclude bots
+
+                // Безопасная проверка: сущность имеет AABBShapeComponent?
+                // Registry-level — НЕ разыменует указатель actor.
+                // Фильтрует сущности в процессе создания/уничтожения.
+                if (!player->mContext.mRegistry->all_of<AABBShapeComponent>(entId)) continue;
+
                 if (excludeBots && antibot->isBot(moduleOwner.mActor)) continue;
 
                 if (type.mType == ActorType::Player && playerOnly || !playerOnly)
@@ -65,14 +67,17 @@ std::vector<struct Actor *> ActorUtils::getActorList(bool playerOnly, bool exclu
             auto tactors = player->getLevel()->getRuntimeActorList();
             for (auto actor : tactors)
             {
-                // Continue if the actor is null
                 if (!actor)
                 {
                     spdlog::critical("Found null actor pointer for entity!");
                     continue;
                 };
 
-                // Continue if the actor is a bot and we want to exclude bots
+                // Filter entities without a physical hitbox — these are phantom
+                // entities in the process of being created/destroyed. Without this
+                // check Aura would try to attack them and get kicked for hitting air.
+                if (!actor->getAABBShapeComponent()) continue;
+
                 if (excludeBots && antibot->isBot(actor)) continue;
 
                 if (playerOnly && actor->isPlayer() || !playerOnly)
@@ -98,7 +103,6 @@ std::vector<Actor*> ActorUtils::getActorsOfType(ActorType type)
     auto player = ClientInstance::get()->getLocalPlayer();
     if (player == nullptr)
     {
-        //spdlog::warn("ActorUtils::getActorList called when player is nullptr");
         return {};
     }
 
@@ -116,7 +120,6 @@ std::vector<Actor*> ActorUtils::getActorsOfType(ActorType type)
                 spdlog::debug("Found null actor pointer for entity!");
                 continue;
             };
-            // do NOT exclude bots as we are specifically requesting a type
 
             if (typeComponent.mType == type)
                 actors.push_back(moduleOwner.mActor);
@@ -142,15 +145,28 @@ bool ActorUtils::isBot(Actor* actor)
 
 std::shared_ptr<InventoryTransactionPacket> ActorUtils::createAttackTransaction(Actor* actor, int slot)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
+    auto* ci = ClientInstance::get();
+    if (!ci) return nullptr;
+    auto player = ci->getLocalPlayer();
+    if (!player) return nullptr;
 
-    if (slot == -1) slot = player->getSupplies()->mSelectedSlot;
+    auto* supplies = player->getSupplies();
+    if (!supplies) return nullptr;
+    auto* container = supplies->getContainer();
+    if (!container) return nullptr;
+
+    if (slot == -1) slot = supplies->mSelectedSlot;
+    // Слот вне хотбара или пустой слот — раньше здесь разыменовывался nullptr.
+    if (slot < 0 || slot > 8) return nullptr;
+    auto* stack = container->getItem(slot);
+    if (!stack || !stack->mItem) return nullptr;
+
     auto pkt = MinecraftPackets::createPacket<InventoryTransactionPacket>();
 
     auto cit = std::make_unique<ItemUseOnActorInventoryTransaction>();
     cit->mSlot = slot;
     cit->mHand = 0;
-    cit->mItemInHand = NetworkItemStackDescriptor(*player->getSupplies()->getContainer()->getItem(slot));
+    cit->mItemInHand = NetworkItemStackDescriptor(*stack);
     auto unique = actor->getActorUniqueIDComponent();
     cit->mActorId = unique ? unique->mUniqueID : -1;
     cit->mActionType = ItemUseOnActorInventoryTransaction::ActionType::Attack;

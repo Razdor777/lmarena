@@ -1,0 +1,55 @@
+    // ItemRenderer::renderGuiItemNew_WithActorContext — higher-level wrapper that constructs
+    // a BaseActorRenderContext internally before calling renderGuiItemNew. Used by
+    // InventoryItemRenderer::render for standard inventory slot rendering.
+    // Params: (ItemRenderer* this, MinecraftUIRenderContext* muirc, IClientInstance* client,
+    //          ItemStack* item, float x, float y, int flags, float scale, int zOrder)
+    // The muirc pointer is used for *(muirc+0x10) = ScreenContext* passed to BARC ctor.
+    ADD_SIG("ItemRenderer::renderGuiItemNew", "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 0F 29 B4 24 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 44 89 4D");
+
+
+    // CubeMap render function - renders panorama on menu screens
+    // IDA address: 0x146A804E0 (in 1.21.132)
+    // First bytes: 48 8B C4 48 89 58 10 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 48 FB FF FF 48 81 EC 80 05 00 00...
+    ADD_SIG("CubemapRender", "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4D 8B E1");
+
+    // ItemRenderer::getAtlasIconInfo - looks up atlas texture handle for an item.
+    // Returns pointer to an atlas cache entry (+24 offset), where +16 is the TexturePtr.
+    // For non-block items (armor etc.), v17 = -1 returns 'missing' entry but texture is still valid.
+    ADD_SIG("ItemRenderer::getAtlasIconInfo", "48 89 5C 24 ? 57 48 83 EC ? 48 8B FA 48 8B D9 E8 ? ? ? ? 80 7F ? 00 48 8D 8B");
+
+        // ItemRenderer::iconBlit - 2D icon quad renderer.  Selects material by useMultiColorTextureTinting:
+    //   false -> ItemRenderer+0x1C0 "ui_texture_and_color" (single tint)
+    //   true  -> ItemRenderer+0x1D0 "ui_texture_and_color_tint" (primary + secondary overlay)
+    // Signature unique to 1.21.13x: stack frame size 0x530 (5*8 XMM saves + extra locals).
+    // Parameters: (this, renderContext, textureObj, x, y, z, uvCoords*, w, h,
+    //              lightMult, alphaMult, colorMult, secondaryColorMult, xscale, yscale,
+    //              iconBlitGlint, useMultiColorTextureTinting)
+    ADD_SIG("ItemRenderer::iconBlit", "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 44 0F 28 C3");
+
+    // CubemapBackgroundScreen::render - the actual function that draws the panorama background
+    // This is called on the MAIN THREAD (records Tessellator commands for later execution)
+    // IDA address: 0x1413A6750 (in latest)
+    // The PanoramaShader module hooks this to replace the panorama with custom shaders.
+    ADD_SIG("CubemapBackgroundScreen::render", "48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 8B EA 48 8B F9 45 33 FF");
+
+    // InnerCubemapRender - the inner function called by CubemapBackgroundScreen::render
+    // This is called AFTER the render target is set up, so we can safely fill with magenta here.
+    // IDA address: 0x1413A6BC0 (in 1.21.130)
+    // Hooking this instead of the parent allows proper greenscreen approach.
+    ADD_SIG("InnerCubemapRender", "48 89 5C 24 ? 55 56 57 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 45 0F B6 F0 48 8B FA");
+
+    ADD_SIG("ItemRenderer::renderItemGroup", "48 8b c4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 81 ec ? ? ? ? 0f 29 70 ? 0f 29 78 ? 44 0f 29 40 ? 44 0f 29 48 ? 41 8b c1");
+
+
+    // Chat/Send System
+    ADD_SIG("ChatScreen::registerButtonHandlers", "48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B F1 48 8D 45 ? 48 89 45 ? 48 8D 05 ? ? ? ? 48 89 45 ? 48 89 4D ? 48 8D 45 ? 48 89 45 ? 0F 57 C0 0F 11 45 ? B9 ? ? ? ? E8 ? ? ? ? 48 8B F8 48 89 45 ? 48 C7 45 ? ? ? ? ? 48 C7 45 ? ? ? ? ? 0F 10 05 ? ? ? ? ? ? ? 0F B6 0D ? ? ? ? 88 48 ? C6 40 ? 00 48 8B D0 41 BF ? ? ? ? 45 8B CF");
+    ADD_SIG("ChatScreenController::sendChat", "48 89 5C 24 ? 48 89 74 24 ? 55 57 41 54 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 48 8B F9 48 83 B9 ? ? ? ? 00");
+    ADD_SIG("ChatScreen::onSendButton", "40 53 48 83 EC ? 48 8B D9 48 8B 49 ? E8 ? ? ? ? 48 8B 53 ? 0F 57 C0");
+    ADD_SIG("LocalCommandProcessor::tryExecute", "48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 8B EA 48 8B F1 C7 44 24 ? 00 00 00 00");
+
+    // Mob::getCurrentSwingDuration — returns swing duration in ticks (default 6).
+    // Accounts for haste (shorter), conduit power (shorter), mining fatigue (longer).
+    ADD_SIG("Mob::getCurrentSwingDuration", "48 89 5C 24 ? 48 89 6C 24 ? 56 57 41 56 48 83 EC ? 8B 41 ? 48 8D 54 24 ? 48 8B 35");
+
+    ADD_SIG("TimeChanger", "44 8B C2 B8 ? ? ? ? F7 EA");
+

@@ -1,4 +1,5 @@
 //
+// Created by vastrakai on 7/3/2024.
 //
 
 #include "BlockSource.hpp"
@@ -7,13 +8,10 @@
 #include <SDK/OffsetProvider.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
-<<<<<<< HEAD:26.62/src/SDK/Minecraft/World/BlockSource.cpp
 #include <SDK/Minecraft/World/Chunk/LevelChunk.hpp>
 #include <SDK/Minecraft/Network/MinecraftPackets.hpp>
 #include <SDK/Minecraft/Network/Packets/UpdateBlockPacket.hpp>
 #include <Utils/GameUtils/PacketUtils.hpp>
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/SDK/Minecraft/World/BlockSource.cpp
 
 #include "HitResult.hpp"
 

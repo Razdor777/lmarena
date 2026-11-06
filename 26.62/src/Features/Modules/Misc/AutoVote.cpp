@@ -47,7 +47,7 @@ void AutoVote::closeForm() {
 
 std::vector<std::string> getPriorityMaps() {
     std::vector<std::string> maps;
-    std::ifstream file(FileUtils::getSolsticeDir() + "Templates\\autoVoteTemplate.txt");
+    std::ifstream file(FileUtils::getDexkoDir() + "Templates\\autoVoteTemplate.txt");
 
     if (!file.is_open()) return maps;
 

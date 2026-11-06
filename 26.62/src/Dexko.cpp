@@ -1,17 +1,14 @@
 //
+// Created by vastrakai on 6/24/2024.
 //
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
 //Test commit
-#include "Solstice.hpp"
-========
-
 #include "Dexko.hpp"
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 
 
 #include <fstream>
 #include <Features/FeatureManager.hpp>
 #include <Features/Configs/ConfigManager.hpp>
+#include <Features/Modules/Misc/DeviceSpoof.hpp>
 #include <Hook/HookManager.hpp>
 #include <Hook/Hooks/RenderHooks/D3DHook.hpp>
 
@@ -34,15 +31,13 @@
 #include <Features/IRC/IrcClient.hpp>
 #include <Features/Modules/Misc/IRC.hpp>
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
+#include <Utils/OAuthUtils.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
 
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
 #include <wininet.h>
 #pragma comment(lib, "wininet.lib")
 
 
-========
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 #ifdef __DEBUG__
 std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "] [debug]";
 #elif __PRIVATE_BUILD__
@@ -65,8 +60,8 @@ void setTitle(std::string title)
     std::wstring wtitle(s, 0);
     MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wtitle.data(), s);
 
-    SetWindowTextW(Solstice::GameWindow, wtitle.c_str());
-    Solstice::mReadyWindow = true;
+    SetWindowTextW(Dexko::GameWindow, wtitle.c_str());
+    Dexko::mReadyWindow = true;
     /*
     auto w = winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [title]() {
         winrt::Windows::UI::ViewManagement::ApplicationView::GetForCurrentView().Title(winrt::to_hstring(title));
@@ -79,7 +74,7 @@ DEFINE_PATCH_FUNC(patchInHandSlot, SigManager::ItemInHandRenderer_renderItem_byt
 // called using winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [&]()
 void Dexko::init(HMODULE hModule)
 {
-    Solstice::GameWindow = FindWindowA(NULL, "Minecraft"); 
+    Dexko::GameWindow = FindWindowA(NULL, "Minecraft"); 
 
     // Not doing this could cause crashes if you inject too soon
     // Honestly, I don't think this helps much but it's not a bad idea to have it here
@@ -94,25 +89,20 @@ void Dexko::init(HMODULE hModule)
     Logger::initialize();
 #endif
 
-    console = spdlog::stdout_color_mt(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
+    console = spdlog::stdout_color_mt(CC(21, 207, 148) + "dexko" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
 
     // Create a file logger sink
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-    std::string logFile = FileUtils::getSolsticeDir() + xorstr_("solstice.log");
-
-========
     std::string logFile = FileUtils::getDexkoDir() + xorstr_("dexko.log");
- 
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
+
     // Don't use the file sink if the log file doesn't exist
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
     console_sink->set_level(spdlog::level::trace);
     console->set_level(spdlog::level::trace);
     console->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
-    spdlog::set_default_logger(std::make_shared<spdlog::logger>(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::sinks_init_list{console_sink}));
+    spdlog::set_default_logger(std::make_shared<spdlog::logger>(CC(21, 207, 148) + "dexko" + ANSI_COLOR_RESET, spdlog::sinks_init_list{console_sink}));
 
-    console->info("Welcome to " + CC(0, 255, 0) + "Solstice" + ANSI_COLOR_RESET + "!"
+    console->info("Welcome to " + CC(0, 255, 0) + "Dexko" + ANSI_COLOR_RESET + "!"
 #ifdef __DEBUG__
         + CC(255, 0, 0) + " [Debug] " + ANSI_COLOR_RESET
 #endif
@@ -130,6 +120,9 @@ void Dexko::init(HMODULE hModule)
     setTitle(title);
 
 
+    sHWID = GET_HWID().toString();
+    spdlog::info("HWID: {}", sHWID);
+
     if (MH_Initialize() != MH_OK)
     {
         console->critical("Failed to initialize MinHook!");
@@ -144,11 +137,24 @@ void Dexko::init(HMODULE hModule)
     {
         while (!IsDebuggerPresent())
         {
-            MessageBoxA(nullptr, "Please attach a debugger to continue.\nThis message is being shown because of your preference settings.", "Solstice", MB_OK | MB_ICONERROR);
+            MessageBoxA(nullptr, "Please attach a debugger to continue.\nThis message is being shown because of your preference settings.", "Dexko", MB_OK | MB_ICONERROR);
             spdlog::info("Waiting for debugger...");
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
+#endif
+
+
+#ifdef __PRIVATE_BUILD__
+#ifndef __PRIVATE_DEBUG__
+#pragma message("Note: This is a private build. Please do not share this build with anyone.")
+    Auth auth;
+    auth.init();
+    if(!auth.isPrivateUser())
+    {
+        auth.exit();
+    }
+#endif
 #endif
 
     /* // fard
@@ -187,7 +193,7 @@ void Dexko::init(HMODULE hModule)
     {
         console->critical("Failed to find {} signatures/offsets!", failedSigs);
 #ifdef __DEBUG__
-        console->critical("Solstice should not be used in this state.");
+        console->critical("Dexko should not be used in this state.");
         console->info("Type 'DEBUG' to continue, or press ENTER to exit.");
         std::string input;
         std::getline(std::cin, input);
@@ -247,18 +253,18 @@ void Dexko::init(HMODULE hModule)
 
 void Dexko::shutdownThread()
 {
-    // Runs on its own thread: pumps client ticks until the eject key is hit.
+    // Wait for the user to press END
+    bool firstCall = true;
     bool isLpValid = false;
     while (!mRequestEject)
     {
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
         if (firstCall)
         {
-            NotifyUtils::notify("Solstice initialized!", 5.0f, Notification::Type::Info);
+            NotifyUtils::notify("Dexko initialized!", 5.0f, Notification::Type::Info);
             firstCall = false;
 
             std::string latestHash;
-            latestHash = "Invalid";
+            latestHash = OAuthUtils::getLatestCommitHash();
 
             if(latestHash == xorstr_("403"))
             {
@@ -266,13 +272,13 @@ void Dexko::shutdownThread()
             }
             else if (!latestHash.empty())
             {
-                if (latestHash != SOLSTICE_BUILD_VERSION)
+                if (latestHash != DEXKO_BUILD_VERSION)
                 {
-                    console->warn("Solstice is out of date! Latest commit: {}", latestHash);
-                    NotifyUtils::notify("There is a new version of Solstice available!\nIt is recommended to update.", 10.0f, Notification::Type::Warning);
-                    ChatUtils::displayClientMessage("§aThere is a new version of Solstice available! Download it from the Discord server.");
+                    console->warn("Dexko is out of date! Latest commit: {}", latestHash);
+                    NotifyUtils::notify("There is a new version of Dexko available!\nIt is recommended to update.", 10.0f, Notification::Type::Warning);
+                    ChatUtils::displayClientMessage("§aThere is a new version of Dexko available! Download it from the Discord server.");
                 } else {
-                    console->info("Solstice is up to date!");
+                    console->info("Dexko is up to date!");
                 }
             }
             else if(latestHash.empty())
@@ -280,8 +286,6 @@ void Dexko::shutdownThread()
                 __fastfail(1);
             }
         }
-========
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 
         if (!isLpValid && ClientInstance::get()->getLocalPlayer())
         {
@@ -297,6 +301,7 @@ void Dexko::shutdownThread()
                 else
                 {
                     console->warn("Default config does not exist! Clearing default config...");
+                    NotifyUtils::notify("Default config does not exist! Clearing default config...", 10.0f, Notification::Type::Warning);
                     Prefs->mDefaultConfigName = "";
                     PreferenceManager::save(Prefs);
                 }
@@ -304,6 +309,11 @@ void Dexko::shutdownThread()
                 console->warn("No default config set!");
             }
         }
+
+        // Device spoofing is mandatory for every injected session, even if
+        // the loaded default config previously had it disabled.
+        auto deviceSpoof = gFeatureManager->mModuleManager->getModule<DeviceSpoof>();
+        if (deviceSpoof) deviceSpoof->setEnabled(true);
 
         patchInHandSlot(ClientInstance::get()->getLocalPlayer() != nullptr);
 
@@ -313,24 +323,35 @@ void Dexko::shutdownThread()
     }
 
     mRequestEject = true;
+    mUnloading.store(true);
 
-    //setTitle("");
+    setTitle("");
 
     patchInHandSlot(false);
 
     HookManager::shutdown();
 
-    setTitle(""); // kotti ga iikana ^^
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // The hooks are gone, but the render thread may still be inside the frame it
+    // started before that. Give it a few frames to get out before anything is
+    // freed.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     gFeatureManager->shutdown();
 
     // Shutdown
     console->warn("Shutting down...");
 
-    ClientInstance::get()->getMinecraftGame()->playUi("beacon.deactivate", 1, 1.0f);
-    ClientInstance::get()->getGuiData()->displayClientMessage("§asolstice§7 » §cEjected!");
+    // Both of these used to be raw dereferences inside the eject path — pulling
+    // the module while the game was between worlds (GuiData gone) crashed right
+    // here, before anything was even unloaded.
+    if (auto* ci = ClientInstance::get())
+    {
+        if (auto* game = ci->getMinecraftGame())
+            game->playUi("beacon.deactivate", 1, 1.0f);
+
+        if (auto* guiData = ci->getGuiData())
+            guiData->displayClientMessage("§adexko§7 » §cEjected!");
+    }
 
     mInitialized = false;
     SigManager::deinitialize();
@@ -340,9 +361,6 @@ void Dexko::shutdownThread()
     Sleep(1000); // Give the user time to read the message
 
     Logger::deinitialize();
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-    FreeLibrary(mModule); // i don't understand this
-========
 
     // ---- unload ---------------------------------------------------------
     //
@@ -374,5 +392,4 @@ DWORD WINAPI Dexko::unloadThreadProc(LPVOID module)
 
     FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
     return 0;
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 }

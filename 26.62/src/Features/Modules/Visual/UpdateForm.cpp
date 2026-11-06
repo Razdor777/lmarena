@@ -13,10 +13,10 @@
 void UpdateForm::getCommits()
 {
     std::string latestHash = mOldHash;
-    /*HttpRequest request(HttpMethod::GET, OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + SOLSTICE_BUILD_VERSION, "", "", &UpdateForm::onHttpResponse, nullptr);
+    /*HttpRequest request(HttpMethod::GET, OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + DEXKO_BUILD_VERSION, "", "", &UpdateForm::onHttpResponse, nullptr);
     request.sendAsync();*/
     mRequest.mMethod = HttpMethod::GET;
-    mRequest.mUrl = OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + SOLSTICE_BUILD_VERSION;
+    mRequest.mUrl = OAuthUtils::sEndpoint + "getCommitsBetween?startHash=" + latestHash + "&endHash=" + DEXKO_BUILD_VERSION;
     mRequest.mCallback = &UpdateForm::onHttpResponse;
     mRequest.mSender = this;
     mRequest.sendAsync();
@@ -45,7 +45,7 @@ void UpdateForm::onHttpResponse(HttpResponseEvent event)
 void UpdateForm::onEnable()
 {
     mOldHash = OAuthUtils::getLastCommitHash();
-    std::string latestHash = SOLSTICE_BUILD_VERSION;
+    std::string latestHash = DEXKO_BUILD_VERSION;
     OAuthUtils::saveCommitHash(latestHash);
 
     if (!mGatheredCommits)
@@ -85,7 +85,7 @@ void UpdateForm::onRenderEvent(RenderEvent& event)
     float padding = 10.0f;
 
     // Calculate dynamic height based on the number of commits and title height
-    float titleHeight = ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Solstice update installed!").y;
+    float titleHeight = ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Dexko update installed!").y;
     float commitHeight = 0.0f;
 
     if (mGatheredCommits)
@@ -122,8 +122,8 @@ void UpdateForm::onRenderEvent(RenderEvent& event)
     }
 
     // if longest commit is shorter than title, use title width
-    if (longestCommit < ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Solstice update installed!").x)
-        longestCommit = ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Solstice update installed!").x;
+    if (longestCommit < ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Dexko update installed!").x)
+        longestCommit = ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Dexko update installed!").x;
 
     rectWidth = longestCommit + 2 * padding;
 
@@ -141,10 +141,10 @@ void UpdateForm::onRenderEvent(RenderEvent& event)
 
     // Title
     ImVec2 titlePos = ImVec2(renderPos.x + (renderSize.x - 200) / 2, renderPos.y + padding);
-    ImVec2 titleSize = ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Solstice update installed!");
+    ImVec2 titleSize = ImGui::GetFont()->CalcTextSizeA(30, FLT_MAX, 0, "New Dexko update installed!");
     titlePos.y += (titleHeight - titleSize.y) / 2;
     titlePos.x = renderPos.x + (renderSize.x - titleSize.x) / 2;
-    drawlist->AddText(ImGui::GetFont(), 30, titlePos, IM_COL32(255, 255, 255, 255), "New Solstice update installed!");
+    drawlist->AddText(ImGui::GetFont(), 30, titlePos, IM_COL32(255, 255, 255, 255), "New Dexko update installed!");
 
     // Commits
     ImVec2 commitPos = ImVec2(renderPos.x + padding, renderPos.y + titleHeight + 2 * padding);

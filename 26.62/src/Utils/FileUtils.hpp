@@ -9,7 +9,7 @@
 class FileUtils {
 public:
     static std::string getRoamingStatePath();
-    static std::string getSolsticeDir();
+    static std::string getDexkoDir();
     static bool fileExists(const std::string& path);
     static void createDirectory(const std::string& path);
     static void validateDirectories();
@@ -18,8 +18,6 @@ public:
     static void writeResourceToFile(const std::string& path, const unsigned char* data, size_t size);
     static std::vector<std::string> listFiles(const std::string& path);
     static void createFile(const std::string& path);
-    // getFileSize
     static size_t getFileSize(const std::string& path);
-    //readFile
     static std::vector<unsigned char> readFile(const std::string& path);
 };

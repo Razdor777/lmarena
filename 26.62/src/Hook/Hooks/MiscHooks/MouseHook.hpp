@@ -15,6 +15,9 @@ public:
     static std::unique_ptr<Detour> mDetour;
 
     static inline std::map<char, bool> mButtonStates;
+    // Pending scroll delta: stored here so it can be injected AFTER ImGui::NewFrame()
+    // (before NewFrame the value gets wiped by ImGui internals)
+    static inline float mScrollDelta = 0.0f;
     static inline bool mCurrentCancel;
 
     static void onMouse(void* _this, char actionButtonId, int buttonData, __int16 x, __int16 y, __int16 dx, __int16 dy, uint8_t forceMotionlessPointer);

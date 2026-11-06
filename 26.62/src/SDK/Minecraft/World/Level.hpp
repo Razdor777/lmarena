@@ -6,7 +6,25 @@
 #include <SDK/Minecraft/mce.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerListPacket.hpp>
 #include <unordered_map>
+#include <SDK/Minecraft/Network/Packets/PlayerListPacket.hpp>
+#include <glm/glm.hpp>
 #include <Utils/MemUtils.hpp>
+
+enum class ParticleType : int {
+    Bubble = 1,
+    Crit = 2,               // Синие криты
+    BlockCrack = 3,         // Осколки блока
+    Smoke = 4,              // Дым
+    Explode = 5,            // Взрыв
+    Heart = 12,             // Сердечки
+    Flame = 15,             // Огонь
+    Lava = 16,              // Брызги лавы
+    Portal = 18,            // Фиолетовый портал
+    EnchantingTable = 21,   // Символы чародейства
+    Totem = 27,             // Искры тотема
+    DragonBreath = 35,      // Дыхание дракона
+    SonicBoom = 53          // Волна Вардена
+};
 
 class PlayerListEntry {
 public:
@@ -65,4 +83,9 @@ public:
 	class SyncedPlayerMovementSettings* getPlayerMovementSettings();
 	std::vector<Actor*> getRuntimeActorList();
 	LevelData* getLevelData();
+	class BlockPalette* getBlockPalette();
+
+	// Спавн партиклов.
+	// TODO(26.62): оффсет addParticle в Level.cpp снят с 1.21.44 — переснять!
+	void addParticle(ParticleType type, const glm::vec3& pos, const glm::vec3& dir = glm::vec3(0.f, 0.05f, 0.f), int data = 0);
 };

@@ -109,7 +109,7 @@ void SkinStealer::saveSkin(Actor* actor)
     std::vector<uint8_t> pngData = convToPng(std::vector<uint8_t>(skinData, skinData + bytes), width, height);
     if (pngData.empty()) return;
 
-    std::string path = FileUtils::getSolsticeDir() + "Skins\\" + actor->getRawName() + "_skin.png";
+    std::string path = FileUtils::getDexkoDir() + "Skins\\" + actor->getRawName() + "_skin.png";
     std::ofstream file(path, std::ios::binary);
     file.write((char*)pngData.data(), pngData.size());
     file.close();
@@ -123,7 +123,7 @@ void SkinStealer::saveSkin(Actor* actor)
     if (capeBytes > 0) {
         capePngData = convToPng(std::vector<uint8_t>(capeData, capeData + capeBytes), capeWidth, capeHeight);
         if (!capePngData.empty()) {
-            path = FileUtils::getSolsticeDir() + "Skins\\" + actor->getRawName() + "_cape.png";
+            path = FileUtils::getDexkoDir() + "Skins\\" + actor->getRawName() + "_cape.png";
             std::ofstream capeFile(path, std::ios::binary);
             capeFile.write((char*)capePngData.data(), capePngData.size());
             capeFile.close();
@@ -132,8 +132,8 @@ void SkinStealer::saveSkin(Actor* actor)
         ChatUtils::displayClientMessage("No cape found for " + actor->getRawName());
     }
 
-    ChatUtils::displayClientMessage("Saved skin for " + actor->getRawName() + " to your Solstice\\Skins folder! (copied to clipboard)");
-    ImGui::SetClipboardText(std::string(FileUtils::getSolsticeDir() + "Skins\\").c_str());
+    ChatUtils::displayClientMessage("Saved skin for " + actor->getRawName() + " to your Dexko\\Skins folder! (copied to clipboard)");
+    ImGui::SetClipboardText(std::string(FileUtils::getDexkoDir() + "Skins\\").c_str());
 
     std::string resourcePatch = skin->mResourcePatch;
     if (mApplySkin) applySkin(actor, pngData, capePngData, capeWidth, capeHeight, resourcePatch);

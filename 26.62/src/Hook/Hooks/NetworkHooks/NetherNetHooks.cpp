@@ -1,6 +1,6 @@
 #include "NetherNetHooks.hpp"
 
-#include <Solstice.hpp>
+#include <Dexko.hpp>
 #include <windows.h>
 #include <Features/FeatureManager.hpp>
 #include <SDK/SigManager.hpp>

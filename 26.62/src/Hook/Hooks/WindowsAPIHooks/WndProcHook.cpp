@@ -104,25 +104,25 @@ LRESULT CALLBACK WndProcHook::onDetour(HWND HWND, UINT Msg, WPARAM wParam, LPARA
 void WndProcHook::init()
 {
 	std::thread([&] {
-        while (!Solstice::mRequestEject)
+        while (!Dexko::mRequestEject)
         {
-            if (Solstice::GameWindow && Solstice::mReadyWindow)
+            if (Dexko::GameWindow && Dexko::mReadyWindow)
             {
                 break;
             }
 
             Sleep(1);
         }
-        if (Solstice::mRequestEject)
+        if (Dexko::mRequestEject)
         {
             return;
         }
 
-        mDetour = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(Solstice::GameWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(onDetour)));
+        mDetour = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(Dexko::GameWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(onDetour)));
 		}).detach();
 }
 
 void WndProcHook::shutdown()
 {
-    SetWindowLongPtrA(Solstice::GameWindow, GWLP_WNDPROC, (LONG_PTR)mDetour);
+    SetWindowLongPtrA(Dexko::GameWindow, GWLP_WNDPROC, (LONG_PTR)mDetour);
 }

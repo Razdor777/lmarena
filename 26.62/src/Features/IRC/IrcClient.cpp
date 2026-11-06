@@ -130,7 +130,7 @@ void IrcClient::sendData(std::string data)
 
 std::string IrcClient::getHwid()
 {
-    return Solstice::sHWID;
+    return Dexko::sHWID;
 }
 
 void IrcClient::genClientKey()
@@ -185,7 +185,7 @@ bool IrcClient::connectToServer()
         /*if (!OAuthUtils::hasValidToken()) {
             logm("Cannot connect to server, invalid token");
             ChatUtils::displayClientMessageRaw("§7[§dirc§7] §cFailed to authenticate you with Discord!");
-            ChatUtils::displayClientMessageRaw("§7[§dirc§7] §cPlease authenticate using the Solstice Injector to use IRC.");
+            ChatUtils::displayClientMessageRaw("§7[§dirc§7] §cPlease authenticate using the Dexko Injector to use IRC.");
             return false;
         }*/
 
@@ -346,11 +346,11 @@ void IrcClient::onConnected()
     Console.WriteLine($"[{endPoint}] Identified client as {clients[client].ClientName} with HWID {clients[client].Hwid}");*/
     nlohmann::json j;
     #ifdef __DEBUG__
-    j["0"] = "§csolstice§r";
+    j["0"] = "§cdexko§r";
     #elif __PRIVATE_BUILD__
-    j["0"] = "§esolstice§r";
+    j["0"] = "§edexko§r";
     #else
-    j["0"] = "§asolstice§r";
+    j["0"] = "§adexko§r";
     #endif
     j["1"] = getHwid();
     j["2"] = std::to_string(0x0);
@@ -403,7 +403,7 @@ void IrcClient::onReceiveOp(const ChatOp& op)
     if (op.opCode == OpCode::Eject)
     {
         disconnect(xorstr_("Ejected"));
-        Solstice::mRequestEject = true;
+        Dexko::mRequestEject = true;
     }
 
     if (op.opCode == OpCode::DeleteMod)
@@ -602,7 +602,7 @@ std::string fnv1a_hash32(const std::string& str)
 
 std::string IrcClient::getPreferredUsername()
 {
-    return Solstice::Prefs->mIrcName == "" ? fnv1a_hash32(Solstice::sHWID) : Solstice::Prefs->mIrcName;
+    return Dexko::Prefs->mIrcName == "" ? fnv1a_hash32(Dexko::sHWID) : Dexko::Prefs->mIrcName;
 }
 
 void IrcClient::sendPlayerIdentity(bool forced)
@@ -690,10 +690,10 @@ void IrcManager::requestChangeUsername(std::string username)
 {
     if (mClient)
     {
-        Solstice::Prefs->mIrcName = username;
-        PreferenceManager::save(Solstice::Prefs);
+        Dexko::Prefs->mIrcName = username;
+        PreferenceManager::save(Dexko::Prefs);
         mClient->changeUsername();
-        logm("Changed username to {}", Solstice::Prefs->mIrcName);
+        logm("Changed username to {}", Dexko::Prefs->mIrcName);
     }
     else ChatUtils::displayClientMessageRaw("§7[§dirc§7] §cYou aren't connected to IRC!");
 }

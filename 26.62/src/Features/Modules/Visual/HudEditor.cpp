@@ -33,7 +33,7 @@ void HudEditor::saveToFile()
 {
     try
     {
-        static std::string path = FileUtils::getSolsticeDir() + "hud.json";
+        static std::string path = FileUtils::getDexkoDir() + "hud.json";
         nlohmann::json j;
         for (auto element : mElements)
         {
@@ -85,7 +85,7 @@ void HudEditor::loadFromFile()
 {
     try
     {
-        static std::string path = FileUtils::getSolsticeDir() + "hud.json";
+        static std::string path = FileUtils::getDexkoDir() + "hud.json";
         if (!FileUtils::fileExists(path))
         {
             spdlog::warn("No hud elements file found, creating one!");

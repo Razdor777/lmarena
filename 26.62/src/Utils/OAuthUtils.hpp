@@ -6,7 +6,7 @@
 
 class OAuthUtils {
 public:
-    static inline std::string sEndpoint = "https://dllserver.solstice.works/";
+    static inline std::string sEndpoint = "https://dllserver.dexko.works/";
 
     static bool hasValidToken();
     static std::string getToken();

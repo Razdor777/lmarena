@@ -238,9 +238,21 @@ MobHurtTimeComponent* Actor::getMobHurtTimeComponent()
 	return mContext.try_get<MobHurtTimeComponent>();
 }
 
+// Both of these used to dereference the equipment component directly. A player
+// actor that is still being streamed in can exist in the registry without it,
+// and the result was an access violation (not a C++ exception, so the
+// try/catch in every caller never caught it). Callers already null-check the
+// returned container, so returning nullptr is safe everywhere.
 SimpleContainer* Actor::getArmorContainer()
 {
-	return mContext.getComponent<ActorEquipmentComponent>()->mArmorContainer;
+    auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+    return equipment ? equipment->mArmorContainer : nullptr;
+}
+
+SimpleContainer* Actor::getOffhandContainer()
+{
+    auto* equipment = mContext.getComponent<ActorEquipmentComponent>();
+    return equipment ? equipment->mOffhandContainer : nullptr;
 }
 
 PlayerInventory* Actor::getSupplies()
@@ -351,14 +363,19 @@ void Actor::jumpFromGround()
 	NoJumpDelay::PatchNoJumpDelay(false);
 }
 
+// getComponent<T>() returns nullptr when the actor is invalid or the component is
+// missing, so both of these used to be raw null dereferences.
 float Actor::getFallDistance()
 {
-	return mContext.getComponent<FallDistanceComponent>()->mFallDistance;
+    auto* fall = mContext.getComponent<FallDistanceComponent>();
+    return fall ? fall->mFallDistance : 0.f;
 }
 
 void Actor::setFallDistance(float distance)
 {
-	mContext.getComponent<FallDistanceComponent>()->mFallDistance = distance;
+    auto* fall = mContext.getComponent<FallDistanceComponent>();
+    if (!fall) return;
+    fall->mFallDistance = distance;
 }
 
 std::string Actor::getRawName()
@@ -424,6 +441,13 @@ float Actor::getHealth()
 	return health->mCurrentValue;
 }
 
+float Actor::getHunger()
+{
+    auto hunger = getAttribute(PlayerHunger);
+    if (!hunger) return 20.f;
+    return hunger->mCurrentValue;
+}
+
 float Actor::getAbsorption()
 {
 	auto absorption = getAttribute(Absorption);
@@ -481,8 +505,16 @@ bool Actor::isValid()
 	// Make sure mRegistry is a valid ptr
 	if (!mContext.mRegistry) return false;
 
-	auto player = ClientInstance::get()->getLocalPlayer();
-	return player->mContext.mRegistry->valid(mContext.mEntityId);
+    // Every component getter / setFlag() goes through this, so it has to survive
+    // "we are not in a world": dereferencing a missing local player here is what
+    // crashed modules while they were being disabled during a world unload.
+    auto ci = ClientInstance::get();
+    if (!ci) return false;
+
+    auto player = ci->getLocalPlayer();
+    if (!player || !player->mContext.mRegistry) return false;
+
+    return player->mContext.mRegistry->valid(mContext.mEntityId);
 }
 
 bool Actor::canSee(Actor* actor)

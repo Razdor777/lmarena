@@ -1,4 +1,5 @@
 //
+// Created by vastrakai on 6/30/2024.
 //
 
 #include "Setting.hpp"
@@ -62,6 +63,11 @@ bool Setting::parse(const std::string& value)
         {
             return false;
         }
+    }
+    if (mType == SettingType::String)
+    {
+        static_cast<StringSetting*>(this)->setValue(value);
+        return true;
     }
     return false;
 }

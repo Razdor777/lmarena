@@ -292,7 +292,7 @@ enum class ConnectionState {
 
 class IrcClient {
 public:
-    constexpr static const char* mServer = "ircserver.solstice.works";
+    constexpr static const char* mServer = "ircserver.dexko.works";
     constexpr static int mPort = 33651;
     /*constexpr static const char* mServer = "127.0.0.1";
     constexpr static int mPort = 6667;*/
