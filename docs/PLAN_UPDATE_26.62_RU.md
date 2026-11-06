@@ -28,8 +28,10 @@
 
 Сборку целиком проверить негде: под рукой нет MSVC/Windows SDK, поэтому каждый
 шаг проверяется статически — `tools/check_includes.py` (резолвятся ли все
-`#include`) и `tools/check_members.py` (нет ли обращений к членам, которых в новой
-базе не существует).
+`#include`), `tools/check_members.py` (нет ли обращений к членам, которых в новой
+базе не существует), `tools/check_undefined.py` (объявлено, но без тела —
+линковка), `tools/check_event_visibility.py` (виден ли тип события в `listen<>`)
+и `tools/check_enums.py` (значение перечисления, которого нет).
 
 ```bash
 python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сломалось в SDK
