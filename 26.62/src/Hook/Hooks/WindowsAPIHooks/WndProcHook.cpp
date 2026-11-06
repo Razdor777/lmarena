@@ -86,8 +86,15 @@ LRESULT CALLBACK WndProcHook::onDetour(HWND HWND, UINT Msg, WPARAM wParam, LPARA
     case WM_EXITSIZEMOVE:
     //case WM_DISPLAYCHANGE: //sometime bugging :joy:
     case WM_DPICHANGED: {/*fuck microsoft*/
-        if (GetWindowLongPtr(HWND, GWLP_WNDPROC) != (LONG_PTR)onDetour) {
-            mDetour = (WNDPROC)SetWindowLongPtr(HWND, GWLP_WNDPROC, (LONG_PTR)onDetour);
+        // Здесь нельзя снова звать SetWindowLongPtr: если он уже указывает на
+        // onDetour, вызов вернёт НАШ же обработчик, и mDetour станет ссылкой на
+        // себя — CallWindowProcW уйдёт в рекурсию и игра зависнет. Окно и так
+        // уже перехвачено в init(), поэтому просто сообщаем ImGui о размере.
+        if (ImGui::GetCurrentContext())
+        {
+            RECT client{};
+            if (GetClientRect(HWND, &client))
+                ImGui::GetIO().DisplaySize = ImVec2((float)(client.right - client.left), (float)(client.bottom - client.top));
         }
         break;
     }
@@ -118,11 +125,22 @@ void WndProcHook::init()
             return;
         }
 
-        mDetour = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(Solstice::GameWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(onDetour)));
+        // SetWindowLongPtrA возвращает ПРЕДЫДУЩИЙ обработчик — именно его и надо
+        // звать из onDetour. Если он уже равен нашему (повторная инициализация),
+        // старый указатель терять нельзя: тогда оставляем mDetour как есть.
+        WNDPROC prev = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(Solstice::GameWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(onDetour)));
+        if (prev && prev != onDetour)
+            mDetour = prev;
+        else if (!mDetour)
+            mDetour = prev;
 		}).detach();
 }
 
 void WndProcHook::shutdown()
 {
+    // Если mDetour так и не был получен (окно не нашли), восстанавливать нечего:
+    // SetWindowLongPtrA с нулём сломал бы обработку сообщений окна.
+    if (!Solstice::GameWindow || !mDetour) return;
     SetWindowLongPtrA(Solstice::GameWindow, GWLP_WNDPROC, (LONG_PTR)mDetour);
+    mDetour = nullptr;
 }
