@@ -38,6 +38,7 @@ python3 tools/check_members.py --vocab-exclude Features -- 26.62/src   # чле�
 python3 tools/sig_checklist.py --out docs/SIGS_26.62_RU.md          # что ждёт скана
 python3 tools/check_undefined.py 26.62/src                          # объявлено, но не определено
 python3 tools/check_event_visibility.py                             # listen<> видит тип события
+python3 tools/check_enums.py 26.62/src                              # Mode::X, где X не объявлен
 python3 tools/gen_resources.py --check                              # ресурсы актуальны
 ```
 
