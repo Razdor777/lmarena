@@ -13,30 +13,35 @@
 class Interface : public ModuleBase<Interface>
 {
 public:
+    // Палитры из базы 1.21.44: Aurora/Abyss/Ember/Blossom/Prism. Раньше здесь
+    // были Trans/Rainbow/Bubblegum/... — они рисовались статичными цветами,
+    // теперь цвет живой градиент (см. ColorUtils::getThemedColor).
     enum ColorTheme {
-        Trans,
-        Rainbow,
-        Bubblegum,
-        Watermelon,
-        Sunset,
-        Poison,
+        Aurora,
+        Abyss,
+        Ember,
+        Blossom,
+        Prism,
+        Spectrum = Prism,
+        Rainbow = Prism,
+        // Custom остаётся последним: им пользуются VISIBILITY_CONDITION и
+        // MathUtils::random(0, ColorTheme::Custom) ниже.
         Custom
     };
 
+    // Клиент грузит ровно один текстовый шрифт — Mntsb (см. FontHelper::load()).
+    // Остальные шрифты удалены из resources: они дублировали кириллицу, ломали
+    // вёрстку и раздували атлас. Nurik сюда осознанно не входит: это набор
+    // иконок, а не текстовый шрифт.
     enum class FontType {
-        Mojangles,
-        ProductSans,
-        /*OpenSans,
-        Comfortaa,
-        SFProDisplay*/
+        Mntsb,
     };
 
     ColorTheme randomTheme = (ColorTheme)MathUtils::random(0, ColorTheme::Custom);
 
     EnumSettingT<NamingStyle> mNamingStyle = EnumSettingT<NamingStyle>("Naming", "The style of the module names.", NamingStyle::NormalSpaced, "lowercase", "lower spaced", "Normal", "Spaced");
-    EnumSettingT<ColorTheme> mMode = EnumSettingT<ColorTheme>("Theme", "The mode of the interface.", randomTheme, "Trans", "Rainbow", "Bubblegum", "Watermelon", "Sunset", "Poison", "Custom");
-    // make sure you actually have the fonts u put here lol
-    EnumSettingT<FontType> mFont = EnumSettingT<FontType>("Font", "The font of the interface.", FontType::ProductSans, "Mojangles", "Product Sans");
+    EnumSettingT<ColorTheme> mMode = EnumSettingT<ColorTheme>("Theme", "Color palette used by the whole client.", Aurora, "Aurora", "Abyss", "Ember", "Blossom", "Prism");
+    EnumSettingT<FontType> mFont = EnumSettingT<FontType>("Font", "The font of the interface.", FontType::Mntsb, "Mntsb");
     NumberSetting mColors = NumberSetting("Colors", "The amount of colors in the interface.", 3, 1, 6, 1);
     // Colors will be Fire-themed by default
     ColorSetting mColor1 = ColorSetting("Color 1", "The first color of the interface.", 0xFFFF0000);
@@ -46,6 +51,20 @@ public:
     ColorSetting mColor5 = ColorSetting("Color 5", "The fifth color of the interface.", 0xFF0000FF);
     ColorSetting mColor6 = ColorSetting("Color 6", "The sixth color of the interface.", 0xFF8B00FF);
     NumberSetting mColorSpeed = NumberSetting("Color Speed", "The speed of the color change.", 3.f, 0.01f, 20.f, 0.01);
+    // ── Живой градиент темы (перенесено из базы 1.21.44) ────────────────────
+    // Палитра морфит между цветами, а не переключается: gradientFlow — дыхание,
+    // colorWave — волна по элементам, pulse — яркость, shimmer — редкие блики,
+    // glowBoost — сила свечения (её читает ModernDropdown для ореолов).
+    BoolSetting mGradientFlow = BoolSetting("Gradient Flow", "Smoothly morphs between colors in the selected palette", true);
+    NumberSetting mFlowDepth = NumberSetting("Flow Depth", "How strongly the moving gradient affects the base color", 0.82f, 0.f, 1.f, 0.02f);
+    BoolSetting mColorWave = BoolSetting("Color Wave", "Waves the hue across elements in sync", true);
+    NumberSetting mWaveSpeed = NumberSetting("Wave Speed", "Speed of the color wave", 1.0f, 0.1f, 5.0f, 0.05f);
+    NumberSetting mWaveSpacing = NumberSetting("Wave Spacing", "How far apart the wave pattern is", 28.f, 5.f, 120.f, 1.f);
+    BoolSetting mPulse = BoolSetting("Pulse", "Breathing brightness pulse on accents", true);
+    NumberSetting mPulseSpeed = NumberSetting("Pulse Speed", "Speed of the brightness pulse", 2.0f, 0.5f, 8.0f, 0.1f);
+    NumberSetting mPulseStrength = NumberSetting("Pulse Strength", "Depth of the brightness pulse", 0.25f, 0.f, 0.8f, 0.05f);
+    BoolSetting mShimmer = BoolSetting("Shimmer", "Occasional bright sparkle sweeping through colors", true);
+    NumberSetting mGlowBoost = NumberSetting("Glow Boost", "Multiplies glow strength of themed elements", 1.f, 0.2f, 2.f, 0.05f);
     NumberSetting mSaturation = NumberSetting("Saturation", "The saturation of the interface.", 1.f, 0.f, 1.f, 0.01);
     BoolSetting mHoveredItem = BoolSetting("Custom Hover", "Customizes the hovered item gui.", false);
     BoolSetting mSlotEasing = BoolSetting("Slot Easing", "Eases the selection of slots", true);
@@ -78,6 +97,16 @@ public:
             &mColor5,
             &mColor6,
             &mColorSpeed,
+            &mGradientFlow,
+            &mFlowDepth,
+            &mColorWave,
+            &mWaveSpeed,
+            &mWaveSpacing,
+            &mPulse,
+            &mPulseSpeed,
+            &mPulseStrength,
+            &mShimmer,
+            &mGlowBoost,
             &mSaturation,
             //&mHoveredItem,
             &mSlotEasing,
