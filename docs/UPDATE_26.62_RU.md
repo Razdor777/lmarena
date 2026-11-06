@@ -23,7 +23,7 @@
 - `RuntimeObject.lib` вместо `WindowsApp.lib`/`OneCore.lib` (как в мастер-ветке).
 
 ### Таблицы, привязанные к версии
-- `SDK/SigManager.hpp`: +48 сигнатур из мастера, 17 раскомментированы. Итог: **103 активных**.
+- `SDK/SigManager.hpp`: +48 сигнатур из мастера, 17 раскомментированы. Итог: **107 активных**.
 - `SDK/OffsetProvider.hpp`: +33 оффсета, 12 раскомментированы. Итог: **114 активных**.
 - Оба файла помечены блоком `// ==== ported from the 1.21.44 master — re-verify on 1.26.62 ====`.
 - Починены дубликаты имён (иначе не собиралось): `GameSession_mEventCallback`, `ClientInputMappingFactory_mKeyboardRemappingLayout`.
@@ -88,6 +88,53 @@ AntiBot, Spammer.
   `src/cmake/CPM.cmake` и `src/GenerateBuildInfo.cmake`.
 - `ItemPhysics` в базе целиком закомментирован (`/* ... */`) и не зарегистрирован — там те же
   glm-сигнатуры, что не находятся на новом билде. Оставлено выключенным.
+
+## 1.1. Итоговые цифры после последнего прохода
+
+| что | сколько |
+|---|---|
+| модулей зарегистрировано | **193** |
+| команд | **31** |
+| хуков | **25** |
+| активных сигнатур | **107** |
+| активных оффсетов | **114** |
+| `.cpp` в `26.62/src` | 355 |
+
+### Что чинилось в этом проходе (всё из-за смены базы, не из-за твоего кода)
+
+**SDK: переименованные поля.** В 1.26.x у `SubChunk` поля называются иначе
+(`blockReadPtr` → `mBlocksReadPtr[0]`, `subchunkIndex` → `mAbsoluteIndex`). Твой
+`OreMiner`, `OreMinerV2`, `BlockESP`, `SmartXRay`, `InfiniteChestAura`, `BlockUtils`
+обращались к старым именам — в `SubChunk.hpp` добавлены поля-адаптеры
+(`__declspec(property)`), так что код читается как раньше.
+
+**SDK: недостающие методы.** `ItemStack::fromDescriptor` (+ `Level::getBlockPalette`),
+`TeleportCommand::sLastUse`, `ColorUtils::{getStaticAccentColor, saturate, HSL-хелперы}`,
+`BaseTickInitEvent`.
+
+**Хуки.**
+- `KeyHook` теперь целиком твой: сначала кормит ImGui (чтобы кириллица в чате
+  работала — `ToUnicode` вместо `ToAscii`), гасит клавиши при вводе в CustomChat,
+  поддерживает ChatBinds. Цепочка ввода в 26.62 другая (`WndProcHook` вместо детура
+  `Keyboard::feed`), поэтому `onKey` возвращает `bool` — «погасить клавишу» — а
+  `WndProcHook` его уважает.
+- `ContainerScreenControllerHook` — версия с хуком наведения на слот, иначе
+  `JavaInventory` и `ContainerActions` не работали бы (они зовут `isScreenActive()`).
+- `ItemRendererHook` — теперь и событие базовое, и кэш `ItemRenderer`/`BaseActorRenderContext`
+  для `InventoryHUD`/`ItemAtlas`.
+- `BaseTickHook` — версия с мьютексом очереди пакетов (в базе гонка), плюс диспатч
+  `BaseTickInitEvent`.
+
+**Шрифты.** `FontHelper::load()` грузит Mntsb и мержит кириллицу из Roboto; TTF больше
+не регистрируются дважды в `Resources.cpp` (раньше ключ занимала копия без кириллицы,
+и русский текст мог рисоваться знаками вопроса).
+
+**Команды.** 12 команд лежали в дереве, но не были зарегистрированы — `.spammer`,
+`.fakechat`, `.pos1/.pos2`, `.sbuild`, `.scopy`, `.spaste`, `.scancel`, `.skin` и др.
+молча ничего не делали.
+
+**Конфиги.** `ConfigManager` из мастера: битый `config.json` больше не роняет клиент —
+делается `.corrupted.<время>.json` и грузятся дефолты.
 
 ---
 
