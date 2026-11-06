@@ -20,8 +20,37 @@ import sys
 INC = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]')
 EXTERNAL = re.compile(
     r'^(spdlog|nlohmann|glm|imgui|implot|entt|magic_enum|winrt|Windows|winsock|d3d|dxgi|'
-    r'dwrite|d2d1|DirectX|cryptopp|libhat|nes|entity|include/|mmsystem|xinput|'
-    r'[a-z_]+\.h$)')
+    r'dwrite|d2d1|DirectX|cryptopp|libhat|nes|entity|include/|mmsystem|xinput|kiero|'
+    # аудио/midi-заголовки win32, которые не лежат в наших include/
+    r'xaudio2|mmdeviceapi|audioclient|wrl|wincodec|shobjidl|propsys|'
+    # любые платформенные заголовки вроде DbgHelp.h / ws2tcpip.h / Audio.h:
+    # в наших include/ им делать нечего
+    r'[A-Za-z0-9_]+\.h$)')
+
+
+# Заголовки стандартной библиотеки: их нет в наших roots, и это нормально.
+STD_HEADERS = {
+    'algorithm', 'any', 'array', 'atomic', 'barrier', 'bit', 'bitset', 'cassert',
+    'cctype', 'cerrno', 'cfenv', 'cfloat', 'charconv', 'chrono', 'cinttypes',
+    'climits', 'clocale', 'cmath', 'codecvt', 'compare', 'complex', 'concepts',
+    'condition_variable', 'coroutine', 'csetjmp', 'csignal', 'cstdarg', 'cstddef',
+    'cstdint', 'cstdio', 'cstdlib', 'cstring', 'ctime', 'cuchar', 'cwchar',
+    'cwctype', 'deque', 'exception', 'execution', 'expected', 'filesystem',
+    'format', 'forward_list', 'fstream', 'functional', 'future', 'initializer_list',
+    'iomanip', 'ios', 'iosfwd', 'iostream', 'istream', 'iterator', 'latch',
+    'limits', 'list', 'locale', 'map', 'mdspan', 'memory', 'memory_resource',
+    'mutex', 'new', 'numbers', 'numeric', 'optional', 'ostream', 'queue',
+    'random', 'ranges', 'ratio', 'regex', 'scoped_allocator', 'semaphore',
+    'set', 'shared_mutex', 'source_location', 'span', 'sstream', 'stack',
+    'stdexcept', 'stop_token', 'streambuf', 'string', 'string_view', 'strstream',
+    'syncstream', 'system_error', 'thread', 'tuple', 'type_traits', 'typeindex',
+    'typeinfo', 'unordered_map', 'unordered_set', 'utility', 'valarray',
+    'variant', 'vector', 'version',
+    # C-заголовки, которые обычно пишут с .h
+    'assert.h', 'ctype.h', 'errno.h', 'float.h', 'limits.h', 'locale.h',
+    'math.h', 'setjmp.h', 'signal.h', 'stdarg.h', 'stddef.h', 'stdint.h',
+    'stdio.h', 'stdlib.h', 'string.h', 'time.h', 'wchar.h',
+}
 
 
 def resolve(includer, inc, roots):
@@ -51,6 +80,8 @@ def main():
                 if not m:
                     continue                      # comments/other lines
                 inc = m.group(1)
+                if not a.all and inc in STD_HEADERS:
+                    continue
                 if not a.all and EXTERNAL.match(inc):
                     continue
                 if resolve(f, inc, roots):
