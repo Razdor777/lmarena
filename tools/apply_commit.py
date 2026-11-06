@@ -86,6 +86,18 @@ def have_commit(root, commit):
     return git(root, "cat-file", "-e", commit + "^{commit}").returncode == 0
 
 
+def _code_only(text):
+    """Текст без комментариев и пустых строк — чтобы не перезаписывать файл
+    из-за разницы только в поясняющих комментариях."""
+    out = []
+    for ln in text.split("\n"):
+        t = ln.strip()
+        if not t or t.startswith("//"):
+            continue
+        out.append(t)
+    return "\n".join(out)
+
+
 def run_git_mode(root, check, backup_dir=None):
     have_any = [c for c in COMMITS if have_commit(root, c)]
     if not have_any:
@@ -112,7 +124,7 @@ def run_git_mode(root, check, backup_dir=None):
             if os.path.isfile(target):
                 with open(target, "r", encoding="utf-8", errors="ignore", newline="") as f:
                     old = f.read()
-            if old == new:
+            if old == new or _code_only(old) == _code_only(new):
                 skipped += 1
                 continue
             print("     + %-64s из %s" % (rel, commit))
@@ -139,10 +151,10 @@ OREMINER_TAIL_MARK = "static const char *oreTypeName(int blockId);"
 OREMINER_STALE_MARKS = ("deepslate", "mDebugCsvPath")
 OREMINER_ANCHOR = "// Строка «сырого» дампа (Dump Seen): блок, который модуль увидел."
 OREMINER_WARNING = [
-    "ВАЖНО: структура и всё ниже — ЕДИНСТВЕННОЕ объявление дампа в классе.",
-    "При слиянии корневой версии с 26.62-версией секция «Debug dump» попала в",
-    "файл дважды (два struct DebugRow, два debugStart/debugFlush/debugStop/",
-    "oreTypeName) — MSVC падал с C2011/C2535/C2086. Вторая копия удалена.",
+    "ВАЖНО: эта секция — ЕДИНСТВЕННОЕ объявление дампа в классе.",
+    "При слиянии версий она попала в файл дважды (два одинаковых объявления",
+    "структуры и методов дампа) — MSVC падал с C2011/C2086/C2535. Вторая",
+    "копия удалена; не вставляйте её обратно при следующем слиянии.",
 ]
 
 

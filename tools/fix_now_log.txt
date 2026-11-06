@@ -1,0 +1,23 @@
+fix_now.py — правки сборки 26.62
+python: 3.11.2
+папка скрипта: /home/user/lmarena/tools
+текущая папка: /home/user/lmarena
+найдено копий: 1
+   /home/user/lmarena
+
+КОПИЯ: /home/user/lmarena
+   =  26.62/src/Features/Modules/Player/OreMinerV2.hpp           уже исправлено (секция одна)
+   =  26.62/src/Features/Modules/Player/ContainerActions.cpp     уже исправлено
+   =  26.62/src/Features/Modules/ModuleManager.cpp               уже исправлено
+   =  26.62/src/Features/Command/Commands/BuildInfoCommand.cpp   уже исправлено
+   =  26.62/GenerateBuildInfo.cmake                              уже исправлено
+   =  26.62/src/Features/Auth/Authorization.hpp                  уже есть защита
+   =  26.62/src/Features/Auth/CustomCryptor.hpp                  уже есть защита
+   =  26.62/src/Features/Command/Commands/SnipeCommand.hpp       уже есть защита
+   =  26.62/src/Features/Command/Commands/VclipCommand.hpp       уже есть защита
+   =  26.62/src/Features/Events/WindowResizeEvent.hpp            уже есть защита
+   =  26.62/src/SDK/Minecraft/Network/Packets/CameraInstructionPacket.hpp уже есть защита
+   проверка OreMinerV2.hpp: struct DebugRow — 1, mDebugCsvPath — 0  OK
+   итог: изменено 0, уже было 11, проблем 0
+
+ГОТОВО
