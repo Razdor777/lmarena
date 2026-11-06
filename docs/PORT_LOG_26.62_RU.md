@@ -113,6 +113,26 @@
 - `SafeWalk`: см. выше.
 - `ScriptingGui` удалён — он обращался к `ScriptManager`, которого в 26.62 нет
   (скриптовый GUI остался только как `Luau` в `include/`).
+- `Interface::onLevelRenderEvent` был объявлен и подписан в конструкторе, но тела
+  не было (его потеряли, когда .cpp перезаписывали корневым) — падала линковка на
+  `&Interface::onLevelRenderEvent`. Вернули; заодно включили обработчик
+  `DrawImageEvent` (ховер-детур `drawImage` в 26.62 вешается, а слушателя не было)
+  и удалили мёртвый `BodyYaw` (модель считается покадрово в `onActorRenderEvent`).
+- `D3DHook`: детур 5-аргументного `ResizeBuffers` писался в `oResizeBuffers1`
+  (7 аргументов) — при первом ресайзе окна вызов уходил с мусором в аргументах;
+  `s_shutdown()` снимал оба метода сразу (второй может быть невалиден). Теперь
+  ветки разделены флагом `isd3d12`.
+- `ExceptionHandler.cpp` перенесли раньше, чем его заголовок: `markThread`/
+  `ThreadRole` определялись в .cpp, но отсутствовали в `hpp`. Заголовок вернули.
+- `ItemRendererHook` в 26.62-версии не запоминал `ItemRenderer`/`BaseActorRenderContext`,
+  а `InventoryHUD` их требует (`getItemRenderer()`/`getBarContext()`) — модуль не
+  компилировался. Плюс вернули `ItemIconQueue` и сам рендер иконок движком в
+  `SetupAndRenderHook` (`renderGuiItemNew`), иначе очередь заданий никто не
+  опустошал и иконки в HUD не рисовались.
+- `BaseTickInitEvent` пропал при переносе событий, хотя `RobloxCamera` его
+  слушает. Вернули класс и одноразовый `trigger` в `BaseTickHook`.
+- Вывод клиентских сообщений (`BaseTickHook`) больше не обходит `ChatUtils::sSink`:
+  при включённом `CustomChat` текст уходил мимо него.
 - Из текстов убран бренд `Juzdex` (в папке, чате, дампах) — везде `Solstice`.
   Функция `FileUtils::getJuzdexDir()` оставлена алиасом на `Solstice\`.
 
@@ -132,4 +152,9 @@ python3 tools/gen_resources.py --check
 2. Доснять сигнатуры по `Minecraft.Windows.exe` 1.26.5x: шесть «догадок» и пять
    `Ambience_*` (порядок — в `docs/SIGS_26.62_RU.md`).
 3. Проверить в игре: чат-бинды, hover-свопы в инвентаре, `.schematic`, `Ambience`,
-   `DamageLog` (нужна `Actor_hurt`), `BowHitMarker` (нужна `Projectile_onHit`).
+   `DamageLog` (нужна `Actor_hurt`), `BowHitMarker` (нужна `Projectile_onHit`),
+   иконки предметов в `InventoryHUD` (рисует движок через `renderGuiItemNew`)
+   и ресайз окна (был краш в `D3DHook::resizeBuffers`).
+4. `ModuleScriptStateChangeEvent` никто не шлёт: скриптового движка в 26.62 нет.
+   Обработчик в `ToggleSounds` безопасен, но и не срабатывает — вернуть вместе
+   со скриптами.
