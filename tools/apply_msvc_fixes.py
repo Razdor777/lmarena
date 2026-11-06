@@ -38,53 +38,90 @@ OREMINER_REL = r"src/Features/Modules/Player/OreMinerV2.hpp"
 # Вторая секция начинается так (уникально: `bool deepslate = false;` есть
 # только в устаревшей копии) и заканчивается строкой `static const char
 # *oreTypeName(int blockId);`, за которой идёт пустая строка и шапка Scan methods.
-OREMINER_SECOND_START = "  // =====================================================\n" \
-                        "  // Debug dump\n" \
-                        "  // =====================================================\n" \
-                        "  struct DebugRow {\n" \
-                        "    BlockPos pos{};\n" \
-                        "    int      blockId  = 0;\n" \
-                        "    bool     deepslate = false;\n"
+# Вторая секция ищется по строкам, а не по точному тексту: номера строк и
+# отступы в чужой копии могут отличаться, поэтому опираемся только на маркеры.
+OREMINER_HEADER_MARK = "// Debug dump"
+OREMINER_TAIL_MARK = "static const char *oreTypeName(int blockId);"
+OREMINER_STALE_MARKS = ("deepslate", "mDebugCsvPath")   # есть только в старой копии
+OREMINER_FRESH_MARKS = ("mDebugDir", "mDbgSeenFile")     # есть только в новой
 
-OREMINER_TAIL_MARK = "  static const char *oreTypeName(int blockId);\n"
+OREMINER_WARNING = [
+    "ВАЖНО: структура и всё ниже — ЕДИНСТВЕННОЕ объявление дампа в классе.",
+    "При слиянии корневой версии с 26.62-версией секция «Debug dump» попала в",
+    "файл дважды (два struct DebugRow, два debugStart/debugFlush/debugStop/",
+    "oreTypeName) — MSVC падал с C2011/C2535/C2086. Вторая копия удалена.",
+]
 
-OREMINER_WARNING = (
-    "  // ВАЖНО: структура и всё ниже — ЕДИНСТВЕННОЕ объявление дампа в классе.\n"
-    "  // При слиянии корневой версии с 26.62-версией секция «Debug dump» попала в\n"
-    "  // файл дважды (два struct DebugRow, два debugStart/debugFlush/debugStop/\n"
-    "  // oreTypeName) — MSVC падал с C2011/C2535/C2086. Вторая копия удалена.\n"
-)
+OREMINER_ANCHOR = "// Строка «сырого» дампа (Dump Seen): блок, который модуль увидел."
 
-OREMINER_ANCHOR = "  // Строка «сырого» дампа (Dump Seen): блок, который модуль увидел.\n"
+
+def _is_sep(line):
+    """Строка-разделитель вида `// ========` или `// --------`."""
+    t = line.strip()
+    if not t.startswith("//"):
+        return False
+    body = t.lstrip("/").strip()
+    return len(body) >= 8 and set(body) <= {"=", "-"}
+
+
+def _sections(lines):
+    """Все секции «Debug dump»: список (начало, конец) — номера строк, 0-based,
+    конец включительно. Начало — строка-разделитель перед заголовком."""
+    out = []
+    for i, ln in enumerate(lines):
+        if ln.strip() != OREMINER_HEADER_MARK:
+            continue
+        start = i - 1 if i > 0 and _is_sep(lines[i - 1]) else i
+        end = None
+        for j in range(i, len(lines)):
+            if OREMINER_TAIL_MARK in lines[j]:
+                end = j
+                break
+        out.append((start, end))
+    return out
 
 
 def fix_oreminer(text):
-    """Возвращает (новый_текст, сообщение) или (text, None), если править нечего."""
-    if "bool     deepslate = false;" not in text:
-        return text, "уже исправлено (второй секции нет)"
+    """Удаляет устаревшую копию секции «Debug dump» (по маркерам, а не по строкам).
 
-    start = text.find(OREMINER_SECOND_START)
-    if start < 0:
-        return text, "НЕ НАЙДЕНО: начало второй секции Debug dump — правка пропущена"
+    Именно этот дефект даёт C2011/C2086/C2535 на DebugRow/debugStart/debugFlush/
+    debugStop/oreTypeName и каскад C2027/C2079/C2665 в OreMinerV2.cpp.
+    """
+    lines = text.split("\n")
+    sections = _sections(lines)
 
-    tail = text.find(OREMINER_TAIL_MARK, start)
-    if tail < 0:
-        return text, "НЕ НАЙДЕНО: конец второй секции Debug dump — правка пропущена"
-    end = tail + len(OREMINER_TAIL_MARK)
+    if not sections:
+        return text, "НЕ НАЙДЕНО: секция «Debug dump» — правка пропущена"
+    if len(sections) == 1:
+        return text, "уже исправлено (секция Debug dump одна)"
 
-    # хвостовые пробелы строки-маркера убираем, перевод строки оставляем:
-    # так между секцией и «Scan methods» остаются ровно две пустые строки
-    while end < len(text) and text[end] in " \t":
-        end += 1
+    # какая из секций устаревшая: та, где есть deepslate/mDebugCsv*
+    stale = []
+    for start, end in sections:
+        body = "\n".join(lines[start:(end + 1 if end is not None else start + 1)])
+        if any(m in body for m in OREMINER_STALE_MARKS):
+            stale.append((start, end))
+    if len(stale) != len(sections) - 1:
+        return text, "НЕ НАЙДЕНО: не удалось однозначно определить устаревшую секцию — пропущено"
+    for start, end in stale:
+        if end is None:
+            return text, "НЕ НАЙДЕНО: у секции нет конца — правка пропущена"
 
-    removed = text[start:end]
-    text = text[:start] + text[end:]
+    # удаляем с конца, чтобы не сбить номера
+    removed = 0
+    for start, end in sorted(stale, reverse=True):
+        del lines[start:end + 1]
+        removed += end - start + 1
 
     # предупреждение в шапку оставшейся секции — один раз
-    if "ВТОРАЯ копия удалена" not in text and OREMINER_ANCHOR in text:
-        text = text.replace(OREMINER_ANCHOR, OREMINER_ANCHOR + OREMINER_WARNING, 1)
+    if "ВТОРАЯ копия удалена" not in text:
+        for i, ln in enumerate(lines):
+            if OREMINER_ANCHOR in ln:
+                indent = ln[:len(ln) - len(ln.lstrip())] or "  "
+                lines[i + 1:i + 1] = [indent + "// " + w for w in OREMINER_WARNING]
+                break
 
-    return text, "удалено строк: %d" % removed.count("\n")
+    return "\n".join(lines), "удалено строк: %d (устаревших секций: %d)" % (removed, len(stale))
 
 
 # ----------------------------------------------------------------------------
@@ -107,11 +144,66 @@ CONTAINER_NEW = (
 
 
 def fix_container(text):
-    if "ItemStackBase::mValid_DeprecatedSeeComment" in text:
-        return text, "уже исправлено"
-    if CONTAINER_OLD not in text:
+    """Армор-сброс: поле живёт в ItemStackBase → нужна квалификация.
+
+    Убирает и «оба варианта сразу»: если старая (неквалифицированная) строка
+    осталась рядом с исправленной — она удаляется, иначе MSVC продолжает
+    ругаться C2039 на строке 277 и путает диагностику.
+    """
+    lines = text.split("\n")
+    old_stmt = "armor->mValid_DeprecatedSeeComment=false;"
+    new_stmt = "armor->ItemStackBase::mValid_DeprecatedSeeComment=false;"
+    note = []
+
+    # индексы строк со сбросом брони
+    old_idx = [i for i, ln in enumerate(lines) if old_stmt in ln and new_stmt not in ln]
+    new_idx = [i for i, ln in enumerate(lines) if new_stmt in ln]
+
+    if not old_idx and not new_idx:
         return text, "НЕ НАЙДЕНО: строка сброса брони — правка пропущена"
-    return text.replace(CONTAINER_OLD, CONTAINER_NEW, 1), "квалифицировано ItemStackBase::"
+
+    # 1) старая строка без квалификации → переписываем (или удаляем, если рядом уже есть новая)
+    for i in reversed(old_idx):
+        if new_idx:
+            del lines[i]                       # дубль: исправленная строка уже есть
+            note.append("удалена устаревшая строка")
+        else:
+            line = lines[i].replace(old_stmt, new_stmt)
+            # сброс полей и сброс флага валидности — на разных строках (читаемее)
+            marker = "armor->ItemStackBase::mValid_DeprecatedSeeComment=false;"
+            if "armor->mCompoundTag=nullptr;" in line and marker in line:
+                head, _ = line.split(marker, 1)
+                indent = head[:len(head) - len(head.lstrip())]
+                lines[i:i + 1] = [head.rstrip(), indent + marker]
+                new_idx.append(i + 1)
+            else:
+                lines[i] = line
+                new_idx.append(i)
+            note.append("квалифицировано ItemStackBase::")
+
+    # 1a) пояснение над сбросом — один раз, чтобы в файле читалось «почему»
+    if new_idx and "C2039" not in text:
+        # комментарий ставим перед всей группой строк сброса брони, а не перед
+        # последней строкой: сначала обнуление полей, потом флаг валидности
+        i = new_idx[0]
+        while i > 0 and lines[i - 1].lstrip().startswith("armor->"):
+            i -= 1
+        indent = lines[i][:len(lines[i]) - len(lines[i].lstrip())]
+        note_lines = [
+            indent + "// mValid_DeprecatedSeeComment живёт в ItemStackBase, а ItemStack",
+            indent + "// начинается с PAD(24) — квалифицированное имя обязательно,",
+            indent + "// иначе MSVC C2039 «не является членом ItemStack».",
+        ]
+        lines[i:i] = note_lines
+        new_idx = [x + len(note_lines) for x in new_idx]
+
+    # 2) повторные присваивания — оставляем одно
+    if len(new_idx) > 1:
+        for i in reversed(new_idx[1:]):
+            del lines[i]
+        note.append("свёрнуты повторные присваивания")
+
+    return "\n".join(lines), "; ".join(note)
 
 
 # ----------------------------------------------------------------------------
