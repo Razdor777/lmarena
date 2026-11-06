@@ -3,12 +3,8 @@
 
 #include "KeyHook.hpp"
 
-<<<<<<< HEAD:26.62/src/Hook/Hooks/MiscHooks/KeyHook.cpp
-#include <Solstice.hpp>
-#include <Features/Modules/Visual/ClickGui.hpp>
-=======
 #include <Dexko.hpp>
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/MiscHooks/KeyHook.cpp
+#include <Features/Modules/Visual/ClickGui.hpp>
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 

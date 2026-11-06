@@ -34,8 +34,6 @@ public:
 
     static inline unsigned char mOriginalData[18];
 
-<<<<<<< HEAD:26.62/src/Features/Modules/Combat/Reach.hpp
-=======
     // [our float][copied rip-relative instruction][jmp back]
     //
     //   F3 44 0F 5D 3D F3 FF FF FF  =  minss xmm15, [rip-13]   <- reads our float
@@ -47,8 +45,8 @@ public:
         0x00, 0x00, 0x40, 0x40,
         0xF3, 0x44, 0x0F, 0x5D, 0x3D, 0xF3, 0xFF, 0xFF, 0xFF
     };
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Combat/Reach.hpp
 
+    static inline void* mDetour = nullptr;
     float* mBlockReachPtr = nullptr;
     float* mCombatPtr = nullptr;
 

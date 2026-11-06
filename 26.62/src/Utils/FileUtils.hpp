@@ -10,6 +10,7 @@ class FileUtils {
 public:
     static std::string getRoamingStatePath();
     static std::string getSolsticeDir();
+    static std::string getDexkoDir(); // alias of getSolsticeDir(): one data folder for the whole client
     static bool fileExists(const std::string& path);
     static void createDirectory(const std::string& path);
     static void validateDirectories();

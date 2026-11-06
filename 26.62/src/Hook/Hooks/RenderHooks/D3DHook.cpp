@@ -50,7 +50,6 @@ static bool d3dInitImGui = false;
 
 
 
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
 struct LoadedResource {
     ID3D11ShaderResourceView* srv;
     int width;
@@ -265,17 +264,12 @@ bool D3DHook::createTextureFromData(const uint8_t* data, int width, int height, 
     return true;
 }
 
-HRESULT D3DHook::present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
-{
-    if (Solstice::mRequestEject)
-=======
 HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT flags)
 {
     // Ejecting (or already ejected): never run another line of our code on the
     // render thread, otherwise the module can be unmapped while this thread is
     // still inside it.
     if (Dexko::mRequestEject || Dexko::mUnloading.load())
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
     {
         return oPresent(swapChain, syncInterval, flags);
     }
@@ -289,10 +283,7 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
             static bool msgwarn = false;
             if (!msgwarn)
             {
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
                 NotifyUtils::notify("WARNING! Solstice is currently running in D3D11 mode. \nThis is NOT recommended and may cause instability.\nI strongly advise you to use D3D12 for the time being.", 15.f, Notification::Type::Warning);
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
                 msgwarn = true;
             }
         }
@@ -422,16 +413,11 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
                 CHECK_HR(gDevice11->CreateRenderTargetView(mBackBuffer11Tex.at(i).get(), nullptr,
                                                      mBackBuffer11Rtv.at(i).put()));
             }
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
-            // fucking wndproc hook
-            // oWndProc = (WNDPROC)SetWindowLongPtr(wnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
-=======
             // Dexko has no clickable menu (everything is driven by chat commands),
             // so no window-proc hook is needed. The old line wrote a NULL proc into
             // the window (oWndProc was still empty at that point) — just keep the
             // game's own proc instead of touching it.
             oWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(wnd, GWLP_WNDPROC));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
         }
         d3dInitImGui = true;
     }
@@ -452,14 +438,11 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     static ImVec2 lastWindowSize = ImGui::GetIO().DisplaySize;
     ImVec2 windowSize = ImVec2(ClientInstance::get()->getGuiData()->mResolution.x, ClientInstance::get()->getGuiData()->mResolution.y);
 
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
     if (lastWindowSize.x != windowSize.x || lastWindowSize.y != windowSize.y) {
         auto holder = nes::make_holder<WindowResizeEvent>(windowSize.x, windowSize.y);
         gFeatureManager->mDispatcher->trigger(holder);
     }
 
-=======
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
     lastWindowSize = windowSize;
 
     winrt::com_ptr<IDXGISurface> surface;
@@ -497,16 +480,13 @@ HRESULT D3DHook::present(IDXGISwapChain3* swapChain, UINT syncInterval, UINT fla
     return oPresent(swapChain, syncInterval, flags);
 }
 // need check
-HRESULT D3DHook::resizeBuffers(IDXGISwapChain* swapChain, UINT bufferCount, UINT width, UINT height,
+HRESULT D3DHook::resizeBuffers(IDXGISwapChain3* swapChain, UINT bufferCount, UINT width, UINT height,
     DXGI_FORMAT newFormat, UINT swapChainFlags)
 {
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
-=======
     // Ejecting: never touch our state from the render thread again.
     if (Dexko::mUnloading.load())
         return oResizeBuffers(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
 
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
     if (d3dInitImGui)
     {
 
@@ -612,70 +592,13 @@ void D3DHook::s_init()
     // Attempt to init on D3D12
     if (kiero::init(kiero::RenderType::D3D12) == kiero::Status::Success)
     {
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
-        Solstice::console->info("Initialized kiero [D3D12]");
-        /*
-        kiero::bind<&IDXGISwapChain::Present>(&oPresent, &D3DHook::present);
-        kiero::bind<&IDXGISwapChain3::ResizeBuffers1>(&oResizeBuffers1, &D3DHook::resizeBuffers1);*/
-        void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>();
-        void* _resize1 = kiero::getMethod<&IDXGISwapChain3::ResizeBuffers1, void*>();
-        void* _oPresent = nullptr;
-        void* _oResize1 = nullptr;
-
-        if (MH_CreateHook(_present, reinterpret_cast<void*>(&D3DHook::present), &_oPresent) != MH_OK) {
-            Solstice::console->critical("Present hook fail");
-            return;
-        }
-        if (MH_CreateHook(_resize1, reinterpret_cast<void*>(&D3DHook::resizeBuffers1), &_oResize1) != MH_OK) {
-            Solstice::console->critical("ResizeBuffers1 hook fail");
-            MH_RemoveHook(_present);
-            return;
-        }
-
-        oPresent = reinterpret_cast<decltype(oPresent)>(_oPresent);
-        oResizeBuffers1 = reinterpret_cast<decltype(oResizeBuffers1)>(_oResize1);
-
-        MH_EnableHook(_present);
-        MH_EnableHook(_resize1);
-=======
         Dexko::console->info("Initialized kiero [D3D12]");
         kiero::bind(140, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
         kiero::bind(145, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
         return;
         // Else, attempt to init on D3D11
     } else if (kiero::init(kiero::RenderType::D3D11) == kiero::Status::Success)
     {
-<<<<<<< HEAD:26.62/src/Hook/Hooks/RenderHooks/D3DHook.cpp
-        Solstice::console->info("Initialized kiero [D3D11]");
-        /*
-        kiero::bind<&IDXGISwapChain::Present>(&oPresent, &D3DHook::present);
-        kiero::bind<&IDXGISwapChain::ResizeBuffers>(&oResizeBuffers, &D3DHook::resizeBuffers);*/
-        void* _present = kiero::getMethod<&IDXGISwapChain::Present, void*>();
-        void* _resize = kiero::getMethod<&IDXGISwapChain::ResizeBuffers, void*>();
-        void* _oPresent = nullptr;
-        void* _oResize = nullptr;
-
-        if (MH_CreateHook(_present, reinterpret_cast<void*>(&D3DHook::present), &_oPresent) != MH_OK) {
-            Solstice::console->critical("Present hook fail");
-            return;
-        }
-        if (MH_CreateHook(_resize, reinterpret_cast<void*>(&D3DHook::resizeBuffers), &_oResize) != MH_OK) {
-            Solstice::console->critical("ResizeBuffers1 hook fail");
-            MH_RemoveHook(_present);
-            return;
-        }
-
-        oPresent = reinterpret_cast<decltype(oPresent)>(_oPresent);
-        oResizeBuffers1 = reinterpret_cast<decltype(oResizeBuffers1)>(_oResize);
-
-        MH_EnableHook(_present);
-        MH_EnableHook(_resize);
-        return;
-    }
-    Solstice::console->error("Failed to initialize kiero");
-    MessageBoxA(NULL, "Failed to initialize kiero", "Solstice", MB_OK | MB_ICONERROR);
-=======
         Dexko::console->info("Initialized kiero [D3D11]");
         kiero::bind(8, reinterpret_cast<void**>(&oPresent), reinterpret_cast<void*>(present));
         kiero::bind(13, reinterpret_cast<void**>(&oResizeBuffers), reinterpret_cast<void*>(resizeBuffers));
@@ -683,7 +606,6 @@ void D3DHook::s_init()
     }
     Dexko::console->error("Failed to initialize kiero");
     MessageBoxA(NULL, "Failed to initialize kiero", "Dexko", MB_OK | MB_ICONERROR);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Hook/Hooks/RenderHooks/D3DHook.cpp
 }
 void D3DHook::shutdown()
 {

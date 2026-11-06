@@ -89,13 +89,9 @@ void Reach::onDisable() {
     gFeatureManager->mDispatcher->deafen<BaseTickEvent, &Reach::onBaseTickEvent>(this);
 
     MemUtils::writeBytes(func, mOriginalData, sizeof(mOriginalData));
-<<<<<<< HEAD:26.62/src/Features/Modules/Combat/Reach.cpp
     FreeBuffer(mCombatPtr);
-=======
-    FreeBuffer(mDetour);
-    mDetour = nullptr;
+    mCombatPtr = nullptr;
     mAppliedOpcode = -1;
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Combat/Reach.cpp
 
     //MemUtils::Write((uintptr_t) mBlockReachPtr, 5.7f);
 }
@@ -115,14 +111,8 @@ void Reach::applyOverrideMode()
 }
 
 void Reach::onBaseTickEvent(class BaseTickEvent &event) {
-<<<<<<< HEAD:26.62/src/Features/Modules/Combat/Reach.cpp
     if (mCombatPtr) {
         *mCombatPtr = mCombatReach.mValue;
     }
-=======
-    applyOverrideMode();
-
-    MemUtils::Write((uintptr_t) mDetour, mCombatReach.mValue);
->>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:dexko/src/Features/Modules/Combat/Reach.cpp
     MemUtils::Write((uintptr_t) mBlockReachPtr, mBlockReach.mValue);
 }

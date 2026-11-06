@@ -26,6 +26,11 @@ std::string FileUtils::getSolsticeDir()
     return getRoamingStatePath() + xorstr_("Solstice\\");
 }
 
+std::string FileUtils::getDexkoDir()
+{
+    return getSolsticeDir();
+}
+
 bool FileUtils::fileExists(const std::string& path)
 {
     return std::filesystem::exists(path);

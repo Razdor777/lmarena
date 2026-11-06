@@ -1,12 +1,7 @@
 //
 //
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-//Test commit
-#include "Solstice.hpp"
-========
 
 #include "Dexko.hpp"
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 
 
 #include <fstream>
@@ -36,13 +31,6 @@
 #include <SDK/Minecraft/Rendering/GuiData.hpp>
 #include <Utils/SysUtils/xorstr.hpp>
 
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-#include <wininet.h>
-#pragma comment(lib, "wininet.lib")
-
-
-========
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 #ifdef __DEBUG__
 std::string title = "[" + std::string(DEXKO_BUILD_VERSION_SHORT) + "-" + std::string(DEXKO_BUILD_BRANCH) + "] [debug]";
 #elif __PRIVATE_BUILD__
@@ -97,13 +85,8 @@ void Dexko::init(HMODULE hModule)
     console = spdlog::stdout_color_mt(CC(21, 207, 148) + "solstice" + ANSI_COLOR_RESET, spdlog::color_mode::automatic);
 
     // Create a file logger sink
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-    std::string logFile = FileUtils::getSolsticeDir() + xorstr_("solstice.log");
-
-========
     std::string logFile = FileUtils::getDexkoDir() + xorstr_("dexko.log");
  
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
     // Don't use the file sink if the log file doesn't exist
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_pattern("[" + CC(255, 135, 0) + "%H:%M:%S.%e" + ANSI_COLOR_RESET + "] [%n] [%^%l%$] %v");
@@ -251,37 +234,6 @@ void Dexko::shutdownThread()
     bool isLpValid = false;
     while (!mRequestEject)
     {
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-        if (firstCall)
-        {
-            NotifyUtils::notify("Solstice initialized!", 5.0f, Notification::Type::Info);
-            firstCall = false;
-
-            std::string latestHash;
-            latestHash = "Invalid";
-
-            if(latestHash == xorstr_("403"))
-            {
-                __fastfail(1);
-            }
-            else if (!latestHash.empty())
-            {
-                if (latestHash != SOLSTICE_BUILD_VERSION)
-                {
-                    console->warn("Solstice is out of date! Latest commit: {}", latestHash);
-                    NotifyUtils::notify("There is a new version of Solstice available!\nIt is recommended to update.", 10.0f, Notification::Type::Warning);
-                    ChatUtils::displayClientMessage("§aThere is a new version of Solstice available! Download it from the Discord server.");
-                } else {
-                    console->info("Solstice is up to date!");
-                }
-            }
-            else if(latestHash.empty())
-            {
-                __fastfail(1);
-            }
-        }
-========
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 
         if (!isLpValid && ClientInstance::get()->getLocalPlayer())
         {
@@ -313,6 +265,7 @@ void Dexko::shutdownThread()
     }
 
     mRequestEject = true;
+    mUnloading.store(true);
 
     //setTitle("");
 
@@ -340,9 +293,6 @@ void Dexko::shutdownThread()
     Sleep(1000); // Give the user time to read the message
 
     Logger::deinitialize();
-<<<<<<<< HEAD:26.62/src/Solstice.cpp
-    FreeLibrary(mModule); // i don't understand this
-========
 
     // ---- unload ---------------------------------------------------------
     //
@@ -374,5 +324,4 @@ DWORD WINAPI Dexko::unloadThreadProc(LPVOID module)
 
     FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
     return 0;
->>>>>>>> 0694274eb35c890fa59f1d8936575574a67bc5de:26.62/src/Dexko.cpp
 }
