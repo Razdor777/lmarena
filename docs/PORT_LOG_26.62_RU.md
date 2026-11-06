@@ -143,6 +143,13 @@
   правилу проекта (паттерны ждут скана, см. `docs/SIGS_26.62_RU.md`).
 - Две мёртвые настройки (`Regen::mChecker`, `PotionHUD::mColorBars`) —
   объявлены, но не регистрировались и не читались; удалены.
+- `FileUtils::getsolsticeDir()` (опечатка в регистре) → `getSolsticeDir()`:
+  `OreMinerV2::debugStart()` не компилировался.
+- `StringUtils` и `StackWalker` в 26.62 были урезаны (24 и 130 строк). Догнали
+  корневые: `StringUtils` 645 строк (`encode/decode/encrypt/decrypt/
+  containsIgnoreCase/RemoveColorCodes` — их зовут `IrcClient`, `AutoCosmetic`,
+  `AutoDodge`), `StackWalker` 192 строки (`describe`/`symbolStatus` нужны
+  новому `ExceptionHandler`, иначе краш-репорт не собирался).
 - Из текстов убран бренд `Juzdex` (в папке, чате, дампах) — везде `Solstice`.
   Функция `FileUtils::getJuzdexDir()` оставлена алиасом на `Solstice\`.
 
