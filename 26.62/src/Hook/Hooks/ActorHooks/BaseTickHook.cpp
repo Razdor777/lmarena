@@ -22,14 +22,37 @@ void BaseTickHook::onBaseTick(Actor* actor)
 
     mQueueMutex.lock();
     auto messages = mQueuedMessages;
+    mQueuedMessages.clear();
+    mQueueMutex.unlock();
+
     if (!messages.empty())
     {
-        std::string messageStr = "";
-        for (auto& message : messages) messageStr += message + "\n";
-        ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
-        mQueuedMessages.clear();
+        // Если включён CustomChat — клиентские сообщения идут в него (он сам
+        // решает, что и как рисовать). Иначе — в ванильный чат, как раньше.
+        // Без этой ветки вывод команд игнорировал CustomChat: текст уходил
+        // мимо него, и в перехваченном чате ничего не появлялось.
+        if (ChatUtils::sSink)
+        {
+            for (auto& message : messages) ChatUtils::sSink(message);
+        }
+        else
+        {
+            std::string messageStr = "";
+            for (auto& message : messages) messageStr += message + "\n";
+            ClientInstance::get()->getGuiData()->displayClientMessage(messageStr);
+        }
     }
-    mQueueMutex.unlock();
+
+    // Один раз на мир: RobloxCamera и другие модули проверяют здесь наличие
+    // компонентов актора (после загрузки их ещё нет — раньше проверка молча
+    // не выполнялась вовсе).
+    static bool baseTickInitDone = false;
+    if (!baseTickInitDone)
+    {
+        baseTickInitDone = true;
+        auto initHolder = nes::make_holder<BaseTickInitEvent>(actor);
+        gFeatureManager->mDispatcher->trigger(initHolder);
+    }
 
     if (auto supplies = actor->getSupplies())
     {

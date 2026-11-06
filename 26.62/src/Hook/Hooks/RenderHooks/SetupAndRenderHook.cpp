@@ -8,6 +8,8 @@
 #include <SDK/Minecraft/Rendering/LevelRenderer.hpp>
 #include <Features/Events/DrawImageEvent.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
+#include <SDK/Minecraft/Rendering/ItemRenderer.hpp>
+#include <Hook/Hooks/RenderHooks/ItemRendererHook.hpp>
 
 #include "D3DHook.hpp"
 
@@ -43,6 +45,26 @@ void* SetupAndRenderHook::onSetupAndRender(void* screenView, void* mcuirc)
     }
 
     if (D3DHook::FrameTransforms) D3DHook::FrameTransforms->push({ ci->getViewMatrix(), origin, playerPos, ci->getFov() });
+
+    // ─── Иконки предметов из памяти игры (путь Flarial) ────────────────────
+    // InventoryHUD кладёт задания в ItemIconQueue из ImGui-потока, здесь их
+    // рисует сам движок: ItemRenderer::renderGuiItemNew(ctx, stack, mode, x, y,
+    // opacity, scale, enchanted) — он же делает атлас → UV → iconBlit.
+    // Раньше этот блок потерялся при переносе, и InventoryHUD не рисовал иконки
+    // вовсе: задания копились в очереди и никто их не опустошал.
+    ItemIconQueue::swapBuffers();
+
+    ItemRenderer* ir = ItemRendererHook::getItemRenderer();
+    BaseActorRenderContext* bar = ItemRendererHook::getBarContext();
+    if (ir && bar)
+    {
+        for (const auto& ic : ItemIconQueue::drawing())
+        {
+            if (!ic.stack || !ic.stack->mItem || ic.scale <= 0.f) continue;
+            ir->renderGuiItemNew(bar, ic.stack, 0, ic.pos.x, ic.pos.y, 1.0f, ic.scale, false);
+        }
+    }
+    ItemIconQueue::drawing().clear();
 
     return original(screenView, mcuirc);
 }

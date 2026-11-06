@@ -12,7 +12,10 @@ std::unique_ptr<Detour> ItemRendererHook::mDetour;
 void ItemRendererHook::render(ItemRenderer *_this, BaseActorRenderContext *renderContext, ActorRenderData *actorRenderData) {
     auto original = mDetour->getOriginal<&ItemRendererHook::render>();
 
-
+    // Запоминаем контекст для отложенных иконок (InventoryHUD::drawSlot кладёт
+    // задание в ItemIconQueue, а рисует их SetupAndRenderHook).
+    if (_this) sItemRenderer = _this;
+    if (renderContext) sBarContext = renderContext;
 
     auto holder = nes::make_holder<ItemRendererEvent>(_this, renderContext, actorRenderData);
     gFeatureManager->mDispatcher->trigger(holder);
