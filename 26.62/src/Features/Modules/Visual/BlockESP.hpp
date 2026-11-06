@@ -2,9 +2,9 @@
 //
 // Created by vastrakai on 7/7/2024.
 //
-// Ported from Combatant BlockESP (visuals). Scanning uses the Juzdex subchunk
+// Ported from Combatant BlockESP (visuals). Scanning uses the solstice subchunk
 // spiral (equivalent of Combatant's WorldSectionBlockScanner). Visibility ("LOS")
-// is approximated with exposed faces, because Juzdex has no render-section data.
+// is approximated with exposed faces, because solstice has no render-section data.
 //
 
 #include <Features/Modules/Module.hpp>

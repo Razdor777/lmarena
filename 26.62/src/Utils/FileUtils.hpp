@@ -9,6 +9,10 @@
 class FileUtils {
 public:
     static std::string getRoamingStatePath();
+    // Историческое имя: часть модулей (OreMinerV2, WhoisCollector) звала папку
+    // клиента getJuzdexDir(). Физически это та же папка Solstice\, поэтому алиас
+    // оставлен, чтобы не переписывать вызовы в перенесённом коде.
+    static std::string getJuzdexDir();
     static std::string getSolsticeDir();
     static bool fileExists(const std::string& path);
     static void createDirectory(const std::string& path);

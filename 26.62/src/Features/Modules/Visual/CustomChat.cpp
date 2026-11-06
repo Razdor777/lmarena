@@ -266,7 +266,7 @@ void CustomChat::onEnable()
     registerHudElement();
     if (mElement) mElement->mVisible = true;
 
-    // Пока модуль включён, клиентские сообщения (вывод команд, «Juzdex » ...»)
+    // Пока модуль включён, клиентские сообщения (вывод команд, «solstice » ...»)
     // идут сюда, а не в ванильный чат.
     ChatUtils::sSink = &CustomChat::onClientMessage;
 

@@ -7,7 +7,7 @@
 //  - Funnel: 3D distortion mesh and leak/ghost geometry become rings and spokes
 //  - Funnel Tint mode and Light Rainbow / Sky / Fade / Analogous color modes
 //    (same color set as JumpCircles)
-//  - Partial-tick interpolation (Juzdex renders without tickDelta)
+//  - Partial-tick interpolation (Solstice renders without tickDelta)
 //
 
 #include "WorldParticles.hpp"

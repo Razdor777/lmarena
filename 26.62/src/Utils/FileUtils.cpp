@@ -26,6 +26,14 @@ std::string FileUtils::getSolsticeDir()
     return getRoamingStatePath() + xorstr_("Solstice\\");
 }
 
+// Алиас: перенесённые модули (OreMinerV2, WhoisCollector, BlockESP) обращаются к
+// папке клиента под старым именем getJuzdexDir(). Отдельной папки больше нет —
+// иначе дампы и конфиги расползлись бы по двум каталогам.
+std::string FileUtils::getJuzdexDir()
+{
+    return getSolsticeDir();
+}
+
 bool FileUtils::fileExists(const std::string& path)
 {
     return std::filesystem::exists(path);

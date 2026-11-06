@@ -997,7 +997,7 @@ void OreMinerV2::syncDebugSession() {
 void OreMinerV2::debugStart() {
   debugCloseFiles();
 
-  mDebugDir = FileUtils::getJuzdexDir() + "Dumps\\";
+  mDebugDir = FileUtils::getsolsticeDir() + "Dumps\\";
   try {
     FileUtils::createDirectory(mDebugDir);
   } catch (const std::exception &e) {

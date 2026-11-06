@@ -21,7 +21,10 @@
 #include <SDK/Minecraft/Network/Packets/PlayerAuthInputPacket.hpp>
 #include <SDK/Minecraft/Actor/Components/ActorHeadRotationComponent.hpp>
 #include <SDK/Minecraft/Actor/Components/MobBodyRotationComponent.hpp>
-#include <SDK/Minecraft/KeyboardMouseSettings.hpp>
+// В 1.26.x KeyboardMouseSettings переименован в KeyboardRemappingLayout
+// (SDK/Minecraft/KeyboardRemappingLayout.hpp) — Scaffold его напрямую не
+// использует, поэтому include просто убран.
+//#include <SDK/Minecraft/KeyboardMouseSettings.hpp>
 
 // ═══════════════════════════════════════════════════════════════
 // Rotation helpers (file-local)

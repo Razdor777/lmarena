@@ -4,9 +4,9 @@
 // Dropped from Combatant:
 //  - 3D depth test (ImGui draws over the world)
 //  - Textured sprites (FIRE_FLY / RANDOM_PARTICLES): tail dots and sparks are procedural circles
-//  - Projectile sparks (Juzdex has no projectile entity query here)
+//  - Projectile sparks (Solstice has no projectile entity query here)
 //  - Light Rainbow / Sky / Fade / Analogous color modes (same set as JumpCircles)
-//  - Partial-tick interpolation (Juzdex renders without tickDelta)
+//  - Partial-tick interpolation (Solstice renders without tickDelta)
 //
 
 #include "Trails.hpp"

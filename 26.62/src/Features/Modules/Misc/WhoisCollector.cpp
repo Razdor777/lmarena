@@ -127,7 +127,7 @@ void WhoisCollector::onEnable() {
     mWhoisQueue.clear();
     mLastSentTime = 0;
 
-    // Пути к файлам: в папку клиента (RoamingState/Juzdex/)
+    // Пути к файлам: в папку клиента (RoamingState/solstice/)
     std::string dir = FileUtils::getSolsticeDir();
     mDataFile  = dir + "WhoisData.txt";
     mMatchFile = dir + "WhoisMatches.txt";

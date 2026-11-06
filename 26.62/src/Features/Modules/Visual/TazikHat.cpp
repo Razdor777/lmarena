@@ -4,8 +4,8 @@
 //
 // Dropped from Combatant:
 //  - 3D depth test (ImGui draws over the world; hats are not occluded by blocks)
-//  - Use Relations (Juzdex has no category colors)
-//  - Hit wobble on damage (no hurt-time data on Juzdex actors)
+//  - Use Relations (Solstice has no category colors)
+//  - Hit wobble on damage (no hurt-time data on Solstice actors)
 //  - Light Rainbow / Sky / Fade / Analogous color modes (same set as JumpCircles)
 //
 
@@ -399,7 +399,7 @@ void TazikHat::renderAttached(ImDrawList* drawList, Actor* actor)
     const float size = mScale.mValue * (helmet ? mHelmetScale.mValue : 1.0f);
     const TazikHatImpl::TazikAnchor anchor = TazikHatImpl::headAnchor(actor, mHeadTopOffset.mValue, mHeadForwardOffset.mValue, mHeadRightOffset.mValue);
 
-    // Idle sway only (hit wobble needs hurt-time data Juzdex does not expose)
+    // Idle sway only (hit wobble needs hurt-time data Solstice does not expose)
     const int64_t rid = actor->getRuntimeID();
     const float time = static_cast<float>(NOW) / 50.f * 0.35f + static_cast<float>(rid) * 0.17f;
     const float idle = 1.3f * mWobbleStrength.mValue;
