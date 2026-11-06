@@ -14,7 +14,6 @@ public:
     BoolSetting   mShowLevel   = BoolSetting  ("Show Level",  "Show amplifier (I, II, III)", true);
     BoolSetting   mShowTimer   = BoolSetting  ("Show Timer",  "Show remaining duration",     true);
     BoolSetting   mBlinkLow    = BoolSetting  ("Blink Low",   "Blink when < 5s remaining",   true);
-    BoolSetting   mColorBars   = BoolSetting  ("Color Bars",  "Colored left accent bar",     false); // kept for compat
     BoolSetting   mHideNegative= BoolSetting  ("Hide Negative","Hide debuffs (poison, etc)", false);
     BoolSetting   mSortByTime  = BoolSetting  ("Sort by Time","Sort effects by time left",   true);
 
@@ -27,6 +26,9 @@ public:
             &mShowLevel, &mShowTimer,
             &mBlinkLow, &mHideNegative, &mSortByTime
         );
+        // «Color Bars» больше не используется: полоска слева красится всегда.
+        // Настройка была объявлена, но никем не читалась и не регистрировалась —
+        // в конфиге она всё равно не сохранялась, поэтому удалена.
         mNames = {
             {Lowercase,       "potionhud"},
             {LowercaseSpaced, "potion hud"},

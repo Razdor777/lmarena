@@ -110,7 +110,6 @@ public:
     BoolSetting mCovering = BoolSetting("Trigger Stealer", "Include covering block", false);
     BoolSetting mRenderFakeOre = BoolSetting("Render Fake Ore", "Renders the ore you are currenty faking", false);
     BoolSetting mReplace = BoolSetting("Raper", "kicks other hackers while hvh", false);
-    BoolSetting mChecker = BoolSetting("Checker", "Checks if the block replacement was successful", false);
     BoolSetting mDynamicUncover = BoolSetting("Dynamic Uncover", "Disables uncover if enemy uncovering ores", false);
     NumberSetting mDisableDuration = NumberSetting("Disable Duration", "The time for dynamic uncover", 3, 1, 10, 1);
     BoolSetting mNoUncoverWhileStealing = BoolSetting("No Uncover While Stealing", "Disables uncover for 5 secs everytime u stole someone's ore", false);
