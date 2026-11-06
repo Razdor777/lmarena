@@ -9,7 +9,7 @@
 | CMake `26.62/`: один таргет `Solstice`, DirectXTK, шейдеры, фильтр исходников | ✅ |
 | Слой совместимости SDK (методы, поля, `StringSetting`, `customData`) | ✅ |
 | Combat (13 модулей) | ✅ перенесено, зарегистрировано, адаптировано |
-| Player (36 модулей + трекеры `CPSTracker`/`HealthTracker`/`PlayerTracker`/`Schematic`) | ✅ перенесено, зарегистрировано |
+| Player (37 модулей, включая `Regen`; + трекеры `CPSTracker`/`HealthTracker`/`PlayerTracker`/`Schematic`) | ✅ перенесено, зарегистрировано (`RegenRecode` в исходниках пустой — переносить нечего) |
 | Movement (29 модулей) | ✅ перенесено, зарегистрировано |
 | Misc (48 модулей) | ✅ перенесено, зарегистрировано |
 | Visual (73 модуля, включая `Ambience`, `SmartXRay`, `Trails`, `TazikHat`) | ✅ перенесено, зарегистрировано |

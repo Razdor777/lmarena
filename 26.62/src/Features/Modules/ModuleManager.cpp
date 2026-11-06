@@ -129,8 +129,7 @@
 #include "Player/NoRotate.hpp"
 #include "Player/Nuker.hpp"
 #include "Player/OreMiner.hpp"
-//#include "Player/Regen.hpp"
-//#include "Player/RegenRecode.hpp"
+#include "Player/Regen.hpp"
 #include "Player/Scaffold.hpp"
 #include "Player/Surround.hpp"
 #include "Player/ZipLine.hpp"
@@ -265,8 +264,7 @@ void ModuleManager::init()
 	mModules.emplace_back(std::make_shared<Timer>());
 	mModules.emplace_back(std::make_shared<ChestStealer>());
 	mModules.emplace_back(std::make_shared<InvManager>());
-	//   mModules.emplace_back(std::make_shared<Regen>());
-	 //  mModules.emplace_back(std::make_shared<RegenRecode>());
+	mModules.emplace_back(std::make_shared<Regen>());
 	mModules.emplace_back(std::make_shared<Scaffold>());
 	mModules.emplace_back(std::make_shared<Surround>());
 	mModules.emplace_back(std::make_shared<ZipLine>());
