@@ -1,5 +1,6 @@
 #pragma once
 #include <Features/Events/BaseTickEvent.hpp>
+#include <Features/Events/ModuleStateChangeEvent.hpp>
 //
 // Created by vastrakai on 8/24/2024.
 //
