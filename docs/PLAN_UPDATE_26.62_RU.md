@@ -27,26 +27,30 @@
 | Сигнатуры под 1.26.5x | ⚠️ 6 «догадок» (`Actor_hurt`, `Projectile_onHit`, `HurtColor`, `ContainerScreenController_onContainerSlotHovered`, `ItemStack_fromDescriptor`, `ContainerScreenController_tryBeginTransition`) + 5 Ambience ждут скана (`docs/SIGS_26.62_RU.md`) |
 
 Сборку целиком проверить негде: под рукой нет MSVC/Windows SDK, поэтому каждый
-шаг проверяется статически — `tools/check_includes.py` (резолвятся ли все
-`#include`), `tools/check_members.py` (нет ли обращений к членам, которых в новой
-базе не существует), `tools/check_undefined.py` (объявлено, но без тела —
-линковка), `tools/check_event_visibility.py` (виден ли тип события в `listen<>`)
-, `tools/check_enums.py` (значение перечисления, которого нет) и
-`tools/check_sig_names.py` (есть ли вообще такое имя в `SigManager`/`OffsetProvider`),
-`tools/check_method_case.py` (регистр имени метода).
+шаг проверяется статически — семью анализаторами (таблица ниже). Каждый ловит
+свой класс ошибок переноса: «нет такого поля», «нет такого имени», «нет тела»,
+«не виден тип», «другой регистр», «нет значения перечисления». Прогон — одна
+команда.
 
 ```bash
-python3 tools/sdk_compat.py   --out docs/SDK_COMPAT_26.62_RU.md   # что сломалось в SDK
-python3 tools/check_includes.py 26.62/src                         # битые include
-python3 tools/check_members.py --vocab-exclude Features -- 26.62/src   # члены без объявления
-python3 tools/sig_checklist.py --out docs/SIGS_26.62_RU.md          # что ждёт скана
-python3 tools/check_undefined.py 26.62/src                          # объявлено, но не определено
-python3 tools/check_event_visibility.py                             # listen<> видит тип события
-python3 tools/check_enums.py 26.62/src                              # Mode::X, где X не объявлен
-python3 tools/check_sig_names.py                                    # SigManager::X / OffsetProvider::X объявлены
-python3 tools/check_method_case.py                                  # Class::Method с другим регистром
-python3 tools/gen_resources.py --check                              # ресурсы актуальны
+bash tools/check_all.sh          # все проверки разом, код возврата = результат
+bash tools/check_all.sh --fix    # + пересобрать Resources.* и docs/SIGS_26.62_RU.md
 ```
+
+Что ловит каждый анализатор (все — в `tools/`):
+
+| Скрипт | Что проверяет |
+|---|---|
+| `check_includes.py` | `#include`, который никуда не резолвится |
+| `check_members.py` | обращение к полю/методу, которого в новой базе нет |
+| `check_undefined.py` | объявлено в классе, но нигде не определено (ошибка линковки) |
+| `check_event_visibility.py` | `listen<Event>` там, где тип события не виден |
+| `check_sig_names.py` | `SigManager::X` / `OffsetProvider::X` без объявления |
+| `check_method_case.py` | `Class::method` с другим регистром букв |
+| `check_enums.py` | `Mode::X`, где `X` в перечислении отсутствует |
+| `gen_resources.py` | `Resources.hpp/.cpp` соответствуют `26.62/resources` |
+| `sig_checklist.py` | журнал сигнатур `docs/SIGS_26.62_RU.md` |
+| `sdk_compat.py` | отчёт о расхождениях SDK `docs/SDK_COMPAT_26.62_RU.md` |
 
 Короткий ответ на «что тебе показать»: **ничего показывать не надо** — обе базы
 уже лежат в этом репозитории, и по ним видно всё, что нужно решить.
