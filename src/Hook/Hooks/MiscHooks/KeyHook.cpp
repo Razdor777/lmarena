@@ -5,6 +5,7 @@
 #include "KeyHook.hpp"
 
 #include <Solstice.hpp>
+#include <Features/ChatBinds/ChatBinds.hpp>
 #include <Features/Modules/Visual/ClickGui.hpp>
 #include <Features/Events/KeyEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
@@ -231,6 +232,12 @@ void KeyHook::onKey(uint32_t key, bool isDown)
     {
         return;
     }
+
+    // Чат-бинды (ClickGui -> Chat Binds): клавиша забиндена — текст ушёл в чат,
+    // а игре клавиша не отдаётся ни нажатием, ни отпусканием (T иначе открыл бы
+    // ещё и ванильный чат). Только в игре: в меню/чате/ClickGui не срабатывает.
+    if (ChatBinds::handleKey(static_cast<int>(key), isDown))
+        return;
 
     if (isDown) gGameSeenKeysDown.insert(static_cast<int>(key));
     else        gGameSeenKeysDown.erase(static_cast<int>(key));

@@ -57,6 +57,19 @@ public:
              "? 4C 8B ? 48 8D ? ? ? ? ? 48 8D ? ? ? E8 ? ? ? ? 48 8B",
              SigType::RefSig, 1); // TODO: Check this and make sure it works, as
                                   // a lot of the other references were inlined
+                                  // ─── ItemRenderer native path (1.21.44) ──────────────────────────────────
+  DEFINE_SIG(ItemRenderer_renderGuiItemNew,
+             "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 D8 48 81 EC 28 01 00 00 0F 29 B4 24 10 01 00 00 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 00 44",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_getAtlasIconInfo,
+             "48 89 5C 24 ? 57 48 83 EC ? 48 8B FA 48 8B D9 E8 ? ? ? ? 80 7F ? 00 48 8D 8B",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_getIconUV,
+             "40 53 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 45 0F B6 C8 44 8B C2",
+             SigType::Sig, 0);
+  DEFINE_SIG(ItemRenderer_iconBlit,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? F3 0F 11 5D",
+             SigType::Sig, 0);
   DEFINE_SIG(Actor_setNameTag,
              "E8 ? ? ? ? 4C 8D ? ? ? ? ? 8B D3 48 8B ? E8 ? ? ? ? E9",
              SigType::RefSig, 1);
@@ -206,20 +219,20 @@ public:
              "0F 29 ? ? 0F 29 ? ? 44 0F ? ? ? 44 0F ? ? ? 49 8B",
              SigType::Sig, 0);
   // ═══ Item Chams / Render Sigs ═══
-  DEFINE_SIG(ItemInHandRenderer_renderItem, 
-             "48 8B C4 55 53 57 41 55 41 56", 
+  DEFINE_SIG(ItemInHandRenderer_renderItem,
+             "48 8B C4 55 53 57 41 55 41 56",
              SigType::Sig, 0);
-             
-  DEFINE_SIG(ItemEntityRenderer_render, 
-             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 49 8B F0 4C 89 44 24", 
+
+  DEFINE_SIG(ItemEntityRenderer_render,
+             "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 44 0F 29 40 ? 44 0F 29 48 ? 44 0F 29 90 ? ? ? ? 44 0F 29 98 ? ? ? ? 44 0F 29 A0 ? ? ? ? 44 0F 29 A8 ? ? ? ? 44 0F 29 B0 ? ? ? ? 44 0F 29 B8 ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 49 8B F0 4C 89 44 24",
              SigType::Sig, 0);
-             
-  DEFINE_SIG(ColorTint_set, 
-             "40 53 48 83 EC ? F3 0F 59 0D ? ? ? ? 4C 8D 4C 24", 
+
+  DEFINE_SIG(ColorTint_set,
+             "40 53 48 83 EC ? F3 0F 59 0D ? ? ? ? 4C 8D 4C 24",
              SigType::Sig, 0);
-             
-  DEFINE_SIG(ItemRenderer_renderGuiItem, 
-             "48 89 5C 24 ? 55 56 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 49 8B E8 4C 8B 84 24", 
+
+  DEFINE_SIG(ItemRenderer_renderGuiItem,
+             "48 89 5C 24 ? 55 56 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 49 8B E8 4C 8B 84 24",
              SigType::Sig, 0);
   // NOTE: the hand-written "GlintComponentGetter" signature was removed.
   // It could not be verified, and one failed sig kills the whole client at

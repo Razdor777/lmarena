@@ -33,6 +33,7 @@
 #include "Misc/JavaInventory.hpp"
 #include "Misc/JavaInventoryHotkeys.hpp"
 #include "Misc/KickSounds.hpp"
+#include "Misc/AutoContract.hpp"
 #include "Misc/NetSkip.hpp"
 #include "Misc/NoFilter.hpp"
 #include "Misc/NoPacket.hpp"
@@ -105,6 +106,9 @@
 #include "Visual/ArmorHUD.hpp"
 #include "Visual/Arraylist.hpp"
 #include "Visual/BlockESP.hpp"
+#include "Visual/TazikHat.hpp"
+#include "Visual/Trails.hpp"
+#include "Visual/WorldParticles.hpp"
 #include "Visual/ClickGui.hpp"
 #include "Visual/CustomChat.hpp"
 #include "Visual/PlayerPositionOffset.hpp"
@@ -232,6 +236,7 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<FakeChat>());
   mModules.emplace_back(std::make_shared<Friends>());
   mModules.emplace_back(std::make_shared<NoPacket>());
+  mModules.emplace_back(std::make_shared<AutoContract>());
   mModules.emplace_back(std::make_shared<NoFilter>());
   mModules.emplace_back(std::make_shared<AutoMessage>());
   mModules.emplace_back(std::make_shared<NetSkip>());
@@ -283,6 +288,9 @@ void ModuleManager::init() {
   mModules.emplace_back(std::make_shared<SkyPack>());
   mModules.emplace_back(std::make_shared<AmbientCubes>());
   mModules.emplace_back(std::make_shared<JumpCircles>());
+  mModules.emplace_back(std::make_shared<TazikHat>());
+  mModules.emplace_back(std::make_shared<Trails>());
+  mModules.emplace_back(std::make_shared<WorldParticles>());
   mModules.emplace_back(std::make_shared<EntityRadar>());
   mModules.emplace_back(std::make_shared<AfterImage>());
   mModules.emplace_back(std::make_shared<PotionHUD>());

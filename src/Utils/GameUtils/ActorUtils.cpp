@@ -143,14 +143,27 @@ bool ActorUtils::isBot(Actor* actor)
 
 std::shared_ptr<InventoryTransactionPacket> ActorUtils::createAttackTransaction(Actor* actor, int slot)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
+    auto* ci = ClientInstance::get();
+    if (!ci) return nullptr;
+    auto player = ci->getLocalPlayer();
+    if (!player) return nullptr;
 
-    if (slot == -1) slot = player->getSupplies()->mSelectedSlot;
+    auto* supplies = player->getSupplies();
+    if (!supplies) return nullptr;
+    auto* container = supplies->getContainer();
+    if (!container) return nullptr;
+
+    if (slot == -1) slot = supplies->mSelectedSlot;
+    // Слот вне хотбара или пустой слот — раньше здесь разыменовывался nullptr.
+    if (slot < 0 || slot > 8) return nullptr;
+    auto* stack = container->getItem(slot);
+    if (!stack || !stack->mItem) return nullptr;
+
     auto pkt = MinecraftPackets::createPacket<InventoryTransactionPacket>();
 
     auto cit = std::make_unique<ItemUseOnActorInventoryTransaction>();
     cit->mSlot = slot;
-    cit->mItemInHand = NetworkItemStackDescriptor(*player->getSupplies()->getContainer()->getItem(slot));
+    cit->mItemInHand = NetworkItemStackDescriptor(*stack);
     auto unique = actor->getActorUniqueIDComponent();
     cit->mActorId = unique ? unique->mUniqueID : -1;
     cit->mActionType = ItemUseOnActorInventoryTransaction::ActionType::Attack;

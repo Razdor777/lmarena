@@ -35,19 +35,25 @@ public:
         "Distance", "Blocks away from the target",
         3.f, 0.1f, 10.f, 0.1f);
 
-    // AutoLock: после телепорта камера (и серверный yaw/pitch) наводится ровно
-    // на ту цель, к которой мы телепортировались, и держится так несколько
-    // тиков. Наводка считается ТОЛЬКО из хитбокса этой цели, а её личность
-    // подтверждается unique id — поэтому прицел не может уехать на другого
-    // игрока, даже если цель окружили со всех сторон.
+    // Aim Lock: после телепорта камера (и серверный yaw/pitch) наводится ровно
+    // на ту цель, к которой мы телепортировались, и держится на ней ещё
+    // mAutoLockHoldMs миллисекунд. Наводка считается ТОЛЬКО из хитбокса этой
+    // цели, а её личность подтверждается unique id — поэтому прицел не может
+    // уехать на другого игрока, даже если цель окружили со всех сторон.
     BoolSetting mAutoLock = BoolSetting(
-        "AutoLock", "Aim the crosshair straight at the target after teleporting", false);
+        "Aim Lock", "Aim the crosshair straight at the target after teleporting", false);
+
+    NumberSetting mAutoLockHoldMs = NumberSetting(
+        "Aim Hold", "How long the crosshair stays locked on the target (ms)",
+        400.f, 0.f, 2000.f, 25.f);
 
     LastTP() : ModuleBase("LastTP",
         "Teleports to the last player you hit or got hit by",
         ModuleCategory::Combat, 0, false)
     {
-        addSettings(&mDirection, &mDistance, &mAutoLock);
+        addSettings(&mDirection, &mDistance, &mAutoLock, &mAutoLockHoldMs);
+
+        VISIBILITY_CONDITION(mAutoLockHoldMs, mAutoLock.mValue);
 
         mNames = {
             {Lowercase,       "lasttp"},
@@ -94,14 +100,18 @@ public:
     float mLocalHealth       = -1.f;
     int   mPrevLocalHurtTime = 0;
 
-    // ==================== AUTOLOCK STATE ====================
+    // ==================== AIM LOCK STATE ====================
     // Идентичность цели фиксируется ДВУМЯ id одновременно: runtime id может
     // переиспользоваться движком под другого игрока, unique id — нет.
-    int64_t mLockRuntimeID = -1;
-    int64_t mLockUniqueID  = -1;
-    int     mLockTicks     = 0;
+    int64_t  mLockRuntimeID = -1;
+    int64_t  mLockUniqueID  = -1;
+    uint64_t mLockUntilMs   = 0;   // NOW-таймстамп, до которого держим прицел (0 = не держим)
 
-    static constexpr int kAutoLockTicks = 6; // ~300 мс удержания прицела
+    // Наводка живёт в LookInputEvent, а не в тике: игровой апдейт камеры
+    // пересчитывает CameraDirectLookComponent из мыши КАЖДЫЙ кадр, поэтому
+    // запись из тика затиралась раньше, чем успевала попасть в кадр — из-за
+    // этого Aim Lock и выглядел нерабочим. Это тот же путь, по которому
+    // работает Aimbot::onLookInputEvent.
 
     // ==================== TUNABLES ====================
     static constexpr float    kStepDistance       = 8.f;  // ClickTP packet step, fixed
@@ -130,9 +140,13 @@ public:
     class Actor* resolveTarget();
     void attemptTeleport();
 
-    // AutoLock
+    // Aim Lock
     class Actor* resolveLockTarget();
-    void updateAutoLock();
+    bool computeLockAim(float& pitchDeg, float& yawDeg); // кто + куда наводимся
+    void refreshAutoLock();  // из тика: страховка на случай, если кадров нет
+    void clearAutoLock();
+    void onLookInputEvent(class LookInputEvent& event); // из кадра: сама наводка
+    static void writeAimTo(class CameraDirectLookComponent* direct, float pitchDeg, float yawDeg);
 
     std::string getSettingDisplay() override
     {

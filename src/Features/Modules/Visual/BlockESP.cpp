@@ -1,6 +1,8 @@
 //
 // Created by vastrakai on 7/7/2024.
 //
+// Ported from Combatant BlockESP. See BlockESP.hpp for the mapping notes.
+//
 
 #include "BlockESP.hpp"
 
@@ -9,10 +11,19 @@
 #include <Features/Events/PacketInEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
+#include <SDK/Minecraft/Actor/GameMode.hpp>
 #include <SDK/Minecraft/Network/Packets/PlayerActionPacket.hpp>
 #include <SDK/Minecraft/World/BlockLegacy.hpp>
 #include <SDK/Minecraft/World/Chunk/LevelChunk.hpp>
 #include <SDK/Minecraft/World/Chunk/SubChunkBlockStorage.hpp>
+#include <Utils/MiscUtils/BlockUtils.hpp>
+#include <Utils/MiscUtils/RenderUtils.hpp>
+#include <Utils/MiscUtils/MathUtils.hpp>
+
+#include <algorithm>
+#include <cstdlib>
+#include <deque>
+#include <mutex>
 
 static std::mutex blockMutex = {};
 
@@ -20,279 +31,106 @@ static std::mutex blockMutex = {};
 // ORE IDS
 // =========================================================
 
-constexpr int REDSTONE_ORE = 73;
-constexpr int REDSTONE_ORE_LIT = 74;
-constexpr int DIAMOND_ORE = 56;
-constexpr int EMERALD_ORE = 129;
-constexpr int GOLD_ORE = 14;
-constexpr int IRON_ORE = 15;
-constexpr int LAPIS_ORE = 21;
-constexpr int COAL_ORE = 16;
-constexpr int DEEPSLATE_REDSTONE_ORE = 658;
-constexpr int DEEPSLATE_LIT_REDSTONE_ORE = 659;
-constexpr int DEEPSLATE_DIAMOND_ORE = 660;
-constexpr int DEEPSLATE_EMERALD_ORE = 662;
-constexpr int DEEPSLATE_GOLD_ORE = 657;
-constexpr int DEEPSLATE_IRON_ORE = 656;
-constexpr int DEEPSLATE_LAPIS_ORE = 655;
-constexpr int DEEPSLATE_COAL_ORE = 661;
-constexpr int PORTAL = 90;
-constexpr int CHEST = 54;
-constexpr int ENDER_CHEST = 130;
-constexpr int TRAPPED_CHEST = 146;
-constexpr int BARREL = 458;
-
-// =========================================================
-// COLORS
-// =========================================================
-
-static std::unordered_map<int, ImColor> blockColors = {
-    { REDSTONE_ORE,               ImColor(1.f, 0.f, 0.f, 1.f) },
-    { REDSTONE_ORE_LIT,           ImColor(1.f, 0.f, 0.f, 1.f) },
-    { DEEPSLATE_REDSTONE_ORE,     ImColor(1.f, 0.f, 0.f, 1.f) },
-    { DEEPSLATE_LIT_REDSTONE_ORE, ImColor(1.f, 0.f, 0.f, 1.f) },
-    { DIAMOND_ORE,                ImColor(0.f, 1.f, 1.f, 1.f) },
-    { DEEPSLATE_DIAMOND_ORE,      ImColor(0.f, 1.f, 1.f, 1.f) },
-    { EMERALD_ORE,                ImColor(0.f, 1.f, 0.f, 1.f) },
-    { DEEPSLATE_EMERALD_ORE,      ImColor(0.f, 1.f, 0.f, 1.f) },
-    { GOLD_ORE,                   ImColor(1.f, 1.f, 0.f, 1.f) },
-    { DEEPSLATE_GOLD_ORE,         ImColor(1.f, 1.f, 0.f, 1.f) },
-    { IRON_ORE,                   ImColor(1.f, 0.5f, 0.f, 1.f) },
-    { DEEPSLATE_IRON_ORE,         ImColor(1.f, 0.5f, 0.f, 1.f) },
-    { LAPIS_ORE,                  ImColor(0.f, 0.f, 1.f, 1.f) },
-    { DEEPSLATE_LAPIS_ORE,        ImColor(0.f, 0.f, 1.f, 1.f) },
-    { COAL_ORE,                   ImColor(0.f, 0.f, 0.f, 1.f) },
-    { DEEPSLATE_COAL_ORE,         ImColor(0.f, 0.f, 0.f, 1.f) },
-    { PORTAL,                     ImColor(0.5f, 0.f, 0.5f, 1.f) },
-    { ENDER_CHEST,                ImColor(0.5f, 0.f, 0.5f, 1.f) },
-    { CHEST,                      ImColor(255, 165, 0) },
-    { TRAPPED_CHEST,              ImColor(255, 165, 0) },
-    { BARREL,                     ImColor(255, 165, 0) }
-};
-
-static bool isValidBlock(int id)
+namespace BlockEspImpl
 {
-    return blockColors.contains(id);
-}
+    constexpr int REDSTONE_ORE = 73;
+    constexpr int REDSTONE_ORE_LIT = 74;
+    constexpr int DIAMOND_ORE = 56;
+    constexpr int EMERALD_ORE = 129;
+    constexpr int GOLD_ORE = 14;
+    constexpr int IRON_ORE = 15;
+    constexpr int LAPIS_ORE = 21;
+    constexpr int COAL_ORE = 16;
+    constexpr int DEEPSLATE_REDSTONE_ORE = 658;
+    constexpr int DEEPSLATE_LIT_REDSTONE_ORE = 659;
+    constexpr int DEEPSLATE_DIAMOND_ORE = 660;
+    constexpr int DEEPSLATE_EMERALD_ORE = 662;
+    constexpr int DEEPSLATE_GOLD_ORE = 657;
+    constexpr int DEEPSLATE_IRON_ORE = 656;
+    constexpr int DEEPSLATE_LAPIS_ORE = 655;
+    constexpr int DEEPSLATE_COAL_ORE = 661;
+    constexpr int PORTAL = 90;
+    constexpr int CHEST = 54;
+    constexpr int ENDER_CHEST = 130;
+    constexpr int TRAPPED_CHEST = 146;
+    constexpr int BARREL = 458;
 
-static ImColor getColorFromId(int id)
-{
-    if (blockColors.contains(id)) return blockColors[id];
-    return ImColor(1.f, 1.f, 1.f, 1.f);
-}
+    constexpr int SCAN_RADIUS_UNLIMITED = 256;
+    constexpr int RECONCILE_BUDGET_PER_TICK = 512;
+    constexpr int DEOB_DELAY_TICKS = 1;
 
-// =========================================================
-// CLUSTER: getOreGroup
-// =========================================================
-
-static int getOreGroup(int id)
-{
-    switch (id) {
-        case COAL_ORE: case DEEPSLATE_COAL_ORE: return 1;
-        case IRON_ORE: case DEEPSLATE_IRON_ORE: return 2;
-        case GOLD_ORE: case DEEPSLATE_GOLD_ORE: return 3;
-        case DIAMOND_ORE: case DEEPSLATE_DIAMOND_ORE: return 4;
-        case EMERALD_ORE: case DEEPSLATE_EMERALD_ORE: return 5;
-        case REDSTONE_ORE: case REDSTONE_ORE_LIT:
-        case DEEPSLATE_REDSTONE_ORE: case DEEPSLATE_LIT_REDSTONE_ORE: return 6;
-        case LAPIS_ORE: case DEEPSLATE_LAPIS_ORE: return 7;
-        case PORTAL: return 8;
-        case CHEST: case ENDER_CHEST: case TRAPPED_CHEST: case BARREL: return 9;
-        default: return 0;
-    }
-}
-
-// =========================================================
-// CLUSTER: isSameOreType
-// =========================================================
-
-bool BlockESP::isSameOreType(int id1, int id2)
-{
-    int g1 = getOreGroup(id1);
-    int g2 = getOreGroup(id2);
-    return g1 != 0 && g1 == g2;
-}
-
-// =========================================================
-// CLUSTER: isOreBlock (not chest/portal)
-// =========================================================
-
-static bool isOreBlock(int id)
-{
-    int g = getOreGroup(id);
-    return g >= 1 && g <= 7;
-}
-
-// =========================================================
-// CLUSTER: BFS to find connected blocks of same ore type
-// =========================================================
-
-std::vector<BlockPos> BlockESP::getCluster(const BlockPos& startPos,
-    const std::unordered_map<BlockPos, FoundBlock>& blocks)
-{
-    std::vector<BlockPos> cluster;
-    std::unordered_set<BlockPos> visited;
-    std::queue<BlockPos> queue;
-
-    auto it = blocks.find(startPos);
-    if (it == blocks.end()) return cluster;
-
-    int startId = it->second.block->mLegacy->getBlockId();
-
-    // Only cluster ore blocks, not chests/portals
-    if (!isOreBlock(startId)) {
-        cluster.push_back(startPos);
-        return cluster;
-    }
-
-    queue.push(startPos);
-    visited.insert(startPos);
-
-    static const BlockPos directions[] = {
-        {1, 0, 0}, {-1, 0, 0},
-        {0, 1, 0}, {0, -1, 0},
-        {0, 0, 1}, {0, 0, -1}
+    static const glm::ivec3 kNeighbours[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
-
-    while (!queue.empty()) {
-        BlockPos current = queue.front();
-        queue.pop();
-        cluster.push_back(current);
-
-        for (const auto& dir : directions) {
-            BlockPos neighbor = {current.x + dir.x, current.y + dir.y, current.z + dir.z};
-
-            if (visited.contains(neighbor)) continue;
-
-            auto nit = blocks.find(neighbor);
-            if (nit == blocks.end()) continue;
-
-            int neighborId = nit->second.block->mLegacy->getBlockId();
-            if (!isSameOreType(startId, neighborId)) continue;
-
-            visited.insert(neighbor);
-            queue.push(neighbor);
-        }
-    }
-
-    return cluster;
 }
 
 // =========================================================
-// CLUSTER: Full recompute (called rarely)
+// SCAN: Current scan radius in blocks
 // =========================================================
 
-void BlockESP::updateClusters()
+int BlockESP::getScanRadius()
 {
-    if (!mClusterFilter.mValue) {
-        mFilteredBlocks = mFoundBlocks;
-        mClustersValid = true;
-        return;
+    return mLimitDistance.mValue ? static_cast<int>(mMaxDistance.mValue) : BlockEspImpl::SCAN_RADIUS_UNLIMITED;
+}
+
+bool BlockESP::withinDistance(const glm::vec3& pos)
+{
+    if (!mLimitDistance.mValue) return true;
+
+    ClientInstance* ci = ClientInstance::get();
+    Actor* player = ci ? ci->getLocalPlayer() : nullptr;
+    if (!player) return false;
+
+    glm::vec3 eye = *player->getPos();
+    glm::vec3 diff = pos - eye;
+    float maxD = mMaxDistance.mValue;
+    return glm::dot(diff, diff) <= maxD * maxD;
+}
+
+bool BlockESP::acceptsMode(bool visible)
+{
+    switch (mScanMode.mValue) {
+        case BlockScanMode::LOS: return visible;
+        case BlockScanMode::Unrestricted: return true;
     }
+    return visible;
+}
 
-    mFilteredBlocks.clear();
+// =========================================================
+// CLUSTERS (6-neighbour connectivity, like Combatant buildClusters)
+// =========================================================
 
-    std::unordered_set<BlockPos> processed;
-    int minSize = static_cast<int>(mMinClusterSize.mValue);
-    int maxSize = static_cast<int>(mMaxClusterSize.mValue);
+std::vector<std::vector<BlockPos>> BlockESP::buildClusters(const std::vector<BlockPos>& positions)
+{
+    std::unordered_set<BlockPos> remaining(positions.begin(), positions.end());
+    std::unordered_set<BlockPos> visited;
+    std::vector<std::vector<BlockPos>> clusters;
 
-    for (auto& [pos, block] : mFoundBlocks) {
-        if (processed.contains(pos)) continue;
-        if (mBlacklistedPositions.contains(pos)) continue;
+    for (const BlockPos& start : positions) {
+        if (visited.contains(start)) continue;
 
-        int blockId = block.block->mLegacy->getBlockId();
+        std::vector<BlockPos> cluster;
+        std::deque<BlockPos> queue;
+        queue.push_back(start);
+        visited.insert(start);
 
-        // Non-ore blocks (chests, portals) always pass through
-        if (!isOreBlock(blockId)) {
-            mFilteredBlocks[pos] = block;
-            processed.insert(pos);
-            continue;
-        }
+        while (!queue.empty()) {
+            BlockPos current = queue.front();
+            queue.pop_front();
+            cluster.push_back(current);
 
-        std::vector<BlockPos> cluster = getCluster(pos, mFoundBlocks);
-
-        for (const auto& cp : cluster)
-            processed.insert(cp);
-
-        int clusterSize = static_cast<int>(cluster.size());
-
-        if (clusterSize >= minSize && clusterSize <= maxSize) {
-            bool blacklisted = false;
-            for (const auto& cp : cluster) {
-                if (mBlacklistedPositions.contains(cp)) {
-                    blacklisted = true;
-                    break;
-                }
-            }
-            if (blacklisted) continue;
-
-            for (const auto& cp : cluster) {
-                auto fit = mFoundBlocks.find(cp);
-                if (fit != mFoundBlocks.end()) {
-                    mFilteredBlocks[cp] = fit->second;
-                }
+            for (const glm::ivec3& d : BlockEspImpl::kNeighbours) {
+                BlockPos next = {current.x + d.x, current.y + d.y, current.z + d.z};
+                if (visited.contains(next) || !remaining.contains(next)) continue;
+                visited.insert(next);
+                queue.push_back(next);
             }
         }
+
+        clusters.push_back(std::move(cluster));
     }
 
-    mClustersValid = true;
-}
-
-// =========================================================
-// CLUSTER: Remove single block incrementally
-// (No full recompute needed — just remove from both maps)
-// =========================================================
-
-void BlockESP::removeBlockIncremental(const BlockPos& pos)
-{
-    mFoundBlocks.erase(pos);
-    mFilteredBlocks.erase(pos);
-}
-
-// =========================================================
-// CLUSTER: Blacklist single cluster by any block in it
-// =========================================================
-
-void BlockESP::blacklistCluster(const BlockPos& anyBlockInCluster)
-{
-    std::lock_guard<std::mutex> lock(blockMutex);
-
-    auto cluster = getCluster(anyBlockInCluster, mFoundBlocks);
-    for (const auto& pos : cluster) {
-        mBlacklistedPositions.insert(pos);
-        mFoundBlocks.erase(pos);
-        mFilteredBlocks.erase(pos);
-    }
-}
-
-// =========================================================
-// CLUSTER: Blacklist list of positions (for OreMinerV2)
-// =========================================================
-
-void BlockESP::blacklistPositions(const std::vector<BlockPos>& positions)
-{
-    std::lock_guard<std::mutex> lock(blockMutex);
-    for (const auto& pos : positions) {
-        mBlacklistedPositions.insert(pos);
-        mFoundBlocks.erase(pos);
-        mFilteredBlocks.erase(pos);
-    }
-}
-
-// =========================================================
-// Thread-safe copy of found blocks (for OreMinerV2)
-// =========================================================
-
-std::unordered_map<BlockPos, BlockESP::FoundBlock> BlockESP::getFoundBlocksCopy()
-{
-    std::lock_guard<std::mutex> lock(blockMutex);
-    std::unordered_map<BlockPos, FoundBlock> copy;
-    for (auto& [pos, block] : mFoundBlocks) {
-        if (!mBlacklistedPositions.contains(pos)) {
-            copy[pos] = block;
-        }
-    }
-    return copy;
+    return clusters;
 }
 
 // =========================================================
@@ -301,11 +139,10 @@ std::unordered_map<BlockPos, BlockESP::FoundBlock> BlockESP::getFoundBlocksCopy(
 
 void BlockESP::moveToNext()
 {
-    if (!ClientInstance::get()->getLevelRenderer()) {
-        reset();
+    ClientInstance* ci = ClientInstance::get();
+    if (!ci->getLevelRenderer()) {
         return;
     }
-    ClientInstance* ci = ClientInstance::get();
     Actor* player = ci->getLocalPlayer();
     if (!player) return;
     BlockSource* blockSource = ci->getBlockSource();
@@ -353,11 +190,10 @@ void BlockESP::tryProcessSub(bool& processed, ChunkPos currentChunkPos, int subC
 
 bool BlockESP::processSub(ChunkPos processChunk, int index)
 {
-    if (!ClientInstance::get()->getLevelRenderer()) {
-        reset();
+    ClientInstance* ci = ClientInstance::get();
+    if (!ci->getLevelRenderer()) {
         return false;
     }
-    ClientInstance* ci = ClientInstance::get();
     Actor* player = ci->getLocalPlayer();
     if (!player) return false;
     BlockSource* blockSource = ci->getBlockSource();
@@ -373,7 +209,7 @@ bool BlockESP::processSub(ChunkPos processChunk, int index)
     if (!blockReader) return false;
 
     std::vector<int> enabledBlocks = getEnabledBlocks();
-    bool changed = false;
+    const size_t maxTargets = static_cast<size_t>(mMaxTargets.mValue);
 
     for (uint16_t x = 0; x < 16; x++) {
         for (uint16_t z = 0; z < 16; z++) {
@@ -386,31 +222,28 @@ bool BlockESP::processSub(ChunkPos processChunk, int index)
                 pos.z = (processChunk.y * 16) + z;
                 pos.y = y + (subChunk.subchunkIndex * 16);
 
-                if (found->mLegacy->getBlockId() == 0) {
-                    if (mFoundBlocks.erase(pos)) {
-                        mFilteredBlocks.erase(pos);
-                        changed = true;
-                    }
+                const int blockId = (found && found->mLegacy) ? found->mLegacy->getBlockId() : 0;
+                if (blockId == 0 || std::ranges::find(enabledBlocks, blockId) == enabledBlocks.end()) {
+                    // Most blocks are not targets: only touch the map when it has entries
+                    if (!mFoundBlocks.empty()) mFoundBlocks.erase(pos);
                     continue;
                 }
 
-                if (mBlacklistedPositions.contains(pos)) continue;
-
-                if (std::ranges::find(enabledBlocks, found->mLegacy->getBlockId()) == enabledBlocks.end()) continue;
-
-                int exposedFace = BlockUtils::getExposedFace(pos);
-                if (mOnlyExposedOres.mValue && exposedFace == -1) continue;
-
-                if (!mFoundBlocks.contains(pos)) {
-                    mFoundBlocks[pos] = { found, AABB(pos, glm::vec3(1.f, 1.f, 1.f)), getColorFromId(found->mLegacy->getBlockId()) };
-                    changed = true;
+                if (!withinDistance(glm::vec3(pos) + glm::vec3(0.5f))) {
+                    mFoundBlocks.erase(pos);
+                    continue;
                 }
+
+                // Already tracked: reconcile handles visibility updates
+                if (mFoundBlocks.contains(pos)) continue;
+                if (mFoundBlocks.size() >= maxTargets) continue;
+
+                bool visible = BlockUtils::getExposedFace(pos) != -1;
+                mFoundBlocks[pos] = { found, blockId, AABB(pos, glm::vec3(1.f, 1.f, 1.f)), visible };
             }
         }
     }
 
-    // Mark that scan data changed — cluster recompute needed eventually
-    if (changed) mScanDirty = true;
     return true;
 }
 
@@ -426,12 +259,11 @@ void BlockESP::reset()
     Actor* player = ci->getLocalPlayer();
     mSearchStart = NOW;
     mFoundBlocks.clear();
-    mFilteredBlocks.clear();
-    mBlacklistedPositions.clear();
-    mClustersValid = false;
-    mScanDirty = false;
-    mLastClusterUpdate = 0;
-    mScanComplete = false;
+    mReconcileKeys.clear();
+    mReconcileIndex = 0;
+    mDeobQueue.clear();
+    mDeobBuilt = false;
+    mDeobDelayTicks = 0;
     mStepsCount = 0;
     mSteps = 1;
     mDirectionIndex = 0;
@@ -445,52 +277,6 @@ void BlockESP::reset()
 // =========================================================
 // ENABLE / DISABLE
 // =========================================================
-
-std::vector<BlockPos> BlockESP::findNearestCluster(
-    glm::vec3 playerPos,
-    const std::unordered_set<BlockPos>& exclude)
-{
-    std::lock_guard<std::mutex> lock(blockMutex);
-
-    auto& source = mClusterFilter.mValue ? mFilteredBlocks : mFoundBlocks;
-
-    BlockPos nearestPos;
-    float nearestDist = FLT_MAX;
-    bool found = false;
-
-    for (auto& [pos, block] : source) {
-        if (exclude.contains(pos)) continue;
-        if (mBlacklistedPositions.contains(pos)) continue;
-
-        float dist = glm::distance(playerPos, glm::vec3(pos) + glm::vec3(0.5f));
-        if (dist < nearestDist) {
-            nearestDist = dist;
-            nearestPos = pos;
-            found = true;
-        }
-    }
-
-    if (!found) return {};
-
-    // BFS — но нам нужна копия source без excluded для getCluster
-    // getCluster принимает const ref map, так что строим временную
-    std::unordered_map<BlockPos, FoundBlock> validBlocks;
-    for (auto& [pos, block] : source) {
-        if (!exclude.contains(pos) && !mBlacklistedPositions.contains(pos))
-            validBlocks[pos] = block;
-    }
-
-    auto fullCluster = getCluster(nearestPos, validBlocks);
-
-    // Sort by distance
-    std::sort(fullCluster.begin(), fullCluster.end(),
-        [&playerPos](const BlockPos& a, const BlockPos& b) {
-            return glm::distance(playerPos, glm::vec3(a) + glm::vec3(0.5f))
-                 < glm::distance(playerPos, glm::vec3(b) + glm::vec3(0.5f));
-        });
-
-    return fullCluster;
-}
 
 void BlockESP::onEnable()
 {
@@ -516,6 +302,7 @@ void BlockESP::onDisable()
 
 std::vector<int> BlockESP::getEnabledBlocks()
 {
+    using namespace BlockEspImpl;
     std::vector<int> enabledBlocks = {};
 
     if (mEmerald.mValue) {
@@ -562,6 +349,143 @@ std::vector<int> BlockESP::getEnabledBlocks()
 }
 
 // =========================================================
+// RECONCILE: re-check a few tracked blocks per tick
+// (still a target? still in range? visible?)
+// =========================================================
+
+void BlockESP::reconcileTargets(int budget)
+{
+    ClientInstance* ci = ClientInstance::get();
+    BlockSource* blockSource = ci->getBlockSource();
+    if (!blockSource) return;
+
+    if (mFoundBlocks.empty()) {
+        mReconcileKeys.clear();
+        mReconcileIndex = 0;
+        return;
+    }
+
+    if (mReconcileIndex >= mReconcileKeys.size()) {
+        mReconcileKeys.clear();
+        mReconcileKeys.reserve(mFoundBlocks.size());
+        for (const auto& [pos, _] : mFoundBlocks) mReconcileKeys.push_back(pos);
+        mReconcileIndex = 0;
+    }
+
+    std::vector<int> enabledBlocks = getEnabledBlocks();
+    int processed = 0;
+    while (processed < budget && mReconcileIndex < mReconcileKeys.size()) {
+        BlockPos pos = mReconcileKeys[mReconcileIndex++];
+        processed++;
+
+        auto it = mFoundBlocks.find(pos);
+        if (it == mFoundBlocks.end()) continue;
+
+        if (!withinDistance(glm::vec3(pos) + glm::vec3(0.5f))) {
+            mFoundBlocks.erase(it);
+            continue;
+        }
+
+        Block* current = blockSource->getBlock(pos);
+        if (!current || current->mLegacy == nullptr) {
+            mFoundBlocks.erase(it);
+            continue;
+        }
+
+        const int id = current->mLegacy->getBlockId();
+        if (std::ranges::find(enabledBlocks, id) == enabledBlocks.end()) {
+            mFoundBlocks.erase(it);
+            continue;
+        }
+
+        it->second.block = current;
+        it->second.blockId = id;
+        it->second.visible = BlockUtils::getExposedFace(pos) != -1;
+    }
+}
+
+// =========================================================
+// DEOBFUSCATION (Combatant BlockDeobfuscationScanner)
+// Briefly "mines" nearby blocks so the server reveals real states.
+// =========================================================
+
+void BlockESP::rebuildDeobQueue()
+{
+    ClientInstance* ci = ClientInstance::get();
+    Actor* player = ci->getLocalPlayer();
+    BlockSource* blockSource = ci->getBlockSource();
+    if (!player || !blockSource) return;
+
+    const int r = std::max(1, static_cast<int>(mDeobfuscationRadius.mValue));
+    const int up = std::max(1, static_cast<int>(mDeobfuscationUp.mValue));
+    const int down = std::max(1, static_cast<int>(mDeobfuscationDown.mValue));
+    const bool fast = mDeobfuscationFast.mValue;
+
+    glm::ivec3 feet = glm::ivec3(glm::floor(*player->getPos() - PLAYER_HEIGHT_VEC));
+    const int minY = blockSource->getBuildDepth();
+    const int maxY = blockSource->getBuildHeight() - 1;
+
+    mDeobQueue.clear();
+    for (int x = feet.x - r; x <= feet.x + r; x++) {
+        for (int y = std::max(minY, feet.y - down); y <= std::min(maxY, feet.y + up); y++) {
+            for (int z = feet.z - r; z <= feet.z + r; z++) {
+                if (fast && (x % 2 == 0 || y % 2 == 0 || z % 2 == 0)) continue;
+
+                Block* state = blockSource->getBlock(glm::ivec3(x, y, z));
+                if (!state || !state->mLegacy || state->mLegacy->getBlockId() == 0) continue;
+
+                mDeobQueue.push_back(BlockPos{x, y, z});
+            }
+        }
+    }
+
+    mDeobCenter = feet;
+    mDeobBuilt = true;
+}
+
+void BlockESP::tickDeobfuscation()
+{
+    if (!mDeobfuscation.mValue) return;
+
+    ClientInstance* ci = ClientInstance::get();
+    Actor* player = ci->getLocalPlayer();
+    if (!player || !ci->getBlockSource()) return;
+    GameMode* gameMode = player->getGameMode();
+    if (!gameMode) return;
+
+    const glm::ivec3 feet = glm::ivec3(glm::floor(*player->getPos() - PLAYER_HEIGHT_VEC));
+    const int r = std::max(1, static_cast<int>(mDeobfuscationRadius.mValue));
+    const int up = std::max(1, static_cast<int>(mDeobfuscationUp.mValue));
+    const int down = std::max(1, static_cast<int>(mDeobfuscationDown.mValue));
+
+    const bool moved = std::abs(feet.x - mDeobCenter.x) > r ||
+                       std::abs(feet.z - mDeobCenter.z) > r ||
+                       (feet.y - mDeobCenter.y) > up ||
+                       (mDeobCenter.y - feet.y) > down;
+    if (!mDeobBuilt || moved) {
+        rebuildDeobQueue();
+    }
+
+    if (mDeobQueue.empty()) return;
+    if (++mDeobDelayTicks < BlockEspImpl::DEOB_DELAY_TICKS) return;
+    mDeobDelayTicks = 0;
+
+    const size_t index = mDeobQueue.size() <= 1 ? 0 : static_cast<size_t>(std::rand()) % mDeobQueue.size();
+    BlockPos target = mDeobQueue[index];
+    mDeobQueue[index] = mDeobQueue.back();
+    mDeobQueue.pop_back();
+
+    // Use GameMode directly: BlockUtils::startDestroyBlock rewrites the crosshair hit result.
+    int face = BlockUtils::getExposedFace(target);
+    if (face == -1) face = 1;
+
+    glm::ivec3 position = target;
+    bool destroyed = false;
+    gameMode->startDestroyBlock(&position, face, destroyed);
+    gameMode->stopDestroyBlock(position);
+}
+
+// =========================================================
 // EVENT: Block changed
 // =========================================================
 
@@ -571,39 +495,32 @@ void BlockESP::onBlockChangedEvent(BlockChangedEvent& event)
         reset();
         return;
     }
+    if (!ClientInstance::get()->getLocalPlayer()) return;
+
     std::lock_guard<std::mutex> lock(blockMutex);
 
-    auto dabl = BlockInfo(event.mNewBlock, event.mBlockPos);
-    if (dabl.getDistance(*ClientInstance::get()->getLocalPlayer()->getPos()) > mRadius.mValue) return;
-
-    auto enabledBlocks = getEnabledBlocks();
-    int newBlockId = event.mNewBlock->mLegacy->getBlockId();
-
-    if (mBlacklistedPositions.contains(event.mBlockPos)) {
-        // Block was blacklisted — don't re-add
+    const BlockPos pos = event.mBlockPos;
+    if (!withinDistance(glm::vec3(pos) + glm::vec3(0.5f))) {
+        mFoundBlocks.erase(pos);
         return;
     }
 
-    if (isValidBlock(newBlockId) &&
-        std::ranges::find(enabledBlocks, newBlockId) != enabledBlocks.end())
-    {
-        // New ore placed/appeared — add it
-        const Block* block = event.mNewBlock;
-        FoundBlock fb = { block, AABB(event.mBlockPos, glm::vec3(1.f, 1.f, 1.f)), getColorFromId(newBlockId) };
-        mFoundBlocks[event.mBlockPos] = fb;
-
-        // If cluster filter is off, also add to filtered immediately
-        if (!mClusterFilter.mValue) {
-            mFilteredBlocks[event.mBlockPos] = fb;
-        } else {
-            // Mark for eventual cluster recompute
-            mScanDirty = true;
-        }
+    if (!event.mNewBlock || !event.mNewBlock->mLegacy) {
+        mFoundBlocks.erase(pos);
+        return;
     }
-    else
-    {
-        // Block removed/replaced with non-ore — remove incrementally
-        removeBlockIncremental(event.mBlockPos);
+
+    const int newBlockId = event.mNewBlock->mLegacy->getBlockId();
+    std::vector<int> enabledBlocks = getEnabledBlocks();
+
+    if (std::ranges::find(enabledBlocks, newBlockId) != enabledBlocks.end()) {
+        if (!mFoundBlocks.contains(pos) && mFoundBlocks.size() >= static_cast<size_t>(mMaxTargets.mValue)) {
+            return;
+        }
+        bool visible = BlockUtils::getExposedFace(pos) != -1;
+        mFoundBlocks[pos] = { event.mNewBlock, newBlockId, AABB(pos, glm::vec3(1.f, 1.f, 1.f)), visible };
+    } else {
+        mFoundBlocks.erase(pos);
     }
 }
 
@@ -617,10 +534,9 @@ void BlockESP::onBaseTickEvent(BaseTickEvent& event)
         reset();
         return;
     }
-    std::lock_guard<std::mutex> lock(blockMutex);
 
     static uint64_t lastUpdate = 0;
-    uint64_t freq = mUpdateFrequency.mValue * 50.f;
+    uint64_t freq = static_cast<uint64_t>(mUpdateFrequency.mValue * 50.f);
     uint64_t now = NOW;
 
     if (lastUpdate + freq > now) return;
@@ -631,22 +547,13 @@ void BlockESP::onBaseTickEvent(BaseTickEvent& event)
     if (!player) return;
     auto blockSource = ci->getBlockSource();
 
-    // Check if we need to restart scan spiral
-    bool spiralComplete = glm::distance(glm::vec2(mCurrentChunkPos), glm::vec2(mSearchCenter)) > mChunkRadius.mValue;
+    std::lock_guard<std::mutex> lock(blockMutex);
+
+    // Restart the spiral when it leaves the scan radius
+    const int chunkRadius = std::max(1, (getScanRadius() + 15) >> 4);
+    bool spiralComplete = glm::distance(glm::vec2(mCurrentChunkPos), glm::vec2(mSearchCenter)) > chunkRadius;
 
     if (spiralComplete) {
-        // Full scan cycle completed
-        if (!mScanComplete) {
-            mScanComplete = true;
-            // Do one cluster recompute now that initial scan is done
-            if (mClusterFilter.mValue && mScanDirty) {
-                updateClusters();
-                mLastClusterUpdate = now;
-                mScanDirty = false;
-            }
-        }
-
-        // Reset spiral for next cycle
         mSearchStart = NOW;
         mSearchCenter = ChunkPos(*player->getPos());
         mCurrentChunkPos = mSearchCenter;
@@ -669,26 +576,8 @@ void BlockESP::onBaseTickEvent(BaseTickEvent& event)
     bool result = false;
     tryProcessSub(result, ChunkPos(playerPos), subChunk);
 
-    // =========================================================
-    // CLUSTER UPDATE LOGIC (throttled)
-    // =========================================================
-    if (mClusterFilter.mValue && mScanDirty) {
-        // During initial scan: don't recompute clusters every tick
-        // After initial scan: recompute at most every 2 seconds
-        uint64_t clusterCooldown = mScanComplete ? 2000 : 5000;
-
-        if (now - mLastClusterUpdate > clusterCooldown) {
-            updateClusters();
-            mLastClusterUpdate = now;
-            mScanDirty = false;
-        }
-    }
-
-    // If cluster filter is off, just mirror found -> filtered
-    if (!mClusterFilter.mValue && !mClustersValid) {
-        mFilteredBlocks = mFoundBlocks;
-        mClustersValid = true;
-    }
+    reconcileTargets(BlockEspImpl::RECONCILE_BUDGET_PER_TICK);
+    tickDeobfuscation();
 }
 
 // =========================================================
@@ -715,17 +604,47 @@ void BlockESP::onPacketInEvent(PacketInEvent& event)
 // =========================================================
 // EVENT: Render
 // =========================================================
-std::unordered_map<BlockPos, BlockESP::FoundBlock> BlockESP::getRenderedBlocksCopy()
+
+void BlockESP::renderTracers()
 {
-    std::lock_guard<std::mutex> lock(blockMutex);
-    auto& source = mClusterFilter.mValue ? mFilteredBlocks : mFoundBlocks;
-    std::unordered_map<BlockPos, FoundBlock> copy;
-    for (auto& [pos, block] : source) {
-        if (!mBlacklistedPositions.contains(pos)) {
-            copy[pos] = block;
-        }
+    if (!mUseTracers.mValue) return;
+
+    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    const ImVec2 origin(display.x * 0.5f, display.y);
+
+    std::vector<BlockPos> positions;
+    positions.reserve(mFoundBlocks.size());
+    for (const auto& [pos, block] : mFoundBlocks) {
+        if (!acceptsMode(block.visible)) continue;
+        if (!withinDistance(glm::vec3(pos) + glm::vec3(0.5f))) continue;
+        positions.push_back(pos);
     }
-    return copy;
+
+    auto drawTo = [&](const glm::vec3& point, ImColor color) {
+        ImVec2 screen;
+        if (!RenderUtils::worldToScreen(point, screen)) return;
+        drawList->AddLine(origin, screen, color, 1.5f);
+    };
+
+    if (!mClusterTracers.mValue) {
+        for (const BlockPos& pos : positions) {
+            bool visible = mFoundBlocks.at(pos).visible;
+            drawTo(glm::vec3(pos) + glm::vec3(0.5f), visible ? mVisibleColor.getAsImColor() : mChunkColor.getAsImColor());
+        }
+        return;
+    }
+
+    for (const auto& cluster : buildClusters(positions)) {
+        glm::vec3 center(0.f);
+        bool anyVisible = false;
+        for (const BlockPos& pos : cluster) {
+            center += glm::vec3(pos) + glm::vec3(0.5f);
+            anyVisible = anyVisible || mFoundBlocks.at(pos).visible;
+        }
+        center /= static_cast<float>(cluster.size());
+        drawTo(center, anyVisible ? mVisibleColor.getAsImColor() : mChunkColor.getAsImColor());
+    }
 }
 
 void BlockESP::onRenderEvent(RenderEvent& event)
@@ -746,8 +665,6 @@ void BlockESP::onRenderEvent(RenderEvent& event)
         return;
     }
 
-    glm::ivec3 playerPos = *player->getPos();
-
     // Render current chunk debug
     if (mRenderCurrentChunk.mValue) {
         ChunkPos currentChunkPos = ChunkPos(mCurrentChunkPos);
@@ -756,45 +673,39 @@ void BlockESP::onRenderEvent(RenderEvent& event)
         std::vector<ImVec2> chunkPoints = MathUtils::getImBoxPoints(chunkAABB);
 
         if (mRenderMode.mValue == BlockRenderMode::Both || mRenderMode.mValue == BlockRenderMode::Outline)
-            drawList->AddPolyline(chunkPoints.data(), chunkPoints.size(), ImColor(1.f, 1.f, 1.f), 0, 2.0f);
+            drawList->AddPolyline(chunkPoints.data(), chunkPoints.size(), mChunkColor.getAsImColor(), 0, 2.0f);
         if (mRenderMode.mValue == BlockRenderMode::Both || mRenderMode.mValue == BlockRenderMode::Filled)
             drawList->AddConvexPolyFilled(chunkPoints.data(), chunkPoints.size(), ImColor(1.f, 1.f, 1.f, 0.25f));
     }
 
-    // Pre-compute for optimization
-    auto enabledVec = getEnabledBlocks();
-    std::unordered_set<int> enabledSet(enabledVec.begin(), enabledVec.end());
-    float radiusSq = mRadius.mValue * mRadius.mValue;
+    const float lineWidth = std::max(0.5f, mLineWidth.mValue);
+    const size_t maxRendered = static_cast<size_t>(mMaxTargets.mValue);
+    size_t rendered = 0;
 
-    auto& renderBlocks = mClusterFilter.mValue ? mFilteredBlocks : mFoundBlocks;
+    for (auto& [pos, block] : mFoundBlocks) {
+        if (rendered >= maxRendered) break;
+        if (!acceptsMode(block.visible)) continue;
 
-    int rendered = 0;
-    static constexpr int MAX_RENDER = 500;
+        glm::vec3 center = glm::vec3(pos) + glm::vec3(0.5f);
+        if (!withinDistance(center)) continue;
 
-    for (auto& [pos, block] : renderBlocks) {
-        if (rendered >= MAX_RENDER) break;
-
-        // Squared distance — no sqrt
-        glm::vec3 diff = glm::vec3(pos) - glm::vec3(playerPos);
-        float distSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-        if (distSq > radiusSq) continue;
-
-        // O(1) lookup instead of O(n) find
-        if (!enabledSet.contains(block.block->mLegacy->getBlockId())) continue;
-
-        // Skip blocks behind camera — 1 check saves 7 projections
+        // Skip blocks behind camera
         ImVec2 centerScreen;
-        if (!RenderUtils::worldToScreen(glm::vec3(pos) + glm::vec3(0.5f), centerScreen)) continue;
+        if (!RenderUtils::worldToScreen(center, centerScreen)) continue;
 
         std::vector<ImVec2> imPoints = MathUtils::getImBoxPoints(block.aabb);
         if (imPoints.empty()) continue;
 
+        ImColor color = block.visible ? mVisibleColor.getAsImColor() : mChunkColor.getAsImColor();
+
         if (mRenderMode.mValue == BlockRenderMode::Both || mRenderMode.mValue == BlockRenderMode::Outline)
-            drawList->AddPolyline(imPoints.data(), imPoints.size(), block.color, 0, 2.0f);
+            drawList->AddPolyline(imPoints.data(), imPoints.size(), color, 0, lineWidth);
         if (mRenderMode.mValue == BlockRenderMode::Both || mRenderMode.mValue == BlockRenderMode::Filled)
             drawList->AddConvexPolyFilled(imPoints.data(), imPoints.size(),
-                ImColor(block.color.Value.x, block.color.Value.y, block.color.Value.z, 0.25f));
+                ImColor(color.Value.x, color.Value.y, color.Value.z, 0.25f));
 
         rendered++;
     }
+
+    renderTracers();
 }

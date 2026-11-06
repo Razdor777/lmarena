@@ -19,6 +19,14 @@ public:
         "Attack Mode", "Slap = шлепок по дуге, Sting = укол", AttackMode::Alternate,
         "Alternate", "Sting", "Slap");
 
+    // ── Стиль формы ───────────────────────────────────────────────────────
+    // Manga: гладкая органика с костяными шипами. Minecraft: квадратное сечение,
+    // ступенчатое сужение и плоское затенение «как блоки».
+    enum class Style { Manga, Minecraft };
+    EnumSettingT<Style> mStyle = EnumSettingT<Style>(
+        "Style", "Manga: smooth flesh and bone spikes. Minecraft: blocky square segments",
+        Style::Manga, "Manga", "Minecraft");
+
     // ── Кровь ─────────────────────────────────────────────────────────────
     enum class ParticleColor { DarkRed, BrightRed, Gradient };
     EnumSettingT<ParticleColor> mParticleColor = EnumSettingT<ParticleColor>(
@@ -48,6 +56,7 @@ public:
     BoolSetting mGlow    = BoolSetting("Glow",     "Blood particles",                      true);
     BoolSetting mShowFPV = BoolSetting("FPV Show", "Show in first person",                 true);
     BoolSetting mDetail  = BoolSetting("Detail",   "Glow bands + strike trail",            true);
+    NumberSetting mRingRes = NumberSetting("Ring Detail", "Cross-section polygon count (higher = smoother)", 12.0f, 8.0f, 16.0f, 4.0f);
 
     // ── Цвета (Palette = Custom) ──────────────────────────────────────────
     ColorSetting mColBlade = ColorSetting("Blade Color", "Flesh color",          0.52f, 0.03f, 0.06f, 1.0f);
@@ -118,6 +127,16 @@ public:
 
         std::array<TrailPt, 24> trail{};
         int trailHead = 0;
+
+        // Аниме-смаз: прошлые позы во время выпада + линии скорости + вспышка
+        std::array<std::array<glm::vec3, kNodes>, 4> ghost{};
+        std::array<float, 4> ghostT{-100.f, -100.f, -100.f, -100.f};
+        int       ghostHead = 0;
+        float     lastGhostT = -100.f;
+        float     smear     = 0.f;          // 0..1, сила смаза в этом кадре
+        glm::vec3 strikeDir = {0.f, 0.f, 1.f};
+        glm::vec3 impactPos = {};
+        float     impactT   = -100.f;       // iT вспышки удара
         void pushTrail(const glm::vec3& p, float t)
         {
             TrailPt tp; tp.p = p; tp.t = t;
@@ -177,7 +196,8 @@ public:
             &mShake,
             &mPulse, &mWidth,
             &mPalette, &mDetail,
-            &mSpikes, &mLegs, &mExitAnim, &mFpvSize, &mYOffset
+            &mSpikes, &mLegs, &mExitAnim, &mFpvSize, &mYOffset,
+            &mStyle, &mRingRes
         );
 
         VISIBILITY_CONDITION(mColBlade, mPalette.mValue == Palette::Custom);

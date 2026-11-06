@@ -8,6 +8,9 @@
 #include <Utils/MiscUtils/ColorUtils.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 
+#include <mutex>
+#include <vector>
+
 class QueuedPacket
 {
 public:
@@ -31,7 +34,16 @@ public:
     /// Can be used for various purposes, such as delaying packets to match rotation.
     /// </summary>
     static inline std::vector<QueuedPacket> mQueuedPackets;
+    // mQueuedPackets пополняют из разных мест (и потоков), а отправляет их
+    // onBaseTick — только под этим мьютексом (см. queuePacket).
+    static inline std::mutex mPacketQueueMutex;
     static std::unique_ptr<Detour> mDetour;
+
+    static void queuePacket(std::shared_ptr<Packet> packet, bool bypassHook)
+    {
+        std::lock_guard<std::mutex> lock(mPacketQueueMutex);
+        mQueuedPackets.emplace_back(std::move(packet), bypassHook);
+    }
 
     static void onBaseTick(class Actor* actor);
     void init() override;

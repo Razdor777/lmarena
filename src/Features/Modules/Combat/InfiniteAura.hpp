@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <mutex>
 
+struct ImDrawList;
+
 class InfiniteAura : public ModuleBase<InfiniteAura>
 {
 public:
@@ -65,6 +67,17 @@ public:
     BoolSetting              mDrawPath        = BoolSetting("Draw Path", "Draw movement path", true);
     BoolSetting              mDrawGhost       = BoolSetting("Draw Ghost", "Draw ghost at attack pos", true);
     BoolSetting              mHighlightLocked = BoolSetting("Highlight Locked", "Highlight locked target", true);
+    BoolSetting              mTargetInfo      = BoolSetting("Target Info", "HP bar, armor and distance above the locked target", true);
+    BoolSetting              mHitTrail        = BoolSetting("Hit Trail", "Fading afterimages of the previous hits", true);
+    NumberSetting            mTrailPoints     = NumberSetting("Trail Points", "How many previous hits to keep", 4.f, 1.f, 12.f, 1.f);
+    BoolSetting              mHitSparks      = BoolSetting("Hit Sparks", "Spark burst flying out of the hit point", true);
+    BoolSetting              mPathFlow       = BoolSetting("Path Flow", "Animated dots running along the teleport path", true);
+    NumberSetting            mPathWidth      = NumberSetting("Path Width", "Teleport path line thickness", 2.f, 1.f, 6.f, 0.5f);
+
+    // --- Debug ---
+    // Одна настройка: показывает, что реально происходит с ударами. Нужна,
+    // чтобы измерить настоящую задержку сервера, а не гадать по CPS.
+    BoolSetting              mDebug          = BoolSetting("Debug", "Sent vs confirmed hits: real delay, real APS, interval history", false);
 
     InfiniteAura() : ModuleBase("InfiniteAura", "Attack players at any distance via chain TP",
         ModuleCategory::Combat, 0, false)
@@ -79,8 +92,15 @@ public:
             &mFollow, &mSilentAccept, &mIgnoreFriends,
             &mSwapMode, &mHotbarOnly,
             &mAutoShield,
-            &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked
+            &mRenderMode, &mDrawPath, &mDrawGhost, &mHighlightLocked,
+            &mTargetInfo, &mHitTrail, &mTrailPoints, &mHitSparks,
+            &mPathFlow, &mPathWidth,
+            &mDebug
         );
+
+        VISIBILITY_CONDITION(mTrailPoints, mHitTrail.mValue);
+        VISIBILITY_CONDITION(mPathFlow,    mDrawPath.mValue);
+        VISIBILITY_CONDITION(mPathWidth,   mDrawPath.mValue && mRenderMode.mValue == RenderMode::Lines);
 
         VISIBILITY_CONDITION(mYOffset,         mOnlySameY.mValue);
         VISIBILITY_CONDITION(mSwitchDelay,     mMode.mValue == Mode::Switch);
@@ -111,6 +131,15 @@ public:
     uint64_t               mLastPathTime = 0;
     std::mutex             mMutex;
 
+    // Визуал: точки прошлых ударов (новые — в конце) и «болит ли он» для вспышки.
+    // Массив фиксированного размера, а не vector: шлейф читает рендер-поток, и
+    // push_back под ним мог бы ловить реаллокацию в самый неподходящий момент.
+    static constexpr int kMaxTrailPoints = 12;
+    glm::vec3            mGhostHistory[kMaxTrailPoints] = {};
+    int                  mGhostHistoryCount = 0;
+    float                mLastLockedHealth  = -1.f;
+    uint64_t             mLastHpDropTime    = 0;
+
     std::unordered_map<int64_t, uint64_t> mLastAttacksByID;
     std::unordered_map<int64_t, uint64_t> mRecentAttackers;
 
@@ -124,6 +153,27 @@ public:
     int64_t     mLockedTargetRuntimeID = -1;
     std::string mLockedTargetName;
     int         mLockTargetKey     = VK_CAPITAL;
+
+    // ── Debug: отправлено vs подтверждено ────────────────────────────────
+    // Каждое нажатие кладём в очередь; подтверждением считаем ActorEvent HURT
+    // по этой же цели. Разница = настоящая задержка сервера. Очередь маленькая
+    // и фиксированная: рендер-поток читает её под своим мьютексом.
+    struct DebugAttack { uint64_t at; int64_t target; };
+    static constexpr int kDebugQueueSize = 64;
+    static constexpr int kDebugConfirmWindow = 32;
+    std::mutex  mDebugMutex;
+    DebugAttack mDebugQueue[kDebugQueueSize]{};
+    int         mDebugQueueCount = 0;
+    uint64_t    mDbgSent = 0, mDbgConfirmed = 0, mDbgLost = 0, mDbgForeign = 0;
+    uint64_t    mDbgLatSum = 0;
+    float       mDbgLastMs = 0.f, mDbgAvgMs = 0.f, mDbgMinMs = 0.f, mDbgMaxMs = 0.f;
+    int         mDbgHist[5] = { 0, 0, 0, 0, 0 };       // 0-50 / 50-100 / 100-200 / 200-500 / 500+
+    uint64_t    mDbgConfirmTimes[kDebugConfirmWindow]{};
+    int         mDbgConfirmCount = 0;
+    uint64_t    mDbgLastConfirmAt = 0;
+    float       mDbgLastIntervalMs = 0.f, mDbgAvgIntervalMs = 0.f;
+    uint64_t    mDbgIntervalSum = 0;
+    float       mDbgRealAps = 0.f;
 
     std::unordered_map<int, bool> mLockKeyStates;
     bool mIsBindingLockKey = false;
@@ -163,6 +213,12 @@ public:
     void onPacketOutEvent(PacketOutEvent& event);
     void onPacketInEvent(PacketInEvent& event);
     void onRenderEvent(RenderEvent& event);
+
+    // Debug (Task 16): измеряем реальную задержку ударов
+    void dbgRecordSent(int64_t targetId);
+    void dbgRecordHit(int64_t targetId);
+    void dbgReset();
+    void dbgRender(ImDrawList* drawList);
 
     std::string getSettingDisplay() override
     {

@@ -16,7 +16,7 @@
 
 int ItemUtils::getItemValue(ItemStack* item) {
     int value = 0;
-    if (!item->mItem) return -1;
+    if (!item || !item->mItem) return -1;
     switch (item->getItem()->getItemType())
     {
     case SItemType::Helmet:
@@ -51,19 +51,30 @@ int ItemUtils::getItemValue(ItemStack* item) {
 
 int ItemUtils::getBestItem(SItemType type, bool hotbarOnly)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
-    auto supplies = player->getSupplies();
-    auto container = supplies->getContainer();
+    // Раньше здесь ни один указатель не проверялся: в момент смены мира,
+    // респавна или открытия контейнера supply/container/item бывают null —
+    // и Aura, которая зовёт это каждый удар, роняла игру.
+    auto* ci = ClientInstance::get();
+    if (!ci) return 0;
 
-    int bestSlot = supplies->mSelectedSlot;
+    auto* player = ci->getLocalPlayer();
+    if (!player) return 0;
+
+    auto* supplies = player->getSupplies();
+    if (!supplies) return 0;
+
+    auto* container = supplies->getContainer();
+    if (!container) return std::clamp(supplies->mSelectedSlot, 0, 8);
+
+    int bestSlot  = std::clamp(supplies->mSelectedSlot, 0, 8);
     int bestValue = 0;
 
     for (int i = 0; i < 36; i++)
     {
-        auto item = container->getItem(i);
-        if (!item->mItem) continue;
-
         if (hotbarOnly && i > 8) break;
+
+        auto* item = container->getItem(i);
+        if (!item || !item->mItem) continue;
 
         if (item->getItem()->getItemType() == type)
         {
@@ -71,11 +82,13 @@ int ItemUtils::getBestItem(SItemType type, bool hotbarOnly)
             if (value > bestValue)
             {
                 bestValue = value;
-                bestSlot = i;
+                bestSlot  = i;
             }
         }
     }
 
+    // Только хотбар: 36 слотов контейнера — это не слоты хотбара.
+    if (hotbarOnly && (bestSlot < 0 || bestSlot > 8)) bestSlot = 0;
     return bestSlot;
 }
 
@@ -151,7 +164,7 @@ int ItemUtils::getAllPlaceables(bool hotbarOnly)
         if (!stack->mItem) continue;
         Item* item = stack->getItem();
         if (hotbarOnly && i > 8) continue;
-        if (stack->mBlock)
+        if (stack->mBlock && stack->mBlock->mLegacy)
         {
             // If the string contains any of the blacklisted blocks, skip it (compare using StringUtils::containsIgnoreCase
             bool skip = false;
@@ -210,17 +223,22 @@ int ItemUtils::getFirstPlaceable(bool hotbarOnly)
 
 int ItemUtils::getPlaceableItemOnBlock(glm::vec3 blockPos, bool hotbarOnly, bool prioHighest)
 {
-    auto player = ClientInstance::get()->getLocalPlayer();
+    auto* ci = ClientInstance::get();
+    if (!ci) return -1;
+    auto player = ci->getLocalPlayer();
     if (!player) return -1;
     auto supplies = player->getSupplies();
+    if (!supplies) return -1;
+    auto* container = supplies->getContainer();
+    if (!container) return -1;
 
     int slot = -1;
     // slot, count
     std::map<int, int> placeables;
     for (int i = 0; i < 36; i++)
     {
-        ItemStack* stack = supplies->getContainer()->getItem(i);
-        if (!stack->mItem) continue;
+        ItemStack* stack = container->getItem(i);
+        if (!stack || !stack->mItem) continue;
         Item* item = stack->getItem();
         if (hotbarOnly && i > 8) continue;
         if (stack->mBlock)

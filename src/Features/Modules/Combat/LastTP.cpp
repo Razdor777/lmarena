@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include <Features/FeatureManager.hpp>
+#include <Features/Events/LookInputEvent.hpp>
 #include <SDK/Minecraft/ClientInstance.hpp>
 #include <SDK/Minecraft/Actor/Actor.hpp>
 #include <SDK/Minecraft/Actor/ActorType.hpp>
@@ -156,19 +157,24 @@ namespace
     // Камера/прицел клиента живёт в CameraDirectLookComponent (радианы):
     //   mRotRads.x = PI - yawMC,   mRotRads.y = -pitchMC
     // (конверсия снята с рабочего Aimbot::calcTargetRotRads / Scaffold::mcToRad).
+    // Отдельная функция, потому что этот же компонент прилетает в LookInputEvent.
+    void writeAim(CameraDirectLookComponent* direct, float pitchDeg, float yawDeg)
+    {
+        if (!direct) return;
+
+        float yawRad = glm::radians(180.f - yawDeg);
+        while (yawRad >  3.14159265f) yawRad -= 2.f * 3.14159265f;
+        while (yawRad < -3.14159265f) yawRad += 2.f * 3.14159265f;
+
+        direct->mRotRads.x = yawRad;
+        direct->mRotRads.y = std::clamp(glm::radians(-pitchDeg), -1.55f, 1.55f);
+    }
+
     void applyAimNow(Actor* player, float pitchDeg, float yawDeg)
     {
         if (!player) return;
 
-        if (auto* direct = player->getCameraDirectLookComponent())
-        {
-            float yawRad = glm::radians(180.f - yawDeg);
-            while (yawRad >  3.14159265f) yawRad -= 2.f * 3.14159265f;
-            while (yawRad < -3.14159265f) yawRad += 2.f * 3.14159265f;
-
-            direct->mRotRads.x = yawRad;
-            direct->mRotRads.y = std::clamp(glm::radians(-pitchDeg), -1.55f, 1.55f);
-        }
+        writeAim(player->getCameraDirectLookComponent(), pitchDeg, yawDeg);
 
         if (auto* rot = player->getActorRotationComponent())
         {
@@ -193,7 +199,8 @@ void LastTP::onInit()
 {
     if (!gFeatureManager || !gFeatureManager->mDispatcher) return;
 
-    gFeatureManager->mDispatcher->listen<BaseTickEvent,  &LastTP::onBaseTickEvent>(this);
+    gFeatureManager->mDispatcher->listen<BaseTickEvent,   &LastTP::onBaseTickEvent>(this);
+    gFeatureManager->mDispatcher->listen<LookInputEvent,  &LastTP::onLookInputEvent, nes::event_priority::FIRST>(this);
     gFeatureManager->mDispatcher->listen<PacketOutEvent,  &LastTP::onPacketOutEvent>(this);
     gFeatureManager->mDispatcher->listen<PacketInEvent,   &LastTP::onPacketInEvent>(this);
     gFeatureManager->mDispatcher->listen<EntityHurtEvent, &LastTP::onEntityHurtEvent>(this);
@@ -206,13 +213,17 @@ void LastTP::onInit()
 // =========================================================
 void LastTP::onBaseTickEvent(BaseTickEvent& event)
 {
-    // Держим прицел на цели, к которой только что телепортировались (AutoLock).
-    // BaseTickEvent прилетает на КАЖДОГО актора, поэтому считаем тики только
-    // по своему — иначе удержание закончилось бы за один кадр.
-    if (mLockTicks > 0)
+    // Aim Lock держится по времени (см. mLockUntilMs), а сама наводка делается
+    // в onLookInputEvent. Здесь только гасим просроченный лок и, если кадров
+    // почему-то нет, повторяем наводку — чтобы прицел точно не «залип».
+    if (mLockUntilMs != 0)
     {
         Actor* self = localPlayer();
-        if (self && (!event.mActor || event.mActor == self)) updateAutoLock();
+        if (self && (!event.mActor || event.mActor == self))
+        {
+            if (static_cast<uint64_t>(NOW) >= mLockUntilMs) clearAutoLock();
+            else refreshAutoLock();
+        }
     }
 
     Actor* player = event.mActor ? event.mActor : localPlayer();
@@ -700,7 +711,8 @@ void LastTP::attemptTeleport()
 
         mLockRuntimeID = runtimeIdOf(target);
         mLockUniqueID  = uniqueIdOf(target);
-        mLockTicks     = kAutoLockTicks;
+        mLockUntilMs   = static_cast<uint64_t>(NOW) +
+                         static_cast<uint64_t>(std::clamp(mAutoLockHoldMs.mValue, 0.f, 2000.f));
     }
 }
 
@@ -737,31 +749,65 @@ Actor* LastTP::resolveLockTarget()
     return target;
 }
 
-void LastTP::updateAutoLock()
+// Кто наша цель и куда именно мы на неё смотрим. Возвращает false, если лок уже
+// недействителен (цель выгрузилась, умерла или unique id не совпал) — тогда лок
+// снимается, и прицел больше никто не трогает.
+bool LastTP::computeLockAim(float& pitchDeg, float& yawDeg)
 {
-    if (mLockTicks <= 0) return;
-
-    --mLockTicks;
-
     Actor* player = localPlayer();
     Actor* target = resolveLockTarget();
 
-    float aimPitch = 0.f, aimYaw = 0.f;
-    if (!player || !target || !aimAt(player, target, aimPitch, aimYaw))
+    if (!player || !target || !aimAt(player, target, pitchDeg, yawDeg))
     {
-        mLockTicks = 0;
-        mLockRuntimeID = -1;
-        mLockUniqueID  = -1;
+        clearAutoLock();
+        return false;
+    }
+    return true;
+}
+
+void LastTP::clearAutoLock()
+{
+    mLockUntilMs   = 0;
+    mLockRuntimeID = -1;
+    mLockUniqueID  = -1;
+}
+
+// Из тика — страховка: если LookInputEvent почему-то не пришёл (лаг, пауза
+// кадра), прицел всё равно доедет до цели и лок погаснет по времени.
+void LastTP::refreshAutoLock()
+{
+    if (mLockUntilMs == 0) { return; }
+
+    float aimPitch = 0.f, aimYaw = 0.f;
+    if (!computeLockAim(aimPitch, aimYaw)) return;
+
+    Actor* player = localPlayer();
+    if (player) applyAimNow(player, aimPitch, aimYaw);
+}
+
+// А это и есть рабочая наводка: LookInputHook вызывает original() (игра
+// пересчитывает камеру из мыши), потом отдаёт компонент нам — значит наша
+// запись переживёт кадр, ровно как у Aimbot.
+void LastTP::onLookInputEvent(LookInputEvent& event)
+{
+    if (mLockUntilMs == 0) return;
+
+    if (static_cast<uint64_t>(NOW) >= mLockUntilMs)
+    {
+        clearAutoLock();
         return;
     }
 
-    applyAimNow(player, aimPitch, aimYaw);
+    float aimPitch = 0.f, aimYaw = 0.f;
+    if (!computeLockAim(aimPitch, aimYaw)) return;
 
-    if (mLockTicks <= 0)
-    {
-        mLockRuntimeID = -1;
-        mLockUniqueID  = -1;
-    }
+    writeAimTo(event.mCameraDirectLookComponent, aimPitch, aimYaw);
+}
+
+// Запись наводки в компонент камеры (используется и тиком, и кадром).
+void LastTP::writeAimTo(CameraDirectLookComponent* direct, float pitchDeg, float yawDeg)
+{
+    writeAim(direct, pitchDeg, yawDeg);
 }
 
 // =========================================================

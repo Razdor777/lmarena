@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <SDK/Minecraft/Actor/SerializedSkin.hpp>
+
 class PlayerSkinPacket : public Packet {
 public:
     static inline PacketID ID = PacketID::PlayerSkin;
