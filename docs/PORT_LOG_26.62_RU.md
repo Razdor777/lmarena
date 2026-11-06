@@ -153,19 +153,50 @@
 - Из текстов убран бренд `Juzdex` (в папке, чате, дампах) — везде `Solstice`.
   Функция `FileUtils::getJuzdexDir()` оставлена алиасом на `Solstice\`.
 
+## 7a. Первая настоящая сборка (MSVC, unity)
+
+Сборка под Windows выявила пять дефектов, которые статика до этого не видела, —
+все закрыты:
+
+| Что было | Почему прорвалось | Как исправлено |
+|---|---|---|
+| `OreMinerV2.hpp`: две секции «Debug dump» (новый API + устаревший блок `DebugRow{deepslate}`, свои `mDebugCsvPath/mDebugCoordsPath/mDebugStartedAt`) | при слиянии модуля в заголовок попали оба варианта — повторное объявление (C2011), за ним каскад C2027/C2079/C2665 в чужих файлах | устаревший блок удалён (26 строк), в шапке секции — предупреждение; теперь `DebugRow/debugStart/debugFlush/debugStop/oreTypeName` объявлены по одному разу |
+| `ContainerActions.cpp` (фаза Drop all): `armor->mValid_DeprecatedSeeComment = false` | поле живёт в `ItemStackBase`, а `ItemStack` начинается с `PAD(24)` → C2039 | `armor->ItemStackBase::mValid_DeprecatedSeeComment = false` |
+| `ModuleManager.cpp`: `catch (const nlohmann::json::exception&)` дважды | `json::exception` наследует `std::exception`, ветка после него недостижима (C4286) | обе ветки убраны; на инициализацию и enable/disable не влияет |
+| `BuildInfoCommand.cpp`: `X != ""` для строкового макроса, `STRING(...)` | сравнение массива с указателем (C5056); макрос `STRING` не виден без `StringUtils.hpp` | `std::string(X) != ""`, `std::to_string(...)` |
+| `GenerateBuildInfo.cmake` публиковал только `DEXKO_*` | `BuildInfoCommand`/`ExceptionHandler` ждут `SOLSTICE_*`, `Solstice.cpp` — `DEXKO_*` | генератор пишет оба набора имён из одних значений |
+
+Плюс шесть своих заголовков (`Authorization`, `CustomCryptor`, `SnipeCommand`,
+`VclipCommand`, `WindowResizeEvent`, `CameraInstructionPacket`) включались из
+нескольких единиц трансляции **без** `#pragma once` — при `UNITY_BUILD`
+(в `26.62/CMakeLists.txt:242`, ~32 `.cpp` на единицу) это прямой путь к C2011.
+Стражи добавлены.
+
+Урок на будущее: класс ошибок «два объявления в одном классе» и «два
+одинаковых `static` в одной unity-единице» статикой не ловился вообще — под
+него сделаны отдельные анализаторы (см. §8).
+
 ## 8. Проверки (без компилятора)
 
 ```bash
-python3 tools/check_includes.py 26.62/src        # 0 unresolved
-python3 tools/check_members.py --vocab-exclude Features -- 26.62/src   # 0 unresolved
-python3 tools/sdk_compat.py --out docs/SDK_COMPAT_26.62_RU.md
-python3 tools/sig_checklist.py --out docs/SIGS_26.62_RU.md
-python3 tools/gen_resources.py --check
+bash tools/check_all.sh          # все 10 проверок, код возврата = результат
+bash tools/check_all.sh --fix    # + пересобрать Resources.* и docs/SIGS_26.62_RU.md
 ```
+
+По отдельности — `tools/`: `check_includes`, `check_members`, `check_undefined`,
+`check_event_visibility`, `check_sig_names`, `check_method_case`, `check_enums`,
+`check_duplicates`, `check_unity_collisions`, `check_header_guards`; отчёты —
+`sig_checklist.py`, `sdk_compat.py`, `gen_resources.py`.
+
+Состояние на последнем прогоне: includes 0, members 0/836, undefined 0/482,
+event-visibility 0, sig-names 0, method-case 0, enums 0, duplicates 0,
+unity-collisions 0/354, header-guards 0/482.
 
 ## 9. Что осталось
 
-1. **Собрать на MSVC/Windows SDK** — это единственная проверка, которой не хватает.
+1. **Сборка на MSVC идёт** (первый прогон разобран в §7a). Нужен следующий лог:
+   ошибки следующего слоя — линковка, шаблоны, D3D-детуры. Компилятора в этой
+   среде нет, поэтому цикл такой: правки → прогон → лог сюда.
 2. Доснять сигнатуры по `Minecraft.Windows.exe` 1.26.5x: шесть «догадок» и пять
    `Ambience_*` (порядок — в `docs/SIGS_26.62_RU.md`).
 3. Проверить в игре: чат-бинды, hover-свопы в инвентаре, `.schematic`, `Ambience`,

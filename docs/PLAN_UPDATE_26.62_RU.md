@@ -27,10 +27,11 @@
 | Сигнатуры под 1.26.5x | ⚠️ 6 «догадок» (`Actor_hurt`, `Projectile_onHit`, `HurtColor`, `ContainerScreenController_onContainerSlotHovered`, `ItemStack_fromDescriptor`, `ContainerScreenController_tryBeginTransition`) + 5 Ambience ждут скана (`docs/SIGS_26.62_RU.md`) |
 
 Сборку целиком проверить негде: под рукой нет MSVC/Windows SDK, поэтому каждый
-шаг проверяется статически — семью анализаторами (таблица ниже). Каждый ловит
+шаг проверяется статически — десятью анализаторами (таблица ниже). Каждый ловит
 свой класс ошибок переноса: «нет такого поля», «нет такого имени», «нет тела»,
-«не виден тип», «другой регистр», «нет значения перечисления». Прогон — одна
-команда.
+«не виден тип», «другой регистр», «нет значения перечисления», «два одинаковых
+объявления в одном классе», «одноимённые static в файлах одной unity-единицы»,
+«заголовок без защиты от повторного включения». Прогон — одна команда.
 
 ```bash
 bash tools/check_all.sh          # все проверки разом, код возврата = результат
@@ -48,6 +49,9 @@ bash tools/check_all.sh --fix    # + пересобрать Resources.* и docs/
 | `check_sig_names.py` | `SigManager::X` / `OffsetProvider::X` без объявления |
 | `check_method_case.py` | `Class::method` с другим регистром букв |
 | `check_enums.py` | `Mode::X`, где `X` в перечислении отсутствует |
+| `check_duplicates.py` | два одинаковых объявления в одном классе (перегрузки и `#ifdef`/`#else` учитываются) |
+| `check_unity_collisions.py` | одноимённые `static`-переменные/функции и члены анонимных namespace в файлах одной unity-единицы (`UNITY_BUILD` включён) |
+| `check_header_guards.py` | свой заголовок без `#pragma once`/стража — при unity-сборке включается дважды |
 | `gen_resources.py` | `Resources.hpp/.cpp` соответствуют `26.62/resources` |
 | `sig_checklist.py` | журнал сигнатур `docs/SIGS_26.62_RU.md` |
 | `sdk_compat.py` | отчёт о расхождениях SDK `docs/SDK_COMPAT_26.62_RU.md` |
